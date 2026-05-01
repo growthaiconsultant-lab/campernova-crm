@@ -70,7 +70,7 @@ Las credenciales reales van en `.claude/settings.local.json` (gitignored — cad
 | MCP        | Paquete                         | Para qué lo usamos                                   | Token necesario                                |
 | ---------- | ------------------------------- | ---------------------------------------------------- | ---------------------------------------------- |
 | `supabase` | `@supabase/mcp-server-supabase` | Inspeccionar schema, ejecutar SQL, gestionar Storage | PAT en supabase.com/dashboard/account/tokens   |
-| `linear`   | `@linear/mcp-server`            | Crear/actualizar tickets, consultar backlog          | API key en linear.app/campersnova/settings/api |
+| `linear`   | `mcp-linear`                    | Crear/actualizar tickets, consultar backlog          | API key en linear.app/campersnova/settings/api |
 
 Para activarlos: abre `.claude/settings.local.json` y reemplaza los dos valores `PENDIENTE` con tus tokens reales.
 
