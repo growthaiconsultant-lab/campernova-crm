@@ -41,6 +41,11 @@ CRM interno para gestionar la compraventa de autocaravanas y campers semi-nuevas
 - No introducir librerías sin discutirlo
 - Commits pequeños y atómicos, mensaje en imperativo
 
+## Modelo a usar
+
+- **Sonnet 4.6** — implementación de tickets (código, schema, UI, tests, migraciones). Úsalo por defecto.
+- **Opus** — decisiones de arquitectura complejas, debugging difícil, revisión de lógica crítica (tasación, matching).
+
 ## Reglas de trabajo
 
 - Cada sesión: pregúntame en qué ticket trabajamos antes de empezar
