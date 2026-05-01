@@ -1,0 +1,16 @@
+# Force LF line endings in the repository (overrides core.autocrlf on Windows)
+* text=auto eol=lf
+
+# Binaries — no conversion
+*.ico binary
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.webp binary
+*.svg binary
+*.woff binary
+*.woff2 binary
+*.ttf binary
+*.eot binary
+*.pdf binary
