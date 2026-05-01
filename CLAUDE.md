@@ -64,15 +64,28 @@ Las credenciales completas están en `.env.local` (no commiteado, en `.gitignore
 
 ## MCPs configurados a nivel de proyecto
 
-La estructura está en `.claude/settings.json` (committed, sin credenciales).
-Las credenciales reales van en `.claude/settings.local.json` (gitignored — cada dev rellena el suyo).
-
 | MCP        | Paquete                         | Para qué lo usamos                                   | Token necesario                                |
 | ---------- | ------------------------------- | ---------------------------------------------------- | ---------------------------------------------- |
 | `supabase` | `@supabase/mcp-server-supabase` | Inspeccionar schema, ejecutar SQL, gestionar Storage | PAT en supabase.com/dashboard/account/tokens   |
 | `linear`   | `mcp-linear`                    | Crear/actualizar tickets, consultar backlog          | API key en linear.app/campersnova/settings/api |
 
-Para activarlos: abre `.claude/settings.local.json` y reemplaza los dos valores `PENDIENTE` con tus tokens reales.
+### Cómo activarlos (Windows + Claude Code Desktop)
+
+**Importante**: en Claude Code Desktop, los `mcpServers` definidos en `.claude/settings.local.json` no se cargan de forma fiable. Hay que registrarlos con la CLI `claude mcp add-json`. Cada dev hace esto una vez en su máquina.
+
+1. Instala la CLI si no la tienes: `npm install -g @anthropic-ai/claude-code`
+2. Desde la raíz del proyecto, registra cada MCP con su token (sustituye el valor):
+
+```powershell
+claude mcp add-json supabase '{\"command\":\"npx\",\"args\":[\"-y\",\"@supabase/mcp-server-supabase@latest\",\"--project-ref\",\"bbmglaatlyilxutzomxd\"],\"env\":{\"SUPABASE_ACCESS_TOKEN\":\"TU_PAT_DE_SUPABASE\"}}'
+
+claude mcp add-json linear '{\"command\":\"npx\",\"args\":[\"-y\",\"mcp-linear@latest\"],\"env\":{\"LINEAR_API_KEY\":\"TU_API_KEY_DE_LINEAR\"}}'
+```
+
+3. Verifica con `claude mcp list` — deberías ver ambos como `✓ Connected`.
+4. Reinicia Claude Code Desktop por completo (cierra ventana e icono de la bandeja del sistema) y abre sesión nueva.
+
+`.claude/settings.json` y `.claude/settings.local.json` se mantienen como referencia de la estructura, pero la fuente de verdad funcional es el registro de la CLI.
 
 ## Pendientes externos (no bloqueantes para sprint 1)
 
