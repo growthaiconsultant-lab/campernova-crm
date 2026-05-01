@@ -1,0 +1,325 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+// ─────────────────────────────────────────────────────────────
+// ENUMS
+// ─────────────────────────────────────────────────────────────
+
+enum UserRole {
+  AGENTE
+  ADMIN
+}
+
+enum LeadCanal {
+  PRO // Captación online vía /vender
+  CN  // Captación en oficina por agente
+}
+
+enum VehicleType {
+  CAMPER
+  AUTOCARAVANA
+}
+
+enum ConservationState {
+  EXCELENTE
+  BUENO
+  NORMAL
+  DETERIORADO
+}
+
+// nuevo → tasado → publicado → reservado → vendido / descartado
+enum VehicleStatus {
+  NUEVO
+  TASADO
+  PUBLICADO
+  RESERVADO
+  VENDIDO
+  DESCARTADO
+}
+
+// nuevo → contactado → cualificado → en_negociacion → cerrado / descartado
+enum SellerLeadStatus {
+  NUEVO
+  CONTACTADO
+  CUALIFICADO
+  EN_NEGOCIACION
+  CERRADO
+  DESCARTADO
+}
+
+// nuevo → contactado → cualificado → en_negociacion → cerrado / perdido
+enum BuyerLeadStatus {
+  NUEVO
+  CONTACTADO
+  CUALIFICADO
+  EN_NEGOCIACION
+  CERRADO
+  PERDIDO
+}
+
+// sugerido → propuesto_cliente → visita → oferta → cerrado / rechazado
+enum MatchStatus {
+  SUGERIDO
+  PROPUESTO_CLIENTE
+  VISITA
+  OFERTA
+  CERRADO
+  RECHAZADO
+}
+
+enum ActivityType {
+  CAMBIO_ESTADO
+  NOTA
+  LLAMADA
+  EMAIL
+  WHATSAPP_INICIADO
+  MATCH_CREADO
+  LEAD_ASIGNADO
+}
+
+enum ValuationMethod {
+  AUTO
+  MANUAL
+}
+
+enum ValuationConfidence {
+  ALTA
+  MEDIA
+  BAJA
+}
+
+enum DocumentType {
+  DNI
+  FICHA_TECNICA
+  ITV
+  CONTRATO
+  OTROS
+}
+
+// ─────────────────────────────────────────────────────────────
+// MODELS
+// ─────────────────────────────────────────────────────────────
+
+/// Usuarios internos del CRM (agentes y admin).
+/// authId referencia auth.users.id de Supabase y se rellena al primer login.
+model User {
+  id        String   @id @default(cuid())
+  authId    String?  @unique @map("auth_id")
+  email     String   @unique
+  name      String
+  role      UserRole @default(AGENTE)
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  sellerLeads SellerLead[] @relation("AgentSellerLeads")
+  buyerLeads  BuyerLead[]  @relation("AgentBuyerLeads")
+  activities  Activity[]
+  valuations  Valuation[]
+
+  @@map("users")
+}
+
+/// Lead de vendedor — persona que quiere vender su vehículo.
+model SellerLead {
+  id        String           @id @default(cuid())
+  name      String
+  email     String
+  phone     String
+  canal     LeadCanal        @default(PRO)
+  status    SellerLeadStatus @default(NUEVO)
+  source    String?
+  agentId   String?          @map("agent_id")
+  createdAt DateTime         @default(now()) @map("created_at")
+  updatedAt DateTime         @updatedAt @map("updated_at")
+
+  agent      User?      @relation("AgentSellerLeads", fields: [agentId], references: [id])
+  vehicle    Vehicle?
+  activities Activity[]
+  documents  Document[]
+
+  @@index([status])
+  @@index([agentId])
+  @@map("seller_leads")
+}
+
+/// Vehículo asociado 1:1 a un SellerLead.
+/// equipment es JSONB con flags booleanos: solar, kitchen, bathroom, shower, heating, etc.
+model Vehicle {
+  id                   String            @id @default(cuid())
+  sellerLeadId         String            @unique @map("seller_lead_id")
+  brand                String
+  model                String
+  year                 Int
+  km                   Int
+  seats                Int
+  length               Float?            // metros
+  type                 VehicleType
+  equipment            Json              @default("{}")
+  conservationState    ConservationState @default(NORMAL) @map("conservation_state")
+  location             String?
+  desiredPrice         Decimal?          @map("desired_price") @db.Decimal(10, 2)
+  valuationMin         Decimal?          @map("valuation_min") @db.Decimal(10, 2)
+  valuationRecommended Decimal?          @map("valuation_recommended") @db.Decimal(10, 2)
+  valuationMax         Decimal?          @map("valuation_max") @db.Decimal(10, 2)
+  status               VehicleStatus     @default(NUEVO)
+  publishedAt          DateTime?         @map("published_at")
+  soldAt               DateTime?         @map("sold_at")
+  createdAt            DateTime          @default(now()) @map("created_at")
+  updatedAt            DateTime          @updatedAt @map("updated_at")
+
+  sellerLead SellerLead     @relation(fields: [sellerLeadId], references: [id], onDelete: Cascade)
+  photos     VehiclePhoto[]
+  valuations Valuation[]
+  matches    Match[]
+
+  @@index([brand, model])
+  @@index([status])
+  @@index([type, status])
+  @@map("vehicles")
+}
+
+/// Fotos del vehículo almacenadas en Supabase Storage (bucket vehicle-photos).
+model VehiclePhoto {
+  id        String   @id @default(cuid())
+  vehicleId String   @map("vehicle_id")
+  url       String
+  order     Int
+  altText   String?  @map("alt_text")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  vehicle Vehicle @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+
+  @@index([vehicleId, order])
+  @@map("vehicle_photos")
+}
+
+/// Histórico de tasaciones (automáticas y manuales) por vehículo.
+model Valuation {
+  id          String              @id @default(cuid())
+  vehicleId   String              @map("vehicle_id")
+  min         Decimal             @db.Decimal(10, 2)
+  recommended Decimal             @db.Decimal(10, 2)
+  max         Decimal             @db.Decimal(10, 2)
+  method      ValuationMethod
+  confidence  ValuationConfidence
+  parameters  Json                @default("{}") // inputs del algoritmo para auditoría
+  createdById String?             @map("created_by_id")
+  createdAt   DateTime            @default(now()) @map("created_at")
+
+  vehicle   Vehicle @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+  createdBy User?   @relation(fields: [createdById], references: [id])
+
+  @@index([vehicleId])
+  @@map("valuations")
+}
+
+/// Lead de comprador — persona que busca comprar un vehículo.
+/// criticalEquipment es JSONB con flags: solar, kitchen, bathroom, shower, heating.
+model BuyerLead {
+  id                String          @id @default(cuid())
+  name              String
+  email             String
+  phone             String
+  agentId           String?         @map("agent_id")
+  vehicleType       VehicleType?    @map("vehicle_type")
+  minSeats          Int?            @map("min_seats")
+  maxBudget         Decimal?        @map("max_budget") @db.Decimal(10, 2)
+  criticalEquipment Json            @default("{}") @map("critical_equipment")
+  useZone           String?         @map("use_zone")
+  purchaseTimeline  String?         @map("purchase_timeline")
+  status            BuyerLeadStatus @default(NUEVO)
+  source            String?
+  createdAt         DateTime        @default(now()) @map("created_at")
+  updatedAt         DateTime        @updatedAt @map("updated_at")
+
+  agent      User?      @relation("AgentBuyerLeads", fields: [agentId], references: [id])
+  matches    Match[]
+  activities Activity[]
+  documents  Document[]
+
+  @@index([status])
+  @@index([agentId])
+  @@map("buyer_leads")
+}
+
+/// Sugerencia de match entre un vehículo y un comprador.
+/// score 0-100. Constraint único evita duplicados.
+model Match {
+  id          String      @id @default(cuid())
+  vehicleId   String      @map("vehicle_id")
+  buyerLeadId String      @map("buyer_lead_id")
+  score       Int
+  generatedBy String      @default("auto") @map("generated_by") // "auto" | "manual"
+  status      MatchStatus @default(SUGERIDO)
+  createdAt   DateTime    @default(now()) @map("created_at")
+  updatedAt   DateTime    @updatedAt @map("updated_at")
+
+  vehicle   Vehicle   @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+  buyerLead BuyerLead @relation(fields: [buyerLeadId], references: [id], onDelete: Cascade)
+
+  @@unique([vehicleId, buyerLeadId])
+  @@index([buyerLeadId])
+  @@map("matches")
+}
+
+/// Timeline de actividad polimórfico: cada row pertenece a un SellerLead O a un BuyerLead.
+model Activity {
+  id           String       @id @default(cuid())
+  type         ActivityType
+  content      String?
+  agentId      String?      @map("agent_id")
+  sellerLeadId String?      @map("seller_lead_id")
+  buyerLeadId  String?      @map("buyer_lead_id")
+  createdAt    DateTime     @default(now()) @map("created_at")
+
+  agent      User?       @relation(fields: [agentId], references: [id])
+  sellerLead SellerLead? @relation(fields: [sellerLeadId], references: [id], onDelete: Cascade)
+  buyerLead  BuyerLead?  @relation(fields: [buyerLeadId], references: [id], onDelete: Cascade)
+
+  @@index([sellerLeadId, createdAt])
+  @@index([buyerLeadId, createdAt])
+  @@map("activities")
+}
+
+/// Documentos adjuntos (DNI, ITV, contrato…) en leads de vendedor o comprador.
+model Document {
+  id           String       @id @default(cuid())
+  type         DocumentType
+  url          String
+  name         String?
+  sellerLeadId String?      @map("seller_lead_id")
+  buyerLeadId  String?      @map("buyer_lead_id")
+  createdAt    DateTime     @default(now()) @map("created_at")
+
+  sellerLead SellerLead? @relation(fields: [sellerLeadId], references: [id], onDelete: Cascade)
+  buyerLead  BuyerLead?  @relation(fields: [buyerLeadId], references: [id], onDelete: Cascade)
+
+  @@map("documents")
+}
+
+/// Tabla de precios de referencia para el algoritmo de tasación.
+/// Poblada manualmente con datos de Wallapop / coches.net al inicio.
+model ReferencePrice {
+  id                String      @id @default(cuid())
+  brand             String
+  model             String
+  type              VehicleType
+  baseYear          Int         @map("base_year")
+  basePrice         Decimal     @map("base_price") @db.Decimal(10, 2)
+  depreciationPerKm Decimal     @map("depreciation_per_km") @db.Decimal(10, 6)
+  notes             String?
+  createdAt         DateTime    @default(now()) @map("created_at")
+  updatedAt         DateTime    @updatedAt @map("updated_at")
+
+  @@unique([brand, model, type, baseYear])
+  @@index([brand, model, type])
+  @@map("reference_prices")
+}
