@@ -87,8 +87,67 @@ claude mcp add-json linear '{\"command\":\"npx\",\"args\":[\"-y\",\"mcp-linear@l
 
 `.claude/settings.json` y `.claude/settings.local.json` se mantienen como referencia de la estructura, pero la fuente de verdad funcional es el registro de la CLI.
 
+## Estado actual (sprint 1)
+
+Tickets completados:
+
+- ✅ **CAM-6** — Repo, scaffold Next.js 14, Vercel, pre-commit hooks
+- ✅ **CAM-7** — Supabase configurado: pgvector activo, buckets `vehicle-photos` y `lead-documents` con RLS, clientes Next.js en `lib/supabase/`
+- ✅ **CAM-8** — Schema Prisma completo, migración aplicada en Supabase, `lib/db.ts`
+
+Pendientes sprint 1:
+
+- 🔲 **CAM-9** — Auth magic link + middleware de protección de rutas
+- 🔲 **CAM-10** — Layout backoffice + theme Campernova
+- 🔲 **CAM-11** — Seed 3 agentes + 1 admin
+
+## Decisiones técnicas
+
+### Prisma 6, no 7
+
+Usamos `prisma@^6` y `@prisma/client@^6`. La v7 eliminó `url` y `directUrl` del bloque `datasource` en `schema.prisma` y requiere un nuevo patrón de adapters (`prisma.config.ts` + `@prisma/adapter-pg`) que no está validado con Next.js 14 + Vercel. Migrar cuando esté estabilizado.
+
+### pnpm build scripts de Prisma
+
+pnpm v10 bloquea build scripts por defecto. Añadido en `package.json`:
+
+```json
+"pnpm": { "onlyBuiltDependencies": ["@prisma/client", "@prisma/engines", "prisma"] }
+```
+
+### Workflow de migraciones Prisma + Supabase
+
+1. Editar `prisma/schema.prisma`
+2. Generar SQL: `pnpm prisma migrate diff --from-schema-datasource --to-schema-datamodel prisma/schema.prisma --script`
+3. Aplicar vía MCP Supabase (`apply_migration`, project_id `bbmglaatlyilxutzomxd`)
+4. Crear carpeta `prisma/migrations/<timestamp>_<nombre>/migration.sql` con el SQL
+5. Marcar como aplicada: `pnpm prisma migrate resolve --applied <nombre>`
+6. Regenerar cliente: `pnpm prisma generate`
+
+> Alternativa si hay conexión directa estable: `pnpm prisma migrate dev --name <nombre>` hace los pasos 2-6 automáticamente.
+
+### Archivo .env para Prisma CLI
+
+Prisma CLI lee `.env` (no `.env.local`). El `.env` contiene solo `DATABASE_URL` y `DIRECT_URL`, copiados de `.env.local`. Está en `.gitignore`. Cada dev lo crea ejecutando:
+
+```bash
+grep -E "^(DATABASE_URL|DIRECT_URL)" .env.local > .env
+```
+
+### Estructura de clientes Supabase
+
+- `lib/supabase/client.ts` — browser (`createBrowserClient`), para `'use client'`
+- `lib/supabase/server.ts` — server (`createServerClient` + cookies de Next.js), para RSC y Server Actions
+- `lib/supabase/middleware.ts` — helper `updateSession()` usado por `middleware.ts` de raíz
+- `lib/db.ts` — singleton `PrismaClient` exportado como `db`
+
+### Supabase project ref
+
+`bbmglaatlyilxutzomxd` (Frankfurt, eu-central-1). Usar como `project_id` en todas las llamadas al MCP de Supabase.
+
 ## Pendientes externos (no bloqueantes para sprint 1)
 
 - Registrar dominio `campersnova.com` y verificar DNS en Resend
 - Identidad legal del operador (autónomo / S.L.) para los avisos legales
-- Activar extensión `vector` en Supabase: `CREATE EXTENSION IF NOT EXISTS vector;`
+- ~~Activar extensión `vector` en Supabase~~ ✅ hecho en CAM-7
+- Añadir env vars de Supabase en Vercel (dejar para CAM-46, primer deploy)
