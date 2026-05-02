@@ -1,8 +1,9 @@
 'use client'
 
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useRef } from 'react'
 import Link from 'next/link'
 import { ArrowRight, Loader2, TrendingUp } from 'lucide-react'
+import posthog from 'posthog-js'
 import { Button } from '@/components/ui/button'
 import { FadeIn } from '@/components/landing/motion'
 import { getBrandsByType, getModelsByBrandAndType } from '@/lib/landing/vehicles'
@@ -37,11 +38,20 @@ export function ValuationCalculator() {
   const [loading, setLoading] = useState(false)
   const [result, setResult] = useState<ValuationResult | null>(null)
   const [error, setError] = useState('')
+  const startedRef = useRef(false)
 
   const brands = useMemo(() => getBrandsByType(type), [type])
   const models = useMemo(() => (brand ? getModelsByBrandAndType(brand, type) : []), [brand, type])
 
+  function fireStarted() {
+    if (!startedRef.current) {
+      startedRef.current = true
+      posthog.capture('calculator_started')
+    }
+  }
+
   function handleTypeChange(t: VehicleType) {
+    fireStarted()
     setType(t)
     setBrand('')
     setModel('')
@@ -50,6 +60,7 @@ export function ValuationCalculator() {
   }
 
   function handleBrandChange(b: string) {
+    fireStarted()
     setBrand(b)
     setModel('')
     setResult(null)
@@ -82,6 +93,7 @@ export function ValuationCalculator() {
       }
 
       setResult(data)
+      posthog.capture('calculator_submitted', { type, brand, model, year, km, method: data.method })
     } catch {
       setError('Error de conexión. Inténtalo de nuevo.')
     } finally {
@@ -289,7 +301,13 @@ export function ValuationCalculator() {
                   definitivo en menos de 24 h tras revisar fotos y estado.
                 </p>
 
-                <Link href={`/vender?${venderParams}`} className="block">
+                <Link
+                  href={`/vender?${venderParams}`}
+                  className="block"
+                  onClick={() =>
+                    posthog.capture('calculator_to_form', { type, brand, model, year, km })
+                  }
+                >
                   <Button className="w-full bg-[#cc6119] font-semibold text-white hover:bg-[#cc6119]/90">
                     Vender mi camper a este precio
                     <ArrowRight className="ml-2 h-4 w-4" />
