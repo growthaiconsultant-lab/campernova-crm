@@ -53,7 +53,7 @@ CRM interno para gestionar la compraventa de autocaravanas y campers semi-nuevas
 
 - **GitHub repo**: `growthaiconsultant-lab/campernova-crm`
 - **Vercel**: conectado al repo (proyecto se crea con primer push)
-- **Supabase**: proyecto `campersnova-crm` en Frankfurt (eu-central-1), pgvector pendiente de activar
+- **Supabase**: proyecto `campersnova-crm` en Frankfurt (eu-central-1), pgvector activo ✅
 - **Resend**: API key creada, dominio pendiente de verificar
 - **Sentry**: proyecto `campernova-crm` en org `ai-marketing-solutions`
 - **PostHog**: proyecto en EU instance
@@ -87,19 +87,28 @@ claude mcp add-json linear '{\"command\":\"npx\",\"args\":[\"-y\",\"mcp-linear@l
 
 `.claude/settings.json` y `.claude/settings.local.json` se mantienen como referencia de la estructura, pero la fuente de verdad funcional es el registro de la CLI.
 
-## Estado actual (sprint 1)
+## Estado actual (inicio sprint 2)
 
-Tickets completados:
+### Sprint 1 — COMPLETADO ✅
 
 - ✅ **CAM-6** — Repo, scaffold Next.js 14, Vercel, pre-commit hooks
 - ✅ **CAM-7** — Supabase configurado: pgvector activo, buckets `vehicle-photos` y `lead-documents` con RLS, clientes Next.js en `lib/supabase/`
 - ✅ **CAM-8** — Schema Prisma completo, migración aplicada en Supabase, `lib/db.ts`
+- ✅ **CAM-9** — Auth magic link + middleware de protección de rutas
+- ✅ **CAM-10** — Layout backoffice + theme Campernova (sidebar teal + topbar con usuario/logout)
+- ✅ **CAM-11** — Seed: Joel (ADMIN) + Esteban (AGENTE) + Joui (AGENTE). Ejecutar con `pnpm seed`
 
-Pendientes sprint 1:
+### Sprint 2 — EN CURSO
 
-- 🔲 **CAM-9** — Auth magic link + middleware de protección de rutas
-- 🔲 **CAM-10** — Layout backoffice + theme Campernova
-- 🔲 **CAM-11** — Seed 3 agentes + 1 admin
+- 🔲 **CAM-12** — Form SellerLead + Vehicle en backoffice (canal CN)
+- 🔲 **CAM-13** — Subida de fotos con drag&drop
+- 🔲 **CAM-14** — Listado de SellerLeads
+- 🔲 **CAM-15** — Ficha SellerLead editable
+- 🔲 **CAM-16** — Form público `/vender` (canal Pro)
+- 🔲 **CAM-17** — Captcha en form público
+- 🔲 **CAM-18** — Email confirmación al vendedor (Resend)
+- 🔲 **CAM-19** — Notificación al agente cuando entra lead
+- 🔲 **CAM-20** — Asignación/reasignación manual de agente
 
 ## Decisiones técnicas
 
@@ -145,9 +154,43 @@ grep -E "^(DATABASE_URL|DIRECT_URL)" .env.local > .env
 
 `bbmglaatlyilxutzomxd` (Frankfurt, eu-central-1). Usar como `project_id` en todas las llamadas al MCP de Supabase.
 
-## Pendientes externos (no bloqueantes para sprint 1)
+### Auth y estructura de rutas (CAM-9 + CAM-10)
 
-- Registrar dominio `campersnova.com` y verificar DNS en Resend
-- Identidad legal del operador (autónomo / S.L.) para los avisos legales
-- ~~Activar extensión `vector` en Supabase~~ ✅ hecho en CAM-7
-- Añadir env vars de Supabase en Vercel (dejar para CAM-46, primer deploy)
+- Rutas públicas: `/login`, `/auth/callback`. Todo lo demás protegido por middleware.
+- `lib/auth.ts` — helpers `requireAuth()` y `requireAdmin()` para RSC y Server Actions.
+- Callback route (`/auth/callback`) intercambia el code y sincroniza `authId` en tabla `users` al primer login.
+- Grupo `app/(auth)/` para rutas de autenticación, grupo `app/(backoffice)/` para el backoffice.
+- `app/(backoffice)/actions.ts` — Server Action `logout()`.
+- Login verifica email en tabla `users` (Prisma) antes de enviar el OTP — sin auto-registro.
+
+### Paleta de colores Campernova (extraída de campersnova.com)
+
+- Primary (sidebar bg): `#294e4c` → `hsl(177, 31%, 23%)`
+- Accent (item activo, CTA): `#cc6119` → `hsl(24, 78%, 45%)`
+- Deep teal (sidebar border): `#153e4d` → `hsl(196, 57%, 19%)`
+- Variables CSS en `app/globals.css`, tokens en `tailwind.config.ts`
+
+### Seed de usuarios
+
+- `prisma/seed.ts` — upsert idempotente por email. Añadir nuevos usuarios aquí.
+- Comando: `pnpm seed`
+- Usuarios actuales: Joel (ADMIN, growth.ai.consultant@gmail.com), Esteban (AGENTE, info@campersnova.com), Joui (AGENTE, joelmarfas@gmail.com)
+
+### shadcn/ui
+
+- Inicializado con base `zinc`, CSS variables, RSC habilitado.
+- Componentes instalados hasta sprint 1: `button`, `avatar`, `dropdown-menu`, `separator`.
+- Añadir nuevos con: `npx shadcn@latest add <componente>`
+
+### Supabase Auth — URLs permitidas
+
+- `http://localhost:3000/auth/callback` (local dev)
+- `https://campernova-crm.vercel.app/auth/callback` (producción)
+- `https://campernova-crm-*-growthaiconsultant-8035s-projects.vercel.app/auth/callback` (preview deploys)
+
+## Pendientes externos
+
+- 🔲 Registrar dominio `campersnova.com` y verificar DNS en Resend — **bloqueante para CAM-18/19**
+- 🔲 Identidad legal del operador (autónomo / S.L.) para los avisos legales
+- ✅ Extensión `vector` activa en Supabase (hecho en CAM-7)
+- 🔲 Añadir env vars de producción en Vercel — dejar para CAM-46 (primer deploy)
