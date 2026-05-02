@@ -100,7 +100,7 @@ claude mcp add-json linear '{\"command\":\"npx\",\"args\":[\"-y\",\"mcp-linear@l
 
 ### Sprint 2 — EN CURSO
 
-- 🔲 **CAM-12** — Form SellerLead + Vehicle en backoffice (canal CN)
+- ✅ **CAM-12** — Form SellerLead + Vehicle en backoffice (canal CN)
 - 🔲 **CAM-13** — Subida de fotos con drag&drop
 - 🔲 **CAM-14** — Listado de SellerLeads
 - 🔲 **CAM-15** — Ficha SellerLead editable
@@ -176,10 +176,18 @@ grep -E "^(DATABASE_URL|DIRECT_URL)" .env.local > .env
 - Comando: `pnpm seed`
 - Usuarios actuales: Joel (ADMIN, growth.ai.consultant@gmail.com), Esteban (AGENTE, info@campersnova.com), Joui (AGENTE, joelmarfas@gmail.com)
 
+### Zod 4 + @hookform/resolvers v5 — separación de tipos input/output
+
+`zodResolver` v5 expone `Resolver<z.input<T>>` (tipo INPUT del schema), no el OUTPUT. Cuando el schema usa `.default()` u `.optional()`, el INPUT difiere del OUTPUT. En los formularios hay que:
+
+1. Exportar `SellerLeadFormValues = z.input<typeof schema>` desde `lib/validators/`
+2. Usar `useForm<SellerLeadFormValues>` (tipo INPUT), no `useForm<OutputType>`
+3. El server action recibe `unknown` y valida con `schema.safeParse(data)` → obtiene el OUTPUT tipado
+
 ### shadcn/ui
 
 - Inicializado con base `zinc`, CSS variables, RSC habilitado.
-- Componentes instalados hasta sprint 1: `button`, `avatar`, `dropdown-menu`, `separator`.
+- Componentes instalados hasta sprint 2: `button`, `avatar`, `dropdown-menu`, `separator`, `form`, `input`, `label`, `select`, `checkbox`, `card`, `textarea`.
 - Añadir nuevos con: `npx shadcn@latest add <componente>`
 
 ### Supabase Auth — URLs permitidas
