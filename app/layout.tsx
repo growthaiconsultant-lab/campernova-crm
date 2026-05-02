@@ -1,5 +1,21 @@
 import type { Metadata } from 'next'
+import { Inter, Fraunces } from 'next/font/google'
 import './globals.css'
+import { CookieBanner } from '@/components/cookie-banner'
+import { PostHogProvider } from '@/components/posthog-provider'
+
+const inter = Inter({
+  subsets: ['latin'],
+  variable: '--font-inter',
+  display: 'swap',
+})
+
+const fraunces = Fraunces({
+  subsets: ['latin'],
+  variable: '--font-fraunces',
+  display: 'swap',
+  axes: ['opsz', 'SOFT', 'WONK'],
+})
 
 export const metadata: Metadata = {
   title: 'CampersNova CRM',
@@ -13,7 +29,12 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="es">
-      <body className="min-h-screen bg-background font-sans antialiased">{children}</body>
+      <body
+        className={`${inter.variable} ${fraunces.variable} min-h-screen bg-background font-sans antialiased`}
+      >
+        <PostHogProvider>{children}</PostHogProvider>
+        <CookieBanner />
+      </body>
     </html>
   )
 }
