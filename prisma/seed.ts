@@ -13,6 +13,11 @@ const USERS: { email: string; name: string; role: UserRole }[] = [
     name: 'Esteban',
     role: UserRole.AGENTE,
   },
+  {
+    email: 'joelmarfas@gmail.com',
+    name: 'Joui',
+    role: UserRole.AGENTE,
+  },
 ]
 
 async function main() {
