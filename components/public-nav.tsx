@@ -35,7 +35,7 @@ export function PublicNav() {
               alt="CampersNova"
               width={140}
               height={36}
-              className="h-8 w-auto object-contain"
+              className="h-8 w-auto object-contain brightness-0 invert"
               priority
             />
           </Link>
