@@ -83,18 +83,20 @@ export function PublicNav() {
           <div className="hidden items-center gap-2.5 lg:flex">
             <Link
               href="/#search-method"
-              className="inline-flex items-center justify-center rounded-full border px-4 py-2.5 text-[13px] font-medium transition-all hover:text-cn-cream-50"
+              className="inline-flex items-center justify-center rounded-full border px-4 py-2.5 text-[13px] font-medium transition-all"
               style={{
                 borderColor: 'var(--cn-teal-900)',
                 color: 'var(--cn-teal-900)',
               }}
               onMouseEnter={(e) => {
-                ;(e.currentTarget as HTMLElement).style.background = 'var(--cn-teal-900)'
-                ;(e.currentTarget as HTMLElement).style.color = 'var(--cn-cream-50)'
+                const el = e.currentTarget as HTMLElement
+                el.style.background = 'var(--cn-teal-900)'
+                el.style.color = 'var(--cn-cream-50)'
               }}
               onMouseLeave={(e) => {
-                ;(e.currentTarget as HTMLElement).style.background = ''
-                ;(e.currentTarget as HTMLElement).style.color = 'var(--cn-teal-900)'
+                const el = e.currentTarget as HTMLElement
+                el.style.background = ''
+                el.style.color = 'var(--cn-teal-900)'
               }}
             >
               Comprar

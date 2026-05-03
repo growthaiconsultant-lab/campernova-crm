@@ -4,28 +4,26 @@ import { PublicFooter } from '@/components/public-footer'
 import { WhatsAppFab } from '@/components/whatsapp-fab'
 import { HeroSection } from '@/components/landing/hero'
 import { TrustStrip } from '@/components/landing/trust-strip'
-import { ValuationCalculator } from '@/components/landing/valuation-calculator'
-import { HowItWorksSection } from '@/components/landing/how-it-works'
-import { ComparisonSection } from '@/components/landing/comparison'
-import { FaqSection } from '@/components/landing/faq'
-import { FinalCta } from '@/components/landing/final-cta'
+import { TwoRoutes } from '@/components/landing/two-routes'
+import { SearchMethod } from '@/components/landing/search-method'
 import { LandingAnalytics } from '@/components/landing/analytics'
 
 export const metadata: Metadata = {
-  title: 'CampersNova · Vende tu camper o autocaravana sin perder valor',
+  title: 'CampersNova · Compraventa de campers y autocaravanas',
   description:
-    'Tasación gratuita en 60 segundos. Te ayudamos a vender tu camper o autocaravana al precio justo. Solo 4% al cierre. Sin coste por adelantado.',
+    'Compra o vende tu camper o autocaravana con confianza. Tasación gratuita, gestión profesional y solo 4% al cierre. Instalaciones en Barcelona.',
   openGraph: {
-    title: 'CampersNova · Vende tu camper o autocaravana sin perder valor',
-    description: 'Tasación gratuita en 60 segundos. Solo 4% al cierre. Sin coste por adelantado.',
+    title: 'CampersNova · Compraventa de campers y autocaravanas',
+    description:
+      'Compra o vende tu camper o autocaravana. Tasación gratuita. Solo 4% al cierre. Sin coste por adelantado.',
     url: 'https://campersnova.com',
     siteName: 'CampersNova',
     images: [
       {
-        url: '/images/lifestyle/theorivierenlaan-vwbus-2450216.jpg',
+        url: '/images/landing/hero-vw-bus.jpg',
         width: 1200,
         height: 630,
-        alt: 'CampersNova — vende tu camper o autocaravana',
+        alt: 'CampersNova — compraventa de campers y autocaravanas',
       },
     ],
     locale: 'es_ES',
@@ -33,8 +31,8 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'CampersNova · Vende tu camper sin perder valor',
-    description: 'Tasación gratuita en 60 segundos. Solo 4% al cierre.',
+    title: 'CampersNova · Compraventa de campers y autocaravanas',
+    description: 'Tasación gratuita. Solo 4% al cierre. Instalaciones en Barcelona.',
   },
   alternates: {
     canonical: 'https://campersnova.com',
@@ -53,9 +51,10 @@ export default function LandingPage() {
             '@type': 'Organization',
             name: 'CampersNova',
             url: 'https://campersnova.com',
-            logo: 'https://campersnova.com/images/brand/Logo Campers Nova.png',
+            logo: 'https://campersnova.com/images/brand/Logo%20Campers%20Nova.png',
             contactPoint: {
               '@type': 'ContactPoint',
+              telephone: '+34-629-925-821',
               email: 'info@campersnova.com',
               contactType: 'customer service',
               areaServed: 'ES',
@@ -67,25 +66,20 @@ export default function LandingPage() {
         }}
       />
 
-      <div className="min-h-screen bg-background">
-        <PublicNav />
+      <PublicNav />
 
-        <main>
-          <HeroSection />
-          <TrustStrip />
-          <ValuationCalculator />
-          <HowItWorksSection />
-          <ComparisonSection />
-          <FaqSection />
-          <FinalCta />
-        </main>
+      <main>
+        <HeroSection />
+        <TrustStrip />
+        <TwoRoutes />
+        <SearchMethod />
+      </main>
 
-        <PublicFooter />
-        <WhatsAppFab />
+      <PublicFooter />
+      <WhatsAppFab />
 
-        {/* PostHog landing events — client only */}
-        <LandingAnalytics />
-      </div>
+      {/* PostHog landing analytics — client only */}
+      <LandingAnalytics />
     </>
   )
 }
