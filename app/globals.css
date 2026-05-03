@@ -13,6 +13,49 @@
     ─────────────────────────────────────────────────────────────── */
     --background: 210 20% 97%;
 
+    /* ── CN Design System — full token palette ────────────────────
+       Source: docs/design-claude/styles.css
+    ─────────────────────────────────────────────────────────────── */
+    /* Teal scale */
+    --cn-teal-900: #1a3a37;
+    --cn-teal-700: #264d49;
+    --cn-teal-500: #3a6b66;
+    --cn-teal-300: #7ea29d;
+
+    /* Cream / warm neutral */
+    --cn-cream-50: #faf6ed;
+    --cn-cream-100: #f5f0e6;
+    --cn-cream-200: #ece4d2;
+
+    /* Sand / wood */
+    --cn-sand-300: #d9c9a8;
+    --cn-sand-500: #b89c6e;
+    --cn-wood-700: #8a6a3f;
+
+    /* Terra / accent */
+    --cn-terra-500: #c26a4a;
+    --cn-terra-600: #a85636;
+
+    /* Ink / text scale */
+    --cn-ink-900: #1f211f;
+    --cn-ink-700: #3a3a38;
+    --cn-ink-500: #6b6b67;
+    --cn-ink-300: #b3b1aa;
+
+    /* Divider */
+    --cn-line: #e6dfd0;
+
+    /* Radius scale */
+    --r-sm: 8px;
+    --r-md: 14px;
+    --r-lg: 20px;
+    --r-xl: 28px;
+
+    /* Shadow scale */
+    --sh-sm: 0 1px 2px rgba(26, 58, 55, 0.06), 0 2px 8px rgba(26, 58, 55, 0.04);
+    --sh-md: 0 4px 12px rgba(26, 58, 55, 0.08), 0 12px 28px rgba(26, 58, 55, 0.06);
+    --sh-lg: 0 20px 60px rgba(26, 58, 55, 0.18);
+
     /* ── Landing tokens ──────────────────────────────────────────── */
     --sand: 40 53% 93%;
     --forest: 155 24% 23%;
@@ -101,6 +144,8 @@
     @apply border-border;
   }
   body {
-    @apply bg-background text-foreground;
+    /* Public pages default to cream. Backoffice layout overrides via bg-background on its root div. */
+    background-color: var(--cn-cream-100);
+    @apply text-foreground;
   }
 }

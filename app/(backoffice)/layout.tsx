@@ -8,7 +8,7 @@ export default async function BackofficeLayout({ children }: { children: React.R
   const roleLabel = user.role === 'ADMIN' ? 'Administrador' : 'Agente'
 
   return (
-    <div className="flex h-screen overflow-hidden">
+    <div className="flex h-screen overflow-hidden bg-background">
       <Sidebar />
 
       <div className="flex flex-1 flex-col overflow-hidden">

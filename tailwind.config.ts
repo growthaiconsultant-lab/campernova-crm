@@ -16,8 +16,38 @@ const config: Config = {
       fontFamily: {
         sans: ['var(--font-inter)', 'system-ui', 'sans-serif'],
         display: ['var(--font-fraunces)', 'Georgia', 'serif'],
+        mono: ['var(--font-jetbrains-mono)', 'ui-monospace', 'monospace'],
       },
       colors: {
+        /* CN design system palette — matches docs/design-claude/styles.css */
+        cn: {
+          teal: {
+            900: '#1a3a37',
+            700: '#264d49',
+            500: '#3a6b66',
+            300: '#7ea29d',
+          },
+          cream: {
+            50: '#faf6ed',
+            100: '#f5f0e6',
+            200: '#ece4d2',
+          },
+          sand: {
+            300: '#d9c9a8',
+            500: '#b89c6e',
+          },
+          terra: {
+            500: '#c26a4a',
+            600: '#a85636',
+          },
+          ink: {
+            900: '#1f211f',
+            700: '#3a3a38',
+            500: '#6b6b67',
+            300: '#b3b1aa',
+          },
+          line: '#e6dfd0',
+        },
         sand: 'hsl(var(--sand))',
         forest: 'hsl(var(--forest))',
         border: 'hsl(var(--border))',
@@ -68,6 +98,10 @@ const config: Config = {
         lg: 'var(--radius)',
         md: 'calc(var(--radius) - 2px)',
         sm: 'calc(var(--radius) - 4px)',
+        'cn-sm': '8px',
+        'cn-md': '14px',
+        'cn-lg': '20px',
+        'cn-xl': '28px',
       },
       keyframes: {
         'accordion-down': {

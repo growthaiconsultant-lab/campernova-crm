@@ -1,5 +1,5 @@
 import type { Metadata } from 'next'
-import { Inter, Fraunces } from 'next/font/google'
+import { Inter, Fraunces, JetBrains_Mono } from 'next/font/google'
 import './globals.css'
 import { CookieBanner } from '@/components/cookie-banner'
 import { PostHogProvider } from '@/components/posthog-provider'
@@ -17,6 +17,12 @@ const fraunces = Fraunces({
   axes: ['opsz', 'SOFT', 'WONK'],
 })
 
+const jetbrainsMono = JetBrains_Mono({
+  subsets: ['latin'],
+  variable: '--font-jetbrains-mono',
+  display: 'swap',
+})
+
 export const metadata: Metadata = {
   title: 'CampersNova CRM',
   description: 'CRM interno para gestión de compraventa de autocaravanas y campers',
@@ -30,7 +36,7 @@ export default function RootLayout({
   return (
     <html lang="es">
       <body
-        className={`${inter.variable} ${fraunces.variable} min-h-screen bg-background font-sans antialiased`}
+        className={`${inter.variable} ${fraunces.variable} ${jetbrainsMono.variable} min-h-screen font-sans antialiased`}
       >
         <PostHogProvider>{children}</PostHogProvider>
         <CookieBanner />
