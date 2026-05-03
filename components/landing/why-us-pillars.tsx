@@ -1,7 +1,7 @@
 const PILLARS = [
   {
-    stat: '4%',
-    label: 'al cierre — nada antes',
+    stat: 'Solo si vendemos',
+    label: '· sin coste de alta',
     desc: 'No pagamos hasta que vendemos tu camper. Sin coste de alta, sin mensualidad. Si no vendemos, no te costamos nada.',
   },
   {

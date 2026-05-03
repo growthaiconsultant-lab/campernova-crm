@@ -6,8 +6,8 @@ export function HeroSection() {
     <section id="main-content" className="relative min-h-[88vh] overflow-hidden">
       {/* Background image */}
       <Image
-        src="/images/landing/hero-vw-bus.jpg"
-        alt="Camper en ruta — CampersNova"
+        src="/images/landing/hero-sunset-window.png"
+        alt="Camper al atardecer — CampersNova"
         fill
         className="object-cover object-center"
         priority

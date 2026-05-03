@@ -11,7 +11,12 @@ interface Row {
 }
 
 const ROWS: Row[] = [
-  { label: 'Comisión', campernova: '4% al cierre', portal: '0% (lo haces tú)', dealer: '10–15%' },
+  {
+    label: 'Comisión',
+    campernova: 'Solo si vendemos',
+    portal: '0% (lo haces tú)',
+    dealer: '10–15%',
+  },
   {
     label: 'Tiempo medio de venta',
     campernova: '~42 días',
@@ -53,7 +58,7 @@ export function ComparisonSection() {
             Compara antes de decidir
           </h2>
           <p className="mx-auto max-w-md text-muted-foreground">
-            Sí, te cobramos un 4%. Esto es lo que obtienes a cambio.
+            Sin coste por adelantado. Solo cobramos si vendemos. Esto es lo que obtienes a cambio.
           </p>
         </FadeIn>
 

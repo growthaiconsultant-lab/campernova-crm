@@ -283,8 +283,7 @@ export default function VenderPage() {
                 className="max-w-[52ch] text-base leading-relaxed"
                 style={{ color: 'var(--cn-ink-500)' }}
               >
-                Sí, te cobramos un <strong style={{ color: 'var(--cn-teal-900)' }}>4%</strong>. Esto
-                es lo que obtienes a cambio.
+                Esto es lo que obtienes con nosotros frente a vender por tu cuenta.
               </p>
             </div>
 

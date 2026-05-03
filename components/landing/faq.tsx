@@ -8,7 +8,7 @@ import { FadeIn } from '@/components/landing/motion'
 const FAQ_ITEMS = [
   {
     q: '¿Cuánto cobráis exactamente?',
-    a: 'El 4% sobre el precio de venta, y solo si vendemos. Sin coste de alta, sin coste mensual, sin sorpresas. Si tu camper se vende por 35.000 €, recibes 33.600 €. Si no vendemos, no nos debes nada.',
+    a: 'Te lo explicamos durante la tasación gratuita, sin compromiso. No hay coste de alta ni mensualidad — solo cobramos si vendemos tu camper.',
   },
   {
     q: '¿Cuánto tarda en venderse mi camper?',

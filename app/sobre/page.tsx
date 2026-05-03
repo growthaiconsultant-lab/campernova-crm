@@ -1,4 +1,5 @@
 import type { Metadata } from 'next'
+import Image from 'next/image'
 import Link from 'next/link'
 import { Check, ArrowRight } from 'lucide-react'
 import { PublicNav } from '@/components/public-nav'
@@ -61,17 +62,18 @@ export default function SobrePage() {
         <section className="px-8 py-20 max-[640px]:px-5">
           <div className="mx-auto max-w-[1280px]">
             <div className="grid items-center gap-16 md:grid-cols-2">
-              {/* Image placeholder */}
+              {/* Foto instalaciones */}
               <div
-                className="flex aspect-[4/5] items-center justify-center rounded-cn-xl"
-                style={{ background: 'var(--cn-cream-200)', border: '1px solid var(--cn-line)' }}
+                className="relative aspect-[4/5] overflow-hidden rounded-cn-xl"
+                style={{ border: '1px solid var(--cn-line)' }}
               >
-                <span
-                  className="font-mono text-xs tracking-widest"
-                  style={{ color: 'var(--cn-ink-300)' }}
-                >
-                  instalaciones.jpg
-                </span>
+                <Image
+                  src="/images/landing/instalaciones.jpg"
+                  alt="Instalaciones CampersNova en Barcelona"
+                  fill
+                  className="object-cover"
+                  sizes="(max-width: 768px) 100vw, 50vw"
+                />
               </div>
 
               {/* Copy */}
@@ -226,17 +228,18 @@ export default function SobrePage() {
                 </div>
               </div>
 
-              {/* Map / image placeholder */}
+              {/* Mapa Google Maps */}
               <div
-                className="flex aspect-[4/3] items-center justify-center rounded-cn-xl"
-                style={{ background: 'var(--cn-cream-200)', border: '1px solid var(--cn-line)' }}
+                className="relative aspect-[4/3] overflow-hidden rounded-cn-xl"
+                style={{ border: '1px solid var(--cn-line)' }}
               >
-                <span
-                  className="font-mono text-xs tracking-widest"
-                  style={{ color: 'var(--cn-ink-300)' }}
-                >
-                  Mapa · Barcelona
-                </span>
+                <iframe
+                  src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d2993!2d2.2429082!3d41.5648851!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x12a4ebf0fa3704c3%3A0x5219e56327ff3bb7!2sCampers%20Nova%2C%20SL!5e0!3m2!1ses!2ses!4v1747000000000!5m2!1ses!2ses"
+                  loading="lazy"
+                  className="absolute inset-0 h-full w-full border-0"
+                  allowFullScreen
+                  title="CampersNova · Carrer Torre de Cellers, 08150 Barcelona"
+                />
               </div>
             </div>
           </div>

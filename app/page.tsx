@@ -19,16 +19,16 @@ import { LandingAnalytics } from '@/components/landing/analytics'
 export const metadata: Metadata = {
   title: 'CampersNova · Compraventa de campers y autocaravanas',
   description:
-    'Compra o vende tu camper o autocaravana con confianza. Tasación gratuita, gestión profesional y solo 4% al cierre. Instalaciones en Barcelona.',
+    'Compra o vende tu camper o autocaravana con confianza. Tasación gratuita, gestión profesional. Solo cobramos si vendemos. Instalaciones en Barcelona.',
   openGraph: {
     title: 'CampersNova · Compraventa de campers y autocaravanas',
     description:
-      'Compra o vende tu camper o autocaravana. Tasación gratuita. Solo 4% al cierre. Sin coste por adelantado.',
+      'Compra o vende tu camper o autocaravana. Tasación gratuita. Solo cobramos si vendemos. Sin coste por adelantado.',
     url: 'https://campersnova.com',
     siteName: 'CampersNova',
     images: [
       {
-        url: '/images/landing/hero-vw-bus.jpg',
+        url: '/images/landing/hero-sunset-window.png',
         width: 1200,
         height: 630,
         alt: 'CampersNova — compraventa de campers y autocaravanas',
@@ -40,7 +40,7 @@ export const metadata: Metadata = {
   twitter: {
     card: 'summary_large_image',
     title: 'CampersNova · Compraventa de campers y autocaravanas',
-    description: 'Tasación gratuita. Solo 4% al cierre. Instalaciones en Barcelona.',
+    description: 'Tasación gratuita. Solo cobramos si vendemos. Instalaciones en Barcelona.',
   },
   alternates: {
     canonical: 'https://campersnova.com',
