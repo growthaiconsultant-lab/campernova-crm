@@ -10,6 +10,10 @@ import { NovaAssistant } from '@/components/landing/nova-assistant'
 import { HowItWorksSection } from '@/components/landing/how-it-works'
 import { WhyUsPillars } from '@/components/landing/why-us-pillars'
 import { SellBlock } from '@/components/landing/sell-block'
+import { InspirationSection } from '@/components/landing/inspiration'
+import { PodcastSection } from '@/components/landing/podcast'
+import { TestimonialsSection } from '@/components/landing/testimonials'
+import { FinalCta } from '@/components/landing/final-cta'
 import { LandingAnalytics } from '@/components/landing/analytics'
 
 export const metadata: Metadata = {
@@ -81,6 +85,10 @@ export default function LandingPage() {
         <HowItWorksSection />
         <WhyUsPillars />
         <SellBlock />
+        <InspirationSection />
+        <PodcastSection />
+        <TestimonialsSection />
+        <FinalCta />
       </main>
 
       <PublicFooter />

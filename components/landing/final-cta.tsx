@@ -1,41 +1,61 @@
 import Link from 'next/link'
-import { ArrowRight } from 'lucide-react'
-import { Button } from '@/components/ui/button'
-import { FadeIn } from '@/components/landing/motion'
 
 export function FinalCta() {
   return (
-    <section className="bg-[#294e4c] px-4 py-20">
-      <div className="container mx-auto max-w-3xl text-center">
-        <FadeIn>
-          <h2 className="mb-4 font-display text-3xl font-bold leading-tight text-white md:text-4xl">
-            Tu autocaravana tiene un precio justo.
-            <br className="hidden sm:block" /> Descúbrelo en 60 segundos.
-          </h2>
-          <p className="mb-8 text-lg leading-relaxed text-white/75">
-            Empieza con una tasación gratuita. Te respondemos en 24 h.
-          </p>
-
-          <Link href="/#calculadora">
-            <Button
-              size="lg"
-              className="h-12 bg-[#cc6119] px-10 text-base font-semibold text-white hover:bg-[#cc6119]/90"
-            >
-              Calcular precio de mi camper
-              <ArrowRight className="ml-2 h-4 w-4" />
-            </Button>
-          </Link>
-
-          <p className="mt-4 text-sm text-white/40">
-            O escríbenos a{' '}
-            <a
-              href="mailto:info@campersnova.com"
-              className="underline underline-offset-2 transition-colors hover:text-white/70"
-            >
-              info@campersnova.com
-            </a>
-          </p>
-        </FadeIn>
+    <section
+      className="px-8 py-24 text-center max-[640px]:px-5"
+      style={{ background: 'var(--cn-teal-900)' }}
+    >
+      <div className="mx-auto max-w-[640px]">
+        <p
+          className="mb-4 font-mono text-[11px] font-semibold uppercase tracking-[0.14em]"
+          style={{ color: 'var(--cn-terra-500)' }}
+        >
+          · Empieza hoy
+        </p>
+        <h2
+          className="mb-5 text-[2rem] font-bold leading-tight tracking-[-0.025em] text-white lg:text-[2.8rem]"
+          style={{ fontFamily: 'var(--font-fraunces)' }}
+        >
+          ¿Listo para vender tu camper?
+        </h2>
+        <p
+          className="mb-10 text-[16px] leading-relaxed"
+          style={{ color: 'rgba(255,255,255,0.68)' }}
+        >
+          Empieza con una tasación gratuita. Sin compromiso. Te respondemos en 24h.
+        </p>
+        <Link
+          href="/vender"
+          className="inline-flex items-center gap-2 rounded-full px-8 py-4 text-[15px] font-semibold text-white transition-opacity hover:opacity-90"
+          style={{ background: 'var(--cn-terra-500)' }}
+        >
+          Calcular el precio de mi camper
+          <svg
+            width="16"
+            height="16"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2.2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            aria-hidden="true"
+          >
+            <path d="M5 12h14" />
+            <path d="M13 5l7 7-7 7" />
+          </svg>
+        </Link>
+        <p className="mt-5 text-[12px]" style={{ color: 'rgba(255,255,255,0.38)' }}>
+          O escríbenos a{' '}
+          <a
+            href="mailto:info@campersnova.com"
+            className="underline underline-offset-2 transition-opacity hover:opacity-80"
+            style={{ color: 'rgba(255,255,255,0.55)' }}
+          >
+            info@campersnova.com
+          </a>
+        </p>
       </div>
     </section>
   )
