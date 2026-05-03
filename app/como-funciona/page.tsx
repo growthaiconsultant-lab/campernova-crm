@@ -63,26 +63,27 @@ export default function ComoFuncionaPage() {
 
       <main className="min-h-screen pt-20" style={{ background: 'var(--cn-cream-100)' }}>
         {/* Hero */}
-        <section
-          className="px-8 pb-16 pt-16 max-[640px]:px-5"
-          style={{ background: 'var(--cn-teal-900)' }}
-        >
+        <section className="px-8 pb-10 pt-16 max-[640px]:px-5">
           <div className="mx-auto max-w-[1280px]">
             <p
-              className="font-mono text-[11px] uppercase tracking-[0.18em]"
-              style={{ color: 'rgba(255,255,255,0.6)' }}
+              className="mb-5 font-mono text-[11px] font-semibold uppercase tracking-[0.14em]"
+              style={{ color: 'var(--cn-terra-500)' }}
             >
               · Cómo funciona
             </p>
             <h1
-              className="mt-4 text-[clamp(2.2rem,5vw,3.5rem)] leading-[1.05] tracking-[-0.02em] text-white"
-              style={{ fontFamily: 'var(--font-fraunces)', maxWidth: '22ch' }}
+              className="text-[clamp(3rem,7vw,5.5rem)] leading-[1.0] tracking-[-0.03em]"
+              style={{
+                fontFamily: 'var(--font-fraunces)',
+                color: 'var(--cn-teal-900)',
+                maxWidth: '18ch',
+              }}
             >
               Un proceso claro de principio a fin.
             </h1>
             <p
-              className="mt-5 text-[18px] leading-relaxed"
-              style={{ color: 'rgba(255,255,255,0.72)', maxWidth: '56ch' }}
+              className="mt-7 text-[17px] leading-relaxed"
+              style={{ color: 'var(--cn-ink-500)', maxWidth: '56ch' }}
             >
               Sin sorpresas, sin presión, sin gestiones por tu cuenta. Te enseñamos cómo trabajamos
               en cada lado de la operación.
