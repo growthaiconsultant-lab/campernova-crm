@@ -5,12 +5,13 @@ export function PodcastSection() {
     <section className="px-8 py-20 max-[640px]:px-5" style={{ background: 'var(--cn-cream-200)' }}>
       <div className="mx-auto max-w-[1280px]">
         <div className="grid gap-12 lg:grid-cols-2 lg:items-center">
-          <div className="relative h-[360px] overflow-hidden rounded-[20px]">
+          <div className="relative overflow-hidden rounded-[20px]">
             <Image
               src="/images/landing/podcast-studio.jpg"
               alt="Estudio del podcast CampersNova"
-              fill
-              className="object-cover"
+              width={640}
+              height={770}
+              className="block h-auto w-full"
               sizes="(max-width: 1024px) 100vw, 50vw"
             />
             <div className="absolute left-5 top-5">
