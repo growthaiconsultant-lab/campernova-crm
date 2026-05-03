@@ -10,7 +10,6 @@ import { NovaAssistant } from '@/components/landing/nova-assistant'
 import { HowItWorksSection } from '@/components/landing/how-it-works'
 import { WhyUsPillars } from '@/components/landing/why-us-pillars'
 import { SellBlock } from '@/components/landing/sell-block'
-import { InspirationSection } from '@/components/landing/inspiration'
 import { LifestyleBanner } from '@/components/landing/lifestyle-banner'
 import { PodcastSection } from '@/components/landing/podcast'
 import { TestimonialsSection } from '@/components/landing/testimonials'
@@ -86,7 +85,6 @@ export default function LandingPage() {
         <HowItWorksSection />
         <WhyUsPillars />
         <SellBlock />
-        <InspirationSection />
         <LifestyleBanner />
         <PodcastSection />
         <TestimonialsSection />
