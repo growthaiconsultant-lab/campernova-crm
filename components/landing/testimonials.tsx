@@ -1,27 +1,21 @@
 const TESTIMONIALS = [
   {
-    name: 'Carlos R.',
-    location: 'Madrid',
-    vehicle: 'Volkswagen California 2018',
-    price: '38.000 €',
+    name: 'Marta & Carlos',
+    meta: 'Vendieron una VW T6 · Bilbao',
     quote:
-      'Pensaba que tardaría meses y tendría que lidiar con curiosos. En menos de 6 semanas encontraron un comprador serio y se ocuparon de todo el papeleo. Solo tuve que firmar.',
+      'Vendimos nuestra furgo en tres semanas. Nos quitaron de encima la parte que más pereza nos daba: las visitas y los curiosos. Profesionales de verdad.',
   },
   {
-    name: 'Ana y Jordi',
-    location: 'Barcelona',
-    vehicle: 'Fiat Ducato camper 2020',
-    price: '52.500 €',
+    name: 'Lucía Reverte',
+    meta: 'Compró una Ford Nugget · Valencia',
     quote:
-      'La tasación fue la más alta que habíamos visto. Al principio dudamos, pero vendieron al precio que dijeron en el tiempo que prometieron. Muy recomendable.',
+      'Buscábamos nuestra primera camper sin saber muy bien por dónde empezar. Nos asesoraron sin presión y acabamos comprando con la tranquilidad de que era la correcta.',
   },
   {
-    name: 'Miguel T.',
-    location: 'Valencia',
-    vehicle: 'Hymer B-Class 2016',
-    price: '41.000 €',
+    name: 'Iñaki Ferrer',
+    meta: 'Vendió una Knaus Boxstar · Madrid',
     quote:
-      'El trato fue excelente desde el primer momento. Nos mantuvieron informados en todo momento y las visitas fueron muy organizadas. Sin estrés.',
+      'El trato cercano marca la diferencia. Te atiende siempre la misma persona y notas que conocen el mundo camper y autocaravana de verdad, no solo el papeleo.',
   },
 ]
 
@@ -51,7 +45,7 @@ export function TestimonialsSection() {
         </div>
 
         <div className="grid gap-6 md:grid-cols-3">
-          {TESTIMONIALS.map(({ name, location, vehicle, price, quote }) => (
+          {TESTIMONIALS.map(({ name, meta, quote }) => (
             <div
               key={name}
               className="flex flex-col rounded-[20px] p-7"
@@ -66,10 +60,10 @@ export function TestimonialsSection() {
               </p>
               <div className="border-t pt-5" style={{ borderColor: 'var(--cn-line)' }}>
                 <p className="text-[13px] font-semibold" style={{ color: 'var(--cn-teal-900)' }}>
-                  {name} · {location}
+                  {name}
                 </p>
                 <p className="mt-0.5 text-[12px]" style={{ color: 'var(--cn-ink-500)' }}>
-                  Vendió su {vehicle} por {price}
+                  {meta}
                 </p>
               </div>
             </div>
