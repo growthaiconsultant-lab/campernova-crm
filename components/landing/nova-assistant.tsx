@@ -1,116 +1,196 @@
-import Link from 'next/link'
+import { Sparkles, Shield, Leaf, Handshake } from 'lucide-react'
 
-const MESSAGES = [
+const FEATURES = [
   {
-    role: 'user' as const,
-    text: '¿Tenéis alguna Fiat Ducato del 2019 con techo elevable y baño?',
+    icon: Sparkles,
+    text: 'Resuelve dudas técnicas en segundos, sin buscar manuales.',
   },
   {
-    role: 'assistant' as const,
-    text: 'Déjame mirar. ¿Cuántas plazas necesitáis y para qué tipo de viajes la pensáis usar?',
+    icon: Shield,
+    text: 'Disponible 24/7, también cuando estás lejos de cobertura humana.',
   },
   {
-    role: 'user' as const,
-    text: 'Para 4, escapadas de fin de semana y alguna semana en verano.',
+    icon: Leaf,
+    text: 'Aprende de tu vehículo: historial, mantenimientos y consejos personalizados.',
   },
   {
-    role: 'assistant' as const,
-    text: 'Tengo 2 que encajan muy bien. Una con baño completo a 38.500 €, otra más compacta a 29.000 €. ¿Te mando los detalles?',
+    icon: Handshake,
+    text: 'Para siempre tuyo. Sin suscripciones, sin coste oculto.',
   },
 ]
+
+/* Inline SVG QR placeholder — decorative, aria-hidden */
+function QrPlaceholder() {
+  return (
+    <svg
+      width="200"
+      height="200"
+      viewBox="0 0 200 200"
+      fill="none"
+      xmlns="http://www.w3.org/2000/svg"
+      aria-hidden="true"
+      role="img"
+    >
+      {/* Outer border */}
+      <rect x="2" y="2" width="196" height="196" rx="8" stroke="currentColor" strokeWidth="4" />
+
+      {/* Top-left position pattern */}
+      <rect x="16" y="16" width="52" height="52" rx="4" stroke="currentColor" strokeWidth="3.5" />
+      <rect x="28" y="28" width="28" height="28" rx="2" fill="currentColor" />
+
+      {/* Top-right position pattern */}
+      <rect x="132" y="16" width="52" height="52" rx="4" stroke="currentColor" strokeWidth="3.5" />
+      <rect x="144" y="28" width="28" height="28" rx="2" fill="currentColor" />
+
+      {/* Bottom-left position pattern */}
+      <rect x="16" y="132" width="52" height="52" rx="4" stroke="currentColor" strokeWidth="3.5" />
+      <rect x="28" y="144" width="28" height="28" rx="2" fill="currentColor" />
+
+      {/* Data module rows (decorative) */}
+      <rect x="84" y="16" width="10" height="10" rx="1" fill="currentColor" />
+      <rect x="98" y="16" width="10" height="10" rx="1" fill="currentColor" />
+      <rect x="112" y="16" width="10" height="10" rx="1" fill="currentColor" />
+      <rect x="84" y="30" width="10" height="10" rx="1" fill="currentColor" />
+      <rect x="112" y="30" width="10" height="10" rx="1" fill="currentColor" />
+      <rect x="98" y="44" width="10" height="10" rx="1" fill="currentColor" />
+      <rect x="84" y="58" width="10" height="10" rx="1" fill="currentColor" />
+      <rect x="112" y="58" width="10" height="10" rx="1" fill="currentColor" />
+
+      <rect x="16" y="84" width="10" height="10" rx="1" fill="currentColor" />
+      <rect x="30" y="84" width="10" height="10" rx="1" fill="currentColor" />
+      <rect x="44" y="84" width="10" height="10" rx="1" fill="currentColor" />
+      <rect x="16" y="98" width="10" height="10" rx="1" fill="currentColor" />
+      <rect x="44" y="98" width="10" height="10" rx="1" fill="currentColor" />
+      <rect x="30" y="112" width="10" height="10" rx="1" fill="currentColor" />
+      <rect x="58" y="84" width="10" height="10" rx="1" fill="currentColor" />
+      <rect x="58" y="98" width="10" height="10" rx="1" fill="currentColor" />
+      <rect x="58" y="112" width="10" height="10" rx="1" fill="currentColor" />
+
+      <rect x="84" y="84" width="10" height="10" rx="1" fill="currentColor" />
+      <rect x="98" y="84" width="10" height="10" rx="1" fill="currentColor" />
+      <rect x="112" y="84" width="10" height="10" rx="1" fill="currentColor" />
+      <rect x="126" y="84" width="10" height="10" rx="1" fill="currentColor" />
+      <rect x="84" y="98" width="10" height="10" rx="1" fill="currentColor" />
+      <rect x="126" y="98" width="10" height="10" rx="1" fill="currentColor" />
+      <rect x="98" y="112" width="10" height="10" rx="1" fill="currentColor" />
+      <rect x="112" y="112" width="10" height="10" rx="1" fill="currentColor" />
+
+      <rect x="140" y="84" width="10" height="10" rx="1" fill="currentColor" />
+      <rect x="154" y="84" width="10" height="10" rx="1" fill="currentColor" />
+      <rect x="168" y="84" width="10" height="10" rx="1" fill="currentColor" />
+      <rect x="140" y="98" width="10" height="10" rx="1" fill="currentColor" />
+      <rect x="168" y="98" width="10" height="10" rx="1" fill="currentColor" />
+      <rect x="154" y="112" width="10" height="10" rx="1" fill="currentColor" />
+
+      <rect x="84" y="126" width="10" height="10" rx="1" fill="currentColor" />
+      <rect x="112" y="126" width="10" height="10" rx="1" fill="currentColor" />
+      <rect x="126" y="126" width="10" height="10" rx="1" fill="currentColor" />
+      <rect x="84" y="140" width="10" height="10" rx="1" fill="currentColor" />
+      <rect x="98" y="140" width="10" height="10" rx="1" fill="currentColor" />
+      <rect x="126" y="140" width="10" height="10" rx="1" fill="currentColor" />
+      <rect x="84" y="154" width="10" height="10" rx="1" fill="currentColor" />
+      <rect x="112" y="154" width="10" height="10" rx="1" fill="currentColor" />
+      <rect x="140" y="126" width="10" height="10" rx="1" fill="currentColor" />
+      <rect x="154" y="140" width="10" height="10" rx="1" fill="currentColor" />
+      <rect x="168" y="126" width="10" height="10" rx="1" fill="currentColor" />
+      <rect x="168" y="154" width="10" height="10" rx="1" fill="currentColor" />
+      <rect x="140" y="168" width="10" height="10" rx="1" fill="currentColor" />
+      <rect x="168" y="168" width="10" height="10" rx="1" fill="currentColor" />
+
+      <rect x="16" y="126" width="10" height="10" rx="1" fill="currentColor" />
+      <rect x="30" y="126" width="10" height="10" rx="1" fill="currentColor" />
+      <rect x="44" y="126" width="10" height="10" rx="1" fill="currentColor" />
+      <rect x="58" y="126" width="10" height="10" rx="1" fill="currentColor" />
+      <rect x="16" y="140" width="10" height="10" rx="1" fill="currentColor" />
+      <rect x="44" y="140" width="10" height="10" rx="1" fill="currentColor" />
+      <rect x="58" y="154" width="10" height="10" rx="1" fill="currentColor" />
+      <rect x="30" y="154" width="10" height="10" rx="1" fill="currentColor" />
+      <rect x="16" y="168" width="10" height="10" rx="1" fill="currentColor" />
+      <rect x="44" y="168" width="10" height="10" rx="1" fill="currentColor" />
+      <rect x="58" y="168" width="10" height="10" rx="1" fill="currentColor" />
+    </svg>
+  )
+}
 
 export function NovaAssistant() {
   return (
     <section className="px-8 pb-20 pt-4 max-[640px]:px-5">
       <div className="mx-auto max-w-[1280px]">
-        <div className="grid gap-12 lg:grid-cols-2 lg:items-center">
-          <div>
-            <p
-              className="mb-3 font-mono text-[11px] font-semibold uppercase tracking-[0.14em]"
-              style={{ color: 'var(--cn-terra-500)' }}
-            >
-              · Para compradores
-            </p>
-            <h2
-              className="mb-5 text-[2rem] font-bold leading-tight tracking-[-0.02em] lg:text-[2.4rem]"
-              style={{ color: 'var(--cn-teal-900)', fontFamily: 'var(--font-fraunces)' }}
-            >
-              Cuéntanos qué buscas. Nosotros encontramos la camper.
-            </h2>
-            <p
-              className="mb-8 max-w-[46ch] text-[15px] leading-relaxed"
-              style={{ color: 'var(--cn-ink-500)' }}
-            >
-              Sin filtros eternos ni fichas técnicas. Solo una conversación donde nos cuentas qué
-              quieres vivir, y te proponemos vehículos que encajan de verdad.
-            </p>
-            <Link
-              href="/comprar"
-              className="inline-flex items-center gap-2 rounded-full px-6 py-3.5 text-[14px] font-semibold text-white transition-opacity hover:opacity-90"
-              style={{ background: 'var(--cn-teal-900)' }}
-            >
-              Empezar conversación
-              <svg
-                width="15"
-                height="15"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2.2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                aria-hidden="true"
+        <div
+          className="overflow-hidden rounded-[24px] px-10 py-14 max-[640px]:px-6 max-[640px]:py-10"
+          style={{ background: 'var(--cn-teal-900)' }}
+        >
+          <div className="grid gap-12 lg:grid-cols-2 lg:items-center">
+            {/* Copy — left */}
+            <div>
+              {/* Badge */}
+              <span
+                className="mb-5 inline-flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-[12px] font-semibold"
+                style={{ background: 'rgba(255,255,255,0.12)', color: 'rgba(255,255,255,0.9)' }}
               >
-                <path d="M5 12h14" />
-                <path d="M13 5l7 7-7 7" />
-              </svg>
-            </Link>
-          </div>
+                <Sparkles className="h-3.5 w-3.5" aria-hidden="true" />
+                Incluido gratis · Exclusivo Campers Nova
+              </span>
 
-          <div
-            className="rounded-[20px] p-5"
-            style={{ background: 'var(--cn-cream-50)', border: '1px solid var(--cn-line)' }}
-          >
-            <div
-              className="mb-4 flex items-center gap-3 rounded-[12px] px-4 py-3"
-              style={{ background: 'var(--cn-teal-900)' }}
-            >
-              <div
-                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full font-bold text-white"
-                style={{ background: 'var(--cn-terra-500)', fontSize: '12px' }}
+              <h2
+                className="mb-5 text-[2rem] font-bold leading-tight tracking-[-0.02em] text-white lg:text-[2.4rem]"
+                style={{ fontFamily: 'var(--font-fraunces)' }}
               >
-                CN
-              </div>
-              <div>
-                <p className="text-[13px] font-semibold text-white">Asistente CampersNova</p>
-                <p className="text-[11px]" style={{ color: 'rgba(255,255,255,0.55)' }}>
-                  Responde al instante
-                </p>
-              </div>
+                Nova Assistant: tu vehículo te responde.
+              </h2>
+
+              <p
+                className="mb-8 max-w-[46ch] text-[15px] leading-relaxed"
+                style={{ color: 'rgba(255,255,255,0.72)' }}
+              >
+                Cada camper o autocaravana que vendemos lleva un código QR único. Escanéalo y abre
+                un chat con tu vehículo: una IA que conoce tu modelo, su equipamiento y su manual.
+                Pregúntale lo que necesites — desde cómo encender la calefacción hasta qué hacer si
+                salta un testigo en la carretera.
+              </p>
+
+              <ul className="flex flex-col gap-3.5">
+                {FEATURES.map(({ icon: Icon, text }) => (
+                  <li key={text} className="flex items-start gap-3">
+                    <span
+                      className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full"
+                      style={{ background: 'rgba(255,255,255,0.12)' }}
+                    >
+                      <Icon
+                        className="h-3.5 w-3.5"
+                        style={{ color: 'var(--cn-terra-300, #f5bc96)' }}
+                        aria-hidden="true"
+                      />
+                    </span>
+                    <span
+                      className="text-[14px] leading-snug"
+                      style={{ color: 'rgba(255,255,255,0.82)' }}
+                    >
+                      {text}
+                    </span>
+                  </li>
+                ))}
+              </ul>
             </div>
 
-            <div className="flex flex-col gap-3">
-              {MESSAGES.map((msg, i) => (
+            {/* QR visual — right */}
+            <div className="flex justify-center lg:justify-end">
+              <div className="flex flex-col items-center gap-5">
                 <div
-                  key={i}
-                  className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
+                  className="flex h-[220px] w-[220px] items-center justify-center rounded-[16px] p-5"
+                  style={{ background: 'white', color: 'var(--cn-teal-900)' }}
                 >
-                  <div
-                    className="max-w-[82%] rounded-[12px] px-4 py-2.5 text-[13px] leading-relaxed"
-                    style={
-                      msg.role === 'user'
-                        ? { background: 'var(--cn-terra-500)', color: 'white' }
-                        : {
-                            background: 'white',
-                            color: 'var(--cn-teal-900)',
-                            border: '1px solid var(--cn-line)',
-                          }
-                    }
-                  >
-                    {msg.text}
-                  </div>
+                  <QrPlaceholder />
                 </div>
-              ))}
+                <p
+                  className="text-center font-mono text-[11px] font-semibold uppercase leading-relaxed tracking-[0.18em]"
+                  style={{ color: 'rgba(255,255,255,0.5)' }}
+                >
+                  Escanéame
+                  <br />
+                  en tu vehículo
+                </p>
+              </div>
             </div>
           </div>
         </div>
