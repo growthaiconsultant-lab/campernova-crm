@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Campers Nova — Compraventa de campers y autocaravanas</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,300;9..144,400;9..144,500;9..144,600&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+<div id="root"></div>
+
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+
+<script type="text/babel" src="tweaks-panel.jsx"></script>
+<script type="text/babel" src="data.jsx"></script>
+<script type="text/babel" src="page-home.jsx"></script>
+<script type="text/babel" src="page-others.jsx"></script>
+
+<script type="text/babel">
+const { Header, Footer, WhatsAppFab } = window.CN;
+const { TweaksPanel, useTweaks, TweakSection, TweakRadio, TweakSelect, TweakColor } = window;
+
+const TWEAK_DEFAULTS = /*EDITMODE-BEGIN*/{
+  "heroImage": "window",
+  "primaryColor": "#264D49",
+  "accentColor": "#C26A4A",
+  "creamColor": "#F5F0E6"
+}/*EDITMODE-END*/;
+
+function App() {
+  const [page, setPage] = React.useState("home");
+  const [vehicleId, setVehicleId] = React.useState(null);
+  const [tweaks, setTweak] = useTweaks(TWEAK_DEFAULTS);
+
+  React.useEffect(() => {
+    document.documentElement.style.setProperty("--teal-700", tweaks.primaryColor);
+    document.documentElement.style.setProperty("--teal-900", tweaks.primaryColor);
+    document.documentElement.style.setProperty("--terra-500", tweaks.accentColor);
+    document.documentElement.style.setProperty("--cream-100", tweaks.creamColor);
+  }, [tweaks.primaryColor, tweaks.accentColor, tweaks.creamColor]);
+
+  const navigate = (p, id) => {
+    setPage(p);
+    if (id) setVehicleId(id);
+    window.scrollTo({ top: 0, behavior: "instant" });
+  };
+
+  let content;
+  if (page === "home") content = <window.HomePage navigate={navigate} tweaks={tweaks} />;
+  else if (page === "comprar") content = <window.ComprarPage navigate={navigate} />;
+  else if (page === "vender") content = <window.VenderPage navigate={navigate} />;
+  else if (page === "detalle") content = <window.DetallePage navigate={navigate} vehicleId={vehicleId} />;
+  else if (page === "como-funciona") content = <window.ComoFuncionaPage navigate={navigate} />;
+  else if (page === "sobre") content = <window.SobrePage navigate={navigate} />;
+  else content = <window.HomePage navigate={navigate} tweaks={tweaks} />;
+
+  return (
+    <>
+      <Header current={page} navigate={navigate} />
+      <main>{content}</main>
+      <Footer navigate={navigate} />
+      <WhatsAppFab />
+
+      <TweaksPanel title="Tweaks">
+        <TweakSection title="Hero">
+          <TweakRadio label="Imagen del hero"
+            value={tweaks.heroImage}
+            onChange={(v) => setTweak("heroImage", v)}
+            options={[
+              { value: "vw", label: "VW clásica" },
+              { value: "couple", label: "Atardecer" },
+              { value: "window", label: "Ventana" },
+            ]} />
+        </TweakSection>
+        <TweakSection title="Colores de marca">
+          <TweakColor label="Primario (teal)" value={tweaks.primaryColor} onChange={(v) => setTweak("primaryColor", v)} />
+          <TweakColor label="Acento (terracota)" value={tweaks.accentColor} onChange={(v) => setTweak("accentColor", v)} />
+          <TweakColor label="Fondo (crema)" value={tweaks.creamColor} onChange={(v) => setTweak("creamColor", v)} />
+        </TweakSection>
+      </TweaksPanel>
+    </>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+</script>
+</body>
+</html>

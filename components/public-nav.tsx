@@ -8,8 +8,7 @@ import { Menu, X } from 'lucide-react'
 
 const NAV_LINKS = [
   { href: '/', label: 'Inicio' },
-  // /comprar points to home anchor until the page is built in commit 7
-  { href: '/#search-method', label: 'Comprar', activePath: '/comprar' },
+  { href: '/comprar', label: 'Comprar' },
   { href: '/vender', label: 'Vender' },
   { href: '/como-funciona', label: 'Cómo funciona' },
   { href: '/sobre', label: 'Sobre nosotros' },
@@ -82,7 +81,7 @@ export function PublicNav() {
           {/* Desktop CTAs */}
           <div className="hidden items-center gap-2.5 lg:flex">
             <Link
-              href="/#search-method"
+              href="/comprar"
               className="inline-flex items-center justify-center rounded-full border px-4 py-2.5 text-[13px] font-medium transition-all"
               style={{
                 borderColor: 'var(--cn-teal-900)',

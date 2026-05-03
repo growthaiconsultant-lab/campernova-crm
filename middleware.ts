@@ -11,6 +11,8 @@ const PUBLIC_PATHS = [
   '/privacidad',
   '/cookies',
   '/api/valuation',
+  '/comprar',
+  '/api/chat',
 ]
 
 export async function middleware(request: NextRequest) {

@@ -3,6 +3,8 @@
 import { db } from '@/lib/db'
 import { requireAuth } from '@/lib/auth'
 import { createSellerLeadSchema } from '@/lib/validators/seller-lead'
+import { runAndSaveAutoValuation } from '@/lib/valuation/save'
+import { recalculateMatchesForVehicle } from '@/lib/matching'
 
 export async function createSellerLead(data: unknown) {
   await requireAuth()
@@ -36,7 +38,7 @@ export async function createSellerLead(data: unknown) {
       phone,
       canal: 'CN',
       status: 'NUEVO',
-      agentId: null, // round-robin se implementa en CAM-19
+      agentId: null,
       vehicle: {
         create: {
           type,
@@ -54,7 +56,20 @@ export async function createSellerLead(data: unknown) {
         },
       },
     },
+    include: { vehicle: true },
   })
+
+  const vehicleId = lead.vehicle!.id
+  await runAndSaveAutoValuation(vehicleId, {
+    brand,
+    model,
+    type,
+    year,
+    km,
+    conservationState,
+    equipment,
+  })
+  await recalculateMatchesForVehicle(vehicleId, db)
 
   return { leadId: lead.id }
 }

@@ -1,4 +1,5 @@
 import { PrismaClient, UserRole } from '@prisma/client'
+import { seedReferencePrices } from './seeds/reference-prices'
 
 const db = new PrismaClient()
 
@@ -31,6 +32,8 @@ async function main() {
     })
     console.log(`  ✓ ${result.role.padEnd(6)} ${result.name} <${result.email}>`)
   }
+
+  await seedReferencePrices(db)
 
   console.log('Done.')
 }

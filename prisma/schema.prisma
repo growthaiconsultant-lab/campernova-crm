@@ -82,6 +82,14 @@ enum ActivityType {
   WHATSAPP_INICIADO
   MATCH_CREADO
   LEAD_ASIGNADO
+  LEAD_CREADO_CHAT
+}
+
+enum BuyerChatStatus {
+  IN_PROGRESS
+  COMPLETED
+  ABANDONED
+  REDIRECTED_SELLER
 }
 
 enum ValuationMethod {
@@ -110,14 +118,15 @@ enum DocumentType {
 /// Usuarios internos del CRM (agentes y admin).
 /// authId referencia auth.users.id de Supabase y se rellena al primer login.
 model User {
-  id        String   @id @default(cuid())
-  authId    String?  @unique @map("auth_id")
-  email     String   @unique
-  name      String
-  role      UserRole @default(AGENTE)
-  active    Boolean  @default(true)
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
+  id               String    @id @default(cuid())
+  authId           String?   @unique @map("auth_id")
+  email            String    @unique
+  name             String
+  role             UserRole  @default(AGENTE)
+  active           Boolean   @default(true)
+  lastMatchEmailAt DateTime? @map("last_match_email_at")
+  createdAt        DateTime  @default(now()) @map("created_at")
+  updatedAt        DateTime  @updatedAt @map("updated_at")
 
   sellerLeads SellerLead[] @relation("AgentSellerLeads")
   buyerLeads  BuyerLead[]  @relation("AgentBuyerLeads")
@@ -133,12 +142,14 @@ model SellerLead {
   name      String
   email     String
   phone     String
-  canal     LeadCanal        @default(PRO)
-  status    SellerLeadStatus @default(NUEVO)
-  source    String?
-  agentId   String?          @map("agent_id")
-  createdAt DateTime         @default(now()) @map("created_at")
-  updatedAt DateTime         @updatedAt @map("updated_at")
+  canal           LeadCanal        @default(PRO)
+  status          SellerLeadStatus @default(NUEVO)
+  source          String?
+  agentId         String?          @map("agent_id")
+  gdprConsentAt   DateTime?        @map("gdpr_consent_at")
+  gdprConsentIp   String?          @map("gdpr_consent_ip")
+  createdAt       DateTime         @default(now()) @map("created_at")
+  updatedAt       DateTime         @updatedAt @map("updated_at")
 
   agent      User?      @relation("AgentSellerLeads", fields: [agentId], references: [id])
   vehicle    Vehicle?
@@ -240,14 +251,55 @@ model BuyerLead {
   createdAt         DateTime        @default(now()) @map("created_at")
   updatedAt         DateTime        @updatedAt @map("updated_at")
 
-  agent      User?      @relation("AgentBuyerLeads", fields: [agentId], references: [id])
-  matches    Match[]
-  activities Activity[]
-  documents  Document[]
+  agent       User?              @relation("AgentBuyerLeads", fields: [agentId], references: [id])
+  matches     Match[]
+  activities  Activity[]
+  documents   Document[]
+  chatSession BuyerChatSession?
 
   @@index([status])
   @@index([agentId])
   @@map("buyer_leads")
+}
+
+/// Sesión de chat para captación de comprador vía /comprar.
+model BuyerChatSession {
+  id           String          @id @default(cuid())
+  sessionToken String          @unique @map("session_token")
+  status       BuyerChatStatus @default(IN_PROGRESS)
+
+  messages Json @default("[]")
+
+  capturedNombre        String?  @map("captured_nombre")
+  capturedEmail         String?  @map("captured_email")
+  capturedTelefono      String?  @map("captured_telefono")
+  capturedNecesidad     String?  @map("captured_necesidad")
+  capturedPlazas        Int?     @map("captured_plazas")
+  capturedPresupuestoMin Int?    @map("captured_presupuesto_min")
+  capturedPresupuestoMax Int?    @map("captured_presupuesto_max")
+  capturedPlazos        String?  @map("captured_plazos")
+  capturedEquipamiento  Json?    @map("captured_equipamiento")
+  capturedZona          String?  @map("captured_zona")
+
+  gdprConsentAt DateTime? @map("gdpr_consent_at")
+  gdprConsentIp String?   @map("gdpr_consent_ip")
+
+  buyerLeadId String?    @unique @map("buyer_lead_id")
+  buyerLead   BuyerLead? @relation(fields: [buyerLeadId], references: [id])
+
+  ipAddress      String?  @map("ip_address")
+  userAgent      String?  @map("user_agent")
+  llmModel       String   @default("claude-haiku-4-5-20251001") @map("llm_model")
+  totalTokens    Int      @default(0) @map("total_tokens")
+  totalCostCents Int      @default(0) @map("total_cost_cents")
+
+  startedAt     DateTime  @default(now()) @map("started_at")
+  lastMessageAt DateTime  @default(now()) @map("last_message_at")
+  completedAt   DateTime? @map("completed_at")
+
+  @@index([status])
+  @@index([startedAt])
+  @@map("buyer_chat_sessions")
 }
 
 /// Sugerencia de match entre un vehículo y un comprador.

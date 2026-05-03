@@ -1,0 +1,81 @@
+brand,model,type,base_year,base_price,depreciation_per_km,notes
+Volkswagen,California Ocean,CAMPER,2020,65000,0.18,
+Volkswagen,California Beach,CAMPER,2020,52000,0.15,
+Volkswagen,California 6.1 Ocean,CAMPER,2021,70000,0.20,
+Volkswagen,Crafter Grand California,CAMPER,2020,65000,0.17,
+Mercedes-Benz,Marco Polo,CAMPER,2020,72000,0.20,Basado en Clase V
+Mercedes-Benz,Marco Polo Activity,CAMPER,2021,68000,0.18,
+Mercedes-Benz,Sprinter Camper,CAMPER,2020,60000,0.16,Conversión sobre Sprinter 316/319
+Ford,Transit Custom Nugget,CAMPER,2020,52000,0.14,
+Ford,Transit Custom Nugget Plus,CAMPER,2021,58000,0.15,
+Fiat,Ducato Camper,CAMPER,2020,38000,0.10,Conversión media sobre Ducato L3H2
+Fiat,Ducato Camper XL,CAMPER,2021,44000,0.11,Conversión larga sobre Ducato L4H2
+Renault,Trafic SpaceClass,CAMPER,2020,33000,0.09,
+Citroën,SpaceTourer Camper,CAMPER,2020,30000,0.08,
+Peugeot,Traveller Camper,CAMPER,2020,28000,0.07,
+Opel,Zafira Life Camper,CAMPER,2021,30000,0.08,
+Toyota,Proace Verso Camper,CAMPER,2021,32000,0.08,
+Westfalia,Kepler Six,CAMPER,2020,58000,0.15,
+Westfalia,Kepler One,CAMPER,2021,52000,0.14,
+Hymer,Venture S,CAMPER,2021,62000,0.16,
+Adria,Twin,CAMPER,2020,52000,0.13,
+Adria,Twin Supreme,CAMPER,2021,60000,0.16,
+Carado,Banff,CAMPER,2021,50000,0.13,
+Knaus,BoxStar,CAMPER,2021,50000,0.13,
+Roller Team,Auto-Roller,CAMPER,2020,42000,0.11,
+Sunlight,Van 47,CAMPER,2021,48000,0.12,
+Chausson,Van 594,CAMPER,2021,54000,0.14,
+Dethleffs,Globevan,CAMPER,2021,55000,0.14,
+LMC,Innova Camper,CAMPER,2021,46000,0.12,
+Wingamm,Oasi 690G,CAMPER,2020,56000,0.15,
+Trigano,Tribute 640 Camper,CAMPER,2020,38000,0.10,
+Hymer,B-Class MobiLine 560,AUTOCARAVANA,2019,52000,0.12,Perfilada sobre Fiat Ducato
+Hymer,B-Class 570,AUTOCARAVANA,2020,62000,0.14,
+Hymer,B-Class 580,AUTOCARAVANA,2021,68000,0.16,
+Hymer,T-Class S 698,AUTOCARAVANA,2020,47000,0.11,Capuchina (alcoba frontal)
+Hymer,Exsis-i 580,AUTOCARAVANA,2021,98000,0.25,Integrada premium
+Adria,Coral 600 SL,AUTOCARAVANA,2020,52000,0.12,
+Adria,Coral XL 670 SF,AUTOCARAVANA,2021,62000,0.14,
+Adria,Matrix Plus 670 SC,AUTOCARAVANA,2020,90000,0.22,Integrada
+Adria,Compact SP,AUTOCARAVANA,2020,39000,0.09,Compacta longitud ≤6m
+Adria,Sonic Plus 700 SL,AUTOCARAVANA,2021,80000,0.20,Integrada gran formato
+Knaus,Sudwind 630 LG,AUTOCARAVANA,2020,50000,0.11,
+Knaus,Sun Ti 700 LFG,AUTOCARAVANA,2021,70000,0.16,
+Knaus,Van Ti 650 MEG,AUTOCARAVANA,2021,60000,0.14,Semi-integrada compacta
+Knaus,Sport TI 700 MEG,AUTOCARAVANA,2022,74000,0.17,
+Dethleffs,Trend T 7057 EB,AUTOCARAVANA,2020,42000,0.10,Perfilada entry-level
+Dethleffs,Esprit T 7150 EB,AUTOCARAVANA,2021,50000,0.11,
+Dethleffs,Globe T 7857 ET,AUTOCARAVANA,2020,46000,0.11,
+Dethleffs,Pulse T 7051 EB,AUTOCARAVANA,2021,54000,0.12,
+Chausson,630,AUTOCARAVANA,2020,52000,0.12,
+Chausson,757 UA,AUTOCARAVANA,2021,66000,0.16,Capuchina queen bed
+Chausson,720 Welcome Premium,AUTOCARAVANA,2020,60000,0.14,
+Chausson,Welcome 60,AUTOCARAVANA,2021,54000,0.12,
+Carado,T 447,AUTOCARAVANA,2020,46000,0.11,
+Carado,T 337,AUTOCARAVANA,2021,42000,0.10,Perfilada compacta
+Carado,I 338,AUTOCARAVANA,2020,64000,0.15,Integrada compacta
+Carado,A 461,AUTOCARAVANA,2021,80000,0.20,Integrada clase A
+Roller Team,Granduca 294,AUTOCARAVANA,2020,44000,0.10,
+Roller Team,Kronos 695 M,AUTOCARAVANA,2021,58000,0.13,
+Roller Team,Livingstone 5,AUTOCARAVANA,2020,50000,0.11,
+Sunlight,T 68,AUTOCARAVANA,2020,44000,0.10,
+Sunlight,A 70,AUTOCARAVANA,2021,62000,0.14,Integrada
+Pilote,G740 LJ Sensation,AUTOCARAVANA,2020,60000,0.14,
+Pilote,Pacific P716,AUTOCARAVANA,2021,72000,0.17,Integrada francesa
+Rapido,676,AUTOCARAVANA,2020,57000,0.13,
+Rapido,896F,AUTOCARAVANA,2021,80000,0.20,
+Hobby,Optima De Luxe T 65 GH,AUTOCARAVANA,2020,60000,0.14,
+Hobby,Siesta T 65 HQ,AUTOCARAVANA,2021,52000,0.12,
+Hobby,Premium T 65 GH,AUTOCARAVANA,2022,70000,0.16,
+LMC,Innova 650 G,AUTOCARAVANA,2020,47000,0.11,
+LMC,Explorer T 630 G,AUTOCARAVANA,2021,57000,0.13,
+Carthago,Chic C-Line I 50,AUTOCARAVANA,2020,118000,0.30,Integrada lujo
+Carthago,C-Tourer I 138,AUTOCARAVANA,2021,90000,0.22,
+Bürstner,Lyseo TD 744,AUTOCARAVANA,2020,74000,0.18,
+Bürstner,Ixeo Time IT 706,AUTOCARAVANA,2021,64000,0.15,
+Bürstner,Minimax T 680,AUTOCARAVANA,2021,56000,0.13,
+Trigano,Tribute 640,AUTOCARAVANA,2020,40000,0.09,Entry-level francesa
+Trigano,Vision 554,AUTOCARAVANA,2021,48000,0.11,
+Niesmann+Bischoff,Flair i 930 LE,AUTOCARAVANA,2021,128000,0.32,Integrada top de gama
+Laika,Ecovip L 3109,AUTOCARAVANA,2021,68000,0.16,Italiana muy popular en España
+Itineo,MB 700,AUTOCARAVANA,2020,57000,0.13,

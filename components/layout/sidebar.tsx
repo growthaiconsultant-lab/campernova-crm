@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { LayoutDashboard, Users, ShoppingCart, Truck, GitMerge, Settings } from 'lucide-react'
+import { LayoutDashboard, Users, ShoppingCart, Truck } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 const NAV_ITEMS = [
@@ -10,8 +10,6 @@ const NAV_ITEMS = [
   { href: '/vendedores', label: 'Vendedores', icon: Users },
   { href: '/compradores', label: 'Compradores', icon: ShoppingCart },
   { href: '/vehiculos', label: 'Vehículos', icon: Truck },
-  { href: '/matches', label: 'Matches', icon: GitMerge },
-  { href: '/ajustes', label: 'Ajustes', icon: Settings },
 ]
 
 export function Sidebar() {
@@ -54,7 +52,7 @@ export function Sidebar() {
 
       {/* Footer */}
       <div className="shrink-0 border-t border-sidebar-border px-5 py-3">
-        <p className="text-[10px] text-sidebar-foreground/40">v0.1 · Sprint 1</p>
+        <p className="text-[10px] text-sidebar-foreground/40">v0.1 · MVP</p>
       </div>
     </aside>
   )
