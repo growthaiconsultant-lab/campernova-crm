@@ -12,6 +12,7 @@ import { WhyUsPillars } from '@/components/landing/why-us-pillars'
 import { WhyUsModel } from '@/components/landing/why-us-model'
 import { SellBlock } from '@/components/landing/sell-block'
 import { InspirationSection } from '@/components/landing/inspiration'
+import { LifestyleBanner } from '@/components/landing/lifestyle-banner'
 import { PodcastSection } from '@/components/landing/podcast'
 import { TestimonialsSection } from '@/components/landing/testimonials'
 import { FinalCta } from '@/components/landing/final-cta'
@@ -88,6 +89,7 @@ export default function LandingPage() {
         <WhyUsModel />
         <SellBlock />
         <InspirationSection />
+        <LifestyleBanner />
         <PodcastSection />
         <TestimonialsSection />
         <FinalCta />
