@@ -125,7 +125,7 @@ claude mcp add-json linear '{\"command\":\"npx\",\"args\":[\"-y\",\"mcp-linear@l
 - ✅ **CAM-28** — Job recalcular matches (idempotente, in-process desde Server Actions)
 - ✅ **CAM-29** — UI "Ver matches" en fichas (sección colapsable en ficha vendedor + comprador)
 
-### Sprint 5 — EN CURSO 🔄
+### Sprint 5 — COMPLETADO ✅
 
 - ✅ **CAM-30** — Estados y transiciones: guards en server actions (SellerLead, Vehicle, BuyerLead), `CAMBIO_ESTADO` en activity log, selectores de estado filtrados por transiciones válidas + deshabilitados en estados terminales
 - ✅ **CAM-31** — Activity log timeline: `ActivityTimeline` en fichas vendedor y comprador (icono por tipo, autor, timestamp)
@@ -134,12 +134,25 @@ claude mcp add-json linear '{\"command\":\"npx\",\"args\":[\"-y\",\"mcp-linear@l
 - ✅ **CAM-34** — Notificación email a agentes cuando match score ≥ 70, con throttle persistente de 30 min por agente (`User.lastMatchEmailAt`)
 - ✅ **CAM-37** — Dashboard KPIs: 4 KPIs, distribución por estado, funnel Pro, tiempo medio por estado, filtro de agente con control de permisos
 - ✅ **CAM-38** — Landing comercial `/`: hero, 3 ventajas, cómo funciona, mini-FAQ, CTA final, footer
-- ✅ **CAM-39** — Página `/contacto`: info estática (email, WhatsApp placeholder, horario) + CTA a `/vender`
+- ✅ **CAM-39** — Página `/contacto`: info real (tel 629 92 58 21, WhatsApp wa.me/34629925821, email, instalaciones) + CTA a `/vender`
 - ✅ **CAM-40** — Aviso legal, privacidad, cookies + banner de consentimiento de cookies
 - ✅ **CAM-41** — Consentimientos en formularios: checkbox RGPD en `/vender` step 3, validación Zod + guard server-side, `gdprConsentAt` + `gdprConsentIp` guardados en `seller_leads`
 - ✅ **CAM-43** — Sentry instalado: `@sentry/nextjs`, configs client/server/edge, `instrumentation.ts`, `global-error.tsx`, `withSentryConfig` con source maps
 - ✅ **CAM-44** — Analytics PostHog: `PostHogProvider`, consentimiento conectado al banner, eventos `form_view`/`form_step_completed`/`form_submitted` en `/vender`
 - ⬜ **CAM-46** — Deploy producción
+
+### Portal comprador — EN CURSO 🔄
+
+Tickets según `docs/PRD-Chat-Buyer-v1.md`:
+
+- ✅ **CAM-50** — Schema Prisma: `BuyerChatSession` + enums + migración + `BuyerLead.source` enum
+- ✅ **CAM-51** — `POST /api/chat/buyer/start`: captcha hCaptcha + rate limit 3 sesiones/IP/día + greeting inicial
+- ✅ **CAM-52** — `POST /api/chat/buyer/message`: streaming Claude (Vercel AI SDK) + persistencia de mensajes
+- ✅ **CAM-53** — `POST /api/chat/buyer/complete`: creación BuyerLead + email a agentes
+- ✅ **CAM-54** — Página `/comprar` con UI de chat streaming, mobile-first, hCaptcha invisible (nota: ruta es `/comprar`, no `/buscar` del PRD)
+- ✅ **Páginas de apoyo**: `/comprar/[id]` ficha de vehículo, `/como-funciona`, `/sobre`, `VCard` + `lib/dummy/vehicles.ts`
+- ✅ **E2E tests**: Playwright 22 tests para todas las páginas públicas, 22 passing
+- ⬜ **CAM-55** — Vista en CRM: pestaña "Conversación" en ficha BuyerLead chat + filtro origen
 
 ## Decisiones técnicas
 
@@ -742,7 +755,9 @@ Calculado solo sobre estados ya transicionados (no el estado actual en curso) pa
 ```
 app/
   page.tsx                        — landing comercial /
-  contacto/page.tsx               — información de contacto estática
+  contacto/page.tsx               — información de contacto (tel/WA/email/instalaciones)
+  como-funciona/page.tsx          — proceso compra/venta, 2 columnas × 4 pasos
+  sobre/page.tsx                  — quiénes somos, beneficios, mapa/horario
   aviso-legal/page.tsx            — aviso legal (LSSI-CE)
   privacidad/page.tsx             — política de privacidad (RGPD)
   cookies/page.tsx                — política de cookies + tabla de cookies
@@ -755,9 +770,9 @@ components/
 
 #### PUBLIC_PATHS en middleware.ts
 
-`/`, `/login`, `/auth/callback`, `/vender`, `/contacto`, `/aviso-legal`, `/privacidad`, `/cookies`
+`/`, `/login`, `/auth/callback`, `/vender`, `/contacto`, `/aviso-legal`, `/privacidad`, `/cookies`, `/api/valuation`, `/comprar`, `/api/chat`, `/como-funciona`, `/sobre`
 
-Añadir aquí cualquier nueva ruta pública. Sin este paso, el middleware redirige a `/login`.
+El middleware usa `startsWith` — `/comprar` cubre `/comprar/[id]` y `/api/chat` cubre todas las rutas del chat. Añadir aquí cualquier nueva ruta pública; sin este paso el middleware redirige a `/login`.
 
 #### FAQ — `<details>/<summary>` nativos
 
@@ -765,7 +780,7 @@ El accordion del FAQ en la landing usa HTML nativo (`<details>/<summary>`), sin 
 
 #### Cookie banner — localStorage
 
-`components/cookie-banner.tsx` es un Client Component. Guarda la preferencia en `localStorage` bajo la clave `cn_cookie_consent` (valores: `'all'` | `'essential'`). Se monta en `app/layout.tsx` para estar disponible en todas las páginas. El banner no activa ni desactiva PostHog todavía — eso se conecta en CAM-44.
+`components/cookie-banner.tsx` es un Client Component. Guarda la preferencia en `localStorage` bajo la clave `cn_cookie_consent` (valores: `'all'` | `'essential'`). Se monta en `app/layout.tsx`. Conectado a PostHog en CAM-44.
 
 #### Placeholders pendientes antes del deploy (CAM-46)
 
@@ -777,9 +792,71 @@ Los tres textos legales contienen estos marcadores con badge amarillo visible:
 
 Buscar con `grep -r "PENDIENTE_"` para localizarlos todos.
 
-#### WhatsApp en /contacto
+### Portal comprador — chat UI y páginas de catálogo
 
-El número en `app/contacto/page.tsx` es un placeholder (`wa.me/34600000000`). Actualizar antes del deploy con el número real.
+#### Página `/comprar` — chat de captación (CAM-54)
+
+Client Component puro (`'use client'`). Flujo de sesión:
+
+1. `onLoad` de hCaptcha invisible → `execute()` automático al montar
+2. `onVerify(token)` → `POST /api/chat/buyer/start` → recibe `sessionToken` + `greeting`
+3. Textarea habilitada solo si `sessionToken !== null`. Placeholder pre-sesión: `'Iniciando sesión segura…'`
+4. Sugerencias (`SUGGESTIONS`) visibles solo cuando `sessionToken && messages.user.length === 0`
+
+El textarea tiene placeholder dinámico — esto afecta a los tests E2E: usar `getByPlaceholder('Iniciando sesión segura…')` para testar el estado pre-sesión.
+
+#### Chat API — rutas `/api/chat/buyer/*`
+
+```
+app/api/chat/buyer/
+  start/route.ts     — POST: verifica hCaptcha, rate limit 3/IP/día, crea BuyerChatSession, devuelve sessionToken + greeting
+  message/route.ts   — POST: valida sessionToken, streaming Claude vía Vercel AI SDK, persiste mensajes
+  complete/route.ts  — POST: crea BuyerLead desde la sesión + notifica agentes (reutiliza CAM-19)
+lib/chat/
+  system-prompt.ts   — BUYER_GREETING + system prompt del asistente
+```
+
+**Rate limit**: 3 sesiones nuevas por IP por día, comprobado contra `BuyerChatSession.startedAt` en Prisma. In-process, sin Redis.
+
+**Sitekey hCaptcha en `/comprar`**: usa `NEXT_PUBLIC_HCAPTCHA_SITE_KEY` (mismo que `/vender`). En dev: test sitekey `10000000-ffff-ffff-ffff-000000000001` auto-pasa. El envío a `/api/chat/buyer/start` puede fallar en test si la sesión no tiene configurado Claude API — el chat simplemente no inicia.
+
+#### Página `/comprar/[id]` — ficha de vehículo
+
+RSC con `generateStaticParams` (pre-renderiza los 6 vehículos dummy). `notFound()` para slugs desconocidos → respuesta 404. Datos en `lib/dummy/vehicles.ts`.
+
+```
+lib/dummy/vehicles.ts     — tipo DummyVehicle + array DUMMY_VEHICLES (6 vehículos demo)
+components/vcard.tsx       — tarjeta de vehículo enlazada a /comprar/${id}
+app/comprar/[id]/page.tsx  — generateStaticParams + generateMetadata + página de detalle
+```
+
+**`DummyVehicle`** tiene: `id`, `title`, `year`, `km`, `seats`, `sleeps`, `fuel`, `transmission`, `type`, `price`, `location`, `tags`, `highlight`, `placeholder`. Es temporal — en producción se reemplazará por datos reales de Prisma.
+
+**Diseño del detalle** (`/comprar/[id]`): grid 2fr/1fr en desktop (galería + specs / sidebar con precio y CTAs), colapsa a 1 columna en ≤1000px. Sidebar: precio en Fraunces 38px, botones "Solicitar información" y "Agendar visita", badge "Nova Assistant incluido" con fondo teal-900.
+
+#### Páginas `/como-funciona` y `/sobre`
+
+Server Components estáticos. Ambas en `PUBLIC_PATHS`.
+
+- `/como-funciona`: grid 2 columnas (comprar / vender), cada columna 4 pasos numerados `01`–`04`. Números de paso como strings literales `'01'`–`'04'` (no `1`–`4`) — los tests E2E comprueban `getByText(/^0[1-4]$/)`.
+- `/sobre`: hero teal + sección misión (image placeholder + 5 bullets) + bloque visita (dirección/horario/contacto + enlace Google Maps).
+
+### E2E tests con Playwright
+
+```
+playwright.config.ts          — Chromium only, baseURL localhost:3000, reuseExistingServer en dev
+e2e/public-pages.spec.ts      — 22 tests sobre 8 rutas públicas
+```
+
+**22 tests, 22 passing**. Cubre: `/` (landing, nav, navegación), `/comprar` (heading, estado pre-sesión, sidebar Esteban), `/comprar/[id]` (título/precio/specs, breadcrumb, 404, 6 vehículos demo), `/vender` (h1, tabla comparativa), `/como-funciona` (columnas, 8 pasos), `/sobre` (misión, bloque visita), `/contacto` (4 cards, link WhatsApp), legales ×3.
+
+**Ejecutar**: `pnpm test:e2e`. Levanta `pnpm dev` automáticamente si no hay servidor en puerto 3000 (reuseExistingServer).
+
+**Selectores clave aprendidos**:
+
+- Nav links: scopear a `page.getByRole('navigation').first()` para evitar duplicados con el footer
+- Textos ambiguos (WhatsApp, Email): scopear a `page.getByRole('main')` para excluir footer
+- Placeholder dinámico en `/comprar`: usar `'Iniciando sesión segura…'` (estado pre-sesión), no el placeholder post-sesión
 
 ### Consentimiento RGPD CAM-41
 
@@ -853,7 +930,7 @@ NEXT_PUBLIC_POSTHOG_HOST=https://eu.posthog.com  # ya en .env.local
 
 - 🔲 Verificar dominio `campersnova.com` en Resend → Domains (DNS records) — CAM-18 y CAM-19 ya funcionales en sandbox; necesario para enviar desde `info@campersnova.com` en producción
 - 🔲 Identidad legal del operador (autónomo / S.L.) para los avisos legales — rellenar `[PENDIENTE_*]` en aviso-legal, privacidad y cookies
-- 🔲 Número de WhatsApp real para `/contacto` — actualizar `wa.me/34600000000`
+- ✅ Número de WhatsApp en `/contacto` — ya actualizado a `wa.me/34629925821`
 - ✅ Extensión `vector` activa en Supabase (hecho en CAM-7)
 - 🔲 `SENTRY_AUTH_TOKEN` — generar en sentry.io y añadir en Vercel antes del deploy (CAM-46)
 - 🔲 Alerta error rate >1% en Sentry UI — configurar tras el primer deploy
