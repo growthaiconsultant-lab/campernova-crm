@@ -48,9 +48,9 @@ export function PublicNav() {
             <Image
               src="/images/brand/Logo Campers Nova.png"
               alt="CampersNova"
-              width={148}
-              height={38}
-              className="h-[38px] w-auto object-contain"
+              width={186}
+              height={48}
+              className="h-[48px] w-auto object-contain"
               priority
             />
           </Link>
