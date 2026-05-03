@@ -2,6 +2,7 @@ import { getResend } from './client'
 import { sellerLeadConfirmationHtml } from './templates/seller-lead-confirmation'
 import { agentLeadNotificationHtml } from './templates/agent-lead-notification'
 import { matchNotificationHtml } from './templates/match-notification'
+import type { RegisterBuyerLeadArgs } from '@/lib/chat/tools'
 
 interface SendSellerLeadConfirmationParams {
   to: string
@@ -106,6 +107,51 @@ interface SendMatchNotificationParams {
   buyerSummary: string
   ctaPath: string
   ctaLabel: string
+}
+
+export async function sendBuyerChatLeadNotification(
+  lead: { id: string },
+  args: RegisterBuyerLeadArgs,
+  agentEmails: string[]
+): Promise<void> {
+  if (agentEmails.length === 0) return
+
+  const from = process.env.EMAIL_FROM ?? 'onboarding@resend.dev'
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000'
+
+  const summary = [
+    args.necesidad,
+    args.presupuestoMin && args.presupuestoMax
+      ? `${args.presupuestoMin.toLocaleString()}–${args.presupuestoMax.toLocaleString()} €`
+      : args.presupuestoMax
+        ? `hasta ${args.presupuestoMax.toLocaleString()} €`
+        : '',
+    args.plazos ?? '',
+  ]
+    .filter(Boolean)
+    .join(' · ')
+
+  const html = `<p><strong>Nuevo lead comprador (chat)</strong></p>
+<p>Nombre: ${args.nombre}<br>Email: <a href="mailto:${args.email}">${args.email}</a><br>Teléfono: <a href="tel:${args.telefono}">${args.telefono}</a></p>
+<p>Necesidad: ${summary}</p>
+<p><a href="${appUrl}/compradores/${lead.id}">Ver ficha →</a></p>`
+
+  try {
+    await Promise.all(
+      agentEmails.map((to) =>
+        getResend()
+          .emails.send({
+            from,
+            to,
+            subject: `Nuevo lead chat: ${args.nombre} — ${summary.slice(0, 60)}`,
+            html,
+          })
+          .catch(console.error)
+      )
+    )
+  } catch (err) {
+    console.error('[email] sendBuyerChatLeadNotification failed:', err)
+  }
 }
 
 export async function sendMatchNotification(params: SendMatchNotificationParams): Promise<void> {

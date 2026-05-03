@@ -1,8 +1,10 @@
 import { NextRequest } from 'next/server'
 import { anthropic } from '@ai-sdk/anthropic'
-import { streamText } from 'ai'
+import { streamText, tool, stepCountIs } from 'ai'
 import { db } from '@/lib/db'
 import { BUYER_SYSTEM_PROMPT } from '@/lib/chat/system-prompt'
+import { registerBuyerLeadSchema } from '@/lib/chat/tools'
+import { sendBuyerChatLeadNotification } from '@/lib/email/send'
 
 const MAX_TURNS = 10
 
@@ -37,6 +39,11 @@ export async function POST(req: NextRequest) {
       return new Response(JSON.stringify({ error: 'turn_limit_reached' }), { status: 409 })
     }
 
+    const ip =
+      req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ??
+      req.headers.get('x-real-ip') ??
+      null
+
     const userMessage = {
       role: 'user' as const,
       content: body.message.trim(),
@@ -63,26 +70,103 @@ export async function POST(req: NextRequest) {
       system: BUYER_SYSTEM_PROMPT,
       messages: chatHistory,
       maxOutputTokens: 500,
-      onFinish: async ({ text, usage }) => {
+      stopWhen: stepCountIs(2),
+      tools: {
+        register_buyer_lead: tool({
+          description:
+            'Registra al comprador interesado y sus preferencias de vehículo. Invocar cuando se hayan capturado nombre, email, teléfono y la necesidad principal.',
+          inputSchema: registerBuyerLeadSchema,
+          execute: async (d) => {
+            const dbResult = await db.$transaction(async (tx) => {
+              const lead = await tx.buyerLead.create({
+                data: {
+                  name: d.nombre,
+                  email: d.email,
+                  phone: d.telefono,
+                  source: 'CHAT',
+                  vehicleType: d.tipo ?? undefined,
+                  minSeats: d.plazas ?? undefined,
+                  maxBudget: d.presupuestoMax ?? undefined,
+                  useZone: d.zona ?? undefined,
+                  purchaseTimeline: d.plazos ?? undefined,
+                  criticalEquipment: d.equipamiento ?? {},
+                },
+              })
+
+              await tx.buyerChatSession.update({
+                where: { sessionToken: body.sessionToken! },
+                data: {
+                  status: 'COMPLETED',
+                  completedAt: new Date(),
+                  buyerLeadId: lead.id,
+                  gdprConsentAt: new Date(),
+                  gdprConsentIp: ip,
+                  capturedNombre: d.nombre,
+                  capturedEmail: d.email,
+                  capturedTelefono: d.telefono,
+                  capturedNecesidad: d.necesidad,
+                  capturedPlazas: d.plazas,
+                  capturedPresupuestoMin: d.presupuestoMin,
+                  capturedPresupuestoMax: d.presupuestoMax,
+                  capturedPlazos: d.plazos,
+                  capturedEquipamiento: d.equipamiento ?? {},
+                  capturedZona: d.zona,
+                },
+              })
+
+              await tx.activity.create({
+                data: {
+                  type: 'LEAD_CREADO_CHAT',
+                  content: `Lead creado desde chat. Necesidad: ${d.necesidad}`,
+                  buyerLeadId: lead.id,
+                },
+              })
+
+              return lead
+            })
+
+            // Non-blocking agent notification
+            db.user
+              .findMany({ where: { active: true } })
+              .then(async (agents) => {
+                if (agents.length > 0) {
+                  await sendBuyerChatLeadNotification(
+                    dbResult,
+                    d,
+                    agents.map((a) => a.email)
+                  )
+                }
+              })
+              .catch(console.error)
+
+            return { ok: true }
+          },
+        }),
+      },
+      onFinish: async (event) => {
         try {
           const assistantMessage = {
             role: 'assistant',
-            content: text,
+            content: event.text,
             timestamp: new Date().toISOString(),
           }
           const finalMessages = [...updatedMessages, assistantMessage]
 
-          const hasIntentVenta = text.includes('[INTENT_VENTA]')
-          const isComplete = text.includes('[CONVERSATION_COMPLETE]')
+          const hasIntentVenta = event.text.includes('[INTENT_VENTA]')
+
+          // Detect if register_buyer_lead was called across all steps (execute already created lead)
+          const hasRegisterCall = event.steps.some((step) =>
+            step.toolCalls.some((tc) => 'toolName' in tc && tc.toolName === 'register_buyer_lead')
+          )
 
           await db.buyerChatSession.update({
             where: { sessionToken: body.sessionToken! },
             data: {
               messages: finalMessages,
               lastMessageAt: new Date(),
-              totalTokens: { increment: usage?.totalTokens ?? 0 },
-              ...(hasIntentVenta && { status: 'REDIRECTED_SELLER' }),
-              ...(isComplete && { status: 'COMPLETED', completedAt: new Date() }),
+              totalTokens: { increment: event.totalUsage.totalTokens },
+              // Only set status if execute didn't already mark COMPLETED
+              ...(!hasRegisterCall && hasIntentVenta && { status: 'REDIRECTED_SELLER' }),
             },
           })
         } catch (err) {

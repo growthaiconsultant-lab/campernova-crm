@@ -27,17 +27,17 @@ export default function ComprarPage() {
   const inputRef = useRef<HTMLTextAreaElement>(null)
 
   const [sessionToken, setSessionToken] = useState<string | null>(null)
+  const [sessionStatus, setSessionStatus] = useState<
+    'IN_PROGRESS' | 'COMPLETED' | 'REDIRECTED_SELLER'
+  >('IN_PROGRESS')
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [input, setInput] = useState('')
   const [isLoading, setIsLoading] = useState(false)
   const [startError, setStartError] = useState<string | null>(null)
   const [chatError, setChatError] = useState<string | null>(null)
 
-  // Derive state from last assistant message
-  const lastAssistantContent =
-    [...messages].reverse().find((m) => m.role === 'assistant')?.content ?? ''
-  const isComplete = lastAssistantContent.includes('[CONVERSATION_COMPLETE]')
-  const isRedirectedSeller = lastAssistantContent.includes('[INTENT_VENTA]')
+  const isComplete = sessionStatus === 'COMPLETED'
+  const isRedirectedSeller = sessionStatus === 'REDIRECTED_SELLER'
 
   // Scroll on new messages
   useEffect(() => {
@@ -126,6 +126,22 @@ export default function ComprarPage() {
             scrollerRef.current.scrollTop = scrollerRef.current.scrollHeight
           }
         }
+
+        // Poll session status — server may have created a BuyerLead via tool use
+        try {
+          const statusRes = await fetch(
+            `/api/chat/buyer/status?sessionToken=${encodeURIComponent(sessionToken ?? '')}`
+          )
+          if (statusRes.ok) {
+            const statusData = (await statusRes.json()) as { status: string }
+            if (statusData.status === 'COMPLETED' || statusData.status === 'REDIRECTED_SELLER') {
+              setSessionStatus(statusData.status as 'COMPLETED' | 'REDIRECTED_SELLER')
+            }
+          }
+        } catch {
+          // Non-blocking — status display degrades gracefully
+        }
+
         inputRef.current?.focus()
       } catch {
         setChatError('Vaya, algo ha fallado. ¿Volvemos a intentarlo?')
@@ -147,8 +163,7 @@ export default function ComprarPage() {
   const showSuggestions =
     sessionToken && messages.filter((m) => m.role === 'user').length === 0 && !isLoading
 
-  const cleanContent = (text: string) =>
-    text.replace('[CONVERSATION_COMPLETE]', '').replace('[INTENT_VENTA]', '').trim()
+  const cleanContent = (text: string) => text.replace('[INTENT_VENTA]', '').trim()
 
   return (
     <>
