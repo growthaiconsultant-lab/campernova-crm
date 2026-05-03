@@ -29,18 +29,18 @@ export function TestimonialsSection() {
   return (
     <section className="px-8 py-20 max-[640px]:px-5">
       <div className="mx-auto max-w-[1280px]">
-        <div className="mb-14 text-center">
+        <div className="mb-14">
           <p
             className="mb-3 font-mono text-[11px] font-semibold uppercase tracking-[0.14em]"
             style={{ color: 'var(--cn-terra-500)' }}
           >
-            · Lo que dicen nuestros clientes
+            · Quien ya viaja con nosotros
           </p>
           <h2
-            className="text-[2rem] font-bold leading-tight tracking-[-0.02em] lg:text-[2.4rem]"
+            className="max-w-[16ch] text-[2.6rem] font-bold leading-[1.1] tracking-[-0.025em] lg:text-[3.2rem]"
             style={{ color: 'var(--cn-teal-900)', fontFamily: 'var(--font-fraunces)' }}
           >
-            Propietarios que ya vendieron con nosotros.
+            Historias reales, viajes que empiezan o terminan bien.
           </h2>
         </div>
 
