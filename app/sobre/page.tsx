@@ -28,36 +28,6 @@ export default function SobrePage() {
       <PublicNav />
 
       <main className="min-h-screen pt-20" style={{ background: 'var(--cn-cream-100)' }}>
-        {/* Hero */}
-        <section
-          className="px-8 pb-16 pt-16 max-[640px]:px-5"
-          style={{ background: 'var(--cn-teal-900)' }}
-        >
-          <div className="mx-auto max-w-[1280px]">
-            <p
-              className="font-mono text-[11px] uppercase tracking-[0.18em]"
-              style={{ color: 'rgba(255,255,255,0.6)' }}
-            >
-              · Sobre nosotros
-            </p>
-            <h1
-              className="mt-4 text-[clamp(2.2rem,5vw,3.5rem)] leading-[1.05] tracking-[-0.02em] text-white"
-              style={{ fontFamily: 'var(--font-fraunces)', maxWidth: '22ch' }}
-            >
-              Nacimos viajando. Trabajamos para que viajes mejor.
-            </h1>
-            <p
-              className="mt-5 text-[18px] leading-relaxed"
-              style={{ color: 'rgba(255,255,255,0.72)', maxWidth: '60ch' }}
-            >
-              Campers Nova nació en 2019 de la unión entre apasionados del mundo camper y
-              autocaravana y profesionales de la compraventa. Trabajamos desde nuestras
-              instalaciones en Barcelona (Carrer Torre de Cellers, 08150), con cobertura para
-              clientes de toda España.
-            </p>
-          </div>
-        </section>
-
         {/* Instalaciones y equipo — 2 columnas texto */}
         <section className="px-8 py-16 max-[640px]:px-5">
           <div className="mx-auto max-w-[1280px]">
