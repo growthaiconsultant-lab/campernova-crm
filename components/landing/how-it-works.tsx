@@ -1,103 +1,136 @@
-import Link from 'next/link'
+'use client'
 
-const STEPS = [
-  {
-    num: '01',
-    title: 'Cuéntanos sobre tu camper',
-    desc: 'Rellenas un formulario rápido con datos y fotos. Menos de 5 minutos.',
-  },
-  {
-    num: '02',
-    title: 'Tasación gratuita en 24h',
-    desc: 'Un agente revisa todo y te llama con el precio definitivo y los siguientes pasos.',
-  },
-  {
-    num: '03',
-    title: 'Publicamos y filtramos compradores',
-    desc: 'Gestionamos el anuncio y filtramos visitas: solo compradores reales llegan a ti.',
-  },
-  {
-    num: '04',
-    title: 'Cierre y papeleo',
-    desc: 'Cuando aparece la oferta correcta, gestionamos la transferencia y el ITP. Tú firmas y cobras.',
-  },
-]
+import { useState } from 'react'
+
+const STEPS = {
+  comprar: [
+    {
+      num: '01',
+      title: 'Cuéntanos',
+      desc: 'Empieza la conversación describiendo qué buscas. Sin filtros ni formularios eternos.',
+    },
+    {
+      num: '02',
+      title: 'Te orientamos',
+      desc: 'El asistente afina contigo y te conecta con Esteban del equipo cuando esté claro.',
+    },
+    {
+      num: '03',
+      title: 'Propuestas',
+      desc: 'Recibes 2-3 vehículos reales que encajan, por WhatsApp o llamada.',
+    },
+    {
+      num: '04',
+      title: 'Visita y cierre',
+      desc: 'Visita en nuestras instalaciones, prueba dinámica y trámites cubiertos.',
+    },
+  ],
+  vender: [
+    {
+      num: '01',
+      title: 'Cuéntanos',
+      desc: 'Envíanos los datos y fotos de tu vehículo en 5 minutos.',
+    },
+    {
+      num: '02',
+      title: 'Valoración',
+      desc: 'Estudiamos tu camper o autocaravana y te damos un precio realista de mercado.',
+    },
+    {
+      num: '03',
+      title: 'Depósito en instalaciones',
+      desc: 'Nos dejas tu vehículo en nuestras instalaciones. Lo preparamos, fotografiamos y mostramos a compradores serios por ti.',
+    },
+    {
+      num: '04',
+      title: 'Cierre',
+      desc: 'Acompañamos hasta la firma con todos los trámites cubiertos.',
+    },
+  ],
+}
+
+type Tab = 'comprar' | 'vender'
 
 export function HowItWorksSection() {
+  const [active, setActive] = useState<Tab>('comprar')
+  const steps = STEPS[active]
+
   return (
-    <section className="px-8 py-20 max-[640px]:px-5" style={{ background: 'var(--cn-teal-900)' }}>
+    <section className="px-8 py-20 max-[640px]:px-5" style={{ background: 'var(--cn-cream-50)' }}>
       <div className="mx-auto max-w-[1280px]">
-        <div className="mb-14 text-center">
+        {/* Header */}
+        <div className="mb-12 text-center">
           <p
-            className="mb-3 font-mono text-[11px] font-semibold uppercase tracking-[0.14em]"
+            className="mb-4 font-mono text-[11px] font-semibold uppercase tracking-[0.14em]"
             style={{ color: 'var(--cn-terra-500)' }}
           >
             · Cómo funciona
           </p>
           <h2
-            className="mb-4 text-[2rem] font-bold leading-tight tracking-[-0.02em] text-white lg:text-[2.4rem]"
-            style={{ fontFamily: 'var(--font-fraunces)' }}
+            className="mx-auto mb-10 max-w-[18ch] text-[2.2rem] font-bold leading-tight tracking-[-0.025em] lg:text-[3rem]"
+            style={{ color: 'var(--cn-teal-900)', fontFamily: 'var(--font-fraunces)' }}
           >
-            Vende en 4 pasos. Nosotros hacemos el resto.
+            Un proceso pensado para los dos lados de la operación.
           </h2>
-          <p
-            className="mx-auto max-w-[52ch] text-[15px] leading-relaxed"
-            style={{ color: 'rgba(255,255,255,0.65)' }}
+
+          {/* Tab toggle */}
+          <div
+            className="inline-flex rounded-full p-1"
+            style={{ background: 'rgba(38,77,73,0.08)' }}
+            role="tablist"
+            aria-label="Selecciona proceso"
           >
-            Sin intermediarios opacos, sin papeleo complicado, sin esperas interminables. Solo un
-            proceso claro desde la tasación hasta el cobro.
-          </p>
+            {(['comprar', 'vender'] as Tab[]).map((tab) => (
+              <button
+                key={tab}
+                role="tab"
+                aria-selected={active === tab}
+                onClick={() => setActive(tab)}
+                className="rounded-full px-7 py-2.5 text-[14px] font-medium transition-all"
+                style={
+                  active === tab
+                    ? {
+                        background: 'var(--cn-teal-900)',
+                        color: 'white',
+                        boxShadow: '0 1px 4px rgba(0,0,0,0.18)',
+                      }
+                    : { color: 'var(--cn-ink-500)' }
+                }
+              >
+                {tab === 'comprar' ? 'Para comprar' : 'Para vender'}
+              </button>
+            ))}
+          </div>
         </div>
 
+        {/* Step cards */}
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-          {STEPS.map(({ num, title, desc }) => (
+          {steps.map(({ num, title, desc }) => (
             <div
               key={num}
-              className="rounded-[16px] p-6"
+              className="rounded-[20px] p-7"
               style={{
-                background: 'rgba(255,255,255,0.06)',
-                border: '1px solid rgba(255,255,255,0.10)',
+                background: 'white',
+                border: '1px solid rgba(38,77,73,0.09)',
               }}
             >
               <span
-                className="mb-4 block font-mono text-[2.5rem] font-bold leading-none"
-                style={{ color: 'rgba(255,255,255,0.15)' }}
+                className="mb-3 block text-[3rem] font-bold leading-none"
+                style={{ color: 'var(--cn-terra-500)', fontFamily: 'var(--font-fraunces)' }}
               >
                 {num}
               </span>
-              <h3 className="mb-2 text-[15px] font-semibold leading-snug text-white">{title}</h3>
-              <p
-                className="text-[13px] leading-relaxed"
-                style={{ color: 'rgba(255,255,255,0.60)' }}
+              <h3
+                className="mb-2 text-[15px] font-semibold leading-snug"
+                style={{ color: 'var(--cn-teal-900)' }}
               >
+                {title}
+              </h3>
+              <p className="text-[13px] leading-relaxed" style={{ color: 'var(--cn-ink-500)' }}>
                 {desc}
               </p>
             </div>
           ))}
-        </div>
-
-        <div className="mt-12 flex justify-center">
-          <Link
-            href="/vender"
-            className="inline-flex items-center gap-2 rounded-full px-6 py-3.5 text-[14px] font-semibold text-white transition-opacity hover:opacity-90"
-            style={{ background: 'var(--cn-terra-500)' }}
-          >
-            Empezar la tasación gratuita
-            <svg
-              width="15"
-              height="15"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2.2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              aria-hidden="true"
-            >
-              <path d="M5 12h14" />
-              <path d="M13 5l7 7-7 7" />
-            </svg>
-          </Link>
         </div>
       </div>
     </section>
