@@ -6,6 +6,10 @@ import { HeroSection } from '@/components/landing/hero'
 import { TrustStrip } from '@/components/landing/trust-strip'
 import { TwoRoutes } from '@/components/landing/two-routes'
 import { SearchMethod } from '@/components/landing/search-method'
+import { NovaAssistant } from '@/components/landing/nova-assistant'
+import { HowItWorksSection } from '@/components/landing/how-it-works'
+import { WhyUsPillars } from '@/components/landing/why-us-pillars'
+import { SellBlock } from '@/components/landing/sell-block'
 import { LandingAnalytics } from '@/components/landing/analytics'
 
 export const metadata: Metadata = {
@@ -73,6 +77,10 @@ export default function LandingPage() {
         <TrustStrip />
         <TwoRoutes />
         <SearchMethod />
+        <NovaAssistant />
+        <HowItWorksSection />
+        <WhyUsPillars />
+        <SellBlock />
       </main>
 
       <PublicFooter />
