@@ -28,35 +28,6 @@ export default function SobrePage() {
       <PublicNav />
 
       <main className="min-h-screen pt-20" style={{ background: 'var(--cn-cream-100)' }}>
-        {/* Instalaciones y equipo — 2 columnas texto */}
-        <section className="px-8 py-16 max-[640px]:px-5">
-          <div className="mx-auto max-w-[1280px]">
-            <div className="grid gap-10 lg:grid-cols-2 lg:items-end">
-              <div>
-                <p
-                  className="mb-4 font-mono text-[11px] font-semibold uppercase tracking-[0.14em]"
-                  style={{ color: 'var(--cn-terra-500)' }}
-                >
-                  · Instalaciones y equipo
-                </p>
-                <h2
-                  className="text-[2.2rem] font-bold leading-[1.1] tracking-[-0.025em] lg:text-[2.8rem]"
-                  style={{ color: 'var(--cn-teal-900)', fontFamily: 'var(--font-fraunces)' }}
-                >
-                  No somos un portal. Somos una empresa con instalaciones propias.
-                </h2>
-              </div>
-              <p
-                className="max-w-[52ch] text-[16px] leading-relaxed lg:pb-1"
-                style={{ color: 'var(--cn-ink-500)' }}
-              >
-                Tenemos espacio en Barcelona para custodia, limpieza y fotografía profesional. Cada
-                vehículo pasa por nuestras manos, no solo por una pantalla.
-              </p>
-            </div>
-          </div>
-        </section>
-
         {/* Mission + benefits */}
         <section className="px-8 py-20 max-[640px]:px-5">
           <div className="mx-auto max-w-[1280px]">
