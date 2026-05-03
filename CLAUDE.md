@@ -148,7 +148,7 @@ Tickets según `docs/PRD-Chat-Buyer-v1.md`:
 - ✅ **CAM-50** — Schema Prisma: `BuyerChatSession` + enums + migración + `BuyerLead.source` enum
 - ✅ **CAM-51** — `POST /api/chat/buyer/start`: captcha hCaptcha + rate limit 3 sesiones/IP/día + greeting inicial
 - ✅ **CAM-52** — `POST /api/chat/buyer/message`: streaming Claude (Vercel AI SDK) + persistencia de mensajes
-- ✅ **CAM-53** — `POST /api/chat/buyer/complete`: creación BuyerLead + email a agentes
+- ✅ **CAM-53** — Creación BuyerLead via Anthropic tool use en `message/route.ts`; `/complete` deprecado (410)
 - ✅ **CAM-54** — Página `/comprar` con UI de chat streaming, mobile-first, hCaptcha invisible (nota: ruta es `/comprar`, no `/buscar` del PRD)
 - ✅ **Páginas de apoyo**: `/comprar/[id]` ficha de vehículo, `/como-funciona`, `/sobre`, `VCard` + `lib/dummy/vehicles.ts`
 - ✅ **E2E tests**: Playwright 22 tests para todas las páginas públicas, 22 passing
@@ -798,27 +798,60 @@ Buscar con `grep -r "PENDIENTE_"` para localizarlos todos.
 
 Client Component puro (`'use client'`). Flujo de sesión:
 
-1. `onLoad` de hCaptcha invisible → `execute()` automático al montar
-2. `onVerify(token)` → `POST /api/chat/buyer/start` → recibe `sessionToken` + `greeting`
-3. Textarea habilitada solo si `sessionToken !== null`. Placeholder pre-sesión: `'Iniciando sesión segura…'`
-4. Sugerencias (`SUGGESTIONS`) visibles solo cuando `sessionToken && messages.user.length === 0`
+1. En **dev**: `useEffect` llama `handleCaptchaVerify('dev-bypass')` automáticamente (el widget hCaptcha no se renderiza).
+   En **producción**: hCaptcha invisible → `onLoad` → `execute()` → `onVerify(token)` → `handleCaptchaVerify(token)`.
+2. `handleCaptchaVerify` → `POST /api/chat/buyer/start` → recibe `sessionToken` + `greeting`.
+3. Textarea habilitada solo si `sessionToken !== null`. Placeholder pre-sesión: `'Iniciando sesión segura…'`.
+4. Sugerencias (`SUGGESTIONS`) visibles solo cuando `sessionToken && messages.user.length === 0`.
+5. Tras cada respuesta del asistente: `GET /api/chat/buyer/status?sessionToken=...` → si devuelve `COMPLETED` o `REDIRECTED_SELLER`, actualiza `sessionStatus` y se oculta el input.
 
-El textarea tiene placeholder dinámico — esto afecta a los tests E2E: usar `getByPlaceholder('Iniciando sesión segura…')` para testar el estado pre-sesión.
+El estado de sesión vive en `sessionStatus: 'IN_PROGRESS' | 'COMPLETED' | 'REDIRECTED_SELLER'` (no se deriva del contenido de los mensajes). `isComplete` y `isRedirectedSeller` son derivadas de `sessionStatus`.
+
+El textarea tiene placeholder dinámico — los tests E2E deben usar `getByPlaceholder('Iniciando sesión segura…')` para testar el estado pre-sesión.
 
 #### Chat API — rutas `/api/chat/buyer/*`
 
 ```
 app/api/chat/buyer/
   start/route.ts     — POST: verifica hCaptcha, rate limit 3/IP/día, crea BuyerChatSession, devuelve sessionToken + greeting
-  message/route.ts   — POST: valida sessionToken, streaming Claude vía Vercel AI SDK, persiste mensajes
-  complete/route.ts  — POST: crea BuyerLead desde la sesión + notifica agentes (reutiliza CAM-19)
+  message/route.ts   — POST: streaming Claude + tool use register_buyer_lead (crea BuyerLead en execute)
+  status/route.ts    — GET ?sessionToken=...: devuelve { status, buyerLeadId } — usado por el cliente tras el stream
+  complete/route.ts  — DEPRECADO: devuelve 410 Gone
 lib/chat/
-  system-prompt.ts   — BUYER_GREETING + system prompt del asistente
+  system-prompt.ts   — BUYER_GREETING + system prompt del asistente (sin marcador [CONVERSATION_COMPLETE])
+  tools.ts           — registerBuyerLeadSchema (Zod) + RegisterBuyerLeadArgs
 ```
 
 **Rate limit**: 3 sesiones nuevas por IP por día, comprobado contra `BuyerChatSession.startedAt` en Prisma. In-process, sin Redis.
 
-**Sitekey hCaptcha en `/comprar`**: usa `NEXT_PUBLIC_HCAPTCHA_SITE_KEY` (mismo que `/vender`). En dev: test sitekey `10000000-ffff-ffff-ffff-000000000001` auto-pasa. El envío a `/api/chat/buyer/start` puede fallar en test si la sesión no tiene configurado Claude API — el chat simplemente no inicia.
+**hCaptcha en `/comprar`**: usa `NEXT_PUBLIC_HCAPTCHA_SITE_KEY`. En dev el widget no se renderiza y el bypass es automático vía `useEffect` — el server también saltea la verificación con `NODE_ENV !== 'production'`.
+
+#### Chat — creación BuyerLead via tool use
+
+**Arquitectura**: el asistente invoca el tool `register_buyer_lead` (definido en `lib/chat/tools.ts`) en cuanto tiene nombre, email, teléfono y necesidad del comprador. La creación del lead ocurre en la función `execute` del tool, que corre en el servidor durante el stream (paso 1 de 2), **antes** de que llegue el texto de confirmación al cliente.
+
+**Por qué `execute` y no `onFinish`**: con `onFinish` el lead se crearía después de que el stream termina, pero el cliente ya haría el poll de `/status` y obtendría `IN_PROGRESS`. Usando `execute`, el `$transaction` (BuyerLead + actualización sesión a `COMPLETED` + Activity) termina antes del paso 2, por lo que cuando el cliente hace el poll, `COMPLETED` ya está en la DB.
+
+**Vercel AI SDK v6 — API relevante**:
+
+- `tool({ inputSchema, execute })` — `inputSchema` (no `parameters`) acepta directamente el schema Zod
+- `stopWhen: stepCountIs(2)` — (no `maxSteps`) paso 1: tool call; paso 2: texto de confirmación
+- `onFinish(event)` — `event.totalUsage.totalTokens` para tokens agregados; `event.steps` para detectar si se invocó el tool
+- No existe `maxSteps` en esta versión; usar siempre `stopWhen`
+
+**Flujo completo**:
+
+1. Cliente envía mensaje → `POST /api/chat/buyer/message`
+2. Servidor: paso 1 — Claude llama `register_buyer_lead` con los datos capturados
+3. `execute` corre: `db.$transaction` → `BuyerLead.create` + `BuyerChatSession.update(COMPLETED)` + `Activity.create`; notificación email a agentes fire-and-forget
+4. Paso 2: Claude genera texto cálido de confirmación ("Un agente te contactará en 24h")
+5. Stream llega al cliente; loop termina (`done: true`)
+6. Cliente hace `GET /api/chat/buyer/status` → recibe `{ status: 'COMPLETED' }` → `setSessionStatus('COMPLETED')`
+7. Input se oculta; se muestra bloque de confirmación
+
+**`onFinish`** solo persiste los mensajes finales, incrementa tokens y detecta `[INTENT_VENTA]` (seller redirect, que sigue siendo texto, no tool). No crea leads.
+
+**Notificación a agentes** (`lib/email/send.ts` → `sendBuyerChatLeadNotification`): misma estructura que `sendAgentLeadNotification` pero recibe `RegisterBuyerLeadArgs` + `agentEmails[]`. La query de agentes activos la hace el caller (`message/route.ts`) para no añadir un import de `db` al módulo de email.
 
 #### Página `/comprar/[id]` — ficha de vehículo
 
