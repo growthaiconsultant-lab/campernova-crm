@@ -1,52 +1,32 @@
+import Link from 'next/link'
 import { Sparkles, Shield, Leaf, Handshake } from 'lucide-react'
 
 const FEATURES = [
-  {
-    icon: Sparkles,
-    text: 'Resuelve dudas técnicas en segundos, sin buscar manuales.',
-  },
-  {
-    icon: Shield,
-    text: 'Disponible 24/7, también cuando estás lejos de cobertura humana.',
-  },
+  { icon: Sparkles, text: 'Resuelve dudas técnicas en segundos, sin buscar manuales.' },
+  { icon: Shield, text: 'Disponible 24/7, también cuando estás lejos de cobertura humana.' },
   {
     icon: Leaf,
     text: 'Aprende de tu vehículo: historial, mantenimientos y consejos personalizados.',
   },
-  {
-    icon: Handshake,
-    text: 'Para siempre tuyo. Sin suscripciones, sin coste oculto.',
-  },
+  { icon: Handshake, text: 'Para siempre tuyo. Sin suscripciones, sin coste oculto.' },
 ]
 
-/* Inline SVG QR placeholder — decorative, aria-hidden */
-function QrPlaceholder() {
+function QrSvg({ size }: { size: number }) {
   return (
     <svg
-      width="200"
-      height="200"
+      width={size}
+      height={size}
       viewBox="0 0 200 200"
       fill="none"
       xmlns="http://www.w3.org/2000/svg"
       aria-hidden="true"
-      role="img"
     >
-      {/* Outer border */}
-      <rect x="2" y="2" width="196" height="196" rx="8" stroke="currentColor" strokeWidth="4" />
-
-      {/* Top-left position pattern */}
-      <rect x="16" y="16" width="52" height="52" rx="4" stroke="currentColor" strokeWidth="3.5" />
+      <rect x="16" y="16" width="52" height="52" rx="4" stroke="currentColor" strokeWidth="4" />
       <rect x="28" y="28" width="28" height="28" rx="2" fill="currentColor" />
-
-      {/* Top-right position pattern */}
-      <rect x="132" y="16" width="52" height="52" rx="4" stroke="currentColor" strokeWidth="3.5" />
+      <rect x="132" y="16" width="52" height="52" rx="4" stroke="currentColor" strokeWidth="4" />
       <rect x="144" y="28" width="28" height="28" rx="2" fill="currentColor" />
-
-      {/* Bottom-left position pattern */}
-      <rect x="16" y="132" width="52" height="52" rx="4" stroke="currentColor" strokeWidth="3.5" />
+      <rect x="16" y="132" width="52" height="52" rx="4" stroke="currentColor" strokeWidth="4" />
       <rect x="28" y="144" width="28" height="28" rx="2" fill="currentColor" />
-
-      {/* Data module rows (decorative) */}
       <rect x="84" y="16" width="10" height="10" rx="1" fill="currentColor" />
       <rect x="98" y="16" width="10" height="10" rx="1" fill="currentColor" />
       <rect x="112" y="16" width="10" height="10" rx="1" fill="currentColor" />
@@ -55,7 +35,6 @@ function QrPlaceholder() {
       <rect x="98" y="44" width="10" height="10" rx="1" fill="currentColor" />
       <rect x="84" y="58" width="10" height="10" rx="1" fill="currentColor" />
       <rect x="112" y="58" width="10" height="10" rx="1" fill="currentColor" />
-
       <rect x="16" y="84" width="10" height="10" rx="1" fill="currentColor" />
       <rect x="30" y="84" width="10" height="10" rx="1" fill="currentColor" />
       <rect x="44" y="84" width="10" height="10" rx="1" fill="currentColor" />
@@ -65,50 +44,141 @@ function QrPlaceholder() {
       <rect x="58" y="84" width="10" height="10" rx="1" fill="currentColor" />
       <rect x="58" y="98" width="10" height="10" rx="1" fill="currentColor" />
       <rect x="58" y="112" width="10" height="10" rx="1" fill="currentColor" />
-
       <rect x="84" y="84" width="10" height="10" rx="1" fill="currentColor" />
-      <rect x="98" y="84" width="10" height="10" rx="1" fill="currentColor" />
       <rect x="112" y="84" width="10" height="10" rx="1" fill="currentColor" />
-      <rect x="126" y="84" width="10" height="10" rx="1" fill="currentColor" />
       <rect x="84" y="98" width="10" height="10" rx="1" fill="currentColor" />
-      <rect x="126" y="98" width="10" height="10" rx="1" fill="currentColor" />
+      <rect x="112" y="98" width="10" height="10" rx="1" fill="currentColor" />
       <rect x="98" y="112" width="10" height="10" rx="1" fill="currentColor" />
-      <rect x="112" y="112" width="10" height="10" rx="1" fill="currentColor" />
-
       <rect x="140" y="84" width="10" height="10" rx="1" fill="currentColor" />
-      <rect x="154" y="84" width="10" height="10" rx="1" fill="currentColor" />
       <rect x="168" y="84" width="10" height="10" rx="1" fill="currentColor" />
-      <rect x="140" y="98" width="10" height="10" rx="1" fill="currentColor" />
-      <rect x="168" y="98" width="10" height="10" rx="1" fill="currentColor" />
-      <rect x="154" y="112" width="10" height="10" rx="1" fill="currentColor" />
-
+      <rect x="154" y="98" width="10" height="10" rx="1" fill="currentColor" />
+      <rect x="140" y="112" width="10" height="10" rx="1" fill="currentColor" />
+      <rect x="168" y="112" width="10" height="10" rx="1" fill="currentColor" />
       <rect x="84" y="126" width="10" height="10" rx="1" fill="currentColor" />
       <rect x="112" y="126" width="10" height="10" rx="1" fill="currentColor" />
-      <rect x="126" y="126" width="10" height="10" rx="1" fill="currentColor" />
-      <rect x="84" y="140" width="10" height="10" rx="1" fill="currentColor" />
       <rect x="98" y="140" width="10" height="10" rx="1" fill="currentColor" />
-      <rect x="126" y="140" width="10" height="10" rx="1" fill="currentColor" />
       <rect x="84" y="154" width="10" height="10" rx="1" fill="currentColor" />
       <rect x="112" y="154" width="10" height="10" rx="1" fill="currentColor" />
       <rect x="140" y="126" width="10" height="10" rx="1" fill="currentColor" />
       <rect x="154" y="140" width="10" height="10" rx="1" fill="currentColor" />
-      <rect x="168" y="126" width="10" height="10" rx="1" fill="currentColor" />
       <rect x="168" y="154" width="10" height="10" rx="1" fill="currentColor" />
       <rect x="140" y="168" width="10" height="10" rx="1" fill="currentColor" />
       <rect x="168" y="168" width="10" height="10" rx="1" fill="currentColor" />
-
       <rect x="16" y="126" width="10" height="10" rx="1" fill="currentColor" />
-      <rect x="30" y="126" width="10" height="10" rx="1" fill="currentColor" />
       <rect x="44" y="126" width="10" height="10" rx="1" fill="currentColor" />
-      <rect x="58" y="126" width="10" height="10" rx="1" fill="currentColor" />
-      <rect x="16" y="140" width="10" height="10" rx="1" fill="currentColor" />
-      <rect x="44" y="140" width="10" height="10" rx="1" fill="currentColor" />
-      <rect x="58" y="154" width="10" height="10" rx="1" fill="currentColor" />
+      <rect x="58" y="140" width="10" height="10" rx="1" fill="currentColor" />
       <rect x="30" y="154" width="10" height="10" rx="1" fill="currentColor" />
       <rect x="16" y="168" width="10" height="10" rx="1" fill="currentColor" />
       <rect x="44" y="168" width="10" height="10" rx="1" fill="currentColor" />
-      <rect x="58" y="168" width="10" height="10" rx="1" fill="currentColor" />
     </svg>
+  )
+}
+
+function NovaVisual() {
+  return (
+    /* Extra padding bottom+right so the rotated QR card is not clipped */
+    <div className="relative pb-14 pr-12">
+      {/* Chat card */}
+      <div
+        className="rounded-[20px] p-5 shadow-2xl"
+        style={{ background: 'var(--cn-cream-50, #f5f0e6)' }}
+      >
+        {/* Header */}
+        <div
+          className="mb-4 flex items-center gap-3 rounded-[12px] px-4 py-3"
+          style={{ background: 'var(--cn-teal-900)' }}
+        >
+          <div
+            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-[13px] font-bold text-white"
+            style={{ background: 'var(--cn-terra-500)' }}
+          >
+            N
+          </div>
+          <div>
+            <p className="text-[13px] font-semibold text-white">Nova · tu California Coast</p>
+            <p
+              className="flex items-center gap-1.5 text-[11px]"
+              style={{ color: 'rgba(255,255,255,0.55)' }}
+            >
+              <span className="inline-block h-1.5 w-1.5 rounded-full bg-green-400" />
+              En línea · responde en segundos
+            </p>
+          </div>
+        </div>
+
+        {/* Messages */}
+        <div className="flex flex-col gap-3">
+          <div className="flex justify-end">
+            <div
+              className="max-w-[82%] rounded-[12px] px-4 py-2.5 text-[13px] leading-relaxed text-white"
+              style={{ background: 'var(--cn-teal-900)' }}
+            >
+              ¿Cómo enciendo la calefacción estacionaria?
+            </div>
+          </div>
+          <div className="flex justify-start">
+            <div
+              className="max-w-[82%] rounded-[12px] px-4 py-2.5 text-[13px] leading-relaxed"
+              style={{
+                background: 'white',
+                color: 'var(--cn-teal-900)',
+                border: '1px solid var(--cn-line)',
+              }}
+            >
+              Pulsa el botón con el símbolo de llama en el panel del techo durante 2 segundos.
+              Selecciona temperatura con la rueda. Tarda unos 5 min en arrancar 🔥
+            </div>
+          </div>
+          <div className="flex justify-end">
+            <div
+              className="max-w-[82%] rounded-[12px] px-4 py-2.5 text-[13px] leading-relaxed text-white"
+              style={{ background: 'var(--cn-teal-900)' }}
+            >
+              Me ha saltado un testigo amarillo de aceite
+            </div>
+          </div>
+          {/* Typing indicator */}
+          <div className="flex justify-start">
+            <div
+              className="rounded-[12px] px-4 py-3"
+              style={{ background: 'white', border: '1px solid var(--cn-line)' }}
+            >
+              <div className="flex items-center gap-1">
+                <span
+                  className="h-2 w-2 animate-bounce rounded-full bg-gray-400"
+                  style={{ animationDelay: '0ms' }}
+                />
+                <span
+                  className="h-2 w-2 animate-bounce rounded-full bg-gray-400"
+                  style={{ animationDelay: '150ms' }}
+                />
+                <span
+                  className="h-2 w-2 animate-bounce rounded-full bg-gray-400"
+                  style={{ animationDelay: '300ms' }}
+                />
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* QR floating card — overlaps bottom-right, slightly rotated */}
+      <div
+        className="absolute bottom-0 right-0 rotate-6 rounded-[16px] p-4 shadow-2xl"
+        style={{ background: 'white', color: 'var(--cn-teal-900)' }}
+        aria-hidden="true"
+      >
+        <QrSvg size={110} />
+        <p
+          className="mt-2.5 text-center font-mono text-[9px] font-semibold uppercase leading-relaxed tracking-[0.16em]"
+          style={{ color: 'var(--cn-ink-500)' }}
+        >
+          Escanéame
+          <br />
+          en tu vehículo
+        </p>
+      </div>
+    </div>
   )
 }
 
@@ -123,7 +193,6 @@ export function NovaAssistant() {
           <div className="grid gap-12 lg:grid-cols-2 lg:items-center">
             {/* Copy — left */}
             <div>
-              {/* Badge */}
               <span
                 className="mb-5 inline-flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-[12px] font-semibold"
                 style={{ background: 'rgba(255,255,255,0.12)', color: 'rgba(255,255,255,0.9)' }}
@@ -149,7 +218,7 @@ export function NovaAssistant() {
                 salta un testigo en la carretera.
               </p>
 
-              <ul className="flex flex-col gap-3.5">
+              <ul className="mb-8 flex flex-col gap-3.5">
                 {FEATURES.map(({ icon: Icon, text }) => (
                   <li key={text} className="flex items-start gap-3">
                     <span
@@ -171,27 +240,42 @@ export function NovaAssistant() {
                   </li>
                 ))}
               </ul>
-            </div>
 
-            {/* QR visual — right */}
-            <div className="flex justify-center lg:justify-end">
-              <div className="flex flex-col items-center gap-5">
-                <div
-                  className="flex h-[220px] w-[220px] items-center justify-center rounded-[16px] p-5"
-                  style={{ background: 'white', color: 'var(--cn-teal-900)' }}
+              {/* CTAs */}
+              <div className="flex flex-wrap items-center gap-4">
+                <Link
+                  href="/comprar"
+                  className="inline-flex items-center gap-2 rounded-full px-6 py-3.5 text-[14px] font-semibold text-white transition-opacity hover:opacity-90"
+                  style={{ background: 'var(--cn-terra-500)' }}
                 >
-                  <QrPlaceholder />
-                </div>
-                <p
-                  className="text-center font-mono text-[11px] font-semibold uppercase leading-relaxed tracking-[0.18em]"
-                  style={{ color: 'rgba(255,255,255,0.5)' }}
+                  Empezar búsqueda guiada
+                  <svg
+                    width="15"
+                    height="15"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2.2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    aria-hidden="true"
+                  >
+                    <path d="M5 12h14" />
+                    <path d="M13 5l7 7-7 7" />
+                  </svg>
+                </Link>
+                <Link
+                  href="/como-funciona"
+                  className="text-[14px] font-medium transition-opacity hover:opacity-80"
+                  style={{ color: 'rgba(245,212,194,0.9)' }}
                 >
-                  Escanéame
-                  <br />
-                  en tu vehículo
-                </p>
+                  Cómo funciona
+                </Link>
               </div>
             </div>
+
+            {/* Visual — right */}
+            <NovaVisual />
           </div>
         </div>
       </div>
