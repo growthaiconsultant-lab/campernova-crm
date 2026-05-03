@@ -42,11 +42,9 @@ const contactStepSchema = z.object({
   name: z.string().min(1, 'El nombre es obligatorio'),
   email: z.string().email('Email no válido'),
   phone: z.string().min(6, 'Teléfono demasiado corto'),
-  gdprConsent: z
-    .boolean()
-    .refine((v) => v === true, {
-      message: 'Debes aceptar la política de privacidad para continuar',
-    }),
+  gdprConsent: z.boolean().refine((v) => v === true, {
+    message: 'Debes aceptar la política de privacidad para continuar',
+  }),
 })
 
 type VehicleStepValues = z.input<typeof vehicleStepSchema>
@@ -284,6 +282,13 @@ export default function VenderEmpezarPage() {
   useEffect(() => {
     posthog?.capture('form_view', { form: 'vender' })
   }, [posthog])
+
+  // Dev: bypass hCaptcha — widget doesn't fire on localhost
+  useEffect(() => {
+    if (process.env.NODE_ENV !== 'production') {
+      setCaptchaToken('dev-bypass')
+    }
+  }, [])
 
   const vehicleForm = useForm<VehicleStepValues>({
     resolver: zodResolver(vehicleStepSchema),
@@ -705,14 +710,16 @@ export default function VenderEmpezarPage() {
                 )}
               </div>
 
-              <div className="flex justify-center">
-                <HCaptcha
-                  ref={captchaRef}
-                  sitekey={process.env.NEXT_PUBLIC_HCAPTCHA_SITE_KEY!}
-                  onVerify={(token) => setCaptchaToken(token)}
-                  onExpire={() => setCaptchaToken(null)}
-                />
-              </div>
+              {process.env.NODE_ENV === 'production' && (
+                <div className="flex justify-center">
+                  <HCaptcha
+                    ref={captchaRef}
+                    sitekey={process.env.NEXT_PUBLIC_HCAPTCHA_SITE_KEY!}
+                    onVerify={(token) => setCaptchaToken(token)}
+                    onExpire={() => setCaptchaToken(null)}
+                  />
+                </div>
+              )}
 
               {submitError && (
                 <p className="rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive">

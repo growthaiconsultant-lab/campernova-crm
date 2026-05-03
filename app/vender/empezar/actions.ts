@@ -18,14 +18,16 @@ import { recalculateMatchesForVehicle } from '@/lib/matching'
 const ALLOWED_MIME = ['image/jpeg', 'image/png', 'image/webp']
 const MAX_FILE_SIZE = 2 * 1024 * 1024
 
-async function verifyHCaptcha(token: string): Promise<boolean> {
-  const secret = process.env.HCAPTCHA_SECRET_KEY
-  if (!secret) return false
+const HCAPTCHA_SECRET =
+  process.env.NODE_ENV === 'production'
+    ? (process.env.HCAPTCHA_SECRET_KEY ?? '')
+    : '0x0000000000000000000000000000000000000000' // test secret (pairs with test sitekey)
 
+async function verifyHCaptcha(token: string): Promise<boolean> {
   const res = await fetch('https://api.hcaptcha.com/siteverify', {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: new URLSearchParams({ secret, response: token }),
+    body: new URLSearchParams({ secret: HCAPTCHA_SECRET, response: token }),
   })
   const data = (await res.json()) as { success: boolean }
   return data.success === true
@@ -48,7 +50,7 @@ export async function submitPublicLead(formData: FormData) {
   if (typeof captchaToken !== 'string' || !captchaToken) {
     return { error: 'Completa el captcha antes de enviar.' }
   }
-  const captchaOk = await verifyHCaptcha(captchaToken)
+  const captchaOk = process.env.NODE_ENV !== 'production' || (await verifyHCaptcha(captchaToken))
   if (!captchaOk) {
     return { error: 'Verificación captcha fallida. Inténtalo de nuevo.' }
   }

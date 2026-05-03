@@ -77,6 +77,13 @@ export default function ComprarPage() {
     }
   }, [])
 
+  // Dev: invisible hCaptcha doesn't fire onVerify on localhost — bypass automatically
+  useEffect(() => {
+    if (process.env.NODE_ENV !== 'production') {
+      void handleCaptchaVerify('dev-bypass')
+    }
+  }, [handleCaptchaVerify])
+
   const sendMessage = useCallback(
     async (text?: string) => {
       const content = (text ?? input).trim()
@@ -570,16 +577,16 @@ export default function ComprarPage() {
       </main>
       <PublicFooter />
 
-      {/* hCaptcha — invisible, auto-executes on load */}
-      <HCaptcha
-        ref={captchaRef}
-        sitekey={
-          process.env.NEXT_PUBLIC_HCAPTCHA_SITE_KEY ?? '10000000-ffff-ffff-ffff-000000000001'
-        }
-        size="invisible"
-        onVerify={handleCaptchaVerify}
-        onLoad={() => captchaRef.current?.execute()}
-      />
+      {/* hCaptcha — invisible, auto-executes on load. In dev: bypassed via useEffect. */}
+      {process.env.NODE_ENV === 'production' && (
+        <HCaptcha
+          ref={captchaRef}
+          sitekey={process.env.NEXT_PUBLIC_HCAPTCHA_SITE_KEY!}
+          size="invisible"
+          onVerify={handleCaptchaVerify}
+          onLoad={() => captchaRef.current?.execute()}
+        />
+      )}
     </>
   )
 }

@@ -2,14 +2,16 @@ import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 import { BUYER_GREETING } from '@/lib/chat/system-prompt'
 
+const HCAPTCHA_SECRET =
+  process.env.NODE_ENV === 'production'
+    ? (process.env.HCAPTCHA_SECRET_KEY ?? '')
+    : '0x0000000000000000000000000000000000000000' // test secret (pairs with test sitekey)
+
 async function verifyHCaptcha(token: string): Promise<boolean> {
   const res = await fetch('https://hcaptcha.com/siteverify', {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: new URLSearchParams({
-      secret: process.env.HCAPTCHA_SECRET_KEY ?? '',
-      response: token,
-    }),
+    body: new URLSearchParams({ secret: HCAPTCHA_SECRET, response: token }),
   })
   const json = (await res.json()) as { success: boolean }
   return json.success
@@ -23,7 +25,8 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'captcha_required' }, { status: 400 })
     }
 
-    const captchaOk = await verifyHCaptcha(body.captchaToken)
+    const captchaOk =
+      process.env.NODE_ENV !== 'production' || (await verifyHCaptcha(body.captchaToken))
     if (!captchaOk) {
       return NextResponse.json({ error: 'captcha_failed' }, { status: 400 })
     }
