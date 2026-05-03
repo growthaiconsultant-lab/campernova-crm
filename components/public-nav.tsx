@@ -6,7 +6,7 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { Menu, X } from 'lucide-react'
 
-const NAV_LINKS = [
+const NAV_LINKS: { href: string; label: string; activePath?: string }[] = [
   { href: '/', label: 'Inicio' },
   { href: '/comprar', label: 'Comprar' },
   { href: '/vender', label: 'Vender' },
