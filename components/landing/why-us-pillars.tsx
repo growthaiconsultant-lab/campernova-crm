@@ -1,70 +1,93 @@
 const PILLARS = [
   {
-    stat: 'Solo si vendemos',
-    label: '· sin coste de alta',
-    desc: 'No pagamos hasta que vendemos tu camper. Sin coste de alta, sin mensualidad. Si no vendemos, no te costamos nada.',
+    num: '01',
+    title: 'Especialistas en camper y autocaravana',
+    desc: 'Llevamos años viviendo y revendiendo el sector. Conocemos cada modelo, marca y particularidad.',
   },
   {
-    stat: '42',
-    label: 'días de media hasta la venta',
-    desc: 'Frente a los 3–6 meses en portales generalistas. Compradores cualificados que ya saben lo que buscan.',
+    num: '02',
+    title: 'Trato cercano',
+    desc: 'Te atiende una persona, no un call center. Sin guiones, sin prisa.',
   },
   {
-    stat: '0€',
-    label: 'de coste por adelantado',
-    desc: 'Tasación gratuita, gestión del anuncio y fotos incluidas. Empiezas sin arriesgar nada.',
+    num: '03',
+    title: 'Selección cuidada',
+    desc: 'No publicamos cualquier vehículo. Filtramos por estado, historial y honestidad del propietario.',
+  },
+  {
+    num: '04',
+    title: 'Transparencia total',
+    desc: 'Documentación, kilometraje real y estado mecánico declarado por escrito.',
+  },
+  {
+    num: '05',
+    title: 'Acompañamiento real',
+    desc: 'Antes, durante y después. También cuando ya estás en la carretera.',
+  },
+  {
+    num: '06',
+    title: 'Seguridad jurídica',
+    desc: 'Contratos revisados, transferencias gestionadas y pagos protegidos.',
   },
 ]
 
 export function WhyUsPillars() {
   return (
-    <section className="px-8 py-20 max-[640px]:px-5" style={{ background: 'var(--cn-cream-200)' }}>
+    <section className="px-8 py-20 max-[640px]:px-5" style={{ background: 'var(--cn-cream-50)' }}>
       <div className="mx-auto max-w-[1280px]">
+        {/* Header — 2 columns */}
         <div className="mb-14 grid gap-8 lg:grid-cols-2 lg:items-end">
           <div>
             <p
               className="mb-3 font-mono text-[11px] font-semibold uppercase tracking-[0.14em]"
               style={{ color: 'var(--cn-terra-500)' }}
             >
-              · Por qué CampersNova
+              · Por qué Campers Nova
             </p>
             <h2
-              className="text-[2rem] font-bold leading-tight tracking-[-0.02em] lg:text-[2.4rem]"
+              className="text-[2rem] font-bold leading-tight tracking-[-0.02em] lg:text-[2.5rem]"
               style={{ color: 'var(--cn-teal-900)', fontFamily: 'var(--font-fraunces)' }}
             >
-              El modelo que nos obliga a hacerlo bien.
+              No somos solo un escaparate de vehículos.
             </h2>
           </div>
           <p
-            className="max-w-[52ch] text-[15px] leading-relaxed"
+            className="max-w-[52ch] text-[15px] leading-relaxed lg:pb-1"
             style={{ color: 'var(--cn-ink-500)' }}
           >
-            Cobramos solo si vendemos. Eso alinea completamente nuestros incentivos con los tuyos.
-            Si no encontramos comprador, perdemos el tiempo nosotros, no tú.
+            Somos un punto de encuentro entre personas que quieren viajar mejor y propietarios que
+            quieren vender con tranquilidad. Esa es la diferencia que se nota desde la primera
+            llamada.
           </p>
         </div>
 
-        <div className="grid gap-6 md:grid-cols-3">
-          {PILLARS.map(({ stat, label, desc }) => (
+        {/* 6-pillar grid */}
+        <div
+          className="grid gap-px overflow-hidden rounded-[20px] md:grid-cols-3"
+          style={{ border: '1px solid var(--cn-line)' }}
+        >
+          {PILLARS.map(({ num, title, desc }) => (
             <div
-              key={stat}
-              className="rounded-[20px] p-8"
-              style={{ background: 'var(--cn-cream-50)', border: '1px solid var(--cn-line)' }}
+              key={num}
+              className="p-8"
+              style={{
+                background: 'var(--cn-cream-50)',
+                borderRight: '1px solid var(--cn-line)',
+                borderBottom: '1px solid var(--cn-line)',
+              }}
             >
-              <div className="mb-4 flex items-baseline gap-2">
-                <span
-                  className="font-mono text-[3.5rem] font-bold leading-none tracking-[-0.03em]"
-                  style={{ color: 'var(--cn-teal-900)' }}
-                >
-                  {stat}
-                </span>
-                <span
-                  className="text-[14px] font-medium leading-snug"
-                  style={{ color: 'var(--cn-ink-500)' }}
-                >
-                  {label}
-                </span>
-              </div>
+              <span
+                className="mb-4 block font-mono text-[11px] font-semibold uppercase tracking-[0.14em]"
+                style={{ color: 'var(--cn-terra-500)' }}
+              >
+                {num}
+              </span>
+              <h3
+                className="mb-2.5 text-[15px] font-semibold leading-snug"
+                style={{ color: 'var(--cn-teal-900)' }}
+              >
+                {title}
+              </h3>
               <p className="text-[13px] leading-relaxed" style={{ color: 'var(--cn-ink-500)' }}>
                 {desc}
               </p>
