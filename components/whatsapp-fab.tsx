@@ -1,6 +1,6 @@
 'use client'
 
-const WA_NUMBER = '34600000000' // TODO: replace with real number before deploy
+const WA_NUMBER = '34629925821'
 const WA_MESSAGE = encodeURIComponent('Hola, quiero información sobre vender mi camper')
 
 export function WhatsAppFab() {

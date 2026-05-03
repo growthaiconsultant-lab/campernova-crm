@@ -3,99 +3,155 @@
 import { useState } from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
+import { usePathname } from 'next/navigation'
 import { Menu, X } from 'lucide-react'
-import { Button } from '@/components/ui/button'
 
 const NAV_LINKS = [
-  { href: '/#como-funciona', label: 'Cómo funciona' },
-  { href: '/#calculadora', label: 'Tasación gratis' },
-  { href: '/#preguntas', label: 'FAQ' },
-  { href: '/contacto', label: 'Contacto' },
+  { href: '/', label: 'Inicio' },
+  // /comprar points to home anchor until the page is built in commit 7
+  { href: '/#search-method', label: 'Comprar', activePath: '/comprar' },
+  { href: '/vender', label: 'Vender' },
+  { href: '/como-funciona', label: 'Cómo funciona' },
+  { href: '/sobre', label: 'Sobre nosotros' },
 ]
 
 export function PublicNav() {
   const [open, setOpen] = useState(false)
+  const pathname = usePathname()
+
+  const isActive = (href: string, activePath?: string) => {
+    const path = activePath ?? href.split('#')[0]
+    if (path === '/') return pathname === '/'
+    return pathname.startsWith(path)
+  }
 
   return (
     <>
-      {/* Skip-to-content for keyboard/screen-reader users */}
       <a
         href="#main-content"
-        className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-[200] focus:rounded-md focus:bg-[#cc6119] focus:px-4 focus:py-2 focus:text-white focus:outline-none"
+        className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-[200] focus:rounded-md focus:bg-cn-terra-500 focus:px-4 focus:py-2 focus:text-white focus:outline-none"
       >
         Saltar al contenido
       </a>
 
-      <header className="fixed left-0 right-0 top-0 z-50 border-b border-[#153e4d] bg-[#294e4c]/95 backdrop-blur-sm">
-        <div className="container mx-auto flex h-16 max-w-6xl items-center justify-between px-4">
+      <header
+        className="sticky top-0 z-50 border-b"
+        style={{
+          background: 'rgba(245,240,230,0.86)',
+          backdropFilter: 'saturate(140%) blur(12px)',
+          WebkitBackdropFilter: 'saturate(140%) blur(12px)',
+          borderColor: 'rgba(38,77,73,0.08)',
+        }}
+      >
+        <div className="mx-auto flex h-[76px] max-w-[1280px] items-center justify-between gap-5 px-8 max-[640px]:px-5">
           {/* Logo */}
-          <Link href="/" className="flex shrink-0 items-center gap-2">
+          <Link href="/" className="flex shrink-0 items-center">
             <Image
               src="/images/brand/Logo Campers Nova.png"
               alt="CampersNova"
-              width={140}
-              height={36}
-              className="h-8 w-auto object-contain brightness-0 invert"
+              width={148}
+              height={38}
+              className="h-[38px] w-auto object-contain"
               priority
             />
           </Link>
 
           {/* Desktop nav */}
-          <nav className="hidden items-center gap-6 md:flex" aria-label="Navegación principal">
-            {NAV_LINKS.map(({ href, label }) => (
-              <Link
-                key={href}
-                href={href}
-                className="text-sm text-white/75 transition-colors hover:text-white"
-              >
-                {label}
-              </Link>
-            ))}
+          <nav className="hidden items-center gap-7 lg:flex" aria-label="Navegación principal">
+            {NAV_LINKS.map(({ href, label, activePath }) => {
+              const active = isActive(href, activePath)
+              return (
+                <Link
+                  key={label}
+                  href={href}
+                  className="relative py-1.5 text-[14px] font-medium transition-colors hover:text-cn-teal-900"
+                  style={{ color: active ? 'var(--cn-teal-900)' : 'var(--cn-ink-700)' }}
+                >
+                  {label}
+                  {active && (
+                    <span
+                      className="absolute -bottom-0.5 left-0 right-0 h-0.5 rounded-full"
+                      style={{ background: 'var(--cn-terra-500)' }}
+                    />
+                  )}
+                </Link>
+              )
+            })}
           </nav>
 
-          {/* Desktop CTA */}
-          <div className="hidden md:block">
-            <Link href="/vender">
-              <Button className="bg-[#cc6119] font-medium text-white hover:bg-[#cc6119]/90">
-                Vender mi camper
-              </Button>
+          {/* Desktop CTAs */}
+          <div className="hidden items-center gap-2.5 lg:flex">
+            <Link
+              href="/#search-method"
+              className="inline-flex items-center justify-center rounded-full border px-4 py-2.5 text-[13px] font-medium transition-all hover:text-cn-cream-50"
+              style={{
+                borderColor: 'var(--cn-teal-900)',
+                color: 'var(--cn-teal-900)',
+              }}
+              onMouseEnter={(e) => {
+                ;(e.currentTarget as HTMLElement).style.background = 'var(--cn-teal-900)'
+                ;(e.currentTarget as HTMLElement).style.color = 'var(--cn-cream-50)'
+              }}
+              onMouseLeave={(e) => {
+                ;(e.currentTarget as HTMLElement).style.background = ''
+                ;(e.currentTarget as HTMLElement).style.color = 'var(--cn-teal-900)'
+              }}
+            >
+              Comprar
+            </Link>
+            <Link
+              href="/vender"
+              className="inline-flex items-center justify-center rounded-full px-4 py-2.5 text-[13px] font-medium text-white transition-all hover:opacity-90"
+              style={{ background: 'var(--cn-terra-500)' }}
+            >
+              Vender mi vehículo
             </Link>
           </div>
 
           {/* Mobile: CTA + hamburger */}
-          <div className="flex items-center gap-2 md:hidden">
-            <Link href="/vender">
-              <Button
-                size="sm"
-                className="bg-[#cc6119] px-3 text-xs font-medium text-white hover:bg-[#cc6119]/90"
-              >
-                Vender
-              </Button>
+          <div className="flex items-center gap-2 lg:hidden">
+            <Link
+              href="/vender"
+              className="inline-flex items-center rounded-full px-3 py-2 text-xs font-medium text-white"
+              style={{ background: 'var(--cn-terra-500)' }}
+            >
+              Vender
             </Link>
             <button
               onClick={() => setOpen((v) => !v)}
               aria-label={open ? 'Cerrar menú' : 'Abrir menú'}
               aria-expanded={open}
-              className="rounded-md p-1.5 text-white/80 transition-colors hover:text-white"
+              className="rounded-md p-1.5 transition-colors"
+              style={{ color: 'var(--cn-ink-700)' }}
             >
               {open ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
             </button>
           </div>
         </div>
 
-        {/* Mobile menu drawer */}
+        {/* Mobile drawer */}
         {open && (
-          <div className="border-t border-[#153e4d] bg-[#294e4c] md:hidden">
+          <div
+            className="border-t lg:hidden"
+            style={{
+              borderColor: 'rgba(38,77,73,0.08)',
+              background: 'rgba(245,240,230,0.97)',
+            }}
+          >
             <nav
-              className="container mx-auto flex max-w-6xl flex-col gap-1 px-4 py-4"
+              className="mx-auto flex max-w-[1280px] flex-col px-8 py-4 max-[640px]:px-5"
               aria-label="Menú móvil"
             >
               {NAV_LINKS.map(({ href, label }) => (
                 <Link
-                  key={href}
+                  key={label}
                   href={href}
                   onClick={() => setOpen(false)}
-                  className="border-b border-white/10 py-2.5 text-sm text-white/80 transition-colors last:border-0 hover:text-white"
+                  className="border-b py-3 text-sm font-medium transition-colors last:border-0 hover:text-cn-teal-900"
+                  style={{
+                    borderColor: 'rgba(38,77,73,0.08)',
+                    color: 'var(--cn-ink-700)',
+                  }}
                 >
                   {label}
                 </Link>
