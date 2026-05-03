@@ -13,6 +13,8 @@ const PUBLIC_PATHS = [
   '/api/valuation',
   '/comprar',
   '/api/chat',
+  '/como-funciona',
+  '/sobre',
 ]
 
 export async function middleware(request: NextRequest) {

@@ -1,103 +1,183 @@
 import type { Metadata } from 'next'
-import { Mail, Clock, MessageCircle } from 'lucide-react'
-import { Button } from '@/components/ui/button'
+import Link from 'next/link'
+import { Mail, Phone, MapPin, Clock, MessageCircle, ArrowRight } from 'lucide-react'
 import { PublicNav } from '@/components/public-nav'
 import { PublicFooter } from '@/components/public-footer'
-import Link from 'next/link'
 
 export const metadata: Metadata = {
-  title: 'Contacto — CampersNova',
+  title: 'Contacto · CampersNova',
   description:
-    'Contacta con el equipo de CampersNova. Estamos disponibles de lunes a viernes de 9:00 a 18:00.',
+    'Contacta con el equipo de CampersNova. Teléfono, email, WhatsApp e instalaciones en Barcelona. Lun–Vie 10:00–19:00.',
 }
 
-const INFO = [
+const MAPS_URL =
+  'https://www.google.com/maps/dir//CAMPERS+NOVA,+SL,+Carrer+Torre+de+Cellers,+08150,+Barcelona/@41.4089216,2.1528576,10z/data=!4m8!4m7!1m0!1m5!1m1!1s0x12a4ebf0fa3704c3:0x5219e56327ff3bb7!2m2!1d2.2429082!2d41.5648851'
+
+const CHANNELS = [
   {
-    icon: Mail,
+    Icon: Phone,
+    title: 'Teléfono',
+    value: '629 92 58 21',
+    href: 'tel:+34629925821',
+    detail: 'Lun–Vie 10:00–19:00 · Sáb 10:00–13:00',
+  },
+  {
+    Icon: MessageCircle,
+    title: 'WhatsApp',
+    value: 'Escríbenos por WhatsApp',
+    href: 'https://wa.me/34629925821',
+    detail: 'Respuesta rápida para dudas sobre tasación o compra.',
+  },
+  {
+    Icon: Mail,
     title: 'Email',
     value: 'info@campersnova.com',
     href: 'mailto:info@campersnova.com',
     detail: 'Respondemos en menos de 24 horas en días laborables.',
   },
   {
-    icon: MessageCircle,
-    title: 'WhatsApp',
-    value: 'Escríbenos por WhatsApp',
-    href: 'https://wa.me/34600000000',
-    detail: 'Atención rápida para dudas sobre tasación o el proceso de venta.',
-  },
-  {
-    icon: Clock,
-    title: 'Horario',
-    value: 'Lunes a viernes, 9:00 – 18:00',
-    href: null,
-    detail: 'Zona horaria peninsular española (CET/CEST).',
+    Icon: MapPin,
+    title: 'Instalaciones',
+    value: 'Carrer Torre de Cellers · 08150 Barcelona',
+    href: MAPS_URL,
+    detail: 'Visítanos y prueba cualquier vehículo del catálogo.',
   },
 ]
 
 export default function ContactoPage() {
   return (
-    <div className="flex min-h-screen flex-col bg-background">
+    <>
       <PublicNav />
 
-      {/* Header */}
-      <section className="bg-[#294e4c] px-4 pb-16 pt-36">
-        <div className="container mx-auto max-w-3xl text-center">
-          <h1 className="mb-4 text-4xl font-bold text-white md:text-5xl">Contacto</h1>
-          <p className="mx-auto max-w-xl text-lg text-white/75">
-            ¿Tienes alguna duda? Escríbenos o consulta la información de contacto a continuación.
-          </p>
-        </div>
-      </section>
+      <main className="min-h-screen pt-20" style={{ background: 'var(--cn-cream-100)' }}>
+        {/* Hero */}
+        <section
+          className="px-8 pb-16 pt-16 max-[640px]:px-5"
+          style={{ background: 'var(--cn-teal-900)' }}
+        >
+          <div className="mx-auto max-w-[1280px]">
+            <p
+              className="font-mono text-[11px] uppercase tracking-[0.18em]"
+              style={{ color: 'rgba(255,255,255,0.6)' }}
+            >
+              · Contacto
+            </p>
+            <h1
+              className="mt-4 text-[clamp(2.2rem,5vw,3.5rem)] leading-[1.05] tracking-[-0.02em] text-white"
+              style={{ fontFamily: 'var(--font-fraunces)', maxWidth: '22ch' }}
+            >
+              Estamos aquí para ayudarte.
+            </h1>
+            <p
+              className="mt-5 text-[18px] leading-relaxed"
+              style={{ color: 'rgba(255,255,255,0.72)', maxWidth: '52ch' }}
+            >
+              Cuéntanos qué necesitas. Te respondemos por el canal que prefieras.
+            </p>
+          </div>
+        </section>
 
-      {/* Info cards */}
-      <section className="flex-1 px-4 py-20">
-        <div className="container mx-auto max-w-3xl">
-          <div className="grid gap-6 sm:grid-cols-3">
-            {INFO.map(({ icon: Icon, title, value, href, detail }) => (
-              <div key={title} className="flex flex-col gap-3 rounded-xl border bg-card p-6">
-                <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-[#294e4c]/10">
-                  <Icon className="h-5 w-5 text-[#294e4c]" />
-                </div>
-                <div>
-                  <p className="mb-1 text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                    {title}
-                  </p>
-                  {href ? (
-                    <a
-                      href={href}
-                      className="text-sm font-medium text-foreground transition-colors hover:text-[#cc6119]"
+        {/* Channels */}
+        <section className="px-8 py-16 max-[640px]:px-5">
+          <div className="mx-auto max-w-[1280px]">
+            <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
+              {CHANNELS.map(({ Icon, title, value, href, detail }) => (
+                <a
+                  key={title}
+                  href={href}
+                  target={href.startsWith('http') ? '_blank' : undefined}
+                  rel={href.startsWith('http') ? 'noopener noreferrer' : undefined}
+                  className="group flex flex-col gap-4 rounded-cn-lg p-6 transition hover:-translate-y-0.5"
+                  style={{
+                    background: '#fff',
+                    border: '1px solid var(--cn-line)',
+                    boxShadow: 'var(--sh-sm)',
+                  }}
+                >
+                  <div
+                    className="flex h-10 w-10 items-center justify-center rounded-[10px]"
+                    style={{ background: 'var(--cn-cream-200)', color: 'var(--cn-teal-700)' }}
+                  >
+                    <Icon size={20} />
+                  </div>
+                  <div>
+                    <p
+                      className="mb-1 font-mono text-[10px] uppercase tracking-[0.1em]"
+                      style={{ color: 'var(--cn-ink-500)' }}
+                    >
+                      {title}
+                    </p>
+                    <p
+                      className="text-[14px] font-medium leading-snug group-hover:underline"
+                      style={{ color: 'var(--cn-teal-900)' }}
                     >
                       {value}
-                    </a>
-                  ) : (
-                    <p className="text-sm font-medium text-foreground">{value}</p>
-                  )}
-                </div>
-                <p className="text-xs leading-relaxed text-muted-foreground">{detail}</p>
-              </div>
-            ))}
-          </div>
+                    </p>
+                  </div>
+                  <p
+                    className="mt-auto text-[13px] leading-relaxed"
+                    style={{ color: 'var(--cn-ink-500)' }}
+                  >
+                    {detail}
+                  </p>
+                </a>
+              ))}
+            </div>
 
-          {/* CTA vender */}
-          <div className="mt-12 rounded-xl border bg-muted/50 p-8 text-center">
-            <h2 className="mb-2 text-xl font-semibold text-foreground">
-              ¿Quieres vender tu autocaravana o camper?
+            {/* Hours */}
+            <div
+              className="mt-8 flex items-start gap-4 rounded-cn-lg p-6"
+              style={{ background: 'var(--cn-cream-50)', border: '1px solid var(--cn-line)' }}
+            >
+              <Clock
+                size={20}
+                style={{ color: 'var(--cn-teal-700)', flexShrink: 0, marginTop: 2 }}
+              />
+              <div>
+                <p className="text-[14px] font-semibold" style={{ color: 'var(--cn-teal-900)' }}>
+                  Horario de atención
+                </p>
+                <p className="mt-1 text-[14px]" style={{ color: 'var(--cn-ink-500)' }}>
+                  Lunes – Viernes · 10:00 – 19:00 &nbsp;·&nbsp; Sábado · 10:00 – 13:00 &nbsp;·&nbsp;
+                  Domingo · Cerrado
+                </p>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* CTA band */}
+        <section
+          className="px-8 py-16 max-[640px]:px-5"
+          style={{ background: 'var(--cn-cream-50)', borderTop: '1px solid var(--cn-line)' }}
+        >
+          <div className="mx-auto flex max-w-[1280px] flex-col items-center gap-6 text-center">
+            <h2
+              className="text-[clamp(1.6rem,3vw,2.2rem)] leading-[1.1] tracking-[-0.02em]"
+              style={{
+                fontFamily: 'var(--font-fraunces)',
+                color: 'var(--cn-teal-900)',
+                maxWidth: '28ch',
+              }}
+            >
+              ¿Quieres vender tu camper o autocaravana?
             </h2>
-            <p className="mb-6 text-sm text-muted-foreground">
-              Usa nuestro formulario online para recibir una tasación gratuita en menos de 60
-              segundos.
+            <p className="text-[16px]" style={{ color: 'var(--cn-ink-500)', maxWidth: '48ch' }}>
+              Empieza con una tasación gratuita online. Te respondemos en menos de 24 horas.
             </p>
-            <Link href="/vender">
-              <Button className="bg-[#cc6119] font-medium text-white hover:bg-[#cc6119]/90">
-                Solicitar tasación gratis
-              </Button>
+            <Link
+              href="/vender"
+              className="inline-flex items-center gap-2 rounded-full px-7 py-3.5 text-[15px] font-semibold text-white transition hover:opacity-90"
+              style={{ background: 'var(--cn-terra-500)' }}
+            >
+              Solicitar tasación gratis
+              <ArrowRight size={16} />
             </Link>
           </div>
-        </div>
-      </section>
+        </section>
+      </main>
 
       <PublicFooter />
-    </div>
+    </>
   )
 }
