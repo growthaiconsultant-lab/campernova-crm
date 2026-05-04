@@ -1,4 +1,14 @@
-import { ArrowRightLeft, Phone, Mail, MessageCircle, Zap, UserCheck, PenLine } from 'lucide-react'
+import {
+  ArrowRightLeft,
+  Phone,
+  Mail,
+  MessageCircle,
+  Zap,
+  UserCheck,
+  PenLine,
+  Megaphone,
+  Download,
+} from 'lucide-react'
 import type { ActivityType } from '@prisma/client'
 import { DeleteNoteButton } from './delete-note-button'
 
@@ -11,6 +21,8 @@ const ACTIVITY_LABELS: Record<ActivityType, string> = {
   MATCH_CREADO: 'Match creado',
   LEAD_ASIGNADO: 'Asignación',
   LEAD_CREADO_CHAT: 'Lead desde chat',
+  ANUNCIO_GENERADO: 'Anuncio generado',
+  FOTOS_DESCARGADAS: 'Fotos descargadas',
 }
 
 const ICON_CLASSES: Record<ActivityType, string> = {
@@ -22,6 +34,8 @@ const ICON_CLASSES: Record<ActivityType, string> = {
   MATCH_CREADO: 'bg-violet-100 text-violet-700 dark:bg-violet-900/40 dark:text-violet-300',
   LEAD_ASIGNADO: 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300',
   LEAD_CREADO_CHAT: 'bg-teal-100 text-teal-700 dark:bg-teal-900/40 dark:text-teal-300',
+  ANUNCIO_GENERADO: 'bg-orange-100 text-orange-700 dark:bg-orange-900/40 dark:text-orange-300',
+  FOTOS_DESCARGADAS: 'bg-sky-100 text-sky-700 dark:bg-sky-900/40 dark:text-sky-300',
 }
 
 function ActivityIcon({ type }: { type: ActivityType }) {
@@ -43,6 +57,10 @@ function ActivityIcon({ type }: { type: ActivityType }) {
       return <UserCheck className={cls} />
     case 'LEAD_CREADO_CHAT':
       return <MessageCircle className={cls} />
+    case 'ANUNCIO_GENERADO':
+      return <Megaphone className={cls} />
+    case 'FOTOS_DESCARGADAS':
+      return <Download className={cls} />
   }
 }
 

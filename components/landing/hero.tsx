@@ -6,8 +6,8 @@ export function HeroSection() {
     <section id="main-content" className="relative min-h-[88vh] overflow-hidden">
       {/* Background image */}
       <Image
-        src="/images/landing/hero-sunset-window.png"
-        alt="Camper al atardecer — CampersNova"
+        src="/images/landing/ChatGPT Image 4 may 2026, 09_40_45.png"
+        alt="Camper y autocaravana en la montaña — CampersNova"
         fill
         className="object-cover object-center"
         priority
@@ -19,7 +19,7 @@ export function HeroSection() {
         className="absolute inset-0"
         style={{
           background:
-            'linear-gradient(to right, rgba(26,58,55,0.90) 0%, rgba(26,58,55,0.60) 50%, rgba(26,58,55,0.25) 100%)',
+            'linear-gradient(to right, rgba(10,25,22,0.82) 0%, rgba(10,25,22,0.55) 55%, rgba(10,25,22,0.15) 100%)',
         }}
       />
 
@@ -79,24 +79,24 @@ export function HeroSection() {
                 Quiero vender mi vehículo
               </Link>
             </div>
+
+            {/* Meta pills — inline below CTAs */}
+            <div className="mt-8 flex flex-wrap gap-2">
+              <span
+                className="inline-flex items-center rounded-full px-3 py-1.5 text-[12px] font-medium text-white"
+                style={{ background: 'rgba(255,255,255,0.12)', backdropFilter: 'blur(8px)' }}
+              >
+                ⭐ 4,6 · 36 reseñas en Google
+              </span>
+              <span
+                className="inline-flex items-center rounded-full px-3 py-1.5 text-[12px] font-medium text-white"
+                style={{ background: 'rgba(255,255,255,0.12)', backdropFilter: 'blur(8px)' }}
+              >
+                · Barcelona · Custodia en instalaciones
+              </span>
+            </div>
           </div>
         </div>
-      </div>
-
-      {/* Meta pills — bottom left */}
-      <div className="absolute bottom-8 left-8 flex flex-wrap gap-2 max-[640px]:left-5">
-        <span
-          className="inline-flex items-center rounded-full px-3 py-1.5 text-[12px] font-medium text-white"
-          style={{ background: 'rgba(255,255,255,0.12)', backdropFilter: 'blur(8px)' }}
-        >
-          ⭐ 4,6 · 36 reseñas en Google
-        </span>
-        <span
-          className="inline-flex items-center rounded-full px-3 py-1.5 text-[12px] font-medium text-white"
-          style={{ background: 'rgba(255,255,255,0.12)', backdropFilter: 'blur(8px)' }}
-        >
-          · Barcelona · Custodia en instalaciones
-        </span>
       </div>
     </section>
   )

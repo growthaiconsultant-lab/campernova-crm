@@ -19,6 +19,10 @@ import { WhatsAppButton } from '@/components/whatsapp-button'
 import { sellerWhatsAppMessage } from '@/lib/whatsapp'
 import { SELLER_LEAD_STATUS_LABELS, SELLER_LEAD_STATUS_CLASSES } from '@/lib/state-machine'
 import type { SellerLeadStatus } from '@prisma/client'
+import { PublicNotesEditor } from '@/components/vehicle-ads/public-notes-editor'
+import { GenerateAdButton } from '@/components/vehicle-ads/generate-ad-button'
+import { DownloadPhotosButton } from '@/components/vehicle-ads/download-photos-button'
+import { CardDescription } from '@/components/ui/card'
 
 export default async function FichaVendedorPage({ params }: { params: { id: string } }) {
   const [currentUser, lead, agents, activities] = await Promise.all([
@@ -49,6 +53,11 @@ export default async function FichaVendedorPage({ params }: { params: { id: stri
               },
               orderBy: { score: 'desc' },
               take: 10,
+            },
+            ads: {
+              include: { createdBy: { select: { name: true } } },
+              orderBy: { createdAt: 'desc' },
+              take: 6,
             },
           },
         },
@@ -213,6 +222,58 @@ export default async function FichaVendedorPage({ params }: { params: { id: stri
           )}
         </CardContent>
       </Card>
+
+      {/* Anuncios y publicación */}
+      {v &&
+        (() => {
+          const lastWallapopAd = v.ads?.find((a) => a.channel === 'WALLAPOP') ?? null
+          const lastCochesNetAd = v.ads?.find((a) => a.channel === 'COCHESNET') ?? null
+          return (
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base">Anuncios y publicación</CardTitle>
+                <CardDescription>
+                  Genera el anuncio listo para copiar y pega en Wallapop o Coches.net. El asistente
+                  usa la ficha del vehículo, las notas del agente y las fotos para redactarlo.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <PublicNotesEditor vehicleId={v.id} initialValue={v.publicNotes} />
+                <div className="flex flex-wrap gap-3">
+                  <GenerateAdButton
+                    vehicleId={v.id}
+                    channel="WALLAPOP"
+                    lastAd={
+                      lastWallapopAd
+                        ? {
+                            id: lastWallapopAd.id,
+                            content: lastWallapopAd.content,
+                            createdAt: lastWallapopAd.createdAt,
+                          }
+                        : null
+                    }
+                    agentName={lastWallapopAd?.createdBy?.name ?? undefined}
+                  />
+                  <GenerateAdButton
+                    vehicleId={v.id}
+                    channel="COCHESNET"
+                    lastAd={
+                      lastCochesNetAd
+                        ? {
+                            id: lastCochesNetAd.id,
+                            content: lastCochesNetAd.content,
+                            createdAt: lastCochesNetAd.createdAt,
+                          }
+                        : null
+                    }
+                    agentName={lastCochesNetAd?.createdBy?.name ?? undefined}
+                  />
+                  <DownloadPhotosButton sellerLeadId={lead.id} photoCount={v.photos.length} />
+                </div>
+              </CardContent>
+            </Card>
+          )
+        })()}
 
       {/* Tasación */}
       {v && (

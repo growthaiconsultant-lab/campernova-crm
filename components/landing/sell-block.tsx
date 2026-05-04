@@ -22,10 +22,10 @@ export function SellBlock() {
             <div className="relative">
               <div className="relative h-[520px] overflow-hidden rounded-[20px] max-[640px]:h-[340px]">
                 <Image
-                  src="/images/landing/hero-vw-bus.jpg"
-                  alt="Autocaravana VW lista para la venta"
+                  src="/images/landing/sell-driver.jpg"
+                  alt="Vendedora feliz tras vender su camper con CampersNova"
                   fill
-                  className="object-cover"
+                  className="object-cover object-center"
                   sizes="(max-width: 1024px) 100vw, 50vw"
                 />
               </div>

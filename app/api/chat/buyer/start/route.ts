@@ -36,8 +36,8 @@ export async function POST(req: NextRequest) {
       req.headers.get('x-real-ip') ??
       null
 
-    // Rate limit: max 3 new sessions per IP per day
-    if (ip) {
+    // Rate limit: max 3 new sessions per IP per day — skip in dev
+    if (ip && process.env.NODE_ENV === 'production') {
       const since = new Date(Date.now() - 24 * 60 * 60 * 1000)
       const count = await db.buyerChatSession.count({
         where: { ipAddress: ip, startedAt: { gte: since } },

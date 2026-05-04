@@ -141,6 +141,17 @@ claude mcp add-json linear '{\"command\":\"npx\",\"args\":[\"-y\",\"mcp-linear@l
 - ✅ **CAM-44** — Analytics PostHog: `PostHogProvider`, consentimiento conectado al banner, eventos `form_view`/`form_step_completed`/`form_submitted` en `/vender`
 - ⬜ **CAM-46** — Deploy producción
 
+### Generación de anuncios — COMPLETADO ✅
+
+Feature P0-E: generación de anuncios Wallapop / Coches.net desde la ficha del vendedor.
+
+- ✅ **Schema** — `Vehicle.publicNotes`, modelo `VehicleAd`, enum `AdChannel`, `ActivityType` ampliado con `ANUNCIO_GENERADO` y `FOTOS_DESCARGADAS`. Migración `20260504000000_add_vehicle_ads` aplicada.
+- ✅ **`lib/ads/`** — knowledge base portado del GPT de Joel; prompts, context builder, generador Anthropic con visión multimodal, descarga ZIP.
+- ✅ **Server Actions** — `generateVehicleAd`, `updateVehicleAdContent`, `updateVehiclePublicNotes` en `ads-actions.ts`.
+- ✅ **Route Handler** — `GET /api/vendedores/[id]/photos.zip` con auth y activity log.
+- ✅ **UI** — sección "Anuncios y publicación" al final de la ficha: `PublicNotesEditor` (autosave 1 s), `GenerateAdButton` (Dialog con spinner + contador + copiar + regenerar), `DownloadPhotosButton`.
+- ✅ **Tests** — 8 tests `build-context.test.ts` + 5 tests `download-photos.test.ts`. Total suite: 113 tests verdes.
+
 ### Portal comprador — EN CURSO 🔄
 
 Tickets según `docs/PRD-Chat-Buyer-v1.md`:
@@ -792,6 +803,70 @@ Los tres textos legales contienen estos marcadores con badge amarillo visible:
 
 Buscar con `grep -r "PENDIENTE_"` para localizarlos todos.
 
+### Diseño visual páginas públicas (iteración post-sprint 5)
+
+#### Landing `app/page.tsx` — orden de secciones y eliminaciones
+
+Orden actual de secciones en la landing:
+
+```
+HeroSection → TrustStrip → TwoRoutes → SearchMethod → NovaAssistant →
+HowItWorksSection → WhyUsPillars → SellBlock → LifestyleBanner →
+PodcastSection → TestimonialsSection → FinalCta
+```
+
+Secciones eliminadas definitivamente (no restaurar):
+
+- `WhyUsModel` — "El modelo que nos obliga a hacerlo bien."
+- `InspirationSection` — banner oscuro "¿Tu camper lleva meses sin salir del garaje?"
+
+#### Landing — componentes rediseñados
+
+**`components/landing/lifestyle-banner.tsx`** (NUEVO):
+Banner de lifestyle encima del podcast. Imagen `hero-sunset-couple.png` como fondo con overlay gradiente hacia la derecha. H2 en Fraunces blanco + CTA pill blanco → `/comprar`.
+
+**`components/landing/sell-block.tsx`**:
+Sección 2 columnas cream: izquierda imagen `sell-driver.jpg` (mujer sonriendo en camper) con card overlay de stats superpuesta + derecha checklist de 6 ítems.
+
+**`components/landing/two-routes.tsx`** — asignación de imágenes por card:
+
+- Card **Comprar**: `ChatGPT Image 4 may 2026, 09_39_33.png` — camper Adria en playa mediterránea con palmeras al atardecer. Gradiente terra en badge.
+- Card **Vender**: `ChatGPT Image 4 may 2026, 10_04_07.png` — apretón de manos en instalaciones CampersNova. Gradiente oscuro teal.
+- Ambas cards: `min-h-[440px]`, `borderRadius: 20px`, hover scale `1.03`, `fill + object-cover object-center`.
+
+**`components/landing/podcast.tsx`**:
+Imagen `podcast-studio.jpg` (640×770, portrait 5:6). Render sin recorte: `width={640} height={770} className="block h-auto w-full"` en contenedor `max-w-[460px] overflow-hidden rounded-[20px]`. No usar `fill + object-cover`.
+
+**`components/landing/testimonials.tsx`**:
+Header alineado a la izquierda (no centrado). Eyebrow: "· Quien ya viaja con nosotros". H2: "Historias reales, viajes que empiezan o terminan bien." (`max-w-[16ch]`).
+
+**`components/landing/final-cta.tsx`**:
+Card redondeada (`rounded-[28px]`) con `radial-gradient(ellipse at 50% 0%, #2e5e59, var(--cn-teal-900))`. Dos CTAs: "Quiero comprar" (terra-500) + "Quiero vender" (blanco con texto teal-900).
+
+#### `/como-funciona` — hero cream
+
+El hero usa fondo cream heredado del `<main>` (sin `background` explícito). H1 gigante en Fraunces: `text-[clamp(3rem,7vw,5.5rem)] leading-[1.0] tracking-[-0.03em]`, color `teal-900`, `maxWidth: '18ch'`. Eyebrow terra. Sin fondo teal oscuro.
+
+#### `/sobre` — estructura de secciones
+
+1. **"Instalaciones y equipo"** — grid 2 columnas texto (eyebrow terra + H2 Fraunces teal + párrafo ink-500). Sin imagen en esta sección.
+2. **"Lo que nos mueve"** — 2 columnas: foto `instalaciones.jpg` (aspect 4/5, fill) + copy con lista de 5 beneficios (Check icon en círculo teal-900).
+3. **"Pásate por la nave"** — 2 columnas: datos contacto/horario/dirección + iframe Google Maps.
+
+El hero teal oscuro ("Nacimos viajando...") fue eliminado. No restaurar.
+
+#### `/comprar` — sidebar design
+
+**Card Esteban** (primer card): fondo `var(--cn-teal-900)`, avatar `var(--cn-terra-500)` con "E" blanco, nombre/quote en blanco, quote en Fraunces italic `rgba(255,255,255,0.85)`.
+
+**"Por qué empezar por aquí"**: eyebrow mono uppercase terra (no `font-semibold` de heading). Checks con círculo relleno `teal-900` + SVG check blanco (no polyline simple).
+
+**"¿Prefieres otro canal?"**: eyebrow mono uppercase terra. Items con `borderBottom: '1px solid var(--cn-line)'` entre ellos (no `gap-3`).
+
+#### `public-nav.tsx` — enlace skip eliminado
+
+El enlace "Saltar al contenido" (`<a href="#main-content" className="sr-only ...">`) fue eliminado. No restaurar.
+
 ### Portal comprador — chat UI y páginas de catálogo
 
 #### Página `/comprar` — chat de captación (CAM-54)
@@ -957,6 +1032,73 @@ eu.posthog.com → Product Analytics → Funnels → New Insight → pasos: `for
 ```
 NEXT_PUBLIC_POSTHOG_KEY=phc_...     # ya en .env.local
 NEXT_PUBLIC_POSTHOG_HOST=https://eu.posthog.com  # ya en .env.local
+```
+
+### Módulo de anuncios — P0-E
+
+#### Arquitectura de `lib/ads/`
+
+```
+lib/ads/
+  knowledge/             — 6 archivos .md: equipamiento, capacidades, modelos, pricing,
+                           estructura 10 secciones, reglas por marketplace
+  templates/
+    sales-conditions.md  — bloque fijo "Condiciones de venta" (literal en Coches.net)
+    cta.md               — "Consúltanos sin compromiso…" (literal en Coches.net)
+  prompts/
+    wallapop.ts          — buildWallapopSystemPrompt(knowledge) → string
+    cochesnet.ts         — buildCochesnetSystemPrompt(knowledge, cta, sales) → string
+  build-context.ts       — buildVehicleContext(vehicle) → JSON string para user message
+  generate.ts            — generateAd({ vehicle, photoUrls, channel }) → { content, tokensUsed, model }
+  download-photos.ts     — downloadVehiclePhotosZip(vehicleId) → Buffer; buildZipFilename()
+  index.ts               — exports públicos
+```
+
+**Filosofía anti-alucinación**: los prompts instruccionan explícitamente a OMITIR líneas si el dato no está en la ficha, las notas del agente o las fotos. NUNCA inventar datos técnicos.
+
+#### Carga de knowledge files
+
+`lib/ads/generate.ts` usa `fs.readFileSync` dentro de la función `loadKnowledge()` (no en el top-level del módulo) para leer los 6 archivos `.md` de `lib/ads/knowledge/` en runtime. El path usa `process.cwd()` — funciona en Node.js (Server Actions y Route Handlers). No se puede usar en edge runtime.
+
+#### Visión multimodal — estrategia URL + fallback base64
+
+`generateAd` envía las fotos (top 5 por order) con `source: { type: 'url', url }`. Si la llamada falla (algunos modelos o versiones SDK no aceptan URL sources), se captura el error y se reintenta con todas las fotos descargadas a base64 (`buildBase64ImageBlocks`). El fallback es transparente para el llamador.
+
+**Modelo por defecto**: `claude-haiku-4-5-20251001` (configurable vía `ANTHROPIC_MODEL` en `.env.local`).  
+**Coste estimado**: ~$0.005–0.010 por anuncio (5 imágenes + ~3000 tokens). Negligible para un equipo de 3 agentes.
+
+#### VehicleAd — sin único por canal, historial completo
+
+Cada llamada a `generateVehicleAd` crea una nueva fila en `vehicle_ads` (no upsert). La ficha muestra siempre el último (`orderBy: createdAt desc, take: 1` por canal). Historial completo disponible en DB para auditoría.
+
+#### publicNotes — autosave debounced, sin form submit
+
+`PublicNotesEditor` guarda con debounce de 1 s usando `setTimeout` + `clearTimeout`. No usa `react-hook-form` — es un campo de texto libre sin validación. El server action `updateVehiclePublicNotes` no tiene guard de ADMIN (cualquier agente puede anotar).
+
+#### Download ZIP — Route Handler, no Server Action
+
+Los Server Actions no pueden devolver binarios directamente. El ZIP se sirve desde `GET /api/vendedores/[id]/photos.zip` (el `[id]` es el `sellerLeadId`, que busca el vehicle asociado). El cliente dispara la descarga con `window.location.href` para evitar bloquear el hilo UI.
+
+#### Archivos clave — P0-E
+
+```
+lib/ads/                                        — módulo completo (ver estructura arriba)
+prisma/migrations/20260504000000_add_vehicle_ads/ — migración Schema
+app/(backoffice)/vendedores/[id]/
+  ads-actions.ts                                — generateVehicleAd, updateVehicleAdContent,
+                                                   updateVehiclePublicNotes
+app/api/vendedores/[id]/photos.zip/route.ts     — descarga autenticada del ZIP
+components/vehicle-ads/
+  public-notes-editor.tsx                       — textarea autosave 1 s
+  generate-ad-button.tsx                        — Dialog con spinner/contador/copiar/regenerar
+  download-photos-button.tsx                    — trigger de descarga vía window.location
+```
+
+#### Env vars añadidas
+
+```
+ANTHROPIC_API_KEY=sk-ant-...          # ya en .env.local (usada también por chat comprador)
+ANTHROPIC_MODEL=claude-haiku-4-5-20251001  # opcional; este es el default
 ```
 
 ## Pendientes externos

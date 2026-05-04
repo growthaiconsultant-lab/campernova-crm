@@ -83,6 +83,13 @@ enum ActivityType {
   MATCH_CREADO
   LEAD_ASIGNADO
   LEAD_CREADO_CHAT
+  ANUNCIO_GENERADO
+  FOTOS_DESCARGADAS
+}
+
+enum AdChannel {
+  WALLAPOP
+  COCHESNET
 }
 
 enum BuyerChatStatus {
@@ -132,6 +139,7 @@ model User {
   buyerLeads  BuyerLead[]  @relation("AgentBuyerLeads")
   activities  Activity[]
   valuations  Valuation[]
+  vehicleAds  VehicleAd[]
 
   @@map("users")
 }
@@ -180,6 +188,7 @@ model Vehicle {
   valuationMin         Decimal?          @map("valuation_min") @db.Decimal(10, 2)
   valuationRecommended Decimal?          @map("valuation_recommended") @db.Decimal(10, 2)
   valuationMax         Decimal?          @map("valuation_max") @db.Decimal(10, 2)
+  publicNotes          String?           @map("public_notes")
   status               VehicleStatus     @default(NUEVO)
   publishedAt          DateTime?         @map("published_at")
   soldAt               DateTime?         @map("sold_at")
@@ -190,6 +199,7 @@ model Vehicle {
   photos     VehiclePhoto[]
   valuations Valuation[]
   matches    Match[]
+  ads        VehicleAd[]
 
   @@index([brand, model])
   @@index([status])
@@ -355,6 +365,24 @@ model Document {
   buyerLead  BuyerLead?  @relation(fields: [buyerLeadId], references: [id], onDelete: Cascade)
 
   @@map("documents")
+}
+
+/// Anuncio generado por IA para un vehículo en un canal de venta.
+model VehicleAd {
+  id          String    @id @default(cuid())
+  vehicleId   String    @map("vehicle_id")
+  channel     AdChannel
+  content     String    @db.Text
+  modelUsed   String    @map("model_used")
+  tokensUsed  Int       @default(0) @map("tokens_used")
+  createdById String?   @map("created_by_id")
+  createdAt   DateTime  @default(now()) @map("created_at")
+
+  vehicle   Vehicle @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+  createdBy User?   @relation(fields: [createdById], references: [id])
+
+  @@index([vehicleId, channel, createdAt(sort: Desc)])
+  @@map("vehicle_ads")
 }
 
 /// Tabla de precios de referencia para el algoritmo de tasación.

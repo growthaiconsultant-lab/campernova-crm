@@ -1,15 +1,18 @@
 export function TrustStrip() {
   return (
-    <div
-      className="border-y px-8 py-10 max-[640px]:px-5"
-      style={{ borderColor: 'var(--cn-line)', background: 'var(--cn-cream-200)' }}
-    >
-      <div className="mx-auto grid max-w-[1280px] grid-cols-2 gap-8 lg:grid-cols-4">
+    <div className="relative z-10 -mt-14 px-8 pb-4 max-[640px]:px-5">
+      <div
+        className="mx-auto grid max-w-[1280px] grid-cols-2 gap-x-8 gap-y-6 rounded-[24px] px-8 py-7 lg:grid-cols-4"
+        style={{
+          background: '#fff',
+          boxShadow: '0 4px 32px rgba(26,58,55,0.10)',
+        }}
+      >
         {ITEMS.map(({ icon, title, text }) => (
           <div key={title} className="flex items-start gap-3.5">
             <span
               className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl"
-              style={{ background: 'rgba(38,77,73,0.10)', color: 'var(--cn-teal-500)' }}
+              style={{ background: 'rgba(38,77,73,0.08)', color: 'var(--cn-teal-500)' }}
             >
               {icon}
             </span>

@@ -72,11 +72,11 @@ export default function ComoFuncionaPage() {
               · Cómo funciona
             </p>
             <h1
-              className="text-[clamp(3rem,7vw,5.5rem)] leading-[1.0] tracking-[-0.03em]"
+              className="text-[2.2rem] font-bold leading-[1.1] tracking-[-0.025em] lg:text-[3rem]"
               style={{
                 fontFamily: 'var(--font-fraunces)',
                 color: 'var(--cn-teal-900)',
-                maxWidth: '18ch',
+                maxWidth: '22ch',
               }}
             >
               Un proceso claro de principio a fin.
@@ -98,32 +98,33 @@ export default function ComoFuncionaPage() {
               {/* Comprar */}
               <div>
                 <h3
-                  className="mb-8 text-[28px] tracking-[-0.02em]"
+                  className="mb-10 text-[2rem] tracking-[-0.02em]"
                   style={{ fontFamily: 'var(--font-fraunces)', color: 'var(--cn-teal-700)' }}
                 >
                   Si quieres comprar
                 </h3>
-                <div className="flex flex-col gap-8">
+                <div className="flex flex-col gap-4">
                   {COMPRA_STEPS.map((s) => (
-                    <div key={s.n} className="flex items-start gap-5">
+                    <div
+                      key={s.n}
+                      className="flex items-start gap-6 rounded-[20px] p-6"
+                      style={{ background: '#fff', border: '1px solid var(--cn-line)' }}
+                    >
                       <span
-                        className="flex-shrink-0 font-mono text-[32px] font-light leading-none"
-                        style={{ color: 'var(--cn-teal-700)' }}
+                        className="flex-shrink-0 text-[2.8rem] leading-none tracking-[-0.03em]"
+                        style={{ fontFamily: 'var(--font-fraunces)', color: 'var(--cn-teal-700)' }}
                       >
                         {s.n}
                       </span>
-                      <div>
+                      <div className="pt-1">
                         <h4
-                          className="text-[18px] tracking-[-0.01em]"
-                          style={{
-                            fontFamily: 'var(--font-fraunces)',
-                            color: 'var(--cn-teal-900)',
-                          }}
+                          className="text-[17px] font-semibold leading-snug tracking-[-0.01em]"
+                          style={{ color: 'var(--cn-teal-900)' }}
                         >
                           {s.l}
                         </h4>
                         <p
-                          className="mt-1.5 text-[14px] leading-relaxed"
+                          className="mt-2 text-[14px] leading-relaxed"
                           style={{ color: 'var(--cn-ink-500)' }}
                         >
                           {s.d}
@@ -132,7 +133,7 @@ export default function ComoFuncionaPage() {
                     </div>
                   ))}
                 </div>
-                <div className="mt-10">
+                <div className="mt-12">
                   <Link
                     href="/comprar"
                     className="inline-flex items-center gap-2 rounded-full px-6 py-3 text-[14px] font-semibold text-white transition hover:opacity-90"
@@ -147,32 +148,33 @@ export default function ComoFuncionaPage() {
               {/* Vender */}
               <div>
                 <h3
-                  className="mb-8 text-[28px] tracking-[-0.02em]"
+                  className="mb-10 text-[2rem] tracking-[-0.02em]"
                   style={{ fontFamily: 'var(--font-fraunces)', color: 'var(--cn-terra-500)' }}
                 >
                   Si quieres vender
                 </h3>
-                <div className="flex flex-col gap-8">
+                <div className="flex flex-col gap-4">
                   {VENTA_STEPS.map((s) => (
-                    <div key={s.n} className="flex items-start gap-5">
+                    <div
+                      key={s.n}
+                      className="flex items-start gap-6 rounded-[20px] p-6"
+                      style={{ background: '#fff', border: '1px solid var(--cn-line)' }}
+                    >
                       <span
-                        className="flex-shrink-0 font-mono text-[32px] font-light leading-none"
-                        style={{ color: 'var(--cn-terra-500)' }}
+                        className="flex-shrink-0 text-[2.8rem] leading-none tracking-[-0.03em]"
+                        style={{ fontFamily: 'var(--font-fraunces)', color: 'var(--cn-terra-500)' }}
                       >
                         {s.n}
                       </span>
-                      <div>
+                      <div className="pt-1">
                         <h4
-                          className="text-[18px] tracking-[-0.01em]"
-                          style={{
-                            fontFamily: 'var(--font-fraunces)',
-                            color: 'var(--cn-teal-900)',
-                          }}
+                          className="text-[17px] font-semibold leading-snug tracking-[-0.01em]"
+                          style={{ color: 'var(--cn-teal-900)' }}
                         >
                           {s.l}
                         </h4>
                         <p
-                          className="mt-1.5 text-[14px] leading-relaxed"
+                          className="mt-2 text-[14px] leading-relaxed"
                           style={{ color: 'var(--cn-ink-500)' }}
                         >
                           {s.d}
@@ -181,7 +183,7 @@ export default function ComoFuncionaPage() {
                     </div>
                   ))}
                 </div>
-                <div className="mt-10">
+                <div className="mt-12">
                   <Link
                     href="/vender"
                     className="inline-flex items-center gap-2 rounded-full border px-6 py-3 text-[14px] font-semibold transition hover:bg-cn-cream-50"

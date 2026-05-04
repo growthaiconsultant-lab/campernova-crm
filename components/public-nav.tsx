@@ -26,13 +26,6 @@ export function PublicNav() {
 
   return (
     <>
-      <a
-        href="#main-content"
-        className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-[200] focus:rounded-md focus:bg-cn-terra-500 focus:px-4 focus:py-2 focus:text-white focus:outline-none"
-      >
-        Saltar al contenido
-      </a>
-
       <header
         className="sticky top-0 z-50 border-b"
         style={{

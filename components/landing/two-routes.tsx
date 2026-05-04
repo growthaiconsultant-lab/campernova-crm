@@ -39,10 +39,10 @@ export function TwoRoutes() {
             style={{ borderRadius: '20px' }}
           >
             <Image
-              src="/images/landing/hero-sunset-window.png"
-              alt="Vista interior de camper en carretera al atardecer"
+              src="/images/landing/ChatGPT Image 4 may 2026, 09_39_33.png"
+              alt="Camper Adria en la playa al atardecer"
               fill
-              className="object-cover transition-transform duration-500 group-hover:scale-[1.03]"
+              className="object-cover object-center transition-transform duration-500 group-hover:scale-[1.03]"
               sizes="(max-width: 1024px) 100vw, 50vw"
             />
             <div
@@ -103,17 +103,17 @@ export function TwoRoutes() {
             style={{ borderRadius: '20px' }}
           >
             <Image
-              src="/images/landing/hero-sunset-couple.png"
-              alt="Pareja junto a su camper al atardecer"
+              src="/images/landing/ChatGPT Image 4 may 2026, 10_04_07.png"
+              alt="Cierre de venta de autocaravana en instalaciones CampersNova"
               fill
-              className="object-cover transition-transform duration-500 group-hover:scale-[1.03]"
+              className="object-cover object-center transition-transform duration-500 group-hover:scale-[1.03]"
               sizes="(max-width: 1024px) 100vw, 50vw"
             />
             <div
               className="absolute inset-0"
               style={{
                 background:
-                  'linear-gradient(to top, rgba(26,58,55,0.88) 0%, rgba(26,58,55,0.3) 55%, transparent 100%)',
+                  'linear-gradient(to top, rgba(10,25,22,0.92) 0%, rgba(10,25,22,0.45) 55%, rgba(10,25,22,0.10) 100%)',
               }}
             />
             <div className="relative p-8">
