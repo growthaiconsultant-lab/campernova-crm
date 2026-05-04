@@ -14,7 +14,7 @@ export default async function BackofficeLayout({ children }: { children: React.R
       <div className="flex flex-1 flex-col overflow-hidden">
         <Topbar userName={user.name} userEmail={user.email} userRole={roleLabel} />
 
-        <main className="flex-1 overflow-y-auto p-6">{children}</main>
+        <main className="flex-1 overflow-y-auto bg-background p-6">{children}</main>
       </div>
     </div>
   )
