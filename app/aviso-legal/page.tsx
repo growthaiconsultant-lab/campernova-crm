@@ -22,19 +22,15 @@ export default function AvisoLegalPage() {
         </p>
         <ul className="mt-3 list-none space-y-1 text-muted-foreground">
           <li>
-            <span className="font-medium text-foreground">Denominación social:</span>{' '}
-            <span className="rounded bg-yellow-100 px-1 text-xs text-yellow-800">
-              [PENDIENTE_NOMBRE_LEGAL]
-            </span>
+            <span className="font-medium text-foreground">Denominación social:</span> Campers Nova
+            S.L
           </li>
           <li>
             <span className="font-medium text-foreground">NIF / CIF:</span> B-22466874
           </li>
           <li>
-            <span className="font-medium text-foreground">Domicilio:</span>{' '}
-            <span className="rounded bg-yellow-100 px-1 text-xs text-yellow-800">
-              [PENDIENTE_DOMICILIO]
-            </span>
+            <span className="font-medium text-foreground">Domicilio:</span> Carrer Torre de Cellers,
+            08150 Barcelona
           </li>
           <li>
             <span className="font-medium text-foreground">Email de contacto:</span>{' '}
