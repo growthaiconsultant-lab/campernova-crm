@@ -177,7 +177,7 @@ export function PublicFooter() {
         {/* Bottom bar */}
         <div className="flex flex-col items-start justify-between gap-2 border-t border-cn-line pt-6 sm:flex-row sm:items-center">
           <span className="font-mono text-[12px] tracking-[0.06em] text-cn-ink-500">
-            © 2026 CAMPERS NOVA, S.L. · CIF B-12345678
+            © 2026 CAMPERS NOVA, S.L. · CIF B-22466874
           </span>
           <span className="font-mono text-[12px] tracking-[0.06em] text-cn-ink-500">
             BARCELONA · 08150
