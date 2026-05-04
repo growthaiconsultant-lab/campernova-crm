@@ -87,10 +87,10 @@ export function PublicFooter() {
             <ul className="flex flex-col gap-2.5">
               <li>
                 <a
-                  href="tel:+34629925821"
+                  href="tel:+34645639185"
                   className="text-sm text-cn-ink-700 transition-colors hover:text-cn-teal-900"
                 >
-                  629 92 58 21
+                  645 63 91 85
                 </a>
               </li>
               <li>
@@ -113,7 +113,7 @@ export function PublicFooter() {
               </li>
               <li>
                 <a
-                  href="https://wa.me/34629925821"
+                  href="https://wa.me/34645639185"
                   target="_blank"
                   rel="noopener noreferrer"
                   className="text-sm text-cn-ink-700 transition-colors hover:text-cn-teal-900"

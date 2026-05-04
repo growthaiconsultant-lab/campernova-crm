@@ -163,7 +163,7 @@ test.describe('/contacto', () => {
   test('WhatsApp link points to correct number', async ({ page }) => {
     await page.goto('/contacto')
     const waLink = page.getByRole('main').getByRole('link', { name: /WhatsApp/ })
-    await expect(waLink).toHaveAttribute('href', 'https://wa.me/34629925821')
+    await expect(waLink).toHaveAttribute('href', 'https://wa.me/34645639185')
   })
 })
 

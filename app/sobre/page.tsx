@@ -188,11 +188,11 @@ export default function SobrePage() {
                       style={{ color: 'var(--cn-ink-500)' }}
                     >
                       <a
-                        href="tel:+34629925821"
+                        href="tel:+34645639185"
                         className="hover:underline"
                         style={{ color: 'var(--cn-teal-700)' }}
                       >
-                        629 92 58 21
+                        645 63 91 85
                       </a>
                       <br />
                       <a

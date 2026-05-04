@@ -324,12 +324,12 @@ export default function VehicleDetailPage({ params }: Props) {
                   Agendar visita
                 </button>
                 <a
-                  href="tel:+34629925821"
+                  href="tel:+34645639185"
                   className="mx-auto mt-2 flex items-center gap-2 text-[13px] hover:underline"
                   style={{ color: 'var(--cn-teal-700)' }}
                 >
                   <Phone size={14} />
-                  629 92 58 21
+                  645 63 91 85
                 </a>
               </div>
 

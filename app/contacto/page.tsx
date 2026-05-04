@@ -17,15 +17,15 @@ const CHANNELS = [
   {
     Icon: Phone,
     title: 'Teléfono',
-    value: '629 92 58 21',
-    href: 'tel:+34629925821',
+    value: '645 63 91 85',
+    href: 'tel:+34645639185',
     detail: 'Lun–Vie 10:00–19:00 · Sáb 10:00–13:00',
   },
   {
     Icon: MessageCircle,
     title: 'WhatsApp',
     value: 'Escríbenos por WhatsApp',
-    href: 'https://wa.me/34629925821',
+    href: 'https://wa.me/34645639185',
     detail: 'Respuesta rápida para dudas sobre tasación o compra.',
   },
   {
