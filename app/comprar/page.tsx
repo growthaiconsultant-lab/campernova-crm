@@ -6,6 +6,7 @@ import Link from 'next/link'
 import Image from 'next/image'
 import { PublicNav } from '@/components/public-nav'
 import { PublicFooter } from '@/components/public-footer'
+import { BUYER_GREETING } from '@/lib/chat/system-prompt'
 
 type ChatMessage = { role: 'user' | 'assistant'; content: string; id: string }
 
@@ -30,7 +31,9 @@ export default function ComprarPage() {
   const [sessionStatus, setSessionStatus] = useState<
     'IN_PROGRESS' | 'COMPLETED' | 'REDIRECTED_SELLER'
   >('IN_PROGRESS')
-  const [messages, setMessages] = useState<ChatMessage[]>([])
+  const [messages, setMessages] = useState<ChatMessage[]>([
+    { role: 'assistant', content: BUYER_GREETING, id: 'greeting' },
+  ])
   const [input, setInput] = useState('')
   const [isLoading, setIsLoading] = useState(false)
   const [startError, setStartError] = useState<string | null>(null)
@@ -69,9 +72,7 @@ export default function ComprarPage() {
       }
       if (!res.ok || !data.sessionToken) throw new Error(data.error ?? 'start_failed')
       setSessionToken(data.sessionToken)
-      if (data.greeting) {
-        setMessages([{ role: 'assistant', content: data.greeting, id: genId() }])
-      }
+      // greeting ya visible desde el mount — no sobreescribir
     } catch {
       setStartError('No hemos podido iniciar la sesión. Recarga la página e inténtalo de nuevo.')
     }
@@ -225,15 +226,6 @@ export default function ComprarPage() {
                   aria-live="polite"
                   aria-label="Conversación"
                 >
-                  {messages.length === 0 && !startError && (
-                    <p
-                      className="text-center text-[14px]"
-                      style={{ color: 'var(--cn-ink-500)', paddingTop: 40 }}
-                    >
-                      Cuéntale al asistente qué buscas. Tarda 2 minutos.
-                    </p>
-                  )}
-
                   {startError && (
                     <p className="text-center text-[14px] text-red-600" style={{ paddingTop: 40 }}>
                       {startError}
