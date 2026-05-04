@@ -28,10 +28,7 @@ export default function AvisoLegalPage() {
             </span>
           </li>
           <li>
-            <span className="font-medium text-foreground">NIF / CIF:</span>{' '}
-            <span className="rounded bg-yellow-100 px-1 text-xs text-yellow-800">
-              [PENDIENTE_NIF]
-            </span>
+            <span className="font-medium text-foreground">NIF / CIF:</span> B-22466874
           </li>
           <li>
             <span className="font-medium text-foreground">Domicilio:</span>{' '}
