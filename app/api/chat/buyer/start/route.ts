@@ -42,7 +42,7 @@ export async function POST(req: NextRequest) {
       const count = await db.buyerChatSession.count({
         where: { ipAddress: ip, startedAt: { gte: since } },
       })
-      if (count >= 3) {
+      if (count >= 50) {
         return NextResponse.json({ error: 'rate_limit' }, { status: 429 })
       }
     }
