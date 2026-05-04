@@ -5,8 +5,12 @@ CRM interno para gestionar la compraventa de autocaravanas y campers semi-nuevas
 ## Identidad confirmada
 
 - Marca comercial: **CampersNova**
+- Razón social: **Campers Nova S.L**
+- CIF: **B-22466874**
+- Domicilio fiscal/nave: **Carrer Torre de Cellers, 08150 Barcelona**
 - Dominio: `campersnova.com`
 - Email contacto: `info@campersnova.com`
+- Teléfono: `645 63 91 85` · WhatsApp: `wa.me/34645639185`
 - Modelo de negocio: comisión 4% sobre venta (intermediación, no propiedad del vehículo)
 - Equipo: 3 agentes comerciales + 1 admin (Joel)
 - Plazo MVP: 5 semanas a tiempo completo
@@ -52,7 +56,7 @@ CRM interno para gestionar la compraventa de autocaravanas y campers semi-nuevas
 ## Servicios externos ya configurados
 
 - **GitHub repo**: `growthaiconsultant-lab/campernova-crm`
-- **Vercel**: conectado al repo (proyecto se crea con primer push)
+- **Vercel**: desplegado en `https://campernova-crm.vercel.app` ✅ (preview URL; dominio real pendiente CAM-46)
 - **Supabase**: proyecto `campersnova-crm` en Frankfurt (eu-central-1), pgvector activo ✅
 - **Resend**: API key creada, dominio pendiente de verificar
 - **Sentry**: proyecto `campernova-crm` en org `ai-marketing-solutions`
@@ -134,12 +138,12 @@ claude mcp add-json linear '{\"command\":\"npx\",\"args\":[\"-y\",\"mcp-linear@l
 - ✅ **CAM-34** — Notificación email a agentes cuando match score ≥ 70, con throttle persistente de 30 min por agente (`User.lastMatchEmailAt`)
 - ✅ **CAM-37** — Dashboard KPIs: 4 KPIs, distribución por estado, funnel Pro, tiempo medio por estado, filtro de agente con control de permisos
 - ✅ **CAM-38** — Landing comercial `/`: hero, 3 ventajas, cómo funciona, mini-FAQ, CTA final, footer
-- ✅ **CAM-39** — Página `/contacto`: info real (tel 629 92 58 21, WhatsApp wa.me/34629925821, email, instalaciones) + CTA a `/vender`
+- ✅ **CAM-39** — Página `/contacto`: info real (tel 645 63 91 85, WhatsApp wa.me/34645639185, email, instalaciones) + CTA a `/vender`
 - ✅ **CAM-40** — Aviso legal, privacidad, cookies + banner de consentimiento de cookies
 - ✅ **CAM-41** — Consentimientos en formularios: checkbox RGPD en `/vender` step 3, validación Zod + guard server-side, `gdprConsentAt` + `gdprConsentIp` guardados en `seller_leads`
 - ✅ **CAM-43** — Sentry instalado: `@sentry/nextjs`, configs client/server/edge, `instrumentation.ts`, `global-error.tsx`, `withSentryConfig` con source maps
 - ✅ **CAM-44** — Analytics PostHog: `PostHogProvider`, consentimiento conectado al banner, eventos `form_view`/`form_step_completed`/`form_submitted` en `/vender`
-- ⬜ **CAM-46** — Deploy producción
+- ✅ **CAM-46** — Deploy Vercel completado (`campernova-crm.vercel.app`); env vars subidas; Supabase Auth URLs configuradas. Pendiente: conectar dominio real `campersnova.com`, verificar dominio en Resend, añadir `SENTRY_AUTH_TOKEN`
 
 ### Generación de anuncios — COMPLETADO ✅
 
@@ -157,7 +161,7 @@ Feature P0-E: generación de anuncios Wallapop / Coches.net desde la ficha del v
 Tickets según `docs/PRD-Chat-Buyer-v1.md`:
 
 - ✅ **CAM-50** — Schema Prisma: `BuyerChatSession` + enums + migración + `BuyerLead.source` enum
-- ✅ **CAM-51** — `POST /api/chat/buyer/start`: captcha hCaptcha + rate limit 3 sesiones/IP/día + greeting inicial
+- ✅ **CAM-51** — `POST /api/chat/buyer/start`: captcha hCaptcha + rate limit 50 sesiones/IP/día + greeting inicial
 - ✅ **CAM-52** — `POST /api/chat/buyer/message`: streaming Claude (Vercel AI SDK) + persistencia de mensajes
 - ✅ **CAM-53** — Creación BuyerLead via Anthropic tool use en `message/route.ts`; `/complete` deprecado (410)
 - ✅ **CAM-54** — Página `/comprar` con UI de chat streaming, mobile-first, hCaptcha invisible (nota: ruta es `/comprar`, no `/buscar` del PRD)
@@ -793,15 +797,15 @@ El accordion del FAQ en la landing usa HTML nativo (`<details>/<summary>`), sin 
 
 `components/cookie-banner.tsx` es un Client Component. Guarda la preferencia en `localStorage` bajo la clave `cn_cookie_consent` (valores: `'all'` | `'essential'`). Se monta en `app/layout.tsx`. Conectado a PostHog en CAM-44.
 
-#### Placeholders pendientes antes del deploy (CAM-46)
+#### Datos legales ya rellenos (CAM-46)
 
-Los tres textos legales contienen estos marcadores con badge amarillo visible:
+Los textos legales (`/aviso-legal`, `/privacidad`) ya tienen los datos reales:
 
-- `[PENDIENTE_NOMBRE_LEGAL]` — denominación social / nombre del autónomo
-- `[PENDIENTE_NIF]` — NIF o CIF
-- `[PENDIENTE_DOMICILIO]` — dirección fiscal
+- **Denominación social:** Campers Nova S.L
+- **CIF:** B-22466874
+- **Domicilio:** Carrer Torre de Cellers, 08150 Barcelona
 
-Buscar con `grep -r "PENDIENTE_"` para localizarlos todos.
+No quedan badges `[PENDIENTE_*]` en las páginas legales.
 
 ### Diseño visual páginas públicas (iteración post-sprint 5)
 
@@ -873,12 +877,13 @@ El enlace "Saltar al contenido" (`<a href="#main-content" className="sr-only ...
 
 Client Component puro (`'use client'`). Flujo de sesión:
 
-1. En **dev**: `useEffect` llama `handleCaptchaVerify('dev-bypass')` automáticamente (el widget hCaptcha no se renderiza).
+1. El saludo (`BUYER_GREETING`) se pre-carga en `messages` en el mount — el chat aparece con texto inmediatamente sin esperar hCaptcha.
+2. En **dev**: `useEffect` llama `handleCaptchaVerify('dev-bypass')` automáticamente (el widget hCaptcha no se renderiza).
    En **producción**: hCaptcha invisible → `onLoad` → `execute()` → `onVerify(token)` → `handleCaptchaVerify(token)`.
-2. `handleCaptchaVerify` → `POST /api/chat/buyer/start` → recibe `sessionToken` + `greeting`.
-3. Textarea habilitada solo si `sessionToken !== null`. Placeholder pre-sesión: `'Iniciando sesión segura…'`.
-4. Sugerencias (`SUGGESTIONS`) visibles solo cuando `sessionToken && messages.user.length === 0`.
-5. Tras cada respuesta del asistente: `GET /api/chat/buyer/status?sessionToken=...` → si devuelve `COMPLETED` o `REDIRECTED_SELLER`, actualiza `sessionStatus` y se oculta el input.
+3. `handleCaptchaVerify` → `POST /api/chat/buyer/start` → recibe `sessionToken` (el greeting ya visible, no se sobreescribe).
+4. Textarea habilitada solo si `sessionToken !== null`. Placeholder pre-sesión: `'Iniciando sesión segura…'`.
+5. Sugerencias (`SUGGESTIONS`) visibles solo cuando `sessionToken && messages.user.length === 0`.
+6. Tras cada respuesta del asistente: `GET /api/chat/buyer/status?sessionToken=...` → si devuelve `COMPLETED` o `REDIRECTED_SELLER`, actualiza `sessionStatus` y se oculta el input.
 
 El estado de sesión vive en `sessionStatus: 'IN_PROGRESS' | 'COMPLETED' | 'REDIRECTED_SELLER'` (no se deriva del contenido de los mensajes). `isComplete` y `isRedirectedSeller` son derivadas de `sessionStatus`.
 
@@ -888,7 +893,7 @@ El textarea tiene placeholder dinámico — los tests E2E deben usar `getByPlace
 
 ```
 app/api/chat/buyer/
-  start/route.ts     — POST: verifica hCaptcha, rate limit 3/IP/día, crea BuyerChatSession, devuelve sessionToken + greeting
+  start/route.ts     — POST: verifica hCaptcha, rate limit 50/IP/día, crea BuyerChatSession, devuelve sessionToken + greeting
   message/route.ts   — POST: streaming Claude + tool use register_buyer_lead (crea BuyerLead en execute)
   status/route.ts    — GET ?sessionToken=...: devuelve { status, buyerLeadId } — usado por el cliente tras el stream
   complete/route.ts  — DEPRECADO: devuelve 410 Gone
@@ -897,7 +902,7 @@ lib/chat/
   tools.ts           — registerBuyerLeadSchema (Zod) + RegisterBuyerLeadArgs
 ```
 
-**Rate limit**: 3 sesiones nuevas por IP por día, comprobado contra `BuyerChatSession.startedAt` en Prisma. In-process, sin Redis.
+**Rate limit**: 50 sesiones nuevas por IP por día, comprobado contra `BuyerChatSession.startedAt` en Prisma. In-process, sin Redis.
 
 **hCaptcha en `/comprar`**: usa `NEXT_PUBLIC_HCAPTCHA_SITE_KEY`. En dev el widget no se renderiza y el bypass es automático vía `useEffect` — el server también saltea la verificación con `NODE_ENV !== 'production'`.
 
@@ -1104,9 +1109,10 @@ ANTHROPIC_MODEL=claude-haiku-4-5-20251001  # opcional; este es el default
 ## Pendientes externos
 
 - 🔲 Verificar dominio `campersnova.com` en Resend → Domains (DNS records) — CAM-18 y CAM-19 ya funcionales en sandbox; necesario para enviar desde `info@campersnova.com` en producción
-- 🔲 Identidad legal del operador (autónomo / S.L.) para los avisos legales — rellenar `[PENDIENTE_*]` en aviso-legal, privacidad y cookies
-- ✅ Número de WhatsApp en `/contacto` — ya actualizado a `wa.me/34629925821`
+- ✅ Identidad legal — Campers Nova S.L · B-22466874 · Carrer Torre de Cellers, 08150 Barcelona (ya en aviso-legal y privacidad)
+- ✅ Número de teléfono/WhatsApp — actualizado a `645 63 91 85` / `wa.me/34645639185` en todo el proyecto
 - ✅ Extensión `vector` activa en Supabase (hecho en CAM-7)
-- 🔲 `SENTRY_AUTH_TOKEN` — generar en sentry.io y añadir en Vercel antes del deploy (CAM-46)
-- 🔲 Alerta error rate >1% en Sentry UI — configurar tras el primer deploy
-- 🔲 Añadir env vars de producción en Vercel — dejar para CAM-46 (primer deploy)
+- ✅ Deploy Vercel — `campernova-crm.vercel.app` activo, env vars subidas, Supabase Auth URLs configuradas
+- 🔲 Conectar dominio real `campersnova.com` en Vercel (DNS + HTTPS)
+- 🔲 `SENTRY_AUTH_TOKEN` — generar en sentry.io y añadir en Vercel (source maps en producción)
+- 🔲 Alerta error rate >1% en Sentry UI — configurar tras conectar el dominio real
