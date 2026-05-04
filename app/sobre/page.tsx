@@ -63,18 +63,14 @@ export default function SobrePage() {
             <div className="grid items-center gap-16 md:grid-cols-2">
               {/* Foto instalaciones */}
               <div className="mx-auto w-full max-w-[420px]">
-                <div
-                  className="relative aspect-[4/3] overflow-hidden rounded-[20px]"
+                <Image
+                  src="/images/landing/instalaciones.jpg"
+                  alt="Instalaciones CampersNova en Barcelona"
+                  width={840}
+                  height={630}
+                  className="h-auto w-full rounded-[20px]"
                   style={{ border: '1px solid var(--cn-line)' }}
-                >
-                  <Image
-                    src="/images/landing/instalaciones.jpg"
-                    alt="Instalaciones CampersNova en Barcelona"
-                    fill
-                    className="object-cover"
-                    sizes="(max-width: 768px) 100vw, 40vw"
-                  />
-                </div>
+                />
               </div>
 
               {/* Copy */}
