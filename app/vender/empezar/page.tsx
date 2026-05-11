@@ -28,6 +28,7 @@ const vehicleStepSchema = z.object({
   conservationState: z.enum(['EXCELENTE', 'BUENO', 'NORMAL', 'DETERIORADO']).default('NORMAL'),
   length: z.number().positive().optional().nullable(),
   location: z.string().optional(),
+  plate: z.string().max(20).optional(),
   desiredPrice: z.number().positive().optional().nullable(),
   equipment: z.object({
     solar: z.boolean().default(false),
@@ -298,6 +299,7 @@ export default function VenderEmpezarPage() {
       length: null,
       desiredPrice: null,
       location: '',
+      plate: '',
     },
   })
 
@@ -339,6 +341,7 @@ export default function VenderEmpezarPage() {
     if (vehicle.length != null) fd.set('length', String(vehicle.length))
     if (vehicle.desiredPrice != null) fd.set('desiredPrice', String(vehicle.desiredPrice))
     if (vehicle.location) fd.set('location', vehicle.location)
+    if (vehicle.plate) fd.set('plate', vehicle.plate.toUpperCase())
     fd.set('equipment.solar', String(vehicle.equipment?.solar ?? false))
     fd.set('equipment.kitchen', String(vehicle.equipment?.kitchen ?? false))
     fd.set('equipment.bathroom', String(vehicle.equipment?.bathroom ?? false))
@@ -567,6 +570,24 @@ export default function VenderEmpezarPage() {
                     placeholder="Ej: Barcelona"
                     {...vehicleForm.register('location')}
                   />
+                </div>
+
+                <div>
+                  <label className="mb-1.5 block text-sm font-medium">
+                    Matrícula <span className="text-muted-foreground">(opcional)</span>
+                  </label>
+                  <input
+                    className="w-full rounded-md border bg-background px-3 py-2 font-mono text-sm uppercase focus:outline-none focus:ring-2 focus:ring-primary"
+                    placeholder="Ej: 1234-ABC"
+                    {...vehicleForm.register('plate')}
+                    onChange={(e) => {
+                      e.target.value = e.target.value.toUpperCase()
+                      vehicleForm.setValue('plate', e.target.value)
+                    }}
+                  />
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    Si la tienes a mano, ayuda a agilizar el proceso de tasación.
+                  </p>
                 </div>
               </div>
 

@@ -33,6 +33,7 @@ export const createSellerLeadSchema = z.object({
   conservationState: z.enum(['EXCELENTE', 'BUENO', 'NORMAL', 'DETERIORADO']).default('NORMAL'),
   location: z.string().optional(),
   desiredPrice: z.number().positive('Debe ser mayor que 0').optional().nullable(),
+  plate: z.string().max(20).optional(),
   equipment: equipmentSchema.default({
     solar: false,
     kitchen: false,

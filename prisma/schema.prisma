@@ -104,6 +104,27 @@ enum ActivityType {
   TICKET_POSTVENTA_CERRADO
   FOLLOWUP_ENVIADO
   FOLLOWUP_RESPONDIDO
+  DOCUMENTO_SUBIDO
+  DOCUMENTO_ELIMINADO
+  MATRICULA_AÑADIDA
+  ITV_ACTUALIZADA
+  CARGAS_VERIFICADAS
+  TITULARIDAD_TRANSFERIDA
+  PUBLICACION_BLOQUEADA
+}
+
+enum VehicleDocumentCategory {
+  DNI_VENDEDOR
+  CONTRATO_COMPRAVENTA
+  FICHA_TECNICA
+  PERMISO_CIRCULACION
+  ITV_VIGENTE
+  JUSTIFICANTE_PAGO
+  INFORME_CARGAS_DGT
+  LIBRO_MANTENIMIENTO
+  FACTURA_COMPRA_ORIGINAL
+  CONTRATO_FINAL_VENTA
+  OTRO
 }
 
 enum VehicleCostCategory {
@@ -255,20 +276,22 @@ model User {
   createdAt        DateTime  @default(now()) @map("created_at")
   updatedAt        DateTime  @updatedAt @map("updated_at")
 
-  sellerLeads           SellerLead[]         @relation("AgentSellerLeads")
-  buyerLeads            BuyerLead[]          @relation("AgentBuyerLeads")
-  activities            Activity[]
-  valuations            Valuation[]
-  vehicleAds            VehicleAd[]
-  assignedWorkOrders    WorkOrder[]          @relation("AssignedWorkOrders")
-  approvedWorkOrders    WorkOrder[]          @relation("ApprovedWorkOrders")
-  workOrderTimeEntries  WorkOrderTimeEntry[]
+  sellerLeads             SellerLead[]            @relation("AgentSellerLeads")
+  buyerLeads              BuyerLead[]             @relation("AgentBuyerLeads")
+  activities              Activity[]
+  valuations              Valuation[]
+  vehicleAds              VehicleAd[]
+  assignedWorkOrders      WorkOrder[]             @relation("AssignedWorkOrders")
+  approvedWorkOrders      WorkOrder[]             @relation("ApprovedWorkOrders")
+  workOrderTimeEntries    WorkOrderTimeEntry[]
   vehicleCostsCreated     VehicleCost[]
   deliveriesResponsable   Delivery[]              @relation("ResponsableDeliveries")
   warrantiesExtended      Warranty[]
   deliveryDocsUploaded    DeliveryDocument[]
   postventaTicketsResp    PostventaTicket[]       @relation("ResponsibleTickets")
   postventaPhotosUploaded PostventaTicketPhoto[]
+  chargeChecksPerformed   Vehicle[]               @relation("ChargeChecks")
+  vehicleDocumentsUploaded VehicleDocument[]
 
   @@map("users")
 }
@@ -323,25 +346,35 @@ model Vehicle {
   marginPercent        Decimal           @default(4.0) @map("margin_percent") @db.Decimal(5, 2)
   entryDate            DateTime?         @map("entry_date")
   naveLocation         String?           @map("nave_location")
+  plate                String?           @map("plate")
+  vin                  String?           @map("vin")
+  itvValidUntil        DateTime?         @map("itv_valid_until")
+  titleTransferredAt   DateTime?         @map("title_transferred_at")
+  chargeCheckedAt      DateTime?         @map("charge_checked_at")
+  chargeCheckedById    String?           @map("charge_checked_by_id")
   status               VehicleStatus     @default(NUEVO)
   publishedAt          DateTime?         @map("published_at")
   soldAt               DateTime?         @map("sold_at")
   createdAt            DateTime          @default(now()) @map("created_at")
   updatedAt            DateTime          @updatedAt @map("updated_at")
 
-  sellerLead  SellerLead     @relation(fields: [sellerLeadId], references: [id], onDelete: Cascade)
-  photos      VehiclePhoto[]
-  valuations  Valuation[]
-  matches     Match[]
-  ads         VehicleAd[]
-  costs       VehicleCost[]
-  workOrders  WorkOrder[]
-  deliveries  Delivery[]
-  warranty    Warranty?
+  sellerLead      SellerLead       @relation(fields: [sellerLeadId], references: [id], onDelete: Cascade)
+  chargeCheckedBy User?            @relation("ChargeChecks", fields: [chargeCheckedById], references: [id])
+  photos          VehiclePhoto[]
+  valuations      Valuation[]
+  matches         Match[]
+  ads             VehicleAd[]
+  costs           VehicleCost[]
+  workOrders      WorkOrder[]
+  deliveries      Delivery[]
+  warranty        Warranty?
+  documents       VehicleDocument[]
 
   @@index([brand, model])
   @@index([status])
   @@index([type, status])
+  @@index([plate])
+  @@index([vin])
   @@map("vehicles")
 }
 
@@ -794,6 +827,26 @@ model PostventaFollowup {
   @@unique([warrantyId, type])
   @@index([status, scheduledFor])
   @@map("postventa_followups")
+}
+
+/// Documento legal asociado al expediente del vehículo (DNI, contratos, ITV, etc.)
+model VehicleDocument {
+  id           String                  @id @default(cuid())
+  vehicleId    String                  @map("vehicle_id")
+  category     VehicleDocumentCategory
+  name         String
+  url          String
+  fileSize     Int?                    @map("file_size")
+  mimeType     String?                 @map("mime_type")
+  notes        String?
+  uploadedById String?                 @map("uploaded_by_id")
+  createdAt    DateTime                @default(now()) @map("created_at")
+
+  vehicle    Vehicle @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+  uploadedBy User?   @relation(fields: [uploadedById], references: [id])
+
+  @@index([vehicleId, category])
+  @@map("vehicle_documents")
 }
 
 /// Tabla de precios de referencia para el algoritmo de tasación.

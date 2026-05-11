@@ -14,6 +14,12 @@ import {
   VEHICLE_STATUS_LABELS,
   isValidTransition,
 } from '@/lib/state-machine'
+import {
+  getVehicleLegalInput,
+  getVehicleDocumentSummary,
+  listMissingRequirements,
+  isReadyForStatus,
+} from '@/lib/vehicle-legal'
 
 export async function updateSellerLead(leadId: string, data: unknown) {
   const actor = await requireAgente()
@@ -135,6 +141,46 @@ export async function updateVehicle(vehicleId: string, data: unknown) {
         ],
         fieldErrors: {},
       },
+    }
+  }
+
+  // ── Legal guards for TASADO and PUBLICADO ──────────────────────────────────
+  const isTransitioningTo = (s: string) => status === s && vehicle.status !== s
+
+  if (isTransitioningTo('TASADO') || isTransitioningTo('PUBLICADO')) {
+    const targetStatus = status as 'TASADO' | 'PUBLICADO'
+    const [legalInput, docs] = await Promise.all([
+      getVehicleLegalInput(db, vehicleId),
+      getVehicleDocumentSummary(db, vehicleId),
+    ])
+
+    // Merge desiredPrice from the incoming form data (not yet saved)
+    const merged = legalInput
+      ? { ...legalInput, desiredPrice: desiredPrice ?? legalInput.desiredPrice }
+      : null
+
+    if (!merged || !isReadyForStatus(merged, targetStatus, docs)) {
+      const missing = merged ? listMissingRequirements(merged, targetStatus, docs) : []
+      const lines = missing.filter((r) => r.severity === 'error').map((r) => `- ${r.message}`)
+
+      // Log the blocked attempt as an activity
+      await db.activity.create({
+        data: {
+          type: 'PUBLICACION_BLOQUEADA',
+          content: `Intento de pasar a ${VEHICLE_STATUS_LABELS[targetStatus]} bloqueado.\n${lines.join('\n')}`,
+          agentId: actor.id,
+          sellerLeadId: vehicle.sellerLeadId,
+        },
+      })
+
+      return {
+        error: {
+          formErrors: [
+            `El vehículo no puede pasar a ${VEHICLE_STATUS_LABELS[targetStatus]}. Faltan:\n${lines.join('\n')}\n\nCompleta el expediente legal en la sección 'Expediente' de la ficha del vehículo antes de reintentar.`,
+          ],
+          fieldErrors: {},
+        },
+      }
     }
   }
 

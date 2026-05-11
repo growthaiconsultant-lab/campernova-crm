@@ -92,7 +92,7 @@ claude mcp add-json linear '{\"command\":\"npx\",\"args\":[\"-y\",\"mcp-linear@l
 
 `.claude/settings.json` y `.claude/settings.local.json` se mantienen como referencia de la estructura, pero la fuente de verdad funcional es el registro de la CLI.
 
-## Estado actual (Block 2 — Entregas y Postventa COMPLETADO ✅)
+## Estado actual (Block 4 — Expediente Legal COMPLETADO ✅)
 
 ### Sprint 1 — COMPLETADO ✅
 
@@ -182,6 +182,34 @@ Implementación completa del ciclo post-venta: gestión de entregas físicas y g
 - ✅ **Dashboard** — 3 nuevos KPIs postventa: garantías activas, tickets abiertos, follow-ups pendientes.
 - ✅ **Sidebar** — Navegación Entregas (CalendarCheck) + Postventa (ShieldCheck).
 - ✅ **ActivityTimeline** — 10 nuevos tipos de actividad cubiertos: `ENTREGA_*`, `GARANTIA_*`, `TICKET_POSTVENTA_*`, `FOLLOWUP_*`.
+
+### Block 3 — Roles y Permisos — COMPLETADO ✅
+
+Sistema RBAC completo con 5 roles diferenciados y guards en todos los niveles (schema, server actions, páginas, UI).
+
+- ✅ **Schema** — `UserRole` ampliado a 5 valores: `ADMIN`, `AGENTE`, `TALLER`, `ENTREGAS`, `MARKETING`. Migración `20260511000000_add_roles_taller_entregas_marketing` aplicada en Supabase.
+- ✅ **`lib/auth.ts`** — `requireRole(roles[])` genérico + 9 helpers semánticos + `userHasRole()` booleano para UI condicional. Ver tabla de permisos en la sección técnica.
+- ✅ **Sidebar dinámico** — `components/layout/sidebar.tsx` recibe `userRole` y filtra los items de navegación según los roles permitidos por cada módulo.
+- ✅ **Topbar** — Muestra el rol con label legible (Taller, Entregas, Marketing…) en lugar de solo Administrador/Agente.
+- ✅ **Usuarios UI** — Select de 5 roles con descripciones, `RoleBadge` 5 colores (azul/teal/amber/índigo/rosa).
+- ✅ **Server action guards** — Todos los módulos protegidos: taller (`requireCanViewTaller`/`requireCanEditTaller`), entregas (`requireCanViewEntregas`/`requireCanEditEntregas`), postventa (`requireCanViewPostventa`/`requireCanEditPostventa`), anuncios (`requireCanGenerateAds`), costes/economía (`requireAdmin`), comercial (`requireAgente`).
+- ✅ **Forbidden toast** — `components/forbidden-toast.tsx` muestra "No tienes permiso" en el Dashboard cuando el redirect llega con `?error=forbidden`.
+- ✅ **Notificaciones por rol** — Leads nuevos (PRO + chat) → solo ADMIN + AGENTE. Tickets ALTA/CRITICA → ADMIN + ENTREGAS. Matches ≥70 → solo agentes ADMIN + AGENTE asignados.
+- ✅ **Tests** — `lib/auth.test.ts` (7 tests), suite completa actualizada: 183 tests verdes.
+
+### Block 4 — Expediente Legal del Vehículo — COMPLETADO ✅
+
+Gestión documental completa del vehículo: campos legales en Vehicle, subida de documentos por categoría, reglas de bloqueo inteligentes que impiden publicar sin expediente completo.
+
+- ✅ **Schema** — Campos en `Vehicle`: `plate`, `vin`, `itvValidUntil`, `titleTransferredAt`, `chargeCheckedAt`/`chargeCheckedById`. Nuevo modelo `VehicleDocument` con enum `VehicleDocumentCategory` (11 categorías). 7 nuevos `ActivityType`: `DOCUMENTO_SUBIDO`, `DOCUMENTO_ELIMINADO`, `MATRICULA_AÑADIDA`, `ITV_ACTUALIZADA`, `CARGAS_VERIFICADAS`, `TITULARIDAD_TRANSFERIDA`, `PUBLICACION_BLOQUEADA`. Migración `20260511100000_add_vehicle_legal_docs` aplicada.
+- ✅ **`lib/vehicle-legal/`** — Módulo puro: `listMissingRequirements`, `isReadyForStatus`, `calculateCompletionPercent`. Requisitos por estado: TASADO exige matrícula + precio deseado + 1 foto; PUBLICADO además exige 7 documentos obligatorios, VIN, ITV vigente, cargas verificadas, precio compra/venta, 5 fotos, sin órdenes taller activas. ITV < 60 días = `warning` (no bloquea). 17 tests verdes.
+- ✅ **Guards en `updateVehicle`** — Antes de transicionar a TASADO o PUBLICADO, verifica `isReadyForStatus`. Si falla: loguea `PUBLICACION_BLOQUEADA` + devuelve error con lista de requisitos pendientes.
+- ✅ **`legal-actions.ts`** — Server actions: `uploadVehicleDocument` (AGENTE), `deleteVehicleDocument` (ADMIN), `updateVehicleLegalFields` (ADMIN), `markChargesChecked` (ADMIN), `getVehicleDocumentSignedUrl` (AGENTE).
+- ✅ **UI** — `VehicleLegalFieldsForm` (campos legales editables/solo lectura según rol), `VehicleDocumentsList` (11 categorías, upload inline, signed URL), `MissingForPublishCard` (alerta verde/amber con lista de pendientes), `CompletionBadge` (semáforo %).
+- ✅ **Ficha vendedor** — Nueva sección "Expediente legal" tras las fotos: campos + documentos + badge de progreso.
+- ✅ **Dashboard** — 3 alertas nuevas: expedientes incompletos (TASADO/PUBLICADO < 100%), ITV próxima a vencer (≤ 60 días), cargas DGT sin verificar.
+- ✅ **Form `/vender`** — Campo matrícula opcional en step 1 (se guarda en `Vehicle.plate`).
+- ✅ **Tests** — `validate.test.ts` (17), `legal-actions.test.ts` (13), `actions.test.ts` guards (7). Suite total: 225 tests verdes.
 
 ## Decisiones técnicas
 

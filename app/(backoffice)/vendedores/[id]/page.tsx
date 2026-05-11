@@ -29,6 +29,14 @@ import { VehicleCostsTable } from '@/components/vehicle-economics/vehicle-costs-
 import { NaveLocationField } from '@/components/vehicle-economics/nave-location-field'
 import { calculateVehicleMargin } from '@/lib/margin'
 import type { VehicleCostCategory } from '@prisma/client'
+import { VehicleLegalFieldsForm } from '@/components/vehicle-legal/vehicle-legal-fields-form'
+import { VehicleDocumentsList } from '@/components/vehicle-legal/vehicle-documents-list'
+import type { VehicleDocumentItem } from '@/components/vehicle-legal/vehicle-documents-list'
+import { MissingForPublishCard } from '@/components/vehicle-legal/missing-for-publish-card'
+import { CompletionBadge } from '@/components/vehicle-legal/completion-badge'
+import { calculateCompletionPercent } from '@/lib/vehicle-legal'
+import type { VehicleLegalInput, DocumentSummary } from '@/lib/vehicle-legal'
+import type { VehicleDocumentCategory } from '@prisma/client'
 
 export default async function FichaVendedorPage({ params }: { params: { id: string } }) {
   const [currentUser, lead, agents, activities] = await Promise.all([
@@ -68,6 +76,17 @@ export default async function FichaVendedorPage({ params }: { params: { id: stri
             costs: {
               include: { createdBy: { select: { name: true } } },
               orderBy: { createdAt: 'desc' },
+            },
+            documents: {
+              include: { uploadedBy: { select: { name: true } } },
+              orderBy: { createdAt: 'asc' },
+            },
+            chargeCheckedBy: { select: { name: true } },
+            workOrders: {
+              where: {
+                status: { in: ['PENDIENTE', 'EN_DIAGNOSTICO', 'PRESUPUESTADA', 'EN_CURSO'] },
+              },
+              select: { id: true },
             },
           },
         },
@@ -232,6 +251,115 @@ export default async function FichaVendedorPage({ params }: { params: { id: stri
           )}
         </CardContent>
       </Card>
+
+      {/* Expediente legal */}
+      {v &&
+        (() => {
+          const legalInput: VehicleLegalInput = {
+            id: v.id,
+            plate: v.plate ?? null,
+            vin: v.vin ?? null,
+            itvValidUntil: v.itvValidUntil ?? null,
+            chargeCheckedAt: v.chargeCheckedAt ?? null,
+            desiredPrice: v.desiredPrice,
+            purchasePrice: v.purchasePrice,
+            salePrice: v.salePrice,
+            photoCount: v.photos.length,
+            workOrdersBlockingCount: v.workOrders?.length ?? 0,
+          }
+
+          const docSummary: DocumentSummary[] = (
+            [
+              'DNI_VENDEDOR',
+              'CONTRATO_COMPRAVENTA',
+              'FICHA_TECNICA',
+              'PERMISO_CIRCULACION',
+              'ITV_VIGENTE',
+              'JUSTIFICANTE_PAGO',
+              'INFORME_CARGAS_DGT',
+              'LIBRO_MANTENIMIENTO',
+              'FACTURA_COMPRA_ORIGINAL',
+              'CONTRATO_FINAL_VENTA',
+              'OTRO',
+            ] as VehicleDocumentCategory[]
+          ).map((cat) => ({
+            category: cat,
+            exists: (v.documents ?? []).some((d) => d.category === cat),
+          }))
+
+          const completionPct = calculateCompletionPercent(legalInput, docSummary)
+
+          const isAdminUser = currentUser.role === 'ADMIN'
+          const canViewExpediente = ['ADMIN', 'AGENTE', 'ENTREGAS', 'TALLER'].includes(
+            currentUser.role
+          )
+          const canUploadDocs = ['ADMIN', 'AGENTE'].includes(currentUser.role)
+
+          if (!canViewExpediente) return null
+
+          const docsForList: VehicleDocumentItem[] = (v.documents ?? []).map((d) => ({
+            id: d.id,
+            category: d.category as VehicleDocumentCategory,
+            name: d.name,
+            url: d.url,
+            fileSize: d.fileSize ?? null,
+            mimeType: d.mimeType ?? null,
+            createdAt: d.createdAt,
+            uploadedBy: d.uploadedBy,
+          }))
+
+          return (
+            <Card>
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <CardTitle className="text-base">Expediente legal</CardTitle>
+                    <CardDescription>
+                      Documentación obligatoria para publicar y vender el vehículo legalmente.
+                    </CardDescription>
+                  </div>
+                  <CompletionBadge percent={completionPct} />
+                </div>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                {/* Campos legales del vehículo */}
+                <div>
+                  <p className="text-cn-ink-400 mb-3 text-xs font-medium uppercase tracking-wide">
+                    Datos legales del vehículo
+                  </p>
+                  <VehicleLegalFieldsForm
+                    vehicleId={v.id}
+                    isAdmin={isAdminUser}
+                    plate={v.plate ?? null}
+                    vin={v.vin ?? null}
+                    itvValidUntil={v.itvValidUntil ?? null}
+                    titleTransferredAt={v.titleTransferredAt ?? null}
+                    chargeCheckedAt={v.chargeCheckedAt ?? null}
+                    chargeCheckedByName={v.chargeCheckedBy?.name ?? null}
+                  />
+                </div>
+
+                {/* Documentos del expediente */}
+                <div>
+                  <p className="text-cn-ink-400 mb-3 text-xs font-medium uppercase tracking-wide">
+                    Documentos del expediente
+                  </p>
+                  <VehicleDocumentsList
+                    vehicleId={v.id}
+                    documents={docsForList}
+                    isAdmin={isAdminUser}
+                    canUpload={canUploadDocs}
+                  />
+                </div>
+
+                {/* Resumen de qué falta para publicar */}
+                {(isAdminUser || currentUser.role === 'AGENTE') && (
+                  <MissingForPublishCard vehicle={legalInput} docs={docSummary} />
+                )}
+              </CardContent>
+            </Card>
+          )
+        })()}
 
       {/* Anuncios y publicación */}
       {v &&

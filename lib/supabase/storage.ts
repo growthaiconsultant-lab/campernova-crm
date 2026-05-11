@@ -72,3 +72,41 @@ export async function postventaPhotoSignedUrl(
   if (error || !data) return null
   return data.signedUrl
 }
+
+// ── VehicleDocument helpers (private bucket — signed URLs) ───────────────────
+
+type SupabaseStorageClient = {
+  storage: {
+    from: (b: string) => {
+      createSignedUrl: (
+        p: string,
+        e: number
+      ) => Promise<{ data: { signedUrl: string } | null; error: unknown }>
+      remove: (paths: string[]) => Promise<{ error: unknown }>
+    }
+  }
+}
+
+export function vehicleDocumentPath(vehicleId: string, fileName: string) {
+  return `docs/${vehicleId}/${fileName}`
+}
+
+export async function vehicleDocumentSignedUrl(
+  supabase: SupabaseStorageClient,
+  path: string,
+  expirySec = 3600
+): Promise<string | null> {
+  const { data, error } = await supabase.storage
+    .from(VEHICLE_DOCUMENTS_BUCKET)
+    .createSignedUrl(path, expirySec)
+  if (error || !data) return null
+  return data.signedUrl
+}
+
+export async function deleteVehicleDocumentFile(
+  supabase: SupabaseStorageClient,
+  path: string
+): Promise<boolean> {
+  const { error } = await supabase.storage.from(VEHICLE_DOCUMENTS_BUCKET).remove([path])
+  return !error
+}

@@ -25,8 +25,19 @@ import {
 } from '@/lib/dashboard/time-in-state'
 import { DashboardFilters } from './dashboard-filters'
 import { ForbiddenToast } from '@/components/forbidden-toast'
-import { TrendingUp, TrendingDown, Minus } from 'lucide-react'
+import {
+  TrendingUp,
+  TrendingDown,
+  Minus,
+  AlertTriangle,
+  FileWarning,
+  ShieldAlert,
+} from 'lucide-react'
 import type { SellerLeadStatus, BuyerLeadStatus, VehicleStatus } from '@prisma/client'
+import { calculateCompletionPercent } from '@/lib/vehicle-legal'
+import type { VehicleLegalInput, DocumentSummary } from '@/lib/vehicle-legal'
+import type { VehicleDocumentCategory } from '@prisma/client'
+import Link from 'next/link'
 
 const ACTIVE_SELLER_STATUSES: SellerLeadStatus[] = [
   'NUEVO',
@@ -72,6 +83,9 @@ export default async function DashboardPage({
     activeWarranties,
     openTickets,
     pendingFollowups,
+    vehiclesTasadosRaw,
+    vehiclesItvExpiring,
+    vehiclesChargesPending,
   ] = await Promise.all([
     getSellerLeadCounts(db, filter),
     getBuyerLeadCounts(db, filter),
@@ -142,6 +156,81 @@ export default async function DashboardPage({
     db.postventaTicket.count({ where: { status: { in: ['ABIERTO', 'EN_PROGRESO'] } } }),
     // Follow-ups pendientes de envío
     db.postventaFollowup.count({ where: { status: 'PENDIENTE' } }),
+    // Expedientes incompletos: vehículos TASADOS con documentos obligatorios faltantes o campos vacíos
+    isAdmin || currentUser.role === 'AGENTE'
+      ? db.vehicle.findMany({
+          where: {
+            status: 'TASADO',
+            ...(filter.agentId ? { sellerLead: { agentId: filter.agentId } } : {}),
+          },
+          select: {
+            id: true,
+            brand: true,
+            model: true,
+            year: true,
+            plate: true,
+            vin: true,
+            itvValidUntil: true,
+            chargeCheckedAt: true,
+            purchasePrice: true,
+            salePrice: true,
+            desiredPrice: true,
+            photos: { select: { id: true } },
+            documents: { select: { category: true } },
+            workOrders: {
+              where: {
+                status: { in: ['PENDIENTE', 'EN_DIAGNOSTICO', 'PRESUPUESTADA', 'EN_CURSO'] },
+              },
+              select: { id: true },
+            },
+            sellerLead: { select: { id: true } },
+          },
+        })
+      : Promise.resolve([]),
+    // ITV próxima a vencer (< 60 días) en vehículos PUBLICADOS
+    isAdmin || currentUser.role === 'AGENTE'
+      ? db.vehicle.findMany({
+          where: {
+            status: 'PUBLICADO',
+            itvValidUntil: {
+              lt: new Date(Date.now() + 60 * 24 * 60 * 60 * 1000),
+            },
+            ...(filter.agentId ? { sellerLead: { agentId: filter.agentId } } : {}),
+          },
+          select: {
+            id: true,
+            brand: true,
+            model: true,
+            year: true,
+            itvValidUntil: true,
+            sellerLead: { select: { id: true } },
+          },
+          orderBy: { itvValidUntil: 'asc' },
+          take: 10,
+        })
+      : Promise.resolve([]),
+    // Cargas DGT pendientes: vehículos con purchasePrice pero sin chargeCheckedAt, creados hace >72h
+    isAdmin || currentUser.role === 'AGENTE'
+      ? db.vehicle.findMany({
+          where: {
+            purchasePrice: { not: null },
+            chargeCheckedAt: null,
+            status: { notIn: ['VENDIDO', 'DESCARTADO'] },
+            createdAt: { lt: new Date(Date.now() - 72 * 60 * 60 * 1000) },
+            ...(filter.agentId ? { sellerLead: { agentId: filter.agentId } } : {}),
+          },
+          select: {
+            id: true,
+            brand: true,
+            model: true,
+            year: true,
+            createdAt: true,
+            sellerLead: { select: { id: true } },
+          },
+          orderBy: { createdAt: 'asc' },
+          take: 10,
+        })
+      : Promise.resolve([]),
   ])
 
   const totalSellerActive = sumWhere(sellerCounts, ACTIVE_SELLER_STATUSES)
@@ -201,6 +290,47 @@ export default async function DashboardPage({
         .rows.sort((a, b) => b.netMarginPct - a.netMarginPct)
         .slice(0, 5)
     : []
+
+  // ── Legal alerts ──────────────────────────────────────────────────────────
+  const ALL_DOC_CATS: VehicleDocumentCategory[] = [
+    'DNI_VENDEDOR',
+    'CONTRATO_COMPRAVENTA',
+    'FICHA_TECNICA',
+    'PERMISO_CIRCULACION',
+    'ITV_VIGENTE',
+    'JUSTIFICANTE_PAGO',
+    'INFORME_CARGAS_DGT',
+    'LIBRO_MANTENIMIENTO',
+    'FACTURA_COMPRA_ORIGINAL',
+    'CONTRATO_FINAL_VENTA',
+    'OTRO',
+  ]
+
+  const incompleteExpedientes = (vehiclesTasadosRaw as typeof vehiclesTasadosRaw)
+    .map((v) => {
+      const legalInput: VehicleLegalInput = {
+        id: v.id,
+        plate: v.plate ?? null,
+        vin: v.vin ?? null,
+        itvValidUntil: v.itvValidUntil ?? null,
+        chargeCheckedAt: v.chargeCheckedAt ?? null,
+        desiredPrice: v.desiredPrice,
+        purchasePrice: v.purchasePrice,
+        salePrice: v.salePrice,
+        photoCount: v.photos.length,
+        workOrdersBlockingCount: v.workOrders.length,
+      }
+      const docSummary: DocumentSummary[] = ALL_DOC_CATS.map((cat) => ({
+        category: cat,
+        exists: v.documents.some((d) => d.category === cat),
+      }))
+      const pct = calculateCompletionPercent(legalInput, docSummary)
+      return { ...v, completionPct: pct, sellerLeadId: v.sellerLead?.id ?? null }
+    })
+    .filter((v) => v.completionPct < 100)
+    .slice(0, 5)
+
+  const now = new Date()
 
   return (
     <div className="space-y-6">
@@ -270,6 +400,129 @@ export default async function DashboardPage({
           </CardContent>
         </Card>
       </div>
+
+      {/* Alertas legales — solo ADMIN y AGENTE */}
+      {(isAdmin || currentUser.role === 'AGENTE') &&
+        (incompleteExpedientes.length > 0 ||
+          (vehiclesItvExpiring as typeof vehiclesItvExpiring).length > 0 ||
+          (vehiclesChargesPending as typeof vehiclesChargesPending).length > 0) && (
+          <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+            {/* Expedientes incompletos */}
+            {incompleteExpedientes.length > 0 && (
+              <Card className="border-amber-200">
+                <CardHeader className="pb-3">
+                  <CardTitle className="flex items-center gap-2 text-sm text-amber-700">
+                    <FileWarning className="h-4 w-4" />
+                    Expedientes incompletos ({incompleteExpedientes.length})
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-2">
+                  {incompleteExpedientes.map((v) => (
+                    <div key={v.id} className="flex items-center justify-between gap-2">
+                      <Link
+                        href={v.sellerLeadId ? `/vendedores/${v.sellerLeadId}` : '#'}
+                        className="truncate text-sm hover:underline"
+                      >
+                        {v.brand} {v.model} {v.year ?? ''}
+                      </Link>
+                      <span
+                        className={`shrink-0 rounded-full px-2 py-0.5 text-xs font-medium ${
+                          v.completionPct >= 60
+                            ? 'bg-amber-100 text-amber-700'
+                            : 'bg-red-100 text-red-700'
+                        }`}
+                      >
+                        {v.completionPct}%
+                      </span>
+                    </div>
+                  ))}
+                  <p className="pt-1 text-xs text-muted-foreground">
+                    Vehículos TASADOS sin expediente completo
+                  </p>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* ITV próxima a vencer */}
+            {(vehiclesItvExpiring as typeof vehiclesItvExpiring).length > 0 && (
+              <Card className="border-orange-200">
+                <CardHeader className="pb-3">
+                  <CardTitle className="flex items-center gap-2 text-sm text-orange-700">
+                    <AlertTriangle className="h-4 w-4" />
+                    ITV próxima a vencer (
+                    {(vehiclesItvExpiring as typeof vehiclesItvExpiring).length})
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-2">
+                  {(vehiclesItvExpiring as typeof vehiclesItvExpiring).map((v) => {
+                    const daysLeft = v.itvValidUntil
+                      ? Math.floor(
+                          (v.itvValidUntil.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)
+                        )
+                      : null
+                    const isCritical = daysLeft !== null && daysLeft < 15
+                    return (
+                      <div key={v.id} className="flex items-center justify-between gap-2">
+                        <Link
+                          href={v.sellerLead?.id ? `/vendedores/${v.sellerLead.id}` : '#'}
+                          className="truncate text-sm hover:underline"
+                        >
+                          {v.brand} {v.model} {v.year ?? ''}
+                        </Link>
+                        <span
+                          className={`shrink-0 rounded-full px-2 py-0.5 text-xs font-medium ${
+                            isCritical ? 'bg-red-100 text-red-700' : 'bg-orange-100 text-orange-700'
+                          }`}
+                        >
+                          {daysLeft !== null ? (daysLeft < 0 ? 'Vencida' : `${daysLeft}d`) : '—'}
+                        </span>
+                      </div>
+                    )
+                  })}
+                  <p className="pt-1 text-xs text-muted-foreground">
+                    Vehículos PUBLICADOS · ITV &lt; 60 días
+                  </p>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Cargas DGT pendientes */}
+            {(vehiclesChargesPending as typeof vehiclesChargesPending).length > 0 && (
+              <Card className="border-red-200">
+                <CardHeader className="pb-3">
+                  <CardTitle className="flex items-center gap-2 text-sm text-red-700">
+                    <ShieldAlert className="h-4 w-4" />
+                    Cargas DGT pendientes (
+                    {(vehiclesChargesPending as typeof vehiclesChargesPending).length})
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-2">
+                  {(vehiclesChargesPending as typeof vehiclesChargesPending).map((v) => {
+                    const daysSince = Math.floor(
+                      (now.getTime() - v.createdAt.getTime()) / (1000 * 60 * 60 * 24)
+                    )
+                    return (
+                      <div key={v.id} className="flex items-center justify-between gap-2">
+                        <Link
+                          href={v.sellerLead?.id ? `/vendedores/${v.sellerLead.id}` : '#'}
+                          className="truncate text-sm hover:underline"
+                        >
+                          {v.brand} {v.model} {v.year ?? ''}
+                        </Link>
+                        <span className="shrink-0 rounded-full bg-red-100 px-2 py-0.5 text-xs font-medium text-red-700">
+                          {daysSince}d
+                        </span>
+                      </div>
+                    )
+                  })}
+                  <p className="pt-1 text-xs text-muted-foreground">
+                    Sin verificar cargas desde hace +72h
+                  </p>
+                </CardContent>
+              </Card>
+            )}
+          </div>
+        )}
 
       {/* KPIs Taller y Margen — solo ADMIN */}
       {isAdmin && (

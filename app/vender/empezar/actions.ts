@@ -69,6 +69,7 @@ export async function submitPublicLead(formData: FormData) {
     length: formData.get('length') ? Number(formData.get('length')) : null,
     conservationState: formData.get('conservationState'),
     location: formData.get('location') ?? '',
+    plate: (formData.get('plate') as string | null)?.trim().toUpperCase() || undefined,
     desiredPrice: formData.get('desiredPrice') ? Number(formData.get('desiredPrice')) : null,
     equipment: {
       solar: formData.get('equipment.solar') === 'true',
@@ -107,6 +108,7 @@ export async function submitPublicLead(formData: FormData) {
     length,
     conservationState,
     location,
+    plate,
     desiredPrice,
     equipment,
   } = parsed.data
@@ -133,6 +135,7 @@ export async function submitPublicLead(formData: FormData) {
           length: length ?? null,
           conservationState,
           location: location ?? null,
+          plate: plate ?? null,
           desiredPrice: desiredPrice ?? null,
           equipment,
           status: 'NUEVO',
