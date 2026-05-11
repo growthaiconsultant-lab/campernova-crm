@@ -10,7 +10,7 @@ import type {
   ChecklistItemCategory,
   ChecklistItemResult,
 } from '@prisma/client'
-import { WorkOrderTabs } from './work-order-tabs'
+import { WorkOrderTabs, TabPanel } from './work-order-tabs'
 import { WorkOrderActionsBar } from './work-order-actions-bar'
 import { ChecklistItemRow } from './checklist-item-row'
 import { TimeEntrySection } from './time-entry-form'
@@ -156,222 +156,215 @@ export default async function WorkOrderPage({ params }: { params: { id: string }
       <Card>
         <CardContent className="pb-6 pt-0">
           <WorkOrderTabs>
-            {(activeTab) => (
-              <>
-                {/* ── RESUMEN ── */}
-                {activeTab === 'resumen' && (
-                  <div className="space-y-4">
-                    <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-                      <div>
-                        <p className="text-xs text-cn-ink-500">Estado aprobación</p>
-                        <p className="mt-0.5 text-sm font-medium text-cn-ink-700">
-                          {APPROVAL_LABELS[wo.approvalLevel]}
-                        </p>
-                      </div>
-                      <div>
-                        <p className="text-xs text-cn-ink-500">Asignado a</p>
-                        <p className="mt-0.5 text-sm font-medium text-cn-ink-700">
-                          {wo.assignedTo?.name ?? '—'}
-                        </p>
-                      </div>
-                      <div>
-                        <p className="text-xs text-cn-ink-500">Coste estimado</p>
-                        <p className="mt-0.5 text-sm font-medium text-cn-ink-700">
-                          {wo.estimatedCost
-                            ? Number(wo.estimatedCost).toLocaleString('es-ES', {
-                                style: 'currency',
-                                currency: 'EUR',
-                              })
-                            : '—'}
-                        </p>
-                      </div>
-                      <div>
-                        <p className="text-xs text-cn-ink-500">Coste real</p>
-                        <p className="mt-0.5 text-sm font-bold text-cn-teal-900">
-                          {totalRealCost.toLocaleString('es-ES', {
+            {/* ── RESUMEN ── */}
+            <TabPanel tab="resumen">
+              <div className="space-y-4">
+                <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+                  <div>
+                    <p className="text-xs text-cn-ink-500">Estado aprobación</p>
+                    <p className="mt-0.5 text-sm font-medium text-cn-ink-700">
+                      {APPROVAL_LABELS[wo.approvalLevel]}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-cn-ink-500">Asignado a</p>
+                    <p className="mt-0.5 text-sm font-medium text-cn-ink-700">
+                      {wo.assignedTo?.name ?? '—'}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-cn-ink-500">Coste estimado</p>
+                    <p className="mt-0.5 text-sm font-medium text-cn-ink-700">
+                      {wo.estimatedCost
+                        ? Number(wo.estimatedCost).toLocaleString('es-ES', {
                             style: 'currency',
                             currency: 'EUR',
-                          })}
-                        </p>
-                      </div>
-                      {wo.startedAt && (
-                        <div>
-                          <p className="text-xs text-cn-ink-500">Inicio</p>
-                          <p className="mt-0.5 text-sm">
-                            {new Date(wo.startedAt).toLocaleDateString('es-ES')}
-                          </p>
-                        </div>
-                      )}
-                      {wo.completedAt && (
-                        <div>
-                          <p className="text-xs text-cn-ink-500">Completada</p>
-                          <p className="mt-0.5 text-sm">
-                            {new Date(wo.completedAt).toLocaleDateString('es-ES')}
-                          </p>
-                        </div>
-                      )}
-                      {wo.approvedBy && (
-                        <div>
-                          <p className="text-xs text-cn-ink-500">Aprobado por</p>
-                          <p className="mt-0.5 text-sm">{wo.approvedBy.name}</p>
-                        </div>
-                      )}
-                      {wo.approvalLimit && (
-                        <div>
-                          <p className="text-xs text-cn-ink-500">Límite aprobación</p>
-                          <p className="mt-0.5 text-sm">
-                            {Number(wo.approvalLimit).toLocaleString('es-ES', {
-                              style: 'currency',
-                              currency: 'EUR',
-                            })}
-                          </p>
-                        </div>
-                      )}
-                    </div>
-
-                    {wo.description && (
-                      <div>
-                        <p className="text-cn-ink-400 mb-1 text-xs font-medium uppercase tracking-wide">
-                          Descripción
-                        </p>
-                        <p className="whitespace-pre-wrap text-sm text-cn-ink-700">
-                          {wo.description}
-                        </p>
-                      </div>
-                    )}
-
-                    {wo.notes && (
-                      <div>
-                        <p className="text-cn-ink-400 mb-1 text-xs font-medium uppercase tracking-wide">
-                          Notas internas
-                        </p>
-                        <p className="whitespace-pre-wrap text-sm text-cn-ink-500">{wo.notes}</p>
-                      </div>
-                    )}
-
-                    {/* Progress checklist summary */}
-                    {wo.checklist.length > 0 &&
-                      (() => {
-                        const okCount = wo.checklist.filter((c) => c.result === 'OK').length
-                        const pct = Math.round((okCount / wo.checklist.length) * 100)
-                        return (
-                          <div>
-                            <p className="text-cn-ink-400 mb-1 text-xs font-medium uppercase tracking-wide">
-                              Checklist — {okCount}/{wo.checklist.length} ítems OK ({pct}%)
-                            </p>
-                            <div className="flex h-2 w-full overflow-hidden rounded-full bg-cn-line">
-                              <div
-                                className="h-full bg-green-500 transition-all"
-                                style={{ width: `${pct}%` }}
-                              />
-                            </div>
-                          </div>
-                        )
-                      })()}
+                          })
+                        : '—'}
+                    </p>
                   </div>
-                )}
-
-                {/* ── CHECKLIST ── */}
-                {activeTab === 'checklist' && (
-                  <div className="space-y-6">
-                    {(Object.keys(checklistByCategory) as ChecklistItemCategory[]).map((cat) => (
-                      <div key={cat}>
-                        <p className="text-cn-ink-400 mb-2 text-xs font-semibold uppercase tracking-wide">
-                          {CATEGORY_LABELS[cat]}
-                        </p>
-                        <div className="overflow-hidden rounded-xl border border-cn-line">
-                          <table className="w-full">
-                            <tbody>
-                              {checklistByCategory[cat].map((item) => (
-                                <ChecklistItemRow
-                                  key={item.id}
-                                  id={item.id}
-                                  item={item.item}
-                                  result={item.result as ChecklistItemResult}
-                                  notes={item.notes}
-                                  isClosed={isClosed}
-                                />
-                              ))}
-                            </tbody>
-                          </table>
-                        </div>
-                      </div>
-                    ))}
+                  <div>
+                    <p className="text-xs text-cn-ink-500">Coste real</p>
+                    <p className="mt-0.5 text-sm font-bold text-cn-teal-900">
+                      {totalRealCost.toLocaleString('es-ES', {
+                        style: 'currency',
+                        currency: 'EUR',
+                      })}
+                    </p>
                   </div>
-                )}
-
-                {/* ── HORAS ── */}
-                {activeTab === 'horas' && (
-                  <TimeEntrySection
-                    woId={wo.id}
-                    entries={timeEntries}
-                    currentUserId={currentUser.id}
-                    isAdmin={isAdmin}
-                    isClosed={isClosed}
-                  />
-                )}
-
-                {/* ── PIEZAS ── */}
-                {activeTab === 'piezas' && (
-                  <PartsSection woId={wo.id} parts={parts} isAdmin={isAdmin} isClosed={isClosed} />
-                )}
-
-                {/* ── COSTES RESULTANTES ── */}
-                {activeTab === 'costes' && (
-                  <div className="space-y-3">
-                    {wo.costs.length === 0 ? (
-                      <p className="text-cn-ink-400 py-6 text-center text-sm">
-                        {isClosed
-                          ? 'Esta orden no generó costes imputados.'
-                          : 'Los costes se generan automáticamente al completar la orden.'}
+                  {wo.startedAt && (
+                    <div>
+                      <p className="text-xs text-cn-ink-500">Inicio</p>
+                      <p className="mt-0.5 text-sm">
+                        {new Date(wo.startedAt).toLocaleDateString('es-ES')}
                       </p>
-                    ) : (
-                      <div className="overflow-hidden rounded-xl border border-cn-line">
-                        <table className="w-full text-sm">
-                          <thead>
-                            <tr className="border-b border-cn-line bg-cn-cream-50">
-                              <th className="px-4 py-2.5 text-left font-medium text-cn-ink-500">
-                                Categoría
-                              </th>
-                              <th className="px-4 py-2.5 text-left font-medium text-cn-ink-500">
-                                Descripción
-                              </th>
-                              <th className="px-4 py-2.5 text-right font-medium text-cn-ink-500">
-                                Importe
-                              </th>
-                              <th className="hidden px-4 py-2.5 text-left font-medium text-cn-ink-500 sm:table-cell">
-                                Creado por
-                              </th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {wo.costs.map((cost) => (
-                              <tr key={cost.id} className="border-b border-cn-line last:border-0">
-                                <td className="px-4 py-3">
-                                  <span className="inline-flex items-center rounded-full bg-cn-line px-2 py-0.5 text-xs font-medium text-cn-ink-700">
-                                    {cost.category === 'MANO_OBRA_TALLER' ? 'Mano obra' : 'Piezas'}
-                                  </span>
-                                </td>
-                                <td className="px-4 py-3 text-cn-ink-700">{cost.description}</td>
-                                <td className="px-4 py-3 text-right font-medium text-cn-teal-900">
-                                  {Number(cost.amount).toLocaleString('es-ES', {
-                                    style: 'currency',
-                                    currency: 'EUR',
-                                  })}
-                                </td>
-                                <td className="hidden px-4 py-3 text-cn-ink-500 sm:table-cell">
-                                  {cost.createdBy?.name ?? '—'}
-                                </td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      </div>
-                    )}
+                    </div>
+                  )}
+                  {wo.completedAt && (
+                    <div>
+                      <p className="text-xs text-cn-ink-500">Completada</p>
+                      <p className="mt-0.5 text-sm">
+                        {new Date(wo.completedAt).toLocaleDateString('es-ES')}
+                      </p>
+                    </div>
+                  )}
+                  {wo.approvedBy && (
+                    <div>
+                      <p className="text-xs text-cn-ink-500">Aprobado por</p>
+                      <p className="mt-0.5 text-sm">{wo.approvedBy.name}</p>
+                    </div>
+                  )}
+                  {wo.approvalLimit && (
+                    <div>
+                      <p className="text-xs text-cn-ink-500">Límite aprobación</p>
+                      <p className="mt-0.5 text-sm">
+                        {Number(wo.approvalLimit).toLocaleString('es-ES', {
+                          style: 'currency',
+                          currency: 'EUR',
+                        })}
+                      </p>
+                    </div>
+                  )}
+                </div>
+
+                {wo.description && (
+                  <div>
+                    <p className="text-cn-ink-400 mb-1 text-xs font-medium uppercase tracking-wide">
+                      Descripción
+                    </p>
+                    <p className="whitespace-pre-wrap text-sm text-cn-ink-700">{wo.description}</p>
                   </div>
                 )}
-              </>
-            )}
+
+                {wo.notes && (
+                  <div>
+                    <p className="text-cn-ink-400 mb-1 text-xs font-medium uppercase tracking-wide">
+                      Notas internas
+                    </p>
+                    <p className="whitespace-pre-wrap text-sm text-cn-ink-500">{wo.notes}</p>
+                  </div>
+                )}
+
+                {wo.checklist.length > 0 &&
+                  (() => {
+                    const okCount = wo.checklist.filter((c) => c.result === 'OK').length
+                    const pct = Math.round((okCount / wo.checklist.length) * 100)
+                    return (
+                      <div>
+                        <p className="text-cn-ink-400 mb-1 text-xs font-medium uppercase tracking-wide">
+                          Checklist — {okCount}/{wo.checklist.length} ítems OK ({pct}%)
+                        </p>
+                        <div className="flex h-2 w-full overflow-hidden rounded-full bg-cn-line">
+                          <div
+                            className="h-full bg-green-500 transition-all"
+                            style={{ width: `${pct}%` }}
+                          />
+                        </div>
+                      </div>
+                    )
+                  })()}
+              </div>
+            </TabPanel>
+
+            {/* ── CHECKLIST ── */}
+            <TabPanel tab="checklist">
+              <div className="space-y-6">
+                {(Object.keys(checklistByCategory) as ChecklistItemCategory[]).map((cat) => (
+                  <div key={cat}>
+                    <p className="text-cn-ink-400 mb-2 text-xs font-semibold uppercase tracking-wide">
+                      {CATEGORY_LABELS[cat]}
+                    </p>
+                    <div className="overflow-hidden rounded-xl border border-cn-line">
+                      <table className="w-full">
+                        <tbody>
+                          {checklistByCategory[cat].map((item) => (
+                            <ChecklistItemRow
+                              key={item.id}
+                              id={item.id}
+                              item={item.item}
+                              result={item.result as ChecklistItemResult}
+                              notes={item.notes}
+                              isClosed={isClosed}
+                            />
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </TabPanel>
+
+            {/* ── HORAS ── */}
+            <TabPanel tab="horas">
+              <TimeEntrySection
+                woId={wo.id}
+                entries={timeEntries}
+                currentUserId={currentUser.id}
+                isAdmin={isAdmin}
+                isClosed={isClosed}
+              />
+            </TabPanel>
+
+            {/* ── PIEZAS ── */}
+            <TabPanel tab="piezas">
+              <PartsSection woId={wo.id} parts={parts} isAdmin={isAdmin} isClosed={isClosed} />
+            </TabPanel>
+
+            {/* ── COSTES RESULTANTES ── */}
+            <TabPanel tab="costes">
+              <div className="space-y-3">
+                {wo.costs.length === 0 ? (
+                  <p className="text-cn-ink-400 py-6 text-center text-sm">
+                    {isClosed
+                      ? 'Esta orden no generó costes imputados.'
+                      : 'Los costes se generan automáticamente al completar la orden.'}
+                  </p>
+                ) : (
+                  <div className="overflow-hidden rounded-xl border border-cn-line">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="border-b border-cn-line bg-cn-cream-50">
+                          <th className="px-4 py-2.5 text-left font-medium text-cn-ink-500">
+                            Categoría
+                          </th>
+                          <th className="px-4 py-2.5 text-left font-medium text-cn-ink-500">
+                            Descripción
+                          </th>
+                          <th className="px-4 py-2.5 text-right font-medium text-cn-ink-500">
+                            Importe
+                          </th>
+                          <th className="hidden px-4 py-2.5 text-left font-medium text-cn-ink-500 sm:table-cell">
+                            Creado por
+                          </th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {wo.costs.map((cost) => (
+                          <tr key={cost.id} className="border-b border-cn-line last:border-0">
+                            <td className="px-4 py-3">
+                              <span className="inline-flex items-center rounded-full bg-cn-line px-2 py-0.5 text-xs font-medium text-cn-ink-700">
+                                {cost.category === 'MANO_OBRA_TALLER' ? 'Mano obra' : 'Piezas'}
+                              </span>
+                            </td>
+                            <td className="px-4 py-3 text-cn-ink-700">{cost.description}</td>
+                            <td className="px-4 py-3 text-right font-medium text-cn-teal-900">
+                              {Number(cost.amount).toLocaleString('es-ES', {
+                                style: 'currency',
+                                currency: 'EUR',
+                              })}
+                            </td>
+                            <td className="hidden px-4 py-3 text-cn-ink-500 sm:table-cell">
+                              {cost.createdBy?.name ?? '—'}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+            </TabPanel>
           </WorkOrderTabs>
         </CardContent>
       </Card>
