@@ -17,6 +17,15 @@ export async function GET(request: NextRequest) {
         data: { authId: data.user.id },
       })
 
+      // Block inactive users before they reach the app
+      const dbUser = await db.user.findUnique({
+        where: { email: data.user.email! },
+        select: { active: true },
+      })
+      if (!dbUser?.active) {
+        return NextResponse.redirect(`${origin}/login?error=inactive`)
+      }
+
       return NextResponse.redirect(`${origin}/dashboard`)
     }
   }

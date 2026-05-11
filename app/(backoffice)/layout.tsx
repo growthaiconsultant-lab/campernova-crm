@@ -9,7 +9,7 @@ export default async function BackofficeLayout({ children }: { children: React.R
 
   return (
     <div className="flex h-screen overflow-hidden bg-background">
-      <Sidebar />
+      <Sidebar isAdmin={user.role === 'ADMIN'} />
 
       <div className="flex flex-1 flex-col overflow-hidden">
         <Topbar userName={user.name} userEmail={user.email} userRole={roleLabel} />

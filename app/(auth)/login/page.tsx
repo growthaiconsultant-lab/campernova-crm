@@ -8,7 +8,9 @@ export default function LoginPage({ searchParams }: LoginPageProps) {
   const callbackError =
     searchParams.error === 'callback'
       ? 'El enlace ha expirado o ya fue usado. Solicita uno nuevo.'
-      : undefined
+      : searchParams.error === 'inactive'
+        ? 'Usuario desactivado. Contacta con el administrador.'
+        : undefined
 
   return <LoginForm callbackError={callbackError} />
 }

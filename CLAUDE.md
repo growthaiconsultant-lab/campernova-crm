@@ -11,8 +11,8 @@ CRM interno para gestionar la compraventa de autocaravanas y campers semi-nuevas
 - Dominio: `campersnova.com`
 - Email contacto: `info@campersnova.com`
 - Teléfono: `645 63 91 85` · WhatsApp: `wa.me/34645639185`
-- Modelo de negocio: comisión 4% sobre venta (intermediación, no propiedad del vehículo)
-- Equipo: 3 agentes comerciales + 1 admin (Joel)
+- Modelo de negocio: depósito-venta con custodia física en la nave de Parets del Vallès. El vendedor trae el vehículo, Campers Nova filtra (antigüedad / km / estado / precio que pide el vendedor) y, si encaja, lo asume en consignación: lo custodia, lo prepara, lo publica en portales y web propia, y busca comprador. Margen aproximado del 4% sobre el precio acordado con el vendedor, variable por vehículo. El margen NUNCA se muestra al cliente final (es interno). Servicios añadidos generan margen extra: taller propio (Manolo), garantía 12 m (ampliable a 36), financiación 4,99% hasta 15 años, parte de pago, gestión documental y cambio de nombre incluido.
+- Equipo: 2 super-admins (Joel + Esteban CEO) + 1 agente comercial (Desirée). Por incorporar al sistema: taller (Manolo), entregas (Javi) y marketing (Ari) — se darán de alta vía UI cuando Joel lo decida, con notifyOnNewLead=false para que no reciban notificaciones de leads.
 - Plazo MVP: 5 semanas a tiempo completo
 
 ## Stack
@@ -34,6 +34,7 @@ CRM interno para gestionar la compraventa de autocaravanas y campers semi-nuevas
 - `docs/Backlog.md` — 41 tickets ordenados con IDs CAM-001 a CAM-1006
 - `docs/Setup.md` — referencias de stack, MCPs y servicios
 - `docs/Quickstart.md` — receta paso a paso de arranque
+- `docs/Vision-CRM-360.md` — spec de referencia del CRM operativo end-to-end para los sprints post-launch (6-10). Modelo de negocio real, 8 fases, objetos, roles, reglas de bloqueo, KPIs.
 
 ## Convenciones
 

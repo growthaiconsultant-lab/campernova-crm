@@ -127,7 +127,8 @@ export async function POST(req: NextRequest) {
 
             // Non-blocking agent notification
             db.user
-              .findMany({ where: { active: true } })
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              .findMany({ where: { active: true, notifyOnNewLead: true } as any })
               .then(async (agents) => {
                 if (agents.length > 0) {
                   await sendBuyerChatLeadNotification(

@@ -131,6 +131,7 @@ model User {
   name             String
   role             UserRole  @default(AGENTE)
   active           Boolean   @default(true)
+  notifyOnNewLead  Boolean   @default(true) @map("notify_on_new_lead")
   lastMatchEmailAt DateTime? @map("last_match_email_at")
   createdAt        DateTime  @default(now()) @map("created_at")
   updatedAt        DateTime  @updatedAt @map("updated_at")

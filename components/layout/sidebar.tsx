@@ -3,7 +3,7 @@
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { LogoCampersNova } from '@/components/logo-campers-nova'
-import { LayoutDashboard, Users, ShoppingCart, Truck } from 'lucide-react'
+import { LayoutDashboard, Users, ShoppingCart, Truck, UserCog } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 const NAV_ITEMS = [
@@ -13,7 +13,11 @@ const NAV_ITEMS = [
   { href: '/vehiculos', label: 'Vehículos', icon: Truck },
 ]
 
-export function Sidebar() {
+interface SidebarProps {
+  isAdmin?: boolean
+}
+
+export function Sidebar({ isAdmin = false }: SidebarProps) {
   const pathname = usePathname()
 
   return (
@@ -48,6 +52,20 @@ export function Sidebar() {
             </Link>
           )
         })}
+        {isAdmin && (
+          <Link
+            href="/usuarios"
+            className={cn(
+              'flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors',
+              pathname === '/usuarios' || pathname.startsWith('/usuarios/')
+                ? 'bg-sidebar-primary text-sidebar-primary-foreground'
+                : 'text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'
+            )}
+          >
+            <UserCog className="h-4 w-4 shrink-0" />
+            Usuarios
+          </Link>
+        )}
       </nav>
 
       {/* Footer */}
