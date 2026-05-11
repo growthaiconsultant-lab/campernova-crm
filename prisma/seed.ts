@@ -47,8 +47,7 @@ async function main() {
   console.log('Seeding users…')
 
   for (const user of USERS) {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const result = await (db.user as any).upsert({
+    const result = await db.user.upsert({
       where: { email: user.email },
       update: {
         name: user.name,

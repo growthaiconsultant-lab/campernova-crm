@@ -84,11 +84,10 @@ export async function notifyHighScoreMatches(
       const now = new Date()
       const tasks: Promise<unknown>[] = []
 
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       if (
         sellerAgent &&
         sellerAgent.active &&
-        (sellerAgent as any).notifyOnNewLead !== false &&
+        sellerAgent.notifyOnNewLead &&
         !shouldThrottle(sellerAgent.lastMatchEmailAt, now)
       ) {
         tasks.push(
@@ -113,8 +112,7 @@ export async function notifyHighScoreMatches(
       if (
         buyerAgent &&
         buyerAgent.active &&
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (buyerAgent as any).notifyOnNewLead !== false &&
+        buyerAgent.notifyOnNewLead &&
         // No notificar dos veces al mismo agente si gestiona los dos lados
         buyerAgent.id !== sellerAgent?.id &&
         !shouldThrottle(buyerAgent.lastMatchEmailAt, now)

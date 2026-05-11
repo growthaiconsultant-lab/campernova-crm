@@ -12,8 +12,7 @@ interface Props {
 export default async function EditarUsuarioPage({ params }: Props) {
   const actor = await requireAdmin()
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const user = await (db.user as any).findUnique({ where: { id: params.id } })
+  const user = await db.user.findUnique({ where: { id: params.id } })
   if (!user) notFound()
 
   const [sellerCount, buyerCount] = await Promise.all([

@@ -28,8 +28,7 @@ export async function createUser(formData: unknown): Promise<ActionResult> {
     }
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  await (db.user as any).create({
+  await db.user.create({
     data: { name, email, role, active, notifyOnNewLead, authId: null },
   })
 
@@ -52,8 +51,7 @@ export async function updateUser(id: string, formData: unknown): Promise<ActionR
     return { ok: false, error: 'No puedes quitarte el rol ADMIN a ti mismo.' }
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  await (db.user as any).update({
+  await db.user.update({
     where: { id },
     data: { name, role, active, notifyOnNewLead },
   })
@@ -95,8 +93,7 @@ export async function toggleUserActive(id: string, newActive: boolean): Promise<
     }
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  await (db.user as any).update({ where: { id }, data: { active: newActive } })
+  await db.user.update({ where: { id }, data: { active: newActive } })
 
   revalidatePath('/usuarios')
   revalidatePath(`/usuarios/${id}`)
@@ -106,8 +103,7 @@ export async function toggleUserActive(id: string, newActive: boolean): Promise<
 export async function toggleUserNotifyOnNewLead(id: string, value: boolean): Promise<ActionResult> {
   await requireAdmin()
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  await (db.user as any).update({ where: { id }, data: { notifyOnNewLead: value } })
+  await db.user.update({ where: { id }, data: { notifyOnNewLead: value } })
 
   revalidatePath('/usuarios')
   return { ok: true }

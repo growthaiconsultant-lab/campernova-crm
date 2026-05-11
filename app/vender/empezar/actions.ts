@@ -195,8 +195,7 @@ export async function submitPublicLead(formData: FormData) {
 
   // Notify all active agents — non-blocking
   const activeUsers = await db.user.findMany({
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    where: { active: true, notifyOnNewLead: true } as any,
+    where: { active: true, notifyOnNewLead: true },
     select: { email: true },
   })
   await sendAgentLeadNotification({

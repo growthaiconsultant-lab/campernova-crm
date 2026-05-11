@@ -9,8 +9,7 @@ export const metadata = { title: 'Usuarios · CampersNova CRM' }
 export default async function UsuariosPage() {
   await requireAdmin()
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const users = await (db.user as any).findMany({
+  const users = await db.user.findMany({
     orderBy: [{ active: 'desc' }, { role: 'asc' }, { name: 'asc' }],
   })
 
@@ -43,8 +42,7 @@ export default async function UsuariosPage() {
             </tr>
           </thead>
           <tbody>
-            {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
-            {users.map((user: any) => (
+            {users.map((user) => (
               <tr key={user.id} className="border-b border-cn-line last:border-0">
                 <td className="px-5 py-3.5 font-medium text-cn-teal-900">
                   <span className={user.active ? '' : 'opacity-50'}>{user.name}</span>
