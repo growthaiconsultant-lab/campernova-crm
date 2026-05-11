@@ -79,8 +79,8 @@ export function Sidebar({ userRole }: SidebarProps) {
   return (
     <aside className="flex h-screen w-16 flex-col items-center bg-sidebar text-sidebar-foreground">
       {/* Logo + CRM badge */}
-      <div className="flex h-16 w-full shrink-0 flex-col items-center justify-center gap-1.5 border-b border-sidebar-border">
-        <LogoCampersNova variant="cream" novaSize={16} />
+      <div className="flex h-16 w-full shrink-0 flex-col items-center justify-center gap-1 border-b border-sidebar-border">
+        <LogoCampersNova variant="cream" className="[--logo-campers:8px] [--logo-nova:20px]" />
         <span
           className="rounded border px-1.5 py-px text-[7px] font-semibold uppercase tracking-[0.22em] text-sidebar-foreground/50"
           style={{ borderColor: 'rgba(239,233,216,0.18)' }}
