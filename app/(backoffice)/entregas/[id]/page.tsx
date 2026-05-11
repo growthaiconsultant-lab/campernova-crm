@@ -2,8 +2,11 @@ import { notFound } from 'next/navigation'
 import Link from 'next/link'
 import { db } from '@/lib/db'
 import { requireAuth } from '@/lib/auth'
+import { createClient } from '@/lib/supabase/server'
+import { deliveryDocumentSignedUrl } from '@/lib/supabase/storage'
 import { DeliveryTabs, TabPanel } from './delivery-tabs'
 import { ChecklistSection } from './checklist-section'
+import { DocumentsSection } from './documents-section'
 import { SignForm } from './sign-form'
 import type { DeliveryStatus } from '@prisma/client'
 
@@ -22,7 +25,7 @@ const STATUS_COLORS: Record<DeliveryStatus, string> = {
 }
 
 export default async function EntregaDetailPage({ params }: { params: { id: string } }) {
-  await requireAuth()
+  const currentUser = await requireAuth()
 
   const delivery = await db.delivery.findUnique({
     where: { id: params.id },
@@ -56,6 +59,20 @@ export default async function EntregaDetailPage({ params }: { params: { id: stri
   const pendingChecklist = delivery.checklist.filter((c) => c.result === 'PENDIENTE').length
   const isSigned = !!(delivery.signedByName && delivery.signedByDni && delivery.signatureUrl)
   const canComplete = pendingChecklist === 0 && isSigned
+  const isTerminal = delivery.status === 'COMPLETADA' || delivery.status === 'CANCELADA'
+  const isAdmin = currentUser.role === 'ADMIN'
+
+  // Generate 1-hour signed URLs for private documents
+  const supabase = createClient()
+  const docsWithUrls = await Promise.all(
+    delivery.documents.map(async (doc) => ({
+      id: doc.id,
+      name: doc.name,
+      category: doc.category,
+      uploadedByName: doc.uploadedBy?.name ?? null,
+      signedUrl: await deliveryDocumentSignedUrl(supabase, doc.url),
+    }))
+  )
 
   return (
     <div className="space-y-6">
@@ -235,35 +252,12 @@ export default async function EntregaDetailPage({ params }: { params: { id: stri
 
         {/* Documentos */}
         <TabPanel tab="documentos">
-          <div className="space-y-4">
-            {delivery.documents.length === 0 ? (
-              <p className="text-cn-ink-400 text-sm">No hay documentos adjuntos.</p>
-            ) : (
-              <div className="divide-y divide-cn-line overflow-hidden rounded-xl border border-cn-line">
-                {delivery.documents.map((doc) => (
-                  <div
-                    key={doc.id}
-                    className="flex items-center justify-between px-4 py-3 hover:bg-cn-cream-50"
-                  >
-                    <div>
-                      <p className="text-sm font-medium text-cn-ink-700">{doc.name}</p>
-                      <p className="text-cn-ink-400 text-xs">
-                        {doc.category} · {doc.uploadedBy?.name ?? '—'}
-                      </p>
-                    </div>
-                    <a
-                      href={doc.url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-xs text-cn-teal-900 hover:underline"
-                    >
-                      Ver →
-                    </a>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
+          <DocumentsSection
+            deliveryId={delivery.id}
+            documents={docsWithUrls}
+            isTerminal={isTerminal}
+            isAdmin={isAdmin}
+          />
         </TabPanel>
 
         {/* Firma */}

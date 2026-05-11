@@ -316,6 +316,23 @@ export async function uploadDeliveryDocument(
 
 export async function deleteDeliveryDocument(docId: string): Promise<ActionResult> {
   await requireAdmin()
+
+  const doc = await db.deliveryDocument.findUnique({
+    where: { id: docId },
+    select: { url: true, deliveryId: true },
+  })
+  if (!doc) return { ok: false, error: 'Documento no encontrado' }
+
+  // Best-effort storage deletion (non-blocking if it fails)
+  try {
+    const { createClient } = await import('@/lib/supabase/server')
+    const supabase = createClient()
+    await supabase.storage.from('vehicle-documents').remove([doc.url])
+  } catch {
+    // log nothing — orphaned file is acceptable
+  }
+
   await db.deliveryDocument.delete({ where: { id: docId } })
+  revalidatePath(`/entregas/${doc.deliveryId}`)
   return { ok: true }
 }
