@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { buildVehicleContext } from './build-context'
 import type { VehicleWithRelations } from './build-context'
-import { VehicleType, ConservationState, VehicleStatus } from '@prisma/client'
+import { Prisma, VehicleType, ConservationState, VehicleStatus } from '@prisma/client'
 
 function makeVehicle(overrides: Partial<VehicleWithRelations> = {}): VehicleWithRelations {
   return {
@@ -25,6 +25,11 @@ function makeVehicle(overrides: Partial<VehicleWithRelations> = {}): VehicleWith
     status: VehicleStatus.NUEVO,
     publishedAt: null,
     soldAt: null,
+    purchasePrice: null,
+    salePrice: null,
+    marginPercent: new Prisma.Decimal(4),
+    entryDate: null,
+    naveLocation: null,
     createdAt: new Date(),
     updatedAt: new Date(),
     photos: [],

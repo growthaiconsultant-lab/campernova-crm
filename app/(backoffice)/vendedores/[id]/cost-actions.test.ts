@@ -21,6 +21,7 @@ const { mockDb } = vi.hoisted(() => {
 
 vi.mock('@/lib/db', () => ({ db: mockDb }))
 
+import type { User } from '@prisma/client'
 import { requireAuth, requireAdmin } from '@/lib/auth'
 import {
   createVehicleCost,
@@ -29,8 +30,8 @@ import {
   updateNaveLocation,
 } from './cost-actions'
 
-const mockAdmin = { id: 'admin-1', role: 'ADMIN' as const, name: 'Admin' }
-const mockAgent = { id: 'agent-1', role: 'AGENTE' as const, name: 'Agente' }
+const mockAdmin = { id: 'admin-1', role: 'ADMIN' as const, name: 'Admin' } as unknown as User
+const mockAgent = { id: 'agent-1', role: 'AGENTE' as const, name: 'Agente' } as unknown as User
 
 beforeEach(() => {
   vi.clearAllMocks()
