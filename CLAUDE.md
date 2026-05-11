@@ -92,7 +92,7 @@ claude mcp add-json linear '{\"command\":\"npx\",\"args\":[\"-y\",\"mcp-linear@l
 
 `.claude/settings.json` y `.claude/settings.local.json` se mantienen como referencia de la estructura, pero la fuente de verdad funcional es el registro de la CLI.
 
-## Estado actual (Block 4 — Expediente Legal COMPLETADO ✅)
+## Estado actual (Block 5 — Dashboard Financiero COMPLETADO ✅)
 
 ### Sprint 1 — COMPLETADO ✅
 
@@ -210,6 +210,16 @@ Gestión documental completa del vehículo: campos legales en Vehicle, subida de
 - ✅ **Dashboard** — 3 alertas nuevas: expedientes incompletos (TASADO/PUBLICADO < 100%), ITV próxima a vencer (≤ 60 días), cargas DGT sin verificar.
 - ✅ **Form `/vender`** — Campo matrícula opcional en step 1 (se guarda en `Vehicle.plate`).
 - ✅ **Tests** — `validate.test.ts` (17), `legal-actions.test.ts` (13), `actions.test.ts` guards (7). Suite total: 225 tests verdes.
+
+### Block 5 — Dashboard Financiero — COMPLETADO ✅
+
+Visibilidad financiera real del negocio: capital en nave, márgenes, rotación, funnels y vehículos estancados.
+
+- ✅ **`lib/dashboard/metrics.ts`** — 12 funciones de métricas financieras: `getStockValue` (valor/capital/margen potencial), `getAverageDaysInStock` (días medios + over-90), `getStagnantVehicles` (>90d en estado actual), `getMonthlyNetMargin` (margen neto + ticket medio mes), `getPublishedToSoldRate` (tasa pub→vendido), `getLeadAcceptanceRate` / `getFunnelComparison` (Pro vs CN), `getAveragePostventaCostPerVehicle`, `getVehiclesPerCommercial`, `getAverageWorkshopHoursPerVehicle`, `getStockHistorySnapshot` (cacheable con `unstable_cache`, raw SQL, 12 meses), `getAverageTicket`.
+- ✅ **`components/dashboard/`** — 5 nuevos componentes: `KpiCard` (genérico con trend), `StockEvolutionChart` (recharts ComposedChart dual-axis: barras valor € + línea conteo), `FunnelComparison` (Pro teal / CN amber, div-based), `StagnantVehiclesTable` (tabla con badge rojo >180d), `VehiclesPerCommercial` (recharts BarChart por comercial).
+- ✅ **`app/(backoffice)/dashboard/page.tsx`** — Reestructurado en 6 secciones role-based: Resumen operativo (todos), Resumen financiero (ADMIN+MARKETING), Stock y rotación (ADMIN+AGENTE+MARKETING+ENTREGAS), Operativas con alertas+distribución+funnel (todos), Análisis avanzado con gráficos (ADMIN), Vehículos estancados (condicional).
+- ✅ **recharts** — `pnpm add recharts` (v3.8.1). `StockEvolutionChart` y `VehiclesPerCommercial` son `'use client'`.
+- ✅ **Tests** — `lib/dashboard/metrics.test.ts` con 26 tests verdes. Suite total: **251 tests verdes**.
 
 ## Decisiones técnicas
 
@@ -1526,6 +1536,33 @@ Solo ADMIN. `extendWarranty(warrantyId, months)` extiende desde `extendedTo` (si
 #### Notificación tickets prioritarios
 
 `sendTicketOpenedNotification` se llama en `createTicket` cuando `priority === 'ALTA' || priority === 'CRITICA'`. Notifica en paralelo a todos los admins activos (`role === 'ADMIN'`). No bloqueante (`.catch(console.error)`).
+
+### Dashboard Financiero Block 5 — decisiones técnicas
+
+#### `lib/dashboard/metrics.ts` — arquitectura
+
+- Todas las funciones toman `database: PrismaClient` y `filter: DashboardFilter` (mismo patrón que `queries.ts`).
+- `getStockHistorySnapshot` usa `unstable_cache` con `revalidate: 300` (5 min). Usa `db` del singleton directamente (no como param) para poder ser envuelta por `unstable_cache` (requiere función sin argumentos).
+- La función raw SQL genera una serie de meses con `generate_series` y hace LEFT JOIN con `vehicles` para aproximar el stock histórico mes a mes. Es una aproximación: cuenta vehículos cuyo `created_at < fin_de_mes` y que no estaban `VENDIDO/DESCARTADO` antes de iniciar ese mes (usando `updated_at >= mes_inicio`). No es 100% precisa pero es funcional para el gráfico de tendencia.
+- `getStagnantVehicles` usa `updatedAt` como proxy de "cuándo cambió el estado por última vez". Es una aproximación válida para la mayoría de casos. En el futuro se puede mejorar leyendo el último `CAMBIO_ESTADO` de activities.
+
+#### recharts — integración
+
+- `StockEvolutionChart` y `VehiclesPerCommercial` son `'use client'` (recharts requiere DOM APIs).
+- Dual Y-axis en `StockEvolutionChart`: eje izquierdo en € (formateado en k€), eje derecho en unidades.
+- Colores: teal `hsl(177, 31%, 23%)` para barras de valor/stock, naranja `hsl(24, 78%, 45%)` para la línea de conteo y barras de publicados — consistentes con la paleta Campernova.
+
+#### Permisos por sección
+
+| Sección                          | ADMIN | AGENTE | TALLER | ENTREGAS | MARKETING |
+| -------------------------------- | ----- | ------ | ------ | -------- | --------- |
+| Resumen operativo                | ✓     | ✓      | ✓      | ✓        | ✓         |
+| Resumen financiero               | ✓     | —      | —      | —        | ✓         |
+| Stock y rotación                 | ✓     | ✓      | —      | ✓        | ✓         |
+| Operativas (alertas+dist+funnel) | ✓     | ✓      | ✓      | ✓        | ✓         |
+| Análisis avanzado (gráficos)     | ✓     | —      | —      | —        | —         |
+| Vehículos estancados             | ✓     | ✓      | —      | ✓        | ✓         |
+| Tiempo medio por estado          | ✓     | ✓      | ✓      | ✓        | ✓         |
 
 ## Pendientes externos
 
