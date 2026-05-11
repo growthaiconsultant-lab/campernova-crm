@@ -102,8 +102,14 @@ export function Sidebar({ userRole }: SidebarProps) {
   return (
     <aside className="flex h-screen w-56 flex-col bg-sidebar text-sidebar-foreground">
       {/* Logo */}
-      <div className="flex h-16 shrink-0 items-center border-b border-sidebar-border px-4">
+      <div className="flex h-16 shrink-0 items-center gap-2.5 border-b border-sidebar-border px-4">
         <LogoCampersNova variant="cream" className="[--logo-campers:9px] [--logo-nova:24px]" />
+        <span
+          className="rounded border px-1.5 py-0.5 text-[8px] font-semibold uppercase tracking-[0.20em] text-sidebar-foreground/50"
+          style={{ borderColor: 'rgba(239,233,216,0.22)' }}
+        >
+          CRM
+        </span>
       </div>
 
       {/* Nav */}
