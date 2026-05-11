@@ -2,14 +2,18 @@ export function TrustStrip() {
   return (
     <div className="relative z-10 -mt-14 px-8 pb-4 max-[640px]:px-5">
       <div
-        className="mx-auto grid max-w-[1280px] grid-cols-2 gap-x-8 gap-y-6 rounded-[24px] px-8 py-7 lg:grid-cols-4"
+        className="mx-auto max-w-[1280px] rounded-[24px] px-8 py-2 lg:grid lg:grid-cols-4 lg:gap-x-8 lg:py-7"
         style={{
           background: '#fff',
           boxShadow: '0 4px 32px rgba(61,47,36,0.10)',
         }}
       >
         {ITEMS.map(({ icon, title, text }) => (
-          <div key={title} className="flex items-start gap-3.5">
+          <div
+            key={title}
+            className="flex items-start gap-3.5 border-b py-5 last:border-0 lg:border-0 lg:py-0"
+            style={{ borderColor: 'rgba(88,71,56,0.10)' }}
+          >
             <span
               className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl"
               style={{ background: 'rgba(88,71,56,0.08)', color: 'var(--cn-teal-500)' }}
@@ -18,12 +22,12 @@ export function TrustStrip() {
             </span>
             <div>
               <h4
-                className="mb-1 text-[13px] font-semibold leading-snug"
+                className="mb-1 text-[14px] font-semibold leading-snug"
                 style={{ color: 'var(--cn-teal-900)' }}
               >
                 {title}
               </h4>
-              <p className="text-[12px] leading-snug" style={{ color: 'var(--cn-ink-500)' }}>
+              <p className="text-[13px] leading-relaxed" style={{ color: 'var(--cn-ink-500)' }}>
                 {text}
               </p>
             </div>
