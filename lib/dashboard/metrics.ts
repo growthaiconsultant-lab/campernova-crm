@@ -198,9 +198,9 @@ export async function getMonthlyNetMargin(
     select: { sellerLeadId: true },
   })
 
-  const sellerLeadIds = [
-    ...new Set(soldActivities.map((a) => a.sellerLeadId).filter(Boolean) as string[]),
-  ]
+  const sellerLeadIds = Array.from(
+    new Set(soldActivities.map((a) => a.sellerLeadId).filter(Boolean) as string[])
+  )
 
   if (sellerLeadIds.length === 0) {
     return { netMargin: 0, grossRevenue: 0, totalCosts: 0, vehiclesSold: 0, averageTicket: null }
@@ -391,7 +391,7 @@ export async function getAverageWorkshopHoursPerVehicle(
   }
 
   const vehicleCount = vehicleHours.size
-  const totalHours = [...vehicleHours.values()].reduce((s, h) => s + h, 0)
+  const totalHours = Array.from(vehicleHours.values()).reduce((s, h) => s + h, 0)
 
   return {
     averageHours: vehicleCount === 0 ? null : totalHours / vehicleCount,
