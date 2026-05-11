@@ -67,8 +67,8 @@ export function StockEvolutionChart({ data }: Props) {
           allowDecimals={false}
         />
         <Tooltip
-          formatter={(value: number, name: string) => {
-            if (name === 'Valor stock') return [EUR.format(value), name]
+          formatter={(value, name) => {
+            if (name === 'Valor stock') return [EUR.format(Number(value)), name]
             return [value, name]
           }}
           labelStyle={{ fontWeight: 600 }}
