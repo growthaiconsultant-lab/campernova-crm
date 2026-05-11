@@ -1,6 +1,7 @@
 import { requireAuth } from '@/lib/auth'
 import { Sidebar } from '@/components/layout/sidebar'
 import { Topbar } from '@/components/layout/topbar'
+import { Toaster } from 'sonner'
 
 export default async function BackofficeLayout({ children }: { children: React.ReactNode }) {
   const user = await requireAuth()
@@ -16,6 +17,7 @@ export default async function BackofficeLayout({ children }: { children: React.R
 
         <main className="flex-1 overflow-y-auto bg-background p-6">{children}</main>
       </div>
+      <Toaster richColors position="top-right" />
     </div>
   )
 }
