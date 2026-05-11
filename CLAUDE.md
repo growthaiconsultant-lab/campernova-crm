@@ -1208,6 +1208,106 @@ ANTHROPIC_API_KEY=sk-ant-...          # ya en .env.local (usada también por cha
 ANTHROPIC_MODEL=claude-haiku-4-5-20251001  # opcional; este es el default
 ```
 
+### Módulo Expediente Legal (Block 4)
+
+#### Arquitectura de `lib/vehicle-legal/`
+
+```
+lib/vehicle-legal/
+  types.ts          — VehicleLegalInput, DocumentSummary, MissingRequirement, TargetStatus, ITV_WARNING_DAYS
+  requirements.ts   — TASADO_MIN_PHOTOS, PUBLICADO_REQUIRED_DOCS (7 categorías), PUBLICADO_MIN_PHOTOS, DOC_LABELS
+  validate.ts       — listMissingRequirements, isReadyForStatus, calculateCompletionPercent
+  prisma-deps.ts    — getVehicleLegalInput(db, vehicleId), getVehicleDocumentSummary(db, vehicleId)
+  index.ts          — barrel exports
+  validate.test.ts  — 17 tests
+```
+
+Módulo puro sin side-effects. Las funciones de `validate.ts` no tocan Prisma — reciben `VehicleLegalInput` + `DocumentSummary[]` como datos planos. `prisma-deps.ts` hace las queries y construye esas estructuras. Mismo patrón que `lib/valuation/` y `lib/matching/`.
+
+#### Reglas de completitud por estado
+
+**TASADO** — requisitos mínimos:
+
+- `plate` presente (matrícula)
+- `desiredPrice` presente (precio deseado del vendedor)
+- Al menos 1 foto (`photoCount ≥ 1`)
+
+**PUBLICADO** — todo lo anterior más:
+
+- `vin` presente (número de bastidor)
+- `itvValidUntil` presente y no vencida
+- `chargeCheckedAt` presente (cargas DGT verificadas)
+- `purchasePrice` y `salePrice` presentes
+- 7 documentos obligatorios (`PUBLICADO_REQUIRED_DOCS`): DNI_VENDEDOR, CONTRATO_COMPRAVENTA, FICHA_TECNICA, PERMISO_CIRCULACION, ITV_VIGENTE, JUSTIFICANTE_PAGO, INFORME_CARGAS_DGT
+- Al menos 5 fotos (`photoCount ≥ 5`)
+- Sin órdenes de taller activas (`workOrdersBlockingCount === 0`)
+
+**ITV próxima a vencer** (< 60 días = `ITV_WARNING_DAYS`): genera `severity: 'warning'`, que NO bloquea `isReadyForStatus`. Solo `severity: 'error'` bloquea.
+
+#### Punto de cumplimiento (completion %)
+
+15 puntos en total: 7 campos del vehículo (plate, vin, itvValidUntil, chargeCheckedAt, purchasePrice, salePrice, desiredPrice) + 7 documentos obligatorios + 1 pack visual (≥ 5 fotos). `calculateCompletionPercent` devuelve un entero 0-100. Semáforo en `CompletionBadge`: verde ≥90%, amber 60-89%, rojo <60%.
+
+#### Guard en `updateVehicle`
+
+La comprobación se dispara solo cuando hay una transición real al estado objetivo:
+
+```typescript
+const isTransitioningTo = (s: string) => status === s && vehicle.status !== s
+if (isTransitioningTo('TASADO') || isTransitioningTo('PUBLICADO')) { … }
+```
+
+Esto evita re-validar si el vehículo ya está en ese estado y el agente solo edita datos. Si el guard falla:
+
+1. Loguea `PUBLICACION_BLOQUEADA` en `activities` (con la lista de errores en el `content`)
+2. Devuelve el error con `formErrors` describiendo cada requisito pendiente
+
+El `desiredPrice` del formulario (aún no guardado en DB) se fusiona con `legalInput` antes de evaluar, para que la validación de TASADO funcione incluso si el agente pone el precio por primera vez en el mismo submit.
+
+#### Permisos por acción
+
+| Acción                           | Rol mínimo |
+| -------------------------------- | ---------- |
+| Subir documento                  | AGENTE     |
+| Ver documento (signed URL)       | AGENTE     |
+| Editar plate/vin/ITV/titularidad | ADMIN      |
+| Marcar cargas verificadas        | ADMIN      |
+| Eliminar documento               | ADMIN      |
+
+#### Bucket `vehicle-documents` — privado, URLs firmadas
+
+A diferencia de `vehicle-photos` (público, URLs directas), los documentos legales van en el bucket `vehicle-documents` (privado). Se generan signed URLs con 1 año de expiración al subir y se almacenan en `VehicleDocument.url`. `getVehicleDocumentSignedUrl` detecta si el valor ya es una URL completa (la devuelve tal cual) o un path (regenera con 1 hora de expiración).
+
+Path en storage: `docs/{vehicleId}/{category}_{timestamp}.{ext}` — el prefijo `docs/` distingue de otras posibles rutas en el mismo bucket.
+
+#### Alertas del Dashboard
+
+Las 3 consultas nuevas (`vehiclesTasadosRaw`, `vehiclesItvExpiring`, `vehiclesChargesPending`) se añaden al `Promise.all` existente. Solo ADMIN y AGENTE ven la sección "Alertas legales":
+
+- **Expedientes incompletos**: vehículos en TASADO o PUBLICADO con `calculateCompletionPercent < 100%`. Top 5, enlace a cada ficha.
+- **ITV próxima a vencer**: `itvValidUntil` entre `now` y `now + 60 días`. Top 5.
+- **Cargas DGT sin verificar**: `chargeCheckedAt IS NULL` en vehículos activos (estados TASADO/PUBLICADO/RESERVADO). Top 5.
+
+#### Archivos clave
+
+```
+prisma/migrations/20260511100000_add_vehicle_legal_docs/migration.sql
+lib/vehicle-legal/                                        — módulo puro (ver arriba)
+app/(backoffice)/vendedores/[id]/
+  legal-actions.ts                                        — server actions
+  legal-actions.test.ts                                   — 13 tests
+  actions.ts                                              — guard TASADO/PUBLICADO añadido a updateVehicle
+  actions.test.ts                                         — 7 tests de bloqueo
+components/vehicle-legal/
+  vehicle-legal-fields-form.tsx                           — formulario plate/vin/ITV/titularidad + marcar cargas
+  vehicle-documents-list.tsx                              — listado 11 categorías con upload inline
+  missing-for-publish-card.tsx                            — tarjeta verde/amber de requisitos pendientes
+  completion-badge.tsx                                    — semáforo % expediente
+app/vender/empezar/page.tsx                               — campo matrícula opcional step 1
+app/vender/empezar/actions.ts                             — plate → Vehicle.plate en vehicle.create
+lib/validators/seller-lead.ts                             — plate: z.string().max(20).optional() en createSellerLeadSchema
+```
+
 ### Módulo Taller
 
 Módulo de gestión de órdenes de trabajo del taller mecánico propio (Manolo). Las órdenes van ligadas a un `Vehicle` y, por tanto, a un `SellerLead`.
