@@ -1167,6 +1167,107 @@ ANTHROPIC_API_KEY=sk-ant-...          # ya en .env.local (usada también por cha
 ANTHROPIC_MODEL=claude-haiku-4-5-20251001  # opcional; este es el default
 ```
 
+### Módulo Taller
+
+Módulo de gestión de órdenes de trabajo del taller mecánico propio (Manolo). Las órdenes van ligadas a un `Vehicle` y, por tanto, a un `SellerLead`.
+
+#### Archivos clave
+
+```
+app/(backoffice)/taller/
+  page.tsx                        — listado de órdenes con filtros por estado y mecánico
+  actions.ts                      — server actions: createWorkOrder, updateWorkOrderStatus,
+                                     updateChecklistItem, addTimeEntry, deleteTimeEntry,
+                                     addPart, deletePart, approveWorkOrder, rejectWorkOrder,
+                                     updateEstimatedCost
+  actions.test.ts                 — 30+ tests Vitest (166 en total con el resto)
+  nueva/page.tsx                  — página "Nueva orden"
+  nueva/work-order-form.tsx       — formulario de creación (client component)
+  [id]/page.tsx                   — ficha con 5 tabs: Resumen / Checklist / Horas / Piezas / Costes
+  [id]/work-order-tabs.tsx        — WorkOrderTabs + TabPanel (Context + CSS hidden)
+  [id]/work-order-actions-bar.tsx — botones de transición de estado y aprobación CEO
+  [id]/checklist-item-row.tsx     — fila de checklist: resultado + notas
+  [id]/time-entry-form.tsx        — TimeEntrySection: imputar horas + tabla de entradas
+  [id]/parts-section.tsx          — PartsSection: añadir piezas + tabla (solo admin borra)
+```
+
+#### Máquina de estados WorkOrder
+
+```
+PENDIENTE → EN_DIAGNOSTICO → PRESUPUESTADA → EN_CURSO → COMPLETADA
+                                                       → RECHAZADA
+(cualquier estado activo → RECHAZADA)
+```
+
+- `COMPLETADA` y `RECHAZADA` son terminales; no hay transiciones de salida.
+- El mapa `VALID_TRANSITIONS` vive directamente en `actions.ts` (no en `lib/state-machine.ts`), ya que es la única entidad que lo usa.
+
+#### Aprobación CEO
+
+Si `estimatedCost > approvalLimit` al crear la orden, `approvalLevel` se pone a `REQUIERE_CEO`. La transición a `EN_CURSO` queda bloqueada en el servidor hasta que un ADMIN llame a `approveWorkOrder` (pasa a `APROBADA_CEO`). El admin también puede rechazar con `rejectWorkOrder` (pasa a `RECHAZADA_CEO`, que bloquea igualmente la transición).
+
+`approvalLimit` por defecto: 500 €. Se puede sobreescribir en el formulario de creación.
+
+#### Checklist inicial — 21 ítems
+
+Se crean automáticamente al crear la orden. Tres categorías:
+
+| Categoría    | Ítems                                                                                        |
+| ------------ | -------------------------------------------------------------------------------------------- |
+| MECANICA     | Motor, Caja de cambios, Frenos, Suspensión, Neumáticos, Batería motor, ITV y documentación   |
+| CAMPER       | Agua, Gas, Calefacción, Boiler, Nevera, Placas solares, Limpieza interior, Limpieza exterior |
+| ELECTRICIDAD | Centralita, Inversor, Baterías auxiliares, Luces, Tomas 230V, Cargadores                     |
+
+Cada ítem puede marcarse como `PENDIENTE | OK | NECESITA_REPARACION | NO_APLICA`.
+
+#### Generación de VehicleCost al completar
+
+Al pasar a `COMPLETADA`, `updateWorkOrderStatus` genera automáticamente filas en `vehicle_costs` en la misma `$transaction`:
+
+- `MANO_OBRA_TALLER` → suma de `hours × hourlyRate` de todas las entradas de tiempo
+- `PIEZAS` → suma de `quantity × unitCost` de todas las piezas
+
+Solo se generan si el importe es > 0. Si no hay horas ni piezas, la transacción solo actualiza el estado + activity.
+
+#### Permisos por acción
+
+| Acción               | Rol mínimo |
+| -------------------- | ---------- |
+| Crear orden          | AGENTE     |
+| Cambiar estado       | AGENTE     |
+| Actualizar checklist | AGENTE     |
+| Imputar horas        | AGENTE     |
+| Borrar horas propias | AGENTE     |
+| Borrar horas ajenas  | ADMIN      |
+| Añadir piezas        | AGENTE     |
+| Borrar piezas        | ADMIN      |
+| Aprobar/rechazar CEO | ADMIN      |
+
+#### WorkOrderTabs — patrón Context + TabPanel
+
+**Problema resuelto**: el patrón render-prop (`children: (activeTab) => ReactNode`) falla en navegación client-side con App Router porque las funciones no son serializables en el payload RSC. Al hacer `router.push('/taller/{id}')` tras crear una orden, `children` llegaba como `null` al cliente → `TypeError: Cannot read properties of null (reading 'get')`.
+
+**Solución**: `WorkOrderTabs` expone un `TabContext` y un componente `TabPanel`. Cada panel llama `useContext(TabContext)` y se oculta con la clase CSS `hidden` — no hay funciones en el árbol de props, todo es serializable.
+
+```tsx
+// page.tsx (Server Component)
+<WorkOrderTabs>
+  <TabPanel tab="resumen">...</TabPanel>
+  <TabPanel tab="checklist">...</TabPanel>
+  ...
+</WorkOrderTabs>
+```
+
+No usar `return null` en `TabPanel` para ocultar — causaría hidratación incorrecta entre SSR (que renderiza todo) y la navegación cliente. CSS `hidden` es la forma correcta.
+
+#### Activity log
+
+Cada acción relevante crea una fila en `activities` con `sellerLeadId` del vehículo asociado (no existe `workOrderId` en la tabla `activities`). Tipos usados: `ORDEN_TALLER_CREADA`, `ORDEN_TALLER_COMPLETADA`, `ORDEN_TALLER_RECHAZADA`, `ORDEN_TALLER_APROBADA`, `CAMBIO_ESTADO`.
+
+#### `build` script — `prisma generate`
+
+`package.json` incluye `"build": "prisma generate && next build"` para garantizar que el cliente Prisma se regenera en cada deploy de Vercel, independientemente de si `node_modules` está cacheado.
+
 ## Pendientes externos
 
 - 🔲 Verificar dominio `campersnova.com` en Resend → Domains (DNS records) — CAM-18 y CAM-19 ya funcionales en sandbox; necesario para enviar desde `info@campersnova.com` en producción
