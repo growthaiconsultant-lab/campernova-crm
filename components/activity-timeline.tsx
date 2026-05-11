@@ -8,6 +8,8 @@ import {
   PenLine,
   Megaphone,
   Download,
+  Wrench,
+  DollarSign,
 } from 'lucide-react'
 import type { ActivityType } from '@prisma/client'
 import { DeleteNoteButton } from './delete-note-button'
@@ -23,6 +25,12 @@ const ACTIVITY_LABELS: Record<ActivityType, string> = {
   LEAD_CREADO_CHAT: 'Lead desde chat',
   ANUNCIO_GENERADO: 'Anuncio generado',
   FOTOS_DESCARGADAS: 'Fotos descargadas',
+  COSTE_IMPUTADO: 'Coste imputado',
+  PRECIO_VENTA_AJUSTADO: 'Precio ajustado',
+  ORDEN_TALLER_CREADA: 'Orden de taller',
+  ORDEN_TALLER_COMPLETADA: 'Taller completado',
+  ORDEN_TALLER_APROBADA: 'Taller aprobado',
+  ORDEN_TALLER_RECHAZADA: 'Taller rechazado',
 }
 
 const ICON_CLASSES: Record<ActivityType, string> = {
@@ -36,6 +44,12 @@ const ICON_CLASSES: Record<ActivityType, string> = {
   LEAD_CREADO_CHAT: 'bg-teal-100 text-teal-700 dark:bg-teal-900/40 dark:text-teal-300',
   ANUNCIO_GENERADO: 'bg-orange-100 text-orange-700 dark:bg-orange-900/40 dark:text-orange-300',
   FOTOS_DESCARGADAS: 'bg-sky-100 text-sky-700 dark:bg-sky-900/40 dark:text-sky-300',
+  COSTE_IMPUTADO: 'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300',
+  PRECIO_VENTA_AJUSTADO: 'bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300',
+  ORDEN_TALLER_CREADA: 'bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-300',
+  ORDEN_TALLER_COMPLETADA: 'bg-teal-100 text-teal-700 dark:bg-teal-900/40 dark:text-teal-300',
+  ORDEN_TALLER_APROBADA: 'bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300',
+  ORDEN_TALLER_RECHAZADA: 'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300',
 }
 
 function ActivityIcon({ type }: { type: ActivityType }) {
@@ -61,6 +75,14 @@ function ActivityIcon({ type }: { type: ActivityType }) {
       return <Megaphone className={cls} />
     case 'FOTOS_DESCARGADAS':
       return <Download className={cls} />
+    case 'COSTE_IMPUTADO':
+    case 'PRECIO_VENTA_AJUSTADO':
+      return <DollarSign className={cls} />
+    case 'ORDEN_TALLER_CREADA':
+    case 'ORDEN_TALLER_COMPLETADA':
+    case 'ORDEN_TALLER_APROBADA':
+    case 'ORDEN_TALLER_RECHAZADA':
+      return <Wrench className={cls} />
   }
 }
 

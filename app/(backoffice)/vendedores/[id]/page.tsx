@@ -23,6 +23,12 @@ import { PublicNotesEditor } from '@/components/vehicle-ads/public-notes-editor'
 import { GenerateAdButton } from '@/components/vehicle-ads/generate-ad-button'
 import { DownloadPhotosButton } from '@/components/vehicle-ads/download-photos-button'
 import { CardDescription } from '@/components/ui/card'
+import { VehicleEconomicsForm } from '@/components/vehicle-economics/vehicle-economics-form'
+import { VehicleMarginSummary } from '@/components/vehicle-economics/vehicle-margin-summary'
+import { VehicleCostsTable } from '@/components/vehicle-economics/vehicle-costs-table'
+import { NaveLocationField } from '@/components/vehicle-economics/nave-location-field'
+import { calculateVehicleMargin } from '@/lib/margin'
+import type { VehicleCostCategory } from '@prisma/client'
 
 export default async function FichaVendedorPage({ params }: { params: { id: string } }) {
   const [currentUser, lead, agents, activities] = await Promise.all([
@@ -58,6 +64,10 @@ export default async function FichaVendedorPage({ params }: { params: { id: stri
               include: { createdBy: { select: { name: true } } },
               orderBy: { createdAt: 'desc' },
               take: 6,
+            },
+            costs: {
+              include: { createdBy: { select: { name: true } } },
+              orderBy: { createdAt: 'desc' },
             },
           },
         },
@@ -269,6 +279,89 @@ export default async function FichaVendedorPage({ params }: { params: { id: stri
                     agentName={lastCochesNetAd?.createdBy?.name ?? undefined}
                   />
                   <DownloadPhotosButton sellerLeadId={lead.id} photoCount={v.photos.length} />
+                </div>
+              </CardContent>
+            </Card>
+          )
+        })()}
+
+      {/* Costes y margen — solo ADMIN */}
+      {v &&
+        currentUser.role === 'ADMIN' &&
+        (() => {
+          const costs = (v.costs ?? []).map((c) => ({
+            id: c.id,
+            category: c.category as VehicleCostCategory,
+            description: c.description,
+            amount: Number(c.amount),
+            supplier: c.supplier,
+            invoiceUrl: c.invoiceUrl,
+            createdAt: c.createdAt,
+            createdBy: c.createdBy,
+          }))
+
+          const margin = calculateVehicleMargin({
+            purchasePrice: v.purchasePrice ? Number(v.purchasePrice) : null,
+            salePrice: v.salePrice ? Number(v.salePrice) : null,
+            marginPercentTarget: v.marginPercent ? Number(v.marginPercent) : 4,
+            costs: costs.map((c) => ({ category: c.category, amount: c.amount })),
+          })
+
+          return (
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base">Costes y margen</CardTitle>
+                <CardDescription>
+                  Precios, costes imputados y rentabilidad neta del vehículo. Solo visible para
+                  administradores.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                {/* Precios y margen objetivo */}
+                <div>
+                  <p className="text-cn-ink-400 mb-3 text-xs font-medium uppercase tracking-wide">
+                    Precios y objetivo
+                  </p>
+                  <VehicleEconomicsForm
+                    vehicleId={v.id}
+                    desiredPrice={v.desiredPrice ? Number(v.desiredPrice) : null}
+                    purchasePrice={v.purchasePrice ? Number(v.purchasePrice) : null}
+                    salePrice={v.salePrice ? Number(v.salePrice) : null}
+                    marginPercent={v.marginPercent ? Number(v.marginPercent) : 4}
+                  />
+                </div>
+
+                {/* Resumen de margen */}
+                <div>
+                  <p className="text-cn-ink-400 mb-3 text-xs font-medium uppercase tracking-wide">
+                    Resumen de margen
+                  </p>
+                  <VehicleMarginSummary margin={margin} />
+                </div>
+
+                {/* Costes imputados */}
+                <div>
+                  <p className="text-cn-ink-400 mb-3 text-xs font-medium uppercase tracking-wide">
+                    Costes imputados
+                  </p>
+                  <VehicleCostsTable
+                    vehicleId={v.id}
+                    costs={costs}
+                    currentUserId={currentUser.id}
+                    isAdmin={true}
+                  />
+                </div>
+
+                {/* Ubicación en nave */}
+                <div>
+                  <p className="text-cn-ink-400 mb-3 text-xs font-medium uppercase tracking-wide">
+                    Ubicación en nave
+                  </p>
+                  <NaveLocationField
+                    vehicleId={v.id}
+                    entryDate={v.entryDate}
+                    naveLocation={v.naveLocation}
+                  />
                 </div>
               </CardContent>
             </Card>

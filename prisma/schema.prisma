@@ -85,6 +85,52 @@ enum ActivityType {
   LEAD_CREADO_CHAT
   ANUNCIO_GENERADO
   FOTOS_DESCARGADAS
+  COSTE_IMPUTADO
+  ORDEN_TALLER_CREADA
+  ORDEN_TALLER_COMPLETADA
+  ORDEN_TALLER_APROBADA
+  ORDEN_TALLER_RECHAZADA
+  PRECIO_VENTA_AJUSTADO
+}
+
+enum VehicleCostCategory {
+  PIEZAS
+  MANO_OBRA_TALLER
+  INSTALACION
+  LIMPIEZA
+  MARKETING
+  CUSTODIA
+  POSTVENTA
+  OTRO
+}
+
+enum WorkOrderStatus {
+  PENDIENTE
+  EN_DIAGNOSTICO
+  PRESUPUESTADA
+  EN_CURSO
+  COMPLETADA
+  RECHAZADA
+}
+
+enum WorkOrderApprovalLevel {
+  NO_REQUIERE
+  REQUIERE_CEO
+  APROBADA_CEO
+  RECHAZADA_CEO
+}
+
+enum ChecklistItemCategory {
+  MECANICA
+  CAMPER
+  ELECTRICIDAD
+}
+
+enum ChecklistItemResult {
+  PENDIENTE
+  OK
+  NECESITA_REPARACION
+  NO_APLICA
 }
 
 enum AdChannel {
@@ -136,11 +182,15 @@ model User {
   createdAt        DateTime  @default(now()) @map("created_at")
   updatedAt        DateTime  @updatedAt @map("updated_at")
 
-  sellerLeads SellerLead[] @relation("AgentSellerLeads")
-  buyerLeads  BuyerLead[]  @relation("AgentBuyerLeads")
-  activities  Activity[]
-  valuations  Valuation[]
-  vehicleAds  VehicleAd[]
+  sellerLeads           SellerLead[]         @relation("AgentSellerLeads")
+  buyerLeads            BuyerLead[]          @relation("AgentBuyerLeads")
+  activities            Activity[]
+  valuations            Valuation[]
+  vehicleAds            VehicleAd[]
+  assignedWorkOrders    WorkOrder[]          @relation("AssignedWorkOrders")
+  approvedWorkOrders    WorkOrder[]          @relation("ApprovedWorkOrders")
+  workOrderTimeEntries  WorkOrderTimeEntry[]
+  vehicleCostsCreated   VehicleCost[]
 
   @@map("users")
 }
@@ -190,17 +240,24 @@ model Vehicle {
   valuationRecommended Decimal?          @map("valuation_recommended") @db.Decimal(10, 2)
   valuationMax         Decimal?          @map("valuation_max") @db.Decimal(10, 2)
   publicNotes          String?           @map("public_notes")
+  purchasePrice        Decimal?          @map("purchase_price") @db.Decimal(10, 2)
+  salePrice            Decimal?          @map("sale_price") @db.Decimal(10, 2)
+  marginPercent        Decimal           @default(4.0) @map("margin_percent") @db.Decimal(5, 2)
+  entryDate            DateTime?         @map("entry_date")
+  naveLocation         String?           @map("nave_location")
   status               VehicleStatus     @default(NUEVO)
   publishedAt          DateTime?         @map("published_at")
   soldAt               DateTime?         @map("sold_at")
   createdAt            DateTime          @default(now()) @map("created_at")
   updatedAt            DateTime          @updatedAt @map("updated_at")
 
-  sellerLead SellerLead     @relation(fields: [sellerLeadId], references: [id], onDelete: Cascade)
-  photos     VehiclePhoto[]
-  valuations Valuation[]
-  matches    Match[]
-  ads        VehicleAd[]
+  sellerLead  SellerLead     @relation(fields: [sellerLeadId], references: [id], onDelete: Cascade)
+  photos      VehiclePhoto[]
+  valuations  Valuation[]
+  matches     Match[]
+  ads         VehicleAd[]
+  costs       VehicleCost[]
+  workOrders  WorkOrder[]
 
   @@index([brand, model])
   @@index([status])
@@ -384,6 +441,115 @@ model VehicleAd {
 
   @@index([vehicleId, channel, createdAt(sort: Desc)])
   @@map("vehicle_ads")
+}
+
+/// Coste individual imputado a un vehículo (manual o auto-generado desde orden de taller).
+model VehicleCost {
+  id          String              @id @default(cuid())
+  vehicleId   String              @map("vehicle_id")
+  category    VehicleCostCategory
+  description String
+  amount      Decimal             @db.Decimal(10, 2)
+  supplier    String?
+  invoiceUrl  String?             @map("invoice_url")
+  createdById String?             @map("created_by_id")
+  workOrderId String?             @map("work_order_id")
+  createdAt   DateTime            @default(now()) @map("created_at")
+
+  vehicle   Vehicle    @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+  createdBy User?      @relation(fields: [createdById], references: [id])
+  workOrder WorkOrder? @relation(fields: [workOrderId], references: [id], onDelete: SetNull)
+
+  @@index([vehicleId, category])
+  @@index([workOrderId])
+  @@map("vehicle_costs")
+}
+
+/// Orden de trabajo de taller asociada a un vehículo.
+model WorkOrder {
+  id             String                 @id @default(cuid())
+  vehicleId      String                 @map("vehicle_id")
+  status         WorkOrderStatus        @default(PENDIENTE)
+  description    String
+  assignedToId   String?                @map("assigned_to_id")
+  estimatedHours Decimal?               @map("estimated_hours") @db.Decimal(6, 2)
+  estimatedCost  Decimal?               @map("estimated_cost") @db.Decimal(10, 2)
+  approvalLevel  WorkOrderApprovalLevel @default(NO_REQUIERE) @map("approval_level")
+  approvalLimit  Decimal                @default(500.00) @map("approval_limit") @db.Decimal(10, 2)
+  approvedById   String?                @map("approved_by_id")
+  approvedAt     DateTime?              @map("approved_at")
+  startedAt      DateTime?              @map("started_at")
+  completedAt    DateTime?              @map("completed_at")
+  notes          String?
+  createdAt      DateTime               @default(now()) @map("created_at")
+  updatedAt      DateTime               @updatedAt @map("updated_at")
+
+  vehicle     Vehicle              @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+  assignedTo  User?                @relation("AssignedWorkOrders", fields: [assignedToId], references: [id])
+  approvedBy  User?                @relation("ApprovedWorkOrders", fields: [approvedById], references: [id])
+  checklist   WorkOrderChecklist[]
+  timeEntries WorkOrderTimeEntry[]
+  parts       WorkOrderPart[]
+  costs       VehicleCost[]
+
+  @@index([vehicleId])
+  @@index([assignedToId, status])
+  @@index([status])
+  @@map("work_orders")
+}
+
+/// Ítem individual del checklist técnico de una orden de taller.
+model WorkOrderChecklist {
+  id          String                @id @default(cuid())
+  workOrderId String                @map("work_order_id")
+  category    ChecklistItemCategory
+  item        String
+  result      ChecklistItemResult   @default(PENDIENTE)
+  notes       String?
+  photos      Json                  @default("[]")
+  createdAt   DateTime              @default(now()) @map("created_at")
+  updatedAt   DateTime              @updatedAt @map("updated_at")
+
+  workOrder WorkOrder @relation(fields: [workOrderId], references: [id], onDelete: Cascade)
+
+  @@index([workOrderId, category])
+  @@map("work_order_checklist")
+}
+
+/// Registro de horas imputadas por un trabajador a una orden de taller.
+model WorkOrderTimeEntry {
+  id          String   @id @default(cuid())
+  workOrderId String   @map("work_order_id")
+  workerId    String   @map("worker_id")
+  hours       Decimal  @db.Decimal(5, 2)
+  hourlyRate  Decimal  @default(30.00) @map("hourly_rate") @db.Decimal(6, 2)
+  description String
+  workDate    DateTime @map("work_date")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  workOrder WorkOrder @relation(fields: [workOrderId], references: [id], onDelete: Cascade)
+  worker    User      @relation(fields: [workerId], references: [id])
+
+  @@index([workOrderId])
+  @@index([workerId, workDate])
+  @@map("work_order_time_entries")
+}
+
+/// Pieza o repuesto usado en una orden de taller.
+model WorkOrderPart {
+  id          String   @id @default(cuid())
+  workOrderId String   @map("work_order_id")
+  name        String
+  quantity    Int      @default(1)
+  unitCost    Decimal  @map("unit_cost") @db.Decimal(10, 2)
+  supplier    String?
+  invoiceUrl  String?  @map("invoice_url")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  workOrder WorkOrder @relation(fields: [workOrderId], references: [id], onDelete: Cascade)
+
+  @@index([workOrderId])
+  @@map("work_order_parts")
 }
 
 /// Tabla de precios de referencia para el algoritmo de tasación.

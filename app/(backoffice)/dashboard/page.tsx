@@ -53,6 +53,8 @@ export default async function DashboardPage({
   const effectiveAgentId = isAdmin ? requestedAgentId : currentUser.id
   const filter: DashboardFilter = { agentId: effectiveAgentId }
 
+  const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)
+
   const [
     sellerCounts,
     buyerCounts,
@@ -63,6 +65,9 @@ export default async function DashboardPage({
     sellerStateMedians,
     buyerStateMedians,
     vehicleStateMedians,
+    workshopCostsLast30,
+    vehiclesWithMargin,
+    topRentabilidad,
   ] = await Promise.all([
     getSellerLeadCounts(db, filter),
     getBuyerLeadCounts(db, filter),
@@ -79,11 +84,113 @@ export default async function DashboardPage({
     fetchSellerStateMedians(filter),
     fetchBuyerStateMedians(filter),
     fetchVehicleStateMedians(filter),
+    // Coste taller total último mes — solo costes procedentes de órdenes de taller
+    db.vehicleCost.aggregate({
+      where: {
+        createdAt: { gte: thirtyDaysAgo },
+        workOrderId: { not: null },
+        ...(filter.agentId ? { vehicle: { sellerLead: { agentId: filter.agentId } } } : {}),
+      },
+      _sum: { amount: true },
+    }),
+    // Vehículos con precios — calcularemos el margen
+    db.vehicle.findMany({
+      where: {
+        purchasePrice: { not: null },
+        salePrice: { not: null },
+        ...(filter.agentId ? { sellerLead: { agentId: filter.agentId } } : {}),
+      },
+      select: {
+        id: true,
+        brand: true,
+        model: true,
+        year: true,
+        purchasePrice: true,
+        salePrice: true,
+        marginPercent: true,
+        costs: { select: { amount: true } },
+        sellerLead: { select: { id: true } },
+      },
+    }),
+    // Top 5 rentabilidad — solo admin
+    isAdmin
+      ? db.vehicle.findMany({
+          where: {
+            purchasePrice: { not: null },
+            salePrice: { not: null },
+          },
+          select: {
+            id: true,
+            brand: true,
+            model: true,
+            year: true,
+            purchasePrice: true,
+            salePrice: true,
+            marginPercent: true,
+            costs: { select: { amount: true } },
+            sellerLead: { select: { id: true } },
+          },
+        })
+      : Promise.resolve([]),
   ])
 
   const totalSellerActive = sumWhere(sellerCounts, ACTIVE_SELLER_STATUSES)
   const totalBuyerActive = sumWhere(buyerCounts, ACTIVE_BUYER_STATUSES)
   const totalPublicados = sumWhere(vehicleCounts, ['PUBLICADO'])
+
+  const workshopTotal = Number(workshopCostsLast30._sum.amount ?? 0)
+
+  // Compute net margin per vehicle
+  type VehicleMarginRow = {
+    id: string
+    brand: string
+    model: string
+    year: number | null
+    netMargin: number
+    netMarginPct: number
+    sellerLeadId: string | null
+  }
+  function computeMargins(vehicles: typeof vehiclesWithMargin): {
+    belowTarget: number
+    rows: VehicleMarginRow[]
+  } {
+    let belowTarget = 0
+    const rows: VehicleMarginRow[] = []
+    for (const v of vehicles) {
+      const purchase = Number(v.purchasePrice)
+      const sale = Number(v.salePrice)
+      const totalCosts = v.costs.reduce((s, c) => s + Number(c.amount), 0)
+      const gross = sale - purchase
+      const net = gross - totalCosts
+      const pct = sale > 0 ? (net / sale) * 100 : 0
+      const target = Number(v.marginPercent)
+      if (pct < target) belowTarget++
+      rows.push({
+        id: v.id,
+        brand: v.brand,
+        model: v.model,
+        year: v.year,
+        netMargin: net,
+        netMarginPct: pct,
+        sellerLeadId: v.sellerLead?.id ?? null,
+      })
+    }
+    return { belowTarget, rows }
+  }
+
+  const { belowTarget, rows: marginRows } = computeMargins(vehiclesWithMargin)
+
+  const avgMargin30 = (() => {
+    if (marginRows.length === 0) return null
+    const sum = marginRows.reduce((s, r) => s + r.netMarginPct, 0)
+    return sum / marginRows.length
+  })()
+
+  const top5Rentabilidad = isAdmin
+    ? computeMargins(topRentabilidad)
+        .rows.sort((a, b) => b.netMarginPct - a.netMarginPct)
+        .slice(0, 5)
+    : []
 
   return (
     <div className="space-y-6">
@@ -117,6 +224,112 @@ export default async function DashboardPage({
           pctChange={salesMoM.pctChange}
         />
       </div>
+
+      {/* KPIs Taller y Margen — solo ADMIN */}
+      {isAdmin && (
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+          <Card>
+            <CardContent className="pt-6">
+              <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                Margen promedio (vehículos con precios)
+              </p>
+              <p className="mt-1 text-3xl font-bold">
+                {avgMargin30 !== null ? `${avgMargin30.toFixed(1)}%` : '—'}
+              </p>
+              <p className="mt-0.5 text-xs text-muted-foreground">
+                {vehiclesWithMargin.length} vehículo{vehiclesWithMargin.length !== 1 ? 's' : ''} con
+                precio compra y venta
+              </p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="pt-6">
+              <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                Costes taller (últimos 30 días)
+              </p>
+              <p className="mt-1 text-3xl font-bold">
+                {workshopTotal.toLocaleString('es-ES', {
+                  style: 'currency',
+                  currency: 'EUR',
+                  maximumFractionDigits: 0,
+                })}
+              </p>
+              <p className="mt-0.5 text-xs text-muted-foreground">
+                Solo costes generados por órdenes
+              </p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="pt-6">
+              <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                Vehículos bajo objetivo de margen
+              </p>
+              <p
+                className={`mt-1 text-3xl font-bold ${belowTarget > 0 ? 'text-red-600' : 'text-green-600'}`}
+              >
+                {belowTarget}
+              </p>
+              <p className="mt-0.5 text-xs text-muted-foreground">
+                de {vehiclesWithMargin.length} con precios configurados
+              </p>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      {/* Top 5 rentabilidad — solo ADMIN */}
+      {isAdmin && top5Rentabilidad.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Top 5 vehículos por margen neto</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b text-left text-xs text-muted-foreground">
+                  <th className="py-1.5 font-medium">Vehículo</th>
+                  <th className="py-1.5 text-right font-medium">Margen neto</th>
+                  <th className="py-1.5 text-right font-medium">%</th>
+                </tr>
+              </thead>
+              <tbody>
+                {top5Rentabilidad.map((v) => (
+                  <tr key={v.id} className="border-b last:border-0">
+                    <td className="py-1.5">
+                      {v.sellerLeadId ? (
+                        <a
+                          href={`/vendedores/${v.sellerLeadId}`}
+                          className="font-medium hover:underline"
+                        >
+                          {v.brand} {v.model} {v.year ?? ''}
+                        </a>
+                      ) : (
+                        <span className="font-medium">
+                          {v.brand} {v.model} {v.year ?? ''}
+                        </span>
+                      )}
+                    </td>
+                    <td
+                      className={`py-1.5 text-right font-semibold ${v.netMargin < 0 ? 'text-red-600' : 'text-green-600'}`}
+                    >
+                      {v.netMargin.toLocaleString('es-ES', {
+                        style: 'currency',
+                        currency: 'EUR',
+                        maximumFractionDigits: 0,
+                      })}
+                    </td>
+                    <td
+                      className={`py-1.5 text-right text-xs font-medium ${v.netMarginPct < 0 ? 'text-red-600' : 'text-cn-ink-700'}`}
+                    >
+                      {v.netMarginPct.toFixed(1)}%
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Distribución por estado */}
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
