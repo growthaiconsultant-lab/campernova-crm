@@ -219,6 +219,7 @@ Visibilidad financiera real del negocio: capital en nave, márgenes, rotación, 
 - ✅ **`components/dashboard/`** — 5 nuevos componentes: `KpiCard` (genérico con trend), `StockEvolutionChart` (recharts ComposedChart dual-axis: barras valor € + línea conteo), `FunnelComparison` (Pro teal / CN amber, div-based), `StagnantVehiclesTable` (tabla con badge rojo >180d), `VehiclesPerCommercial` (recharts BarChart por comercial).
 - ✅ **`app/(backoffice)/dashboard/page.tsx`** — Reestructurado en 6 secciones role-based: Resumen operativo (todos), Resumen financiero (ADMIN+MARKETING), Stock y rotación (ADMIN+AGENTE+MARKETING+ENTREGAS), Operativas con alertas+distribución+funnel (todos), Análisis avanzado con gráficos (ADMIN), Vehículos estancados (condicional).
 - ✅ **recharts** — `pnpm add recharts` (v3.8.1). `StockEvolutionChart` y `VehiclesPerCommercial` son `'use client'`.
+- ✅ **Tooltips informativos** — `components/info-tooltip.tsx` + `components/ui/tooltip.tsx` (shadcn). Icono `(i)` en todos los KPIs y métricas del dashboard con texto explicativo en español. Ver sección técnica más abajo.
 - ✅ **Tests** — `lib/dashboard/metrics.test.ts` con 26 tests verdes. Suite total: **251 tests verdes**.
 
 ## Decisiones técnicas
@@ -1551,6 +1552,39 @@ Solo ADMIN. `extendWarranty(warrantyId, months)` extiende desde `extendedTo` (si
 - `StockEvolutionChart` y `VehiclesPerCommercial` son `'use client'` (recharts requiere DOM APIs).
 - Dual Y-axis en `StockEvolutionChart`: eje izquierdo en € (formateado en k€), eje derecho en unidades.
 - Colores: teal `hsl(177, 31%, 23%)` para barras de valor/stock, naranja `hsl(24, 78%, 45%)` para la línea de conteo y barras de publicados — consistentes con la paleta Campernova.
+- **Formatter del Tooltip**: el prop `formatter` de recharts recibe `value: ValueType` (no `number`). Siempre castear con `Number(value)` antes de formatearlo con `EUR.format()`. Tiparlo como `(value: number)` directamente rompe el build de Vercel.
+
+#### Tooltips informativos en el dashboard
+
+`components/info-tooltip.tsx` — componente reutilizable `'use client'`:
+
+```tsx
+<InfoTooltip text="Explicación..." side="top" maxWidth={260} />
+```
+
+- Usa `@radix-ui/react-tooltip` (instalado vía `npx shadcn@latest add tooltip`).
+- Icono `Info` de lucide-react (h-3.5 w-3.5, color `text-muted-foreground/60`).
+- `delayDuration={200}` — aparece con un pequeño delay para no molestar al navegar.
+- `maxWidth` configurable via CSS custom property `--tooltip-max-w` (default 260px).
+- Para usarlo en un card, envolver el label en `<div className="flex items-center gap-1">` con el `<InfoTooltip>` al lado.
+- Para usarlo en un `<CardTitle>`, añadir `flex items-center gap-1.5` al className del título.
+- Todos los tooltips del dashboard tienen `side="right"` en los `CardTitle` y `side="top"` (default) en los KPI inline.
+
+#### TypeScript + Vercel — iteración de Set y Map
+
+El `tsconfig.json` usa un target que no permite el spread de iteradores (`...new Set()`, `[...map.values()]`). El build local con `tsc --noEmit` muestra el warning pero Next.js dev lo ignora; Vercel lo trata como error y falla el build.
+
+**Regla**: nunca usar spread en `Set` ni en `Map.values()`. Usar siempre `Array.from()`:
+
+```typescript
+// ❌ rompe en Vercel
+const ids = [...new Set(arr)]
+const vals = [...map.values()]
+
+// ✅ correcto
+const ids = Array.from(new Set(arr))
+const vals = Array.from(map.values())
+```
 
 #### Permisos por sección
 
