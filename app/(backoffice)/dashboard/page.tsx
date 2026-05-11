@@ -54,6 +54,7 @@ import { StockEvolutionChart } from '@/components/dashboard/stock-evolution-char
 import { FunnelComparison } from '@/components/dashboard/funnel-comparison'
 import { StagnantVehiclesTable } from '@/components/dashboard/stagnant-vehicles-table'
 import { VehiclesPerCommercial } from '@/components/dashboard/vehicles-per-commercial'
+import { InfoTooltip } from '@/components/info-tooltip'
 
 const ACTIVE_SELLER_STATUSES: SellerLeadStatus[] = [
   'NUEVO',
@@ -373,18 +374,26 @@ export default async function DashboardPage({
             label="Vendedores activos"
             value={totalSellerActive}
             hint="excluye cerrados/descartados"
+            info="Leads de vendedores en estados activos (Nuevo, Contactado, Cualificado, En negociación). No cuenta los cerrados ni descartados."
           />
           <KPICard
             label="Compradores activos"
             value={totalBuyerActive}
             hint="excluye cerrados/perdidos"
+            info="Leads de compradores en estados activos (Nuevo, Contactado, Cualificado, En negociación). No cuenta los cerrados ni perdidos."
           />
-          <KPICard label="Vehículos publicados" value={totalPublicados} hint="ahora mismo" />
+          <KPICard
+            label="Vehículos publicados"
+            value={totalPublicados}
+            hint="ahora mismo"
+            info="Vehículos con estado Publicado en este momento. Son los que están visibles en los portales de venta."
+          />
           <SalesKPI
             current={salesMoM.current}
             previous={salesMoM.previous}
             delta={salesMoM.delta}
             pctChange={salesMoM.pctChange}
+            info="Vehículos cuyo estado cambió a Vendido durante el mes en curso, comparado con el mes anterior. El porcentaje muestra la variación relativa."
           />
         </div>
 
@@ -392,18 +401,24 @@ export default async function DashboardPage({
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
           <Card>
             <CardContent className="pt-6">
-              <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                Garantías activas
-              </p>
+              <div className="flex items-center gap-1">
+                <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                  Garantías activas
+                </p>
+                <InfoTooltip text="Garantías postventa cuya fecha de fin aún no ha llegado. Cada vehículo entregado genera automáticamente una garantía de 12 meses, ampliable hasta 36." />
+              </div>
               <p className="mt-1 text-3xl font-bold">{activeWarranties}</p>
               <p className="mt-0.5 text-xs text-muted-foreground">no expiradas</p>
             </CardContent>
           </Card>
           <Card>
             <CardContent className="pt-6">
-              <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                Tickets abiertos
-              </p>
+              <div className="flex items-center gap-1">
+                <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                  Tickets abiertos
+                </p>
+                <InfoTooltip text="Incidencias postventa en estado Abierto o En progreso que requieren atención. Los tickets de prioridad Alta o Crítica generan una notificación al equipo al abrirse." />
+              </div>
               <p className={`mt-1 text-3xl font-bold ${openTickets > 0 ? 'text-amber-600' : ''}`}>
                 {openTickets}
               </p>
@@ -412,9 +427,12 @@ export default async function DashboardPage({
           </Card>
           <Card>
             <CardContent className="pt-6">
-              <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                Follow-ups pendientes
-              </p>
+              <div className="flex items-center gap-1">
+                <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                  Follow-ups pendientes
+                </p>
+                <InfoTooltip text="Emails de seguimiento automáticos programados al día 7 y día 30 post-entrega que aún no se han enviado. El cron los procesa cada día a las 9:00." />
+              </div>
               <p
                 className={`mt-1 text-3xl font-bold ${pendingFollowups > 0 ? 'text-blue-600' : ''}`}
               >
@@ -435,9 +453,12 @@ export default async function DashboardPage({
           <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
             <Card>
               <CardContent className="pt-6">
-                <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                  Valor en stock
-                </p>
+                <div className="flex items-center gap-1">
+                  <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                    Valor en stock
+                  </p>
+                  <InfoTooltip text="Suma del precio de venta (o tasación recomendada si no hay precio) de todos los vehículos activos en nave. Es el valor potencial si se vendieran todos al precio actual." />
+                </div>
                 <p className="mt-1 text-2xl font-bold">{EUR.format(stockValue.totalStockValue)}</p>
                 <p className="mt-0.5 text-xs text-muted-foreground">
                   {stockValue.vehicleCount} vehículos
@@ -446,9 +467,12 @@ export default async function DashboardPage({
             </Card>
             <Card>
               <CardContent className="pt-6">
-                <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                  Capital comprometido
-                </p>
+                <div className="flex items-center gap-1">
+                  <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                    Capital comprometido
+                  </p>
+                  <InfoTooltip text="Suma de los precios de compra de todos los vehículos activos en nave. Representa el capital que CampersNova tiene inmovilizado en stock." />
+                </div>
                 <p className="mt-1 text-2xl font-bold">
                   {EUR.format(stockValue.committedInvestment)}
                 </p>
@@ -457,9 +481,12 @@ export default async function DashboardPage({
             </Card>
             <Card>
               <CardContent className="pt-6">
-                <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                  Margen potencial stock
-                </p>
+                <div className="flex items-center gap-1">
+                  <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                    Margen potencial stock
+                  </p>
+                  <InfoTooltip text="Diferencia entre el valor en stock y el capital comprometido, descontando costes ya registrados. Es el margen bruto que se obtendría si se vendiera todo al precio actual. No incluye ventas futuras." />
+                </div>
                 <p
                   className={`mt-1 text-2xl font-bold ${stockValue.potentialMargin >= 0 ? 'text-green-600' : 'text-red-600'}`}
                 >
@@ -473,9 +500,12 @@ export default async function DashboardPage({
             {isAdmin && monthlyMargin && (
               <Card>
                 <CardContent className="pt-6">
-                  <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                    Margen neto este mes
-                  </p>
+                  <div className="flex items-center gap-1">
+                    <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                      Margen neto este mes
+                    </p>
+                    <InfoTooltip text="Suma de (precio venta − precio compra − costes) de los vehículos vendidos durante el mes en curso. Refleja el beneficio real generado este mes." />
+                  </div>
                   <p
                     className={`mt-1 text-2xl font-bold ${monthlyMargin.netMargin >= 0 ? 'text-green-600' : 'text-red-600'}`}
                   >
@@ -497,9 +527,12 @@ export default async function DashboardPage({
               {monthlyMargin?.averageTicket != null && (
                 <Card>
                   <CardContent className="pt-6">
-                    <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                      Ticket medio este mes
-                    </p>
+                    <div className="flex items-center gap-1">
+                      <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                        Ticket medio este mes
+                      </p>
+                      <InfoTooltip text="Precio de venta promedio de los vehículos vendidos durante el mes en curso. Útil para seguir si el mix de ventas se orienta hacia vehículos de mayor o menor valor." />
+                    </div>
                     <p className="mt-1 text-2xl font-bold">
                       {EUR.format(monthlyMargin.averageTicket)}
                     </p>
@@ -510,9 +543,12 @@ export default async function DashboardPage({
               {pubToSoldRate && (
                 <Card>
                   <CardContent className="pt-6">
-                    <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                      Tasa publicado → vendido
-                    </p>
+                    <div className="flex items-center gap-1">
+                      <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                        Tasa publicado → vendido
+                      </p>
+                      <InfoTooltip text="Porcentaje de vehículos vendidos sobre el total que llegaron a estar publicados (incluye Publicado, Reservado y Vendido). Mide la eficacia comercial una vez el vehículo entra al mercado." />
+                    </div>
                     <p className="mt-1 text-2xl font-bold">
                       {pubToSoldRate.rate !== null ? `${pubToSoldRate.rate.toFixed(1)}%` : '—'}
                     </p>
@@ -524,9 +560,12 @@ export default async function DashboardPage({
               )}
               <Card>
                 <CardContent className="pt-6">
-                  <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                    Margen promedio (con precios)
-                  </p>
+                  <div className="flex items-center gap-1">
+                    <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                      Margen promedio (con precios)
+                    </p>
+                    <InfoTooltip text="Margen neto porcentual promedio calculado sobre todos los vehículos que tienen precio de compra y venta registrados. Descuenta costes imputados. Cuanto mayor, mejor rentabilidad general." />
+                  </div>
                   <p className="mt-1 text-2xl font-bold">
                     {avgMargin !== null ? `${avgMargin.toFixed(1)}%` : '—'}
                   </p>
@@ -537,9 +576,12 @@ export default async function DashboardPage({
               </Card>
               <Card>
                 <CardContent className="pt-6">
-                  <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                    Bajo objetivo de margen
-                  </p>
+                  <div className="flex items-center gap-1">
+                    <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                      Bajo objetivo de margen
+                    </p>
+                    <InfoTooltip text="Vehículos cuyo margen neto real está por debajo del objetivo configurado en la ficha (campo 'Margen objetivo %'). Si el número es alto, conviene revisar precios de venta o reducir costes." />
+                  </div>
                   <p
                     className={`mt-1 text-2xl font-bold ${belowTarget > 0 ? 'text-red-600' : 'text-green-600'}`}
                   >
@@ -566,9 +608,12 @@ export default async function DashboardPage({
               <>
                 <Card>
                   <CardContent className="pt-6">
-                    <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                      Días medios en stock
-                    </p>
+                    <div className="flex items-center gap-1">
+                      <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                        Días medios en stock
+                      </p>
+                      <InfoTooltip text="Media de días que llevan en nave los vehículos activos (Nuevo, Tasado, Publicado, Reservado). Se calcula desde la fecha de entrada registrada o la fecha de creación del expediente." />
+                    </div>
                     <p className="mt-1 text-3xl font-bold">
                       {avgDaysInStock.averageDays !== null ? `${avgDaysInStock.averageDays}d` : '—'}
                     </p>
@@ -577,9 +622,12 @@ export default async function DashboardPage({
                 </Card>
                 <Card>
                   <CardContent className="pt-6">
-                    <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                      Más de 90 días en nave
-                    </p>
+                    <div className="flex items-center gap-1">
+                      <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                        Más de 90 días en nave
+                      </p>
+                      <InfoTooltip text="Vehículos activos que llevan más de 90 días sin venderse. Por encima de este umbral es recomendable revisar el precio o la estrategia de publicación." />
+                    </div>
                     <p
                       className={`mt-1 text-3xl font-bold ${avgDaysInStock.over90Count > 0 ? 'text-amber-600' : ''}`}
                     >
@@ -595,9 +643,12 @@ export default async function DashboardPage({
             {isAdmin && workshopCostsLast30 && (
               <Card>
                 <CardContent className="pt-6">
-                  <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                    Costes taller (30d)
-                  </p>
+                  <div className="flex items-center gap-1">
+                    <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                      Costes taller (30d)
+                    </p>
+                    <InfoTooltip text="Suma de costes generados por órdenes de taller completadas en los últimos 30 días. Incluye mano de obra y piezas imputadas a los vehículos." />
+                  </div>
                   <p className="mt-1 text-3xl font-bold">
                     {workshopTotal.toLocaleString('es-ES', {
                       style: 'currency',
@@ -615,7 +666,13 @@ export default async function DashboardPage({
           {showFinancials && stockHistory.length > 0 && (
             <Card>
               <CardHeader>
-                <CardTitle className="text-base">Evolución del stock (12 meses)</CardTitle>
+                <CardTitle className="flex items-center gap-1.5 text-base">
+                  Evolución del stock (12 meses)
+                  <InfoTooltip
+                    text="Historial mensual aproximado del número de vehículos en nave y su valor total. Los datos se recalculan cada 5 minutos. Es una estimación basada en fechas de creación y último estado."
+                    side="right"
+                  />
+                </CardTitle>
               </CardHeader>
               <CardContent>
                 <StockEvolutionChart data={stockHistory} />
@@ -781,7 +838,13 @@ export default async function DashboardPage({
         {isAdmin && funnelComparison && (
           <Card>
             <CardHeader>
-              <CardTitle className="text-base">Comparativa funnels Pro vs CN</CardTitle>
+              <CardTitle className="flex items-center gap-1.5 text-base">
+                Comparativa funnels Pro vs CN
+                <InfoTooltip
+                  text="Embudo de conversión del canal Pro (leads del formulario web /vender) frente al canal CN (leads captados directamente por el equipo). Muestra cuántos leads llegan a publicado y a vendido en cada canal."
+                  side="right"
+                />
+              </CardTitle>
             </CardHeader>
             <CardContent>
               <FunnelComparison data={funnelComparison} />
@@ -793,7 +856,13 @@ export default async function DashboardPage({
         {!isAdmin && (
           <Card>
             <CardHeader>
-              <CardTitle className="text-base">Conversión canal Pro</CardTitle>
+              <CardTitle className="flex items-center gap-1.5 text-base">
+                Conversión canal Pro
+                <InfoTooltip
+                  text="Leads recibidos por el formulario web (/vender) que llegaron a publicado y a vendido. Mide la eficacia del canal de captación online."
+                  side="right"
+                />
+              </CardTitle>
             </CardHeader>
             <CardContent>
               <ProFunnelView
@@ -821,7 +890,13 @@ export default async function DashboardPage({
             {vehiclesPerCommercial.length > 0 && (
               <Card>
                 <CardHeader>
-                  <CardTitle className="text-base">Vehículos por comercial</CardTitle>
+                  <CardTitle className="flex items-center gap-1.5 text-base">
+                    Vehículos por comercial
+                    <InfoTooltip
+                      text="Vehículos en stock activo (Nuevo, Tasado, Publicado, Reservado) y publicados actualmente, agrupados por el agente comercial responsable del expediente."
+                      side="right"
+                    />
+                  </CardTitle>
                 </CardHeader>
                 <CardContent>
                   <VehiclesPerCommercial data={vehiclesPerCommercial} />
@@ -834,9 +909,12 @@ export default async function DashboardPage({
               {avgWorkshopHours && (
                 <Card>
                   <CardContent className="pt-6">
-                    <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                      Horas taller promedio / vehículo
-                    </p>
+                    <div className="flex items-center gap-1">
+                      <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                        Horas taller promedio / vehículo
+                      </p>
+                      <InfoTooltip text="Media de horas de taller invertidas por vehículo, calculada sobre todas las órdenes de trabajo completadas. Sirve para estimar el coste de preparación de nuevos ingresos." />
+                    </div>
                     <p className="mt-1 text-3xl font-bold">
                       {avgWorkshopHours.averageHours !== null
                         ? `${avgWorkshopHours.averageHours.toFixed(1)}h`
@@ -851,9 +929,12 @@ export default async function DashboardPage({
               {avgPostventaCost && (
                 <Card>
                   <CardContent className="pt-6">
-                    <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                      Coste postventa promedio / vehículo
-                    </p>
+                    <div className="flex items-center gap-1">
+                      <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                        Coste postventa promedio / vehículo
+                      </p>
+                      <InfoTooltip text="Media del coste real de tickets de postventa por vehículo afectado. Ayuda a calibrar el impacto real de la garantía en el margen neto de cada venta." />
+                    </div>
                     <p className="mt-1 text-3xl font-bold">
                       {avgPostventaCost.averageCost !== null
                         ? EUR.format(avgPostventaCost.averageCost)
@@ -872,7 +953,13 @@ export default async function DashboardPage({
           {top5Rentabilidad.length > 0 && (
             <Card>
               <CardHeader>
-                <CardTitle className="text-base">Top 5 vehículos por margen neto</CardTitle>
+                <CardTitle className="flex items-center gap-1.5 text-base">
+                  Top 5 vehículos por margen neto
+                  <InfoTooltip
+                    text="Los 5 vehículos con mayor margen neto porcentual entre todos los que tienen precio de compra y venta registrados. El % se calcula como (venta − compra − costes) / venta."
+                    side="right"
+                  />
+                </CardTitle>
               </CardHeader>
               <CardContent>
                 <table className="w-full text-sm">
@@ -928,16 +1015,19 @@ export default async function DashboardPage({
               title="Tiempo medio · vendedores"
               rows={sellerStateMedians}
               labels={SELLER_LEAD_STATUS_LABELS}
+              info="Mediana del tiempo que los leads de vendedores han permanecido en cada estado antes de avanzar al siguiente. Solo incluye transiciones ya completadas."
             />
             <StateMediansCard
               title="Tiempo medio · compradores"
               rows={buyerStateMedians}
               labels={BUYER_LEAD_STATUS_LABELS}
+              info="Mediana del tiempo que los leads de compradores han permanecido en cada estado antes de avanzar. Solo incluye transiciones ya completadas."
             />
             <StateMediansCard
               title="Tiempo medio · vehículos"
               rows={vehicleStateMedians}
               labels={VEHICLE_STATUS_LABELS}
+              info="Mediana del tiempo que los vehículos han permanecido en cada estado (Nuevo, Tasado, Publicado…) antes de transicionar al siguiente. Solo incluye transiciones ya completadas."
             />
           </div>
         </section>
@@ -964,16 +1054,19 @@ export default async function DashboardPage({
             title="Tiempo medio · vendedores"
             rows={sellerStateMedians}
             labels={SELLER_LEAD_STATUS_LABELS}
+            info="Mediana del tiempo que los leads de vendedores han permanecido en cada estado antes de avanzar al siguiente. Solo incluye transiciones ya completadas."
           />
           <StateMediansCard
             title="Tiempo medio · compradores"
             rows={buyerStateMedians}
             labels={BUYER_LEAD_STATUS_LABELS}
+            info="Mediana del tiempo que los leads de compradores han permanecido en cada estado antes de avanzar. Solo incluye transiciones ya completadas."
           />
           <StateMediansCard
             title="Tiempo medio · vehículos"
             rows={vehicleStateMedians}
             labels={VEHICLE_STATUS_LABELS}
+            info="Mediana del tiempo que los vehículos han permanecido en cada estado (Nuevo, Tasado, Publicado…) antes de transicionar al siguiente. Solo incluye transiciones ya completadas."
           />
         </div>
       )}
@@ -1060,11 +1153,26 @@ async function fetchVehicleStateMedians(
 
 // ── subcomponentes ────────────────────────────────────────────────────────────
 
-function KPICard({ label, value, hint }: { label: string; value: number; hint?: string }) {
+function KPICard({
+  label,
+  value,
+  hint,
+  info,
+}: {
+  label: string
+  value: number
+  hint?: string
+  info?: string
+}) {
   return (
     <Card>
       <CardContent className="pt-6">
-        <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{label}</p>
+        <div className="flex items-center gap-1">
+          <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+            {label}
+          </p>
+          {info && <InfoTooltip text={info} />}
+        </div>
         <p className="mt-1 text-3xl font-bold">{value}</p>
         {hint && <p className="mt-0.5 text-xs text-muted-foreground">{hint}</p>}
       </CardContent>
@@ -1077,11 +1185,13 @@ function SalesKPI({
   previous,
   delta,
   pctChange,
+  info,
 }: {
   current: number
   previous: number
   delta: number
   pctChange: number | null
+  info?: string
 }) {
   const trend = delta > 0 ? 'up' : delta < 0 ? 'down' : 'flat'
   const Icon = trend === 'up' ? TrendingUp : trend === 'down' ? TrendingDown : Minus
@@ -1090,9 +1200,12 @@ function SalesKPI({
   return (
     <Card>
       <CardContent className="pt-6">
-        <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-          Ventas este mes
-        </p>
+        <div className="flex items-center gap-1">
+          <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+            Ventas este mes
+          </p>
+          {info && <InfoTooltip text={info} />}
+        </div>
         <p className="mt-1 text-3xl font-bold">{current}</p>
         <div className={`mt-1 flex items-center gap-1 text-xs ${color}`}>
           <Icon className="h-3 w-3" />
@@ -1227,15 +1340,20 @@ function StateMediansCard<T extends string>({
   title,
   rows,
   labels,
+  info,
 }: {
   title: string
   rows: StateMedianRow<T>[]
   labels: Record<T, string>
+  info?: string
 }) {
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="text-base">{title}</CardTitle>
+        <CardTitle className="flex items-center gap-1.5 text-base">
+          {title}
+          {info && <InfoTooltip text={info} side="right" />}
+        </CardTitle>
       </CardHeader>
       <CardContent>
         {rows.length === 0 ? (
