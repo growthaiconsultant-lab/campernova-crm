@@ -23,48 +23,62 @@ interface NavItem {
   roles: UserRole[]
 }
 
-const NAV_ITEMS: NavItem[] = [
+interface NavSection {
+  title?: string
+  items: NavItem[]
+}
+
+const NAV_SECTIONS: NavSection[] = [
   {
-    href: '/dashboard',
-    label: 'Dashboard',
-    icon: LayoutDashboard,
-    roles: ['ADMIN', 'AGENTE', 'TALLER', 'ENTREGAS', 'MARKETING'],
+    items: [
+      {
+        href: '/dashboard',
+        label: 'Dashboard',
+        icon: LayoutDashboard,
+        roles: ['ADMIN', 'AGENTE', 'TALLER', 'ENTREGAS', 'MARKETING'],
+      },
+      {
+        href: '/vendedores',
+        label: 'Vendedores',
+        icon: Users,
+        roles: ['ADMIN', 'AGENTE'],
+      },
+      {
+        href: '/compradores',
+        label: 'Compradores',
+        icon: ShoppingCart,
+        roles: ['ADMIN', 'AGENTE'],
+      },
+      {
+        href: '/vehiculos',
+        label: 'Vehículos',
+        icon: Truck,
+        roles: ['ADMIN', 'AGENTE', 'TALLER', 'MARKETING'],
+      },
+    ],
   },
   {
-    href: '/vendedores',
-    label: 'Vendedores',
-    icon: Users,
-    roles: ['ADMIN', 'AGENTE'],
-  },
-  {
-    href: '/compradores',
-    label: 'Compradores',
-    icon: ShoppingCart,
-    roles: ['ADMIN', 'AGENTE'],
-  },
-  {
-    href: '/vehiculos',
-    label: 'Vehículos',
-    icon: Truck,
-    roles: ['ADMIN', 'AGENTE', 'TALLER', 'MARKETING'],
-  },
-  {
-    href: '/taller',
-    label: 'Taller',
-    icon: Wrench,
-    roles: ['ADMIN', 'AGENTE', 'TALLER'],
-  },
-  {
-    href: '/entregas',
-    label: 'Entregas',
-    icon: CalendarCheck,
-    roles: ['ADMIN', 'AGENTE', 'ENTREGAS'],
-  },
-  {
-    href: '/postventa',
-    label: 'Postventa',
-    icon: ShieldCheck,
-    roles: ['ADMIN', 'AGENTE', 'ENTREGAS'],
+    title: 'Operaciones',
+    items: [
+      {
+        href: '/taller',
+        label: 'Taller',
+        icon: Wrench,
+        roles: ['ADMIN', 'AGENTE', 'TALLER'],
+      },
+      {
+        href: '/entregas',
+        label: 'Entregas',
+        icon: CalendarCheck,
+        roles: ['ADMIN', 'AGENTE', 'ENTREGAS'],
+      },
+      {
+        href: '/postventa',
+        label: 'Postventa',
+        icon: ShieldCheck,
+        roles: ['ADMIN', 'AGENTE', 'ENTREGAS'],
+      },
+    ],
   },
 ]
 
@@ -74,60 +88,61 @@ interface SidebarProps {
 
 export function Sidebar({ userRole }: SidebarProps) {
   const pathname = usePathname()
-  const visibleItems = NAV_ITEMS.filter((item) => item.roles.includes(userRole))
+
+  const isActive = (href: string) => pathname === href || pathname.startsWith(`${href}/`)
+
+  const navLinkClass = (href: string) =>
+    cn(
+      'flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors',
+      isActive(href)
+        ? 'bg-sidebar-primary text-sidebar-primary-foreground font-medium'
+        : 'text-sidebar-foreground/60 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'
+    )
 
   return (
-    <aside className="flex h-screen w-16 flex-col items-center bg-sidebar text-sidebar-foreground">
-      {/* Logo + CRM badge */}
-      <div className="flex h-16 w-full shrink-0 flex-col items-center justify-center gap-1 border-b border-sidebar-border">
-        <LogoCampersNova variant="cream" className="[--logo-campers:8px] [--logo-nova:20px]" />
-        <span
-          className="rounded border px-1.5 py-px text-[7px] font-semibold uppercase tracking-[0.22em] text-sidebar-foreground/50"
-          style={{ borderColor: 'rgba(239,233,216,0.18)' }}
-        >
-          CRM
-        </span>
+    <aside className="flex h-screen w-56 flex-col bg-sidebar text-sidebar-foreground">
+      {/* Logo */}
+      <div className="flex h-16 shrink-0 items-center border-b border-sidebar-border px-4">
+        <LogoCampersNova variant="cream" className="[--logo-campers:9px] [--logo-nova:24px]" />
       </div>
 
       {/* Nav */}
-      <nav className="flex flex-1 flex-col items-center gap-1 overflow-y-auto py-3">
-        {visibleItems.map(({ href, label, icon: Icon }) => {
-          const isActive = pathname === href || pathname.startsWith(`${href}/`)
+      <nav className="flex flex-1 flex-col gap-4 overflow-y-auto px-3 py-4">
+        {NAV_SECTIONS.map((section, i) => {
+          const visibleItems = section.items.filter((item) => item.roles.includes(userRole))
+          if (visibleItems.length === 0) return null
           return (
-            <Link
-              key={href}
-              href={href}
-              title={label}
-              className={cn(
-                'flex h-10 w-10 items-center justify-center rounded-lg transition-colors',
-                isActive
-                  ? 'bg-sidebar-primary text-sidebar-primary-foreground'
-                  : 'text-sidebar-foreground/50 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'
+            <div key={i} className="flex flex-col gap-0.5">
+              {section.title && (
+                <p className="mb-1 px-3 text-[10px] font-semibold uppercase tracking-[0.16em] text-sidebar-foreground/30">
+                  {section.title}
+                </p>
               )}
-            >
-              <Icon className="h-[18px] w-[18px]" />
-            </Link>
+              {visibleItems.map(({ href, label, icon: Icon }) => (
+                <Link key={href} href={href} className={navLinkClass(href)}>
+                  <Icon className="h-[17px] w-[17px] shrink-0" />
+                  {label}
+                </Link>
+              ))}
+            </div>
           )
         })}
 
         {userRole === 'ADMIN' && (
-          <Link
-            href="/usuarios"
-            title="Usuarios"
-            className={cn(
-              'flex h-10 w-10 items-center justify-center rounded-lg transition-colors',
-              pathname === '/usuarios' || pathname.startsWith('/usuarios/')
-                ? 'bg-sidebar-primary text-sidebar-primary-foreground'
-                : 'text-sidebar-foreground/50 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'
-            )}
-          >
-            <UserCog className="h-[18px] w-[18px]" />
-          </Link>
+          <div className="flex flex-col gap-0.5">
+            <p className="mb-1 px-3 text-[10px] font-semibold uppercase tracking-[0.16em] text-sidebar-foreground/30">
+              Sistema
+            </p>
+            <Link href="/usuarios" className={navLinkClass('/usuarios')}>
+              <UserCog className="h-[17px] w-[17px] shrink-0" />
+              Usuarios
+            </Link>
+          </div>
         )}
       </nav>
 
       {/* Footer */}
-      <div className="shrink-0 pb-3">
+      <div className="shrink-0 px-4 pb-4">
         <p className="text-[8px] text-sidebar-foreground/25">v0.1</p>
       </div>
     </aside>
