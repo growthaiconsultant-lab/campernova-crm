@@ -87,8 +87,7 @@ export function PublicNav() {
             className="inline-flex items-center justify-center rounded-full px-3.5 py-2 text-[12px] font-medium text-white transition-all hover:opacity-90 lg:px-4 lg:py-2.5 lg:text-[13px]"
             style={{ background: 'var(--cn-terra-500)' }}
           >
-            <span className="hidden sm:inline">Vender mi vehículo</span>
-            <span className="sm:hidden">Vender</span>
+            Vender mi vehículo
           </Link>
         </div>
       </div>
