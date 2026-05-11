@@ -2,7 +2,7 @@
 
 import { revalidatePath } from 'next/cache'
 import { db } from '@/lib/db'
-import { requireAuth } from '@/lib/auth'
+import { requireAgente } from '@/lib/auth'
 import type { MatchStatus } from '@prisma/client'
 
 const VALID_TRANSITIONS: Partial<Record<MatchStatus, MatchStatus[]>> = {
@@ -13,7 +13,7 @@ const VALID_TRANSITIONS: Partial<Record<MatchStatus, MatchStatus[]>> = {
 }
 
 export async function updateMatchStatus(matchId: string, newStatus: MatchStatus) {
-  await requireAuth()
+  await requireAgente()
 
   const match = await db.match.findUnique({
     where: { id: matchId },

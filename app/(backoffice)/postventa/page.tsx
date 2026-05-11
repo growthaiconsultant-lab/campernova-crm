@@ -1,6 +1,6 @@
 import Link from 'next/link'
 import { db } from '@/lib/db'
-import { requireAuth } from '@/lib/auth'
+import { requireCanViewPostventa } from '@/lib/auth'
 import type { TicketStatus } from '@prisma/client'
 
 const TICKET_STATUS_LABELS: Record<TicketStatus, string> = {
@@ -24,7 +24,7 @@ export default async function PostventaPage({
 }: {
   searchParams: { status?: string }
 }) {
-  await requireAuth()
+  await requireCanViewPostventa()
 
   const warranties = await db.warranty.findMany({
     include: {

@@ -3,7 +3,7 @@
 import { revalidatePath } from 'next/cache'
 import { z } from 'zod'
 import { db } from '@/lib/db'
-import { requireAdmin, requireAuth } from '@/lib/auth'
+import { requireAdmin, requireCanEditTaller, requireCanViewTaller } from '@/lib/auth'
 import type { WorkOrderStatus } from '@prisma/client'
 
 type ActionResult<T = undefined> =
@@ -86,7 +86,7 @@ const partSchema = z.object({
 // ─── Actions ──────────────────────────────────────────────────────────────────
 
 export async function createWorkOrder(formData: unknown): Promise<ActionResult<{ id: string }>> {
-  const actor = await requireAuth()
+  const actor = await requireCanViewTaller()
 
   const parsed = createWorkOrderSchema.safeParse(formData)
   if (!parsed.success) {
@@ -152,7 +152,7 @@ export async function updateWorkOrderStatus(
   woId: string,
   newStatus: WorkOrderStatus
 ): Promise<ActionResult> {
-  const actor = await requireAuth()
+  const actor = await requireCanEditTaller()
 
   const wo = await db.workOrder.findUnique({
     where: { id: woId },
@@ -254,7 +254,7 @@ export async function updateChecklistItem(
   checklistItemId: string,
   data: { result: string; notes?: string | null; photos?: string[] }
 ): Promise<ActionResult> {
-  await requireAuth()
+  await requireCanEditTaller()
 
   await db.workOrderChecklist.update({
     where: { id: checklistItemId },
@@ -274,7 +274,7 @@ export async function updateChecklistItem(
 }
 
 export async function addTimeEntry(woId: string, formData: unknown): Promise<ActionResult> {
-  const actor = await requireAuth()
+  const actor = await requireCanEditTaller()
 
   const parsed = timeEntrySchema.safeParse(formData)
   if (!parsed.success) {
@@ -305,7 +305,7 @@ export async function addTimeEntry(woId: string, formData: unknown): Promise<Act
 }
 
 export async function deleteTimeEntry(entryId: string): Promise<ActionResult> {
-  const actor = await requireAuth()
+  const actor = await requireCanEditTaller()
 
   const entry = await db.workOrderTimeEntry.findUnique({
     where: { id: entryId },
@@ -323,7 +323,7 @@ export async function deleteTimeEntry(entryId: string): Promise<ActionResult> {
 }
 
 export async function addPart(woId: string, formData: unknown): Promise<ActionResult> {
-  await requireAuth()
+  await requireCanEditTaller()
 
   const parsed = partSchema.safeParse(formData)
   if (!parsed.success) {
@@ -423,7 +423,7 @@ export async function updateEstimatedCost(
   woId: string,
   estimatedCost: number
 ): Promise<ActionResult> {
-  await requireAuth()
+  await requireCanEditTaller()
 
   const wo = await db.workOrder.findUnique({
     where: { id: woId },

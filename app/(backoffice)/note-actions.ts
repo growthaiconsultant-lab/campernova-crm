@@ -2,10 +2,10 @@
 
 import { revalidatePath } from 'next/cache'
 import { db } from '@/lib/db'
-import { requireAuth } from '@/lib/auth'
+import { requireAgente } from '@/lib/auth'
 
 export async function deleteNote(activityId: string) {
-  const actor = await requireAuth()
+  const actor = await requireAgente()
 
   const activity = await db.activity.findUnique({
     where: { id: activityId },

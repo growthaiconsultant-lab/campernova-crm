@@ -195,7 +195,7 @@ export async function submitPublicLead(formData: FormData) {
 
   // Notify all active agents — non-blocking
   const activeUsers = await db.user.findMany({
-    where: { active: true, notifyOnNewLead: true },
+    where: { active: true, notifyOnNewLead: true, role: { in: ['ADMIN', 'AGENTE'] } },
     select: { email: true },
   })
   await sendAgentLeadNotification({

@@ -7,6 +7,8 @@ vi.mock('next/cache', () => ({ revalidatePath: vi.fn() }))
 vi.mock('@/lib/auth', () => ({
   requireAuth: vi.fn(),
   requireAdmin: vi.fn(),
+  requireCanViewTaller: vi.fn(),
+  requireCanEditTaller: vi.fn(),
 }))
 
 const { mockDb } = vi.hoisted(() => {
@@ -26,7 +28,7 @@ const { mockDb } = vi.hoisted(() => {
 vi.mock('@/lib/db', () => ({ db: mockDb }))
 
 import type { User } from '@prisma/client'
-import { requireAuth, requireAdmin } from '@/lib/auth'
+import { requireAdmin, requireCanViewTaller, requireCanEditTaller } from '@/lib/auth'
 import {
   createWorkOrder,
   updateWorkOrderStatus,
@@ -52,7 +54,8 @@ beforeEach(() => {
 
 describe('createWorkOrder', () => {
   it('crea la orden con checklist de 21 ítems (no requiere aprobación)', async () => {
-    vi.mocked(requireAuth).mockResolvedValue(mockAgent)
+    vi.mocked(requireCanViewTaller).mockResolvedValue(mockAgent)
+    vi.mocked(requireCanEditTaller).mockResolvedValue(mockAgent)
     mockDb.vehicle.findUnique.mockResolvedValue({
       sellerLeadId: 'sl-1',
       brand: 'Bürstner',
@@ -77,7 +80,8 @@ describe('createWorkOrder', () => {
   })
 
   it('marca REQUIERE_CEO si estimatedCost > approvalLimit', async () => {
-    vi.mocked(requireAuth).mockResolvedValue(mockAgent)
+    vi.mocked(requireCanViewTaller).mockResolvedValue(mockAgent)
+    vi.mocked(requireCanEditTaller).mockResolvedValue(mockAgent)
     mockDb.vehicle.findUnique.mockResolvedValue({
       sellerLeadId: 'sl-1',
       brand: 'Bürstner',
@@ -98,7 +102,8 @@ describe('createWorkOrder', () => {
   })
 
   it('rechaza si vehicleId es vacío', async () => {
-    vi.mocked(requireAuth).mockResolvedValue(mockAgent)
+    vi.mocked(requireCanViewTaller).mockResolvedValue(mockAgent)
+    vi.mocked(requireCanEditTaller).mockResolvedValue(mockAgent)
 
     const result = await createWorkOrder({
       vehicleId: '',
@@ -109,7 +114,8 @@ describe('createWorkOrder', () => {
   })
 
   it('error si vehículo no existe', async () => {
-    vi.mocked(requireAuth).mockResolvedValue(mockAgent)
+    vi.mocked(requireCanViewTaller).mockResolvedValue(mockAgent)
+    vi.mocked(requireCanEditTaller).mockResolvedValue(mockAgent)
     mockDb.vehicle.findUnique.mockResolvedValue(null)
 
     const result = await createWorkOrder({ vehicleId: 'v-unknown', description: 'Test' })
@@ -131,7 +137,8 @@ describe('updateWorkOrderStatus', () => {
   }
 
   it('transición válida: PENDIENTE → EN_DIAGNOSTICO', async () => {
-    vi.mocked(requireAuth).mockResolvedValue(mockAgent)
+    vi.mocked(requireCanViewTaller).mockResolvedValue(mockAgent)
+    vi.mocked(requireCanEditTaller).mockResolvedValue(mockAgent)
     mockDb.workOrder.findUnique.mockResolvedValue(baseWo)
     mockDb.workOrder.update.mockResolvedValue({})
     mockDb.activity.create.mockResolvedValue({})
@@ -141,7 +148,8 @@ describe('updateWorkOrderStatus', () => {
   })
 
   it('transición inválida: PENDIENTE → COMPLETADA', async () => {
-    vi.mocked(requireAuth).mockResolvedValue(mockAgent)
+    vi.mocked(requireCanViewTaller).mockResolvedValue(mockAgent)
+    vi.mocked(requireCanEditTaller).mockResolvedValue(mockAgent)
     mockDb.workOrder.findUnique.mockResolvedValue(baseWo)
 
     const result = await updateWorkOrderStatus('wo-1', 'COMPLETADA')
@@ -150,7 +158,8 @@ describe('updateWorkOrderStatus', () => {
   })
 
   it('bloquea EN_CURSO si requiere aprobación CEO', async () => {
-    vi.mocked(requireAuth).mockResolvedValue(mockAgent)
+    vi.mocked(requireCanViewTaller).mockResolvedValue(mockAgent)
+    vi.mocked(requireCanEditTaller).mockResolvedValue(mockAgent)
     mockDb.workOrder.findUnique.mockResolvedValue({
       ...baseWo,
       status: 'PRESUPUESTADA' as const,
@@ -163,7 +172,8 @@ describe('updateWorkOrderStatus', () => {
   })
 
   it('genera VehicleCost MANO_OBRA_TALLER y PIEZAS al COMPLETADA', async () => {
-    vi.mocked(requireAuth).mockResolvedValue(mockAgent)
+    vi.mocked(requireCanViewTaller).mockResolvedValue(mockAgent)
+    vi.mocked(requireCanEditTaller).mockResolvedValue(mockAgent)
     mockDb.workOrder.findUnique.mockResolvedValue({
       ...baseWo,
       status: 'EN_CURSO' as const,
@@ -185,7 +195,8 @@ describe('updateWorkOrderStatus', () => {
   })
 
   it('no genera VehicleCost si no hay horas ni piezas al COMPLETADA', async () => {
-    vi.mocked(requireAuth).mockResolvedValue(mockAgent)
+    vi.mocked(requireCanViewTaller).mockResolvedValue(mockAgent)
+    vi.mocked(requireCanEditTaller).mockResolvedValue(mockAgent)
     mockDb.workOrder.findUnique.mockResolvedValue({
       ...baseWo,
       status: 'EN_CURSO' as const,
@@ -208,7 +219,8 @@ describe('updateWorkOrderStatus', () => {
 
 describe('addTimeEntry', () => {
   it('imputa horas correctamente', async () => {
-    vi.mocked(requireAuth).mockResolvedValue(mockAgent)
+    vi.mocked(requireCanViewTaller).mockResolvedValue(mockAgent)
+    vi.mocked(requireCanEditTaller).mockResolvedValue(mockAgent)
     mockDb.workOrder.findUnique.mockResolvedValue({ status: 'EN_CURSO' })
     mockDb.workOrderTimeEntry.create.mockResolvedValue({})
 
@@ -224,7 +236,8 @@ describe('addTimeEntry', () => {
   })
 
   it('bloquea imputar horas en orden COMPLETADA', async () => {
-    vi.mocked(requireAuth).mockResolvedValue(mockAgent)
+    vi.mocked(requireCanViewTaller).mockResolvedValue(mockAgent)
+    vi.mocked(requireCanEditTaller).mockResolvedValue(mockAgent)
     mockDb.workOrder.findUnique.mockResolvedValue({ status: 'COMPLETADA' })
 
     const result = await addTimeEntry('wo-1', {
@@ -243,7 +256,8 @@ describe('addTimeEntry', () => {
 
 describe('deleteTimeEntry', () => {
   it('el trabajador puede borrar su propia entrada', async () => {
-    vi.mocked(requireAuth).mockResolvedValue(mockAgent)
+    vi.mocked(requireCanViewTaller).mockResolvedValue(mockAgent)
+    vi.mocked(requireCanEditTaller).mockResolvedValue(mockAgent)
     mockDb.workOrderTimeEntry.findUnique.mockResolvedValue({
       workerId: 'agent-1',
       workOrderId: 'wo-1',
@@ -255,7 +269,8 @@ describe('deleteTimeEntry', () => {
   })
 
   it('bloquea a un agente borrar entrada ajena', async () => {
-    vi.mocked(requireAuth).mockResolvedValue(mockAgent)
+    vi.mocked(requireCanViewTaller).mockResolvedValue(mockAgent)
+    vi.mocked(requireCanEditTaller).mockResolvedValue(mockAgent)
     mockDb.workOrderTimeEntry.findUnique.mockResolvedValue({
       workerId: 'other-worker',
       workOrderId: 'wo-1',
@@ -266,7 +281,7 @@ describe('deleteTimeEntry', () => {
   })
 
   it('el admin puede borrar cualquier entrada', async () => {
-    vi.mocked(requireAuth).mockResolvedValue(mockAdmin)
+    vi.mocked(requireCanEditTaller).mockResolvedValue(mockAdmin)
     mockDb.workOrderTimeEntry.findUnique.mockResolvedValue({
       workerId: 'other-worker',
       workOrderId: 'wo-1',
@@ -282,7 +297,8 @@ describe('deleteTimeEntry', () => {
 
 describe('addPart', () => {
   it('añade pieza correctamente', async () => {
-    vi.mocked(requireAuth).mockResolvedValue(mockAgent)
+    vi.mocked(requireCanViewTaller).mockResolvedValue(mockAgent)
+    vi.mocked(requireCanEditTaller).mockResolvedValue(mockAgent)
     mockDb.workOrderPart.create.mockResolvedValue({})
 
     const result = await addPart('wo-1', { name: 'Filtro aceite', quantity: 1, unitCost: 25 })
@@ -290,7 +306,8 @@ describe('addPart', () => {
   })
 
   it('rechaza datos inválidos', async () => {
-    vi.mocked(requireAuth).mockResolvedValue(mockAgent)
+    vi.mocked(requireCanViewTaller).mockResolvedValue(mockAgent)
+    vi.mocked(requireCanEditTaller).mockResolvedValue(mockAgent)
 
     const result = await addPart('wo-1', { name: '', quantity: 0, unitCost: -5 })
     expect(result.ok).toBe(false)

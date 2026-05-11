@@ -1,12 +1,12 @@
 import Link from 'next/link'
 import { db } from '@/lib/db'
-import { requireAuth } from '@/lib/auth'
+import { requireCanViewTaller } from '@/lib/auth'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { WorkOrderForm } from './work-order-form'
 
 export default async function NuevaOrdenPage() {
-  await requireAuth()
+  await requireCanViewTaller()
 
   const [vehicles, users] = await Promise.all([
     db.vehicle.findMany({

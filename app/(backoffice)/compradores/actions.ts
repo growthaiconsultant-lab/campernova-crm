@@ -1,12 +1,12 @@
 'use server'
 
 import { db } from '@/lib/db'
-import { requireAuth } from '@/lib/auth'
+import { requireAgente } from '@/lib/auth'
 import { createBuyerLeadSchema } from '@/lib/validators/buyer-lead'
 import { recalculateMatchesForBuyer } from '@/lib/matching'
 
 export async function createBuyerLead(data: unknown) {
-  await requireAuth()
+  await requireAgente()
 
   const parsed = createBuyerLeadSchema.safeParse(data)
   if (!parsed.success) {

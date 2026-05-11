@@ -3,7 +3,7 @@
 import { revalidatePath } from 'next/cache'
 import { z } from 'zod'
 import { db } from '@/lib/db'
-import { requireAdmin, requireAuth } from '@/lib/auth'
+import { requireAdmin } from '@/lib/auth'
 
 type ActionResult =
   | { ok: true }
@@ -123,17 +123,13 @@ export async function updateVehicleCost(costId: string, formData: unknown): Prom
 }
 
 export async function deleteVehicleCost(costId: string): Promise<ActionResult> {
-  const actor = await requireAuth()
+  await requireAdmin()
 
   const cost = await db.vehicleCost.findUnique({
     where: { id: costId },
-    select: { createdById: true, vehicle: { select: { sellerLeadId: true } } },
+    select: { vehicle: { select: { sellerLeadId: true } } },
   })
   if (!cost) return { ok: false, error: 'Coste no encontrado' }
-
-  if (cost.createdById !== actor.id && actor.role !== 'ADMIN') {
-    return { ok: false, error: 'Solo el autor o un admin puede eliminar este coste.' }
-  }
 
   await db.vehicleCost.delete({ where: { id: costId } })
   revalidateVehiclePage(cost.vehicle.sellerLeadId)

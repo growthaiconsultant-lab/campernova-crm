@@ -24,6 +24,7 @@ import {
   type StateMedianRow,
 } from '@/lib/dashboard/time-in-state'
 import { DashboardFilters } from './dashboard-filters'
+import { ForbiddenToast } from '@/components/forbidden-toast'
 import { TrendingUp, TrendingDown, Minus } from 'lucide-react'
 import type { SellerLeadStatus, BuyerLeadStatus, VehicleStatus } from '@prisma/client'
 
@@ -203,6 +204,7 @@ export default async function DashboardPage({
 
   return (
     <div className="space-y-6">
+      <ForbiddenToast />
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold">Dashboard</h1>

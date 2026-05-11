@@ -14,23 +14,67 @@ import {
   ShieldCheck,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import type { UserRole } from '@prisma/client'
 
-const NAV_ITEMS = [
-  { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
-  { href: '/vendedores', label: 'Vendedores', icon: Users },
-  { href: '/compradores', label: 'Compradores', icon: ShoppingCart },
-  { href: '/vehiculos', label: 'Vehículos', icon: Truck },
-  { href: '/taller', label: 'Taller', icon: Wrench },
-  { href: '/entregas', label: 'Entregas', icon: CalendarCheck },
-  { href: '/postventa', label: 'Postventa', icon: ShieldCheck },
+interface NavItem {
+  href: string
+  label: string
+  icon: React.ElementType
+  roles: UserRole[]
+}
+
+const NAV_ITEMS: NavItem[] = [
+  {
+    href: '/dashboard',
+    label: 'Dashboard',
+    icon: LayoutDashboard,
+    roles: ['ADMIN', 'AGENTE', 'TALLER', 'ENTREGAS', 'MARKETING'],
+  },
+  {
+    href: '/vendedores',
+    label: 'Vendedores',
+    icon: Users,
+    roles: ['ADMIN', 'AGENTE'],
+  },
+  {
+    href: '/compradores',
+    label: 'Compradores',
+    icon: ShoppingCart,
+    roles: ['ADMIN', 'AGENTE'],
+  },
+  {
+    href: '/vehiculos',
+    label: 'Vehículos',
+    icon: Truck,
+    roles: ['ADMIN', 'AGENTE', 'TALLER', 'MARKETING'],
+  },
+  {
+    href: '/taller',
+    label: 'Taller',
+    icon: Wrench,
+    roles: ['ADMIN', 'AGENTE', 'TALLER'],
+  },
+  {
+    href: '/entregas',
+    label: 'Entregas',
+    icon: CalendarCheck,
+    roles: ['ADMIN', 'AGENTE', 'ENTREGAS'],
+  },
+  {
+    href: '/postventa',
+    label: 'Postventa',
+    icon: ShieldCheck,
+    roles: ['ADMIN', 'AGENTE', 'ENTREGAS'],
+  },
 ]
 
 interface SidebarProps {
-  isAdmin?: boolean
+  userRole: UserRole
 }
 
-export function Sidebar({ isAdmin = false }: SidebarProps) {
+export function Sidebar({ userRole }: SidebarProps) {
   const pathname = usePathname()
+  const visibleItems = NAV_ITEMS.filter((item) => item.roles.includes(userRole))
 
   return (
     <aside className="flex h-screen w-60 flex-col bg-sidebar text-sidebar-foreground">
@@ -46,7 +90,7 @@ export function Sidebar({ isAdmin = false }: SidebarProps) {
 
       {/* Nav */}
       <nav className="flex-1 space-y-0.5 overflow-y-auto px-3 py-4">
-        {NAV_ITEMS.map(({ href, label, icon: Icon }) => {
+        {visibleItems.map(({ href, label, icon: Icon }) => {
           const isActive = pathname === href || pathname.startsWith(`${href}/`)
           return (
             <Link
@@ -64,7 +108,7 @@ export function Sidebar({ isAdmin = false }: SidebarProps) {
             </Link>
           )
         })}
-        {isAdmin && (
+        {userRole === 'ADMIN' && (
           <Link
             href="/usuarios"
             className={cn(

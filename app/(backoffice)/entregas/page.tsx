@@ -1,6 +1,6 @@
 import Link from 'next/link'
 import { db } from '@/lib/db'
-import { requireAuth } from '@/lib/auth'
+import { requireCanViewEntregas } from '@/lib/auth'
 import { Button } from '@/components/ui/button'
 import { Plus } from 'lucide-react'
 import type { DeliveryStatus } from '@prisma/client'
@@ -24,7 +24,7 @@ export default async function EntregasPage({
 }: {
   searchParams: { status?: string }
 }) {
-  await requireAuth()
+  await requireCanViewEntregas()
 
   const where: Record<string, unknown> = {}
   if (searchParams.status) where.status = searchParams.status

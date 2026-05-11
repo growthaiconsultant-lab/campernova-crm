@@ -88,6 +88,7 @@ export async function notifyHighScoreMatches(
         sellerAgent &&
         sellerAgent.active &&
         sellerAgent.notifyOnNewLead &&
+        (sellerAgent.role === 'ADMIN' || sellerAgent.role === 'AGENTE') &&
         !shouldThrottle(sellerAgent.lastMatchEmailAt, now)
       ) {
         tasks.push(
@@ -113,6 +114,7 @@ export async function notifyHighScoreMatches(
         buyerAgent &&
         buyerAgent.active &&
         buyerAgent.notifyOnNewLead &&
+        (buyerAgent.role === 'ADMIN' || buyerAgent.role === 'AGENTE') &&
         // No notificar dos veces al mismo agente si gestiona los dos lados
         buyerAgent.id !== sellerAgent?.id &&
         !shouldThrottle(buyerAgent.lastMatchEmailAt, now)

@@ -1,13 +1,13 @@
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
 import { db } from '@/lib/db'
-import { requireAuth } from '@/lib/auth'
+import { requireCanViewPostventa } from '@/lib/auth'
 import { CreateTicketForm } from './create-ticket-form'
 import { TicketCard, FollowupCard } from './ticket-card'
 import { extendWarranty } from '../actions'
 
 export default async function PostventaDetailPage({ params }: { params: { id: string } }) {
-  const currentUser = await requireAuth()
+  const currentUser = await requireCanViewPostventa()
 
   const warranty = await db.warranty.findUnique({
     where: { id: params.id },

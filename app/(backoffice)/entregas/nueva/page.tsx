@@ -1,9 +1,9 @@
 import { db } from '@/lib/db'
-import { requireAuth } from '@/lib/auth'
+import { requireCanViewEntregas } from '@/lib/auth'
 import { NewDeliveryForm } from './new-delivery-form'
 
 export default async function NuevaEntregaPage() {
-  await requireAuth()
+  await requireCanViewEntregas()
 
   const [vehicles, buyers, users] = await Promise.all([
     db.vehicle.findMany({

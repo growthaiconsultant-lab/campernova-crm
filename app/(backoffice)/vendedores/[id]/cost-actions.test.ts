@@ -5,7 +5,6 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 vi.mock('next/cache', () => ({ revalidatePath: vi.fn() }))
 
 vi.mock('@/lib/auth', () => ({
-  requireAuth: vi.fn(),
   requireAdmin: vi.fn(),
 }))
 
@@ -22,7 +21,7 @@ const { mockDb } = vi.hoisted(() => {
 vi.mock('@/lib/db', () => ({ db: mockDb }))
 
 import type { User } from '@prisma/client'
-import { requireAuth, requireAdmin } from '@/lib/auth'
+import { requireAdmin } from '@/lib/auth'
 import {
   createVehicleCost,
   deleteVehicleCost,
@@ -31,7 +30,6 @@ import {
 } from './cost-actions'
 
 const mockAdmin = { id: 'admin-1', role: 'ADMIN' as const, name: 'Admin' } as unknown as User
-const mockAgent = { id: 'agent-1', role: 'AGENTE' as const, name: 'Agente' } as unknown as User
 
 beforeEach(() => {
   vi.clearAllMocks()
@@ -91,43 +89,19 @@ describe('createVehicleCost', () => {
 // ─── deleteVehicleCost ────────────────────────────────────────────────────────
 
 describe('deleteVehicleCost', () => {
-  it('permite al autor borrar su propio coste', async () => {
-    vi.mocked(requireAuth).mockResolvedValue(mockAgent)
+  it('admin puede borrar cualquier coste', async () => {
+    vi.mocked(requireAdmin).mockResolvedValue(mockAdmin)
     mockDb.vehicleCost.findUnique.mockResolvedValue({
-      createdById: 'agent-1',
       vehicle: { sellerLeadId: 'sl-1' },
     })
     mockDb.vehicleCost.delete.mockResolvedValue({})
 
     const result = await deleteVehicleCost('cost-1')
     expect(result.ok).toBe(true)
-  })
-
-  it('permite al admin borrar costes de otros', async () => {
-    vi.mocked(requireAuth).mockResolvedValue(mockAdmin)
-    mockDb.vehicleCost.findUnique.mockResolvedValue({
-      createdById: 'other-user',
-      vehicle: { sellerLeadId: 'sl-1' },
-    })
-    mockDb.vehicleCost.delete.mockResolvedValue({})
-
-    const result = await deleteVehicleCost('cost-1')
-    expect(result.ok).toBe(true)
-  })
-
-  it('prohíbe a un agente borrar coste de otro', async () => {
-    vi.mocked(requireAuth).mockResolvedValue(mockAgent)
-    mockDb.vehicleCost.findUnique.mockResolvedValue({
-      createdById: 'other-user',
-      vehicle: { sellerLeadId: 'sl-1' },
-    })
-
-    const result = await deleteVehicleCost('cost-1')
-    expect(result.ok).toBe(false)
   })
 
   it('error si el coste no existe', async () => {
-    vi.mocked(requireAuth).mockResolvedValue(mockAgent)
+    vi.mocked(requireAdmin).mockResolvedValue(mockAdmin)
     mockDb.vehicleCost.findUnique.mockResolvedValue(null)
 
     const result = await deleteVehicleCost('cost-unknown')

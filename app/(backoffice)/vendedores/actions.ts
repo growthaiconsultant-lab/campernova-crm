@@ -1,13 +1,13 @@
 'use server'
 
 import { db } from '@/lib/db'
-import { requireAuth } from '@/lib/auth'
+import { requireAgente } from '@/lib/auth'
 import { createSellerLeadSchema } from '@/lib/validators/seller-lead'
 import { runAndSaveAutoValuation } from '@/lib/valuation/save'
 import { recalculateMatchesForVehicle } from '@/lib/matching'
 
 export async function createSellerLead(data: unknown) {
-  await requireAuth()
+  await requireAgente()
 
   const parsed = createSellerLeadSchema.safeParse(data)
   if (!parsed.success) {

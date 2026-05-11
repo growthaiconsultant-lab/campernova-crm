@@ -3,7 +3,7 @@
 import { revalidatePath } from 'next/cache'
 import { z } from 'zod'
 import { db } from '@/lib/db'
-import { requireAuth, requireAdmin } from '@/lib/auth'
+import { requireAdmin, requireCanViewEntregas, requireCanEditEntregas } from '@/lib/auth'
 import { createWarrantyForDelivery } from '@/lib/postventa'
 import { sendDeliveryConfirmation } from '@/lib/email/send'
 import type { DeliveryStatus } from '@prisma/client'
@@ -52,7 +52,7 @@ const signDeliverySchema = z.object({
 })
 
 export async function createDelivery(formData: unknown): Promise<ActionResult<{ id: string }>> {
-  const actor = await requireAuth()
+  const actor = await requireCanViewEntregas()
 
   const parsed = createDeliverySchema.safeParse(formData)
   if (!parsed.success) return { ok: false, error: 'Datos inválidos' }
@@ -108,7 +108,7 @@ export async function updateDeliveryStatus(
   deliveryId: string,
   newStatus: DeliveryStatus
 ): Promise<ActionResult> {
-  const actor = await requireAuth()
+  const actor = await requireCanEditEntregas()
 
   const delivery = await db.delivery.findUnique({
     where: { id: deliveryId },
@@ -236,7 +236,7 @@ export async function updateDeliveryChecklistItem(
   itemId: string,
   data: { result: string; notes?: string | null }
 ): Promise<ActionResult> {
-  await requireAuth()
+  await requireCanEditEntregas()
 
   await db.deliveryChecklistItem.update({
     where: { id: itemId },
@@ -255,7 +255,7 @@ export async function updateDeliveryChecklistItem(
 }
 
 export async function signDelivery(deliveryId: string, formData: unknown): Promise<ActionResult> {
-  const actor = await requireAuth()
+  const actor = await requireCanEditEntregas()
 
   const parsed = signDeliverySchema.safeParse(formData)
   if (!parsed.success) return { ok: false, error: 'Datos de firma inválidos' }
@@ -298,7 +298,7 @@ export async function uploadDeliveryDocument(
   deliveryId: string,
   data: { category: string; name: string; url: string }
 ): Promise<ActionResult> {
-  const actor = await requireAuth()
+  const actor = await requireCanEditEntregas()
 
   await db.deliveryDocument.create({
     data: {

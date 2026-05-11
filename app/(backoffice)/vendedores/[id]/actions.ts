@@ -3,7 +3,7 @@
 import { revalidatePath } from 'next/cache'
 import { z } from 'zod'
 import { db } from '@/lib/db'
-import { requireAuth } from '@/lib/auth'
+import { requireAgente } from '@/lib/auth'
 import { updateSellerLeadSchema, updateVehicleSchema } from '@/lib/validators/seller-lead'
 import { runAndSaveAutoValuation } from '@/lib/valuation/save'
 import { recalculateMatchesForVehicle } from '@/lib/matching'
@@ -16,7 +16,7 @@ import {
 } from '@/lib/state-machine'
 
 export async function updateSellerLead(leadId: string, data: unknown) {
-  const actor = await requireAuth()
+  const actor = await requireAgente()
 
   const parsed = updateSellerLeadSchema.safeParse(data)
   if (!parsed.success) {
@@ -99,7 +99,7 @@ export async function updateSellerLead(leadId: string, data: unknown) {
 }
 
 export async function updateVehicle(vehicleId: string, data: unknown) {
-  const actor = await requireAuth()
+  const actor = await requireAgente()
 
   const parsed = updateVehicleSchema.safeParse(data)
   if (!parsed.success) {
@@ -209,7 +209,7 @@ export async function updateVehicle(vehicleId: string, data: unknown) {
 }
 
 export async function addSellerLeadNote(leadId: string, content: string) {
-  const actor = await requireAuth()
+  const actor = await requireAgente()
 
   const trimmed = content.trim()
   if (!trimmed) return { error: 'El contenido no puede estar vacío' }
@@ -244,7 +244,7 @@ const overrideValuationSchema = z
   })
 
 export async function overrideValuation(vehicleId: string, data: unknown) {
-  const actor = await requireAuth()
+  const actor = await requireAgente()
 
   const parsed = overrideValuationSchema.safeParse(data)
   if (!parsed.success) {

@@ -5,12 +5,21 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { toast } from 'sonner'
 import { createUser, updateUser, toggleUserActive } from './actions'
+import type { UserRoleValue } from '@/lib/validators/user'
+
+const ROLE_OPTIONS: { value: UserRoleValue; label: string; description: string }[] = [
+  { value: 'ADMIN', label: 'Admin', description: 'Acceso total al CRM' },
+  { value: 'AGENTE', label: 'Agente comercial', description: 'Módulo comercial + lectura general' },
+  { value: 'TALLER', label: 'Taller', description: 'Módulo taller + ver vehículos' },
+  { value: 'ENTREGAS', label: 'Entregas', description: 'Entregas + postventa' },
+  { value: 'MARKETING', label: 'Marketing', description: 'Anuncios + fotos + lectura vehículos' },
+]
 
 interface UserData {
   id: string
   name: string
   email: string
-  role: 'ADMIN' | 'AGENTE'
+  role: UserRoleValue
   active: boolean
   notifyOnNewLead: boolean
 }
@@ -29,7 +38,7 @@ export function UserForm({ mode, user, isSelf = false, activeLeadCount = 0 }: Pr
 
   const [name, setName] = useState(user?.name ?? '')
   const [email, setEmail] = useState(user?.email ?? '')
-  const [role, setRole] = useState<'ADMIN' | 'AGENTE'>(user?.role ?? 'AGENTE')
+  const [role, setRole] = useState<UserRoleValue>(user?.role ?? 'AGENTE')
   const [active, setActive] = useState(user?.active ?? true)
   const [notifyOnNewLead, setNotifyOnNewLead] = useState(user?.notifyOnNewLead ?? true)
 
@@ -112,12 +121,15 @@ export function UserForm({ mode, user, isSelf = false, activeLeadCount = 0 }: Pr
         <label className="mb-1.5 block text-sm font-medium text-cn-teal-900">Rol</label>
         <select
           value={role}
-          onChange={(e) => setRole(e.target.value as 'ADMIN' | 'AGENTE')}
+          onChange={(e) => setRole(e.target.value as UserRoleValue)}
           disabled={isSelf}
           className="h-10 w-full rounded-lg border border-cn-line bg-white px-3 text-sm focus:outline-none focus:ring-2 focus:ring-cn-teal-900/20 disabled:cursor-not-allowed disabled:opacity-50"
         >
-          <option value="AGENTE">Agente</option>
-          <option value="ADMIN">Admin</option>
+          {ROLE_OPTIONS.map((opt) => (
+            <option key={opt.value} value={opt.value}>
+              {opt.label} — {opt.description}
+            </option>
+          ))}
         </select>
         {isSelf && <p className="mt-1 text-xs text-cn-ink-500">No puedes cambiar tu propio rol.</p>}
       </div>

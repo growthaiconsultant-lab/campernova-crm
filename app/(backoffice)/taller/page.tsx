@@ -1,6 +1,6 @@
 import Link from 'next/link'
 import { db } from '@/lib/db'
-import { requireAuth } from '@/lib/auth'
+import { requireCanViewTaller } from '@/lib/auth'
 import { Button } from '@/components/ui/button'
 import { Plus } from 'lucide-react'
 import type { WorkOrderStatus, WorkOrderApprovalLevel } from '@prisma/client'
@@ -42,7 +42,7 @@ export default async function TallerPage({
 }: {
   searchParams: { status?: string; assigned?: string }
 }) {
-  await requireAuth()
+  await requireCanViewTaller()
 
   const where: Record<string, unknown> = {}
   if (searchParams.status) where.status = searchParams.status

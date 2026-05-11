@@ -2,7 +2,7 @@
 
 import { revalidatePath } from 'next/cache'
 import { db } from '@/lib/db'
-import { requireAuth } from '@/lib/auth'
+import { requireCanEditPostventa } from '@/lib/auth'
 
 type ActionResult = { ok: true } | { ok: false; error: string }
 
@@ -10,7 +10,7 @@ export async function recordFollowupResponse(
   followupId: string,
   responseNotes: string
 ): Promise<ActionResult> {
-  const actor = await requireAuth()
+  const actor = await requireCanEditPostventa()
 
   const followup = await db.postventaFollowup.findUnique({
     where: { id: followupId },
@@ -42,7 +42,7 @@ export async function recordFollowupResponse(
 }
 
 export async function dismissFollowup(followupId: string): Promise<ActionResult> {
-  await requireAuth()
+  await requireCanEditPostventa()
 
   await db.postventaFollowup.update({
     where: { id: followupId },

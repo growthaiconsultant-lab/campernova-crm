@@ -2,12 +2,12 @@
 
 import { revalidatePath } from 'next/cache'
 import { db } from '@/lib/db'
-import { requireAuth } from '@/lib/auth'
+import { requireCanGenerateAds } from '@/lib/auth'
 import { generateAd } from '@/lib/ads/generate'
 import type { AdChannel } from '@prisma/client'
 
 export async function generateVehicleAd(vehicleId: string, channel: 'WALLAPOP' | 'COCHESNET') {
-  const actor = await requireAuth()
+  const actor = await requireCanGenerateAds()
 
   const vehicle = await db.vehicle.findUnique({
     where: { id: vehicleId },
@@ -56,7 +56,7 @@ export async function generateVehicleAd(vehicleId: string, channel: 'WALLAPOP' |
 }
 
 export async function updateVehicleAdContent(adId: string, content: string) {
-  const actor = await requireAuth()
+  const actor = await requireCanGenerateAds()
 
   const ad = await db.vehicleAd.findUnique({
     where: { id: adId },
@@ -75,7 +75,7 @@ export async function updateVehicleAdContent(adId: string, content: string) {
 }
 
 export async function updateVehiclePublicNotes(vehicleId: string, publicNotes: string) {
-  await requireAuth()
+  await requireCanGenerateAds()
 
   const vehicle = await db.vehicle.findUnique({
     where: { id: vehicleId },

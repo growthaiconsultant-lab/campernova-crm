@@ -2,14 +2,14 @@
 
 import { revalidatePath } from 'next/cache'
 import { db } from '@/lib/db'
-import { requireAuth } from '@/lib/auth'
+import { requireAgente } from '@/lib/auth'
 
 export async function logWhatsApp(params: {
   leadId: string
   leadType: 'seller' | 'buyer'
   phone: string
 }) {
-  const actor = await requireAuth()
+  const actor = await requireAgente()
 
   await db.activity.create({
     data: {

@@ -1,7 +1,7 @@
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
 import { db } from '@/lib/db'
-import { requireAuth } from '@/lib/auth'
+import { requireCanViewEntregas } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
 import { deliveryDocumentSignedUrl } from '@/lib/supabase/storage'
 import { DeliveryTabs, TabPanel } from './delivery-tabs'
@@ -25,7 +25,7 @@ const STATUS_COLORS: Record<DeliveryStatus, string> = {
 }
 
 export default async function EntregaDetailPage({ params }: { params: { id: string } }) {
-  const currentUser = await requireAuth()
+  const currentUser = await requireCanViewEntregas()
 
   const delivery = await db.delivery.findUnique({
     where: { id: params.id },

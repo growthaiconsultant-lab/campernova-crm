@@ -3,7 +3,7 @@
 import { revalidatePath } from 'next/cache'
 import { randomUUID } from 'node:crypto'
 import { db } from '@/lib/db'
-import { requireAuth } from '@/lib/auth'
+import { requireCanGenerateAds } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
 import {
   VEHICLE_PHOTOS_BUCKET,
@@ -20,7 +20,7 @@ type UploadOk = { photo: { id: string; url: string; order: number } }
 type Ok = { ok: true }
 
 export async function uploadVehiclePhoto(formData: FormData): Promise<UploadOk | ActionError> {
-  await requireAuth()
+  await requireCanGenerateAds()
 
   const vehicleId = formData.get('vehicleId')
   const file = formData.get('file')
@@ -78,7 +78,7 @@ export async function uploadVehiclePhoto(formData: FormData): Promise<UploadOk |
 }
 
 export async function deleteVehiclePhoto(photoId: string): Promise<Ok | ActionError> {
-  await requireAuth()
+  await requireCanGenerateAds()
 
   const photo = await db.vehiclePhoto.findUnique({
     where: { id: photoId },
@@ -110,7 +110,7 @@ export async function reorderVehiclePhotos(
   vehicleId: string,
   orderedIds: string[]
 ): Promise<Ok | ActionError> {
-  await requireAuth()
+  await requireCanGenerateAds()
 
   if (!Array.isArray(orderedIds) || orderedIds.length === 0) {
     return { error: 'Orden inválido' }

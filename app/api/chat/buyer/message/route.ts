@@ -127,7 +127,9 @@ export async function POST(req: NextRequest) {
 
             // Non-blocking agent notification
             db.user
-              .findMany({ where: { active: true, notifyOnNewLead: true } })
+              .findMany({
+                where: { active: true, notifyOnNewLead: true, role: { in: ['ADMIN', 'AGENTE'] } },
+              })
               .then(async (agents) => {
                 if (agents.length > 0) {
                   await sendBuyerChatLeadNotification(

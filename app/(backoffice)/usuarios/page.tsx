@@ -75,15 +75,21 @@ export default async function UsuariosPage() {
   )
 }
 
+const ROLE_BADGE: Record<string, { label: string; className: string }> = {
+  ADMIN: { label: 'Admin', className: 'bg-blue-950 text-white' },
+  AGENTE: { label: 'Agente', className: 'bg-cn-teal-900/10 text-cn-teal-900' },
+  TALLER: { label: 'Taller', className: 'bg-amber-100 text-amber-800' },
+  ENTREGAS: { label: 'Entregas', className: 'bg-indigo-100 text-indigo-800' },
+  MARKETING: { label: 'Marketing', className: 'bg-pink-100 text-pink-800' },
+}
+
 function RoleBadge({ role }: { role: string }) {
-  const isAdmin = role === 'ADMIN'
+  const badge = ROLE_BADGE[role] ?? { label: role, className: 'bg-gray-100 text-gray-700' }
   return (
     <span
-      className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${
-        isAdmin ? 'bg-blue-950 text-white' : 'bg-cn-teal-900/10 text-cn-teal-900'
-      }`}
+      className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${badge.className}`}
     >
-      {isAdmin ? 'Admin' : 'Agente'}
+      {badge.label}
     </span>
   )
 }

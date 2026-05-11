@@ -2,7 +2,7 @@
 
 import { revalidatePath } from 'next/cache'
 import { db } from '@/lib/db'
-import { requireAuth } from '@/lib/auth'
+import { requireAgente } from '@/lib/auth'
 import { updateBuyerLeadSchema } from '@/lib/validators/buyer-lead'
 import { recalculateMatchesForBuyer } from '@/lib/matching'
 import {
@@ -12,7 +12,7 @@ import {
 } from '@/lib/state-machine'
 
 export async function updateBuyerLead(leadId: string, data: unknown) {
-  const actor = await requireAuth()
+  const actor = await requireAgente()
 
   const parsed = updateBuyerLeadSchema.safeParse(data)
   if (!parsed.success) {
@@ -137,7 +137,7 @@ export async function updateBuyerLead(leadId: string, data: unknown) {
 }
 
 export async function addBuyerLeadNote(leadId: string, content: string) {
-  const actor = await requireAuth()
+  const actor = await requireAgente()
 
   const trimmed = content.trim()
   if (!trimmed) return { error: 'El contenido no puede estar vacío' }

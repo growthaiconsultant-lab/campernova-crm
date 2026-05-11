@@ -13,8 +13,11 @@ datasource db {
 // ─────────────────────────────────────────────────────────────
 
 enum UserRole {
-  AGENTE
-  ADMIN
+  ADMIN      // Joel, Esteban — acceso total
+  AGENTE     // Desirée, comerciales — comercial + lectura general
+  TALLER     // Manolo — solo módulo taller + ver vehículos
+  ENTREGAS   // Javi — entregas + postventa
+  MARKETING  // Ari — anuncios + fotos + lectura vehículos
 }
 
 enum LeadCanal {

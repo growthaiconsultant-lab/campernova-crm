@@ -3,7 +3,7 @@
 import { revalidatePath } from 'next/cache'
 import { z } from 'zod'
 import { db } from '@/lib/db'
-import { requireAuth, requireAdmin } from '@/lib/auth'
+import { requireAdmin, requireCanViewPostventa, requireCanEditPostventa } from '@/lib/auth'
 import { imputeTicketCost, extendWarranty as extendWarrantyLib } from '@/lib/postventa'
 import { sendTicketOpenedNotification } from '@/lib/email/send'
 import type { TicketStatus, TicketPriority } from '@prisma/client'
@@ -46,7 +46,7 @@ const updateTicketSchema = z.object({
 })
 
 export async function createTicket(formData: unknown): Promise<ActionResult<{ id: string }>> {
-  const actor = await requireAuth()
+  const actor = await requireCanViewPostventa()
 
   const parsed = createTicketSchema.safeParse(formData)
   if (!parsed.success) return { ok: false, error: 'Datos inválidos' }
@@ -81,7 +81,7 @@ export async function createTicket(formData: unknown): Promise<ActionResult<{ id
   // Notify admins for HIGH/CRITICAL tickets
   if (priority === 'ALTA' || priority === 'CRITICA') {
     const admins = await db.user.findMany({
-      where: { role: 'ADMIN', active: true },
+      where: { role: { in: ['ADMIN', 'ENTREGAS'] }, active: true },
       select: { email: true },
     })
     sendTicketOpenedNotification({
@@ -97,7 +97,7 @@ export async function createTicket(formData: unknown): Promise<ActionResult<{ id
 }
 
 export async function updateTicket(ticketId: string, formData: unknown): Promise<ActionResult> {
-  await requireAuth()
+  await requireCanEditPostventa()
 
   const parsed = updateTicketSchema.safeParse(formData)
   if (!parsed.success) return { ok: false, error: 'Datos inválidos' }
@@ -122,7 +122,7 @@ export async function changeTicketStatus(
   ticketId: string,
   newStatus: TicketStatus
 ): Promise<ActionResult> {
-  const actor = await requireAuth()
+  const actor = await requireCanEditPostventa()
 
   const ticket = await db.postventaTicket.findUnique({
     where: { id: ticketId },
@@ -174,7 +174,7 @@ export async function setTicketCost(
   ticketId: string,
   data: { costEstimate?: number | null; costReal?: number | null }
 ): Promise<ActionResult> {
-  await requireAuth()
+  await requireCanEditPostventa()
 
   await db.postventaTicket.update({
     where: { id: ticketId },
@@ -192,7 +192,7 @@ export async function uploadTicketPhoto(
   ticketId: string,
   data: { type: 'PROBLEMA' | 'SOLUCION'; url: string }
 ): Promise<ActionResult> {
-  const actor = await requireAuth()
+  const actor = await requireCanEditPostventa()
 
   await db.postventaTicketPhoto.create({
     data: { ticketId, type: data.type, url: data.url, uploadedById: actor.id },

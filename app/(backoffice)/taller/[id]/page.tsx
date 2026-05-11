@@ -1,7 +1,7 @@
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
 import { db } from '@/lib/db'
-import { requireAuth } from '@/lib/auth'
+import { requireCanViewTaller } from '@/lib/auth'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import type {
@@ -48,7 +48,7 @@ const CATEGORY_LABELS: Record<ChecklistItemCategory, string> = {
 }
 
 export default async function WorkOrderPage({ params }: { params: { id: string } }) {
-  const currentUser = await requireAuth()
+  const currentUser = await requireCanViewTaller()
 
   const wo = await db.workOrder.findUnique({
     where: { id: params.id },
