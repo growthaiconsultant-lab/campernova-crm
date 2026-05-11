@@ -84,8 +84,8 @@ const mockLegalInput = {
 }
 
 const mockDocs = [
-  { category: 'DNI_VENDEDOR', exists: false },
-  { category: 'CONTRATO_COMPRAVENTA', exists: false },
+  { category: 'DNI_VENDEDOR' as const, exists: false },
+  { category: 'CONTRATO_COMPRAVENTA' as const, exists: false },
 ]
 
 beforeEach(() => {

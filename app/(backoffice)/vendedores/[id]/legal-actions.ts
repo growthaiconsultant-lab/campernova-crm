@@ -4,7 +4,7 @@ import { revalidatePath } from 'next/cache'
 import { z } from 'zod'
 import { db } from '@/lib/db'
 import { requireAdmin, requireAgente } from '@/lib/auth'
-import { createServerClient } from '@/lib/supabase/server'
+import { createClient as createServerClient } from '@/lib/supabase/server'
 import {
   vehicleDocumentPath,
   vehicleDocumentSignedUrl,
@@ -44,7 +44,7 @@ export async function uploadVehicleDocument(vehicleId: string, formData: FormDat
   const fileName = `${parsed.data.category}_${Date.now()}.${ext}`
   const path = vehicleDocumentPath(vehicleId, fileName)
 
-  const supabase = await createServerClient()
+  const supabase = createServerClient()
   const bytes = await file.arrayBuffer()
   const { error: uploadError } = await supabase.storage
     .from('vehicle-documents')
@@ -96,7 +96,7 @@ export async function deleteVehicleDocument(documentId: string) {
   })
   if (!doc) return { ok: false as const, error: 'Documento no encontrado' }
 
-  const supabase = await createServerClient()
+  const supabase = createServerClient()
   // Attempt to delete from storage (best-effort — URL may be external)
   const path = vehicleDocumentPath(doc.vehicleId, doc.url.split('/').pop() ?? '')
   await deleteVehicleDocumentFile(supabase, path).catch(console.error)
@@ -249,7 +249,7 @@ export async function getVehicleDocumentSignedUrl(documentId: string) {
   // If already a full signed URL return as-is; if it's a path regenerate
   if (doc.url.startsWith('http')) return { ok: true as const, url: doc.url }
 
-  const supabase = await createServerClient()
+  const supabase = createServerClient()
   const url = await vehicleDocumentSignedUrl(supabase, doc.url, 3600)
   if (!url) return { ok: false as const, error: 'Error al generar la URL' }
 

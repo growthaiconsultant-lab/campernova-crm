@@ -10,7 +10,7 @@ vi.mock('@/lib/auth', () => ({
 }))
 
 vi.mock('@/lib/supabase/server', () => ({
-  createServerClient: vi.fn(),
+  createClient: vi.fn(),
 }))
 
 vi.mock('@/lib/supabase/storage', () => ({
@@ -23,7 +23,7 @@ vi.mock('@/lib/supabase/storage', () => ({
 
 const { mockDb } = vi.hoisted(() => {
   const mockDb = {
-    vehicle: { findUnique: vi.fn() },
+    vehicle: { findUnique: vi.fn(), update: vi.fn() },
     vehicleDocument: {
       create: vi.fn(),
       findUnique: vi.fn(),
@@ -40,7 +40,7 @@ vi.mock('@/lib/db', () => ({ db: mockDb }))
 
 import type { User } from '@prisma/client'
 import { requireAdmin, requireAgente } from '@/lib/auth'
-import { createServerClient } from '@/lib/supabase/server'
+import { createClient as createServerClient } from '@/lib/supabase/server'
 import { vehicleDocumentSignedUrl, deleteVehicleDocumentFile } from '@/lib/supabase/storage'
 import {
   uploadVehicleDocument,
@@ -64,13 +64,9 @@ const mockSupabase = {
 
 beforeEach(() => {
   vi.clearAllMocks()
-  vi.mocked(createServerClient).mockResolvedValue(
-    mockSupabase as unknown as ReturnType<typeof createServerClient> extends Promise<infer T>
-      ? T
-      : never
-  )
-  mockDb.$transaction.mockImplementation(async (ops: unknown[]) => {
-    if (typeof ops === 'function') return ops(mockDb)
+  vi.mocked(createServerClient).mockReturnValue(mockSupabase as never)
+  mockDb.$transaction.mockImplementation(async (ops: unknown) => {
+    if (typeof ops === 'function') return (ops as (tx: typeof mockDb) => Promise<unknown>)(mockDb)
     const results = await Promise.all(ops as Promise<unknown>[])
     return results
   })
@@ -180,7 +176,7 @@ describe('updateVehicleLegalFields', () => {
       itvValidUntil: null,
       titleTransferredAt: null,
     })
-    mockDb.vehicle.update = vi.fn().mockResolvedValue({})
+    mockDb.vehicle.update.mockResolvedValue({})
     mockDb.activity.create.mockResolvedValue({})
 
     const result = await updateVehicleLegalFields('v-1', {
@@ -199,7 +195,7 @@ describe('updateVehicleLegalFields', () => {
       itvValidUntil: null,
       titleTransferredAt: null,
     })
-    mockDb.vehicle.update = vi.fn().mockResolvedValue({})
+    mockDb.vehicle.update.mockResolvedValue({})
 
     const activitiesCreated: unknown[] = []
     mockDb.$transaction.mockImplementation(async (ops: unknown[]) => {
@@ -232,7 +228,7 @@ describe('markChargesChecked', () => {
   it('solo ADMIN puede verificar cargas', async () => {
     vi.mocked(requireAdmin).mockResolvedValue(mockAdmin)
     mockDb.vehicle.findUnique.mockResolvedValue({ sellerLeadId: 'sl-1' })
-    mockDb.vehicle.update = vi.fn().mockResolvedValue({})
+    mockDb.vehicle.update.mockResolvedValue({})
     mockDb.activity.create.mockResolvedValue({})
 
     const result = await markChargesChecked('v-1')
@@ -242,7 +238,7 @@ describe('markChargesChecked', () => {
   it('incluye notas opcionales en el log de actividad', async () => {
     vi.mocked(requireAdmin).mockResolvedValue(mockAdmin)
     mockDb.vehicle.findUnique.mockResolvedValue({ sellerLeadId: 'sl-1' })
-    mockDb.vehicle.update = vi.fn().mockResolvedValue({})
+    mockDb.vehicle.update.mockResolvedValue({})
 
     let activityContent = ''
     mockDb.activity.create.mockImplementation((args: { data: { content: string } }) => {

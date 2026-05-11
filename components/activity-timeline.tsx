@@ -13,6 +13,8 @@ import {
   CalendarCheck,
   ShieldCheck,
   Ticket,
+  FileText,
+  Ban,
 } from 'lucide-react'
 import type { ActivityType } from '@prisma/client'
 import { DeleteNoteButton } from './delete-note-button'
@@ -44,6 +46,13 @@ const ACTIVITY_LABELS: Record<ActivityType, string> = {
   TICKET_POSTVENTA_CERRADO: 'Ticket cerrado',
   FOLLOWUP_ENVIADO: 'Follow-up enviado',
   FOLLOWUP_RESPONDIDO: 'Follow-up respondido',
+  DOCUMENTO_SUBIDO: 'Documento subido',
+  DOCUMENTO_ELIMINADO: 'Documento eliminado',
+  MATRICULA_AÑADIDA: 'Matrícula añadida',
+  ITV_ACTUALIZADA: 'ITV actualizada',
+  CARGAS_VERIFICADAS: 'Cargas verificadas',
+  TITULARIDAD_TRANSFERIDA: 'Titularidad transferida',
+  PUBLICACION_BLOQUEADA: 'Publicación bloqueada',
 }
 
 const ICON_CLASSES: Record<ActivityType, string> = {
@@ -74,6 +83,14 @@ const ICON_CLASSES: Record<ActivityType, string> = {
   TICKET_POSTVENTA_CERRADO: 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300',
   FOLLOWUP_ENVIADO: 'bg-sky-100 text-sky-700 dark:bg-sky-900/40 dark:text-sky-300',
   FOLLOWUP_RESPONDIDO: 'bg-teal-100 text-teal-700 dark:bg-teal-900/40 dark:text-teal-300',
+  DOCUMENTO_SUBIDO: 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300',
+  DOCUMENTO_ELIMINADO: 'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300',
+  MATRICULA_AÑADIDA: 'bg-teal-100 text-teal-700 dark:bg-teal-900/40 dark:text-teal-300',
+  ITV_ACTUALIZADA: 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300',
+  CARGAS_VERIFICADAS: 'bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300',
+  TITULARIDAD_TRANSFERIDA:
+    'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-300',
+  PUBLICACION_BLOQUEADA: 'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300',
 }
 
 function ActivityIcon({ type }: { type: ActivityType }) {
@@ -120,6 +137,15 @@ function ActivityIcon({ type }: { type: ActivityType }) {
     case 'FOLLOWUP_ENVIADO':
     case 'FOLLOWUP_RESPONDIDO':
       return <Ticket className={cls} />
+    case 'DOCUMENTO_SUBIDO':
+    case 'DOCUMENTO_ELIMINADO':
+    case 'MATRICULA_AÑADIDA':
+    case 'ITV_ACTUALIZADA':
+    case 'CARGAS_VERIFICADAS':
+    case 'TITULARIDAD_TRANSFERIDA':
+      return <FileText className={cls} />
+    case 'PUBLICACION_BLOQUEADA':
+      return <Ban className={cls} />
   }
 }
 
