@@ -68,6 +68,9 @@ export default async function DashboardPage({
     workshopCostsLast30,
     vehiclesWithMargin,
     topRentabilidad,
+    activeWarranties,
+    openTickets,
+    pendingFollowups,
   ] = await Promise.all([
     getSellerLeadCounts(db, filter),
     getBuyerLeadCounts(db, filter),
@@ -132,6 +135,12 @@ export default async function DashboardPage({
           },
         })
       : Promise.resolve([]),
+    // Garantías activas (endDate > now)
+    db.warranty.count({ where: { endDate: { gt: new Date() } } }),
+    // Tickets de postventa abiertos
+    db.postventaTicket.count({ where: { status: { in: ['ABIERTO', 'EN_PROGRESO'] } } }),
+    // Follow-ups pendientes de envío
+    db.postventaFollowup.count({ where: { status: 'PENDIENTE' } }),
   ])
 
   const totalSellerActive = sumWhere(sellerCounts, ACTIVE_SELLER_STATUSES)
@@ -223,6 +232,41 @@ export default async function DashboardPage({
           delta={salesMoM.delta}
           pctChange={salesMoM.pctChange}
         />
+      </div>
+
+      {/* KPIs Postventa */}
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+        <Card>
+          <CardContent className="pt-6">
+            <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+              Garantías activas
+            </p>
+            <p className="mt-1 text-3xl font-bold">{activeWarranties}</p>
+            <p className="mt-0.5 text-xs text-muted-foreground">no expiradas</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="pt-6">
+            <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+              Tickets abiertos
+            </p>
+            <p className={`mt-1 text-3xl font-bold ${openTickets > 0 ? 'text-amber-600' : ''}`}>
+              {openTickets}
+            </p>
+            <p className="mt-0.5 text-xs text-muted-foreground">abiertos o en progreso</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="pt-6">
+            <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+              Follow-ups pendientes
+            </p>
+            <p className={`mt-1 text-3xl font-bold ${pendingFollowups > 0 ? 'text-blue-600' : ''}`}>
+              {pendingFollowups}
+            </p>
+            <p className="mt-0.5 text-xs text-muted-foreground">día 7 y día 30 sin enviar</p>
+          </CardContent>
+        </Card>
       </div>
 
       {/* KPIs Taller y Margen — solo ADMIN */}

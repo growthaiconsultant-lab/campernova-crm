@@ -2,6 +2,8 @@ import { getResend } from './client'
 import { sellerLeadConfirmationHtml } from './templates/seller-lead-confirmation'
 import { agentLeadNotificationHtml } from './templates/agent-lead-notification'
 import { matchNotificationHtml } from './templates/match-notification'
+import { deliveryConfirmationHtml } from './templates/delivery-confirmation'
+import { ticketOpenedHtml } from './templates/ticket-opened'
 import type { RegisterBuyerLeadArgs } from '@/lib/chat/tools'
 
 interface SendSellerLeadConfirmationParams {
@@ -151,6 +153,76 @@ export async function sendBuyerChatLeadNotification(
     )
   } catch (err) {
     console.error('[email] sendBuyerChatLeadNotification failed:', err)
+  }
+}
+
+interface SendDeliveryConfirmationParams {
+  buyerName: string
+  buyerEmail: string
+  vehicleLabel: string
+  scheduledAt: Date
+  deliveryId: string
+}
+
+export async function sendDeliveryConfirmation(
+  params: SendDeliveryConfirmationParams
+): Promise<void> {
+  const from = process.env.EMAIL_FROM ?? 'onboarding@resend.dev'
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000'
+
+  try {
+    await getResend().emails.send({
+      from,
+      to: params.buyerEmail,
+      subject: `Confirmación de entrega — ${params.vehicleLabel}`,
+      html: deliveryConfirmationHtml({
+        buyerName: params.buyerName,
+        vehicleLabel: params.vehicleLabel,
+        scheduledAt: params.scheduledAt,
+        deliveryId: params.deliveryId,
+        appUrl,
+      }),
+    })
+  } catch (err) {
+    console.error('[email] sendDeliveryConfirmation failed:', err)
+  }
+}
+
+interface SendTicketOpenedNotificationParams {
+  adminEmails: string[]
+  ticketTitle: string
+  priority: string
+  ticketId: string
+}
+
+export async function sendTicketOpenedNotification(
+  params: SendTicketOpenedNotificationParams
+): Promise<void> {
+  if (params.adminEmails.length === 0) return
+
+  const from = process.env.EMAIL_FROM ?? 'onboarding@resend.dev'
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000'
+
+  const html = ticketOpenedHtml({
+    ticketTitle: params.ticketTitle,
+    priority: params.priority,
+    ticketId: params.ticketId,
+    appUrl,
+  })
+
+  try {
+    await Promise.all(
+      params.adminEmails.map((to) =>
+        getResend().emails.send({
+          from,
+          to,
+          subject: `[${params.priority}] Ticket postventa: ${params.ticketTitle}`,
+          html,
+        })
+      )
+    )
+  } catch (err) {
+    console.error('[email] sendTicketOpenedNotification failed:', err)
   }
 }
 

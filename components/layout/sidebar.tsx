@@ -3,7 +3,16 @@
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { LogoCampersNova } from '@/components/logo-campers-nova'
-import { LayoutDashboard, Users, ShoppingCart, Truck, UserCog, Wrench } from 'lucide-react'
+import {
+  LayoutDashboard,
+  Users,
+  ShoppingCart,
+  Truck,
+  UserCog,
+  Wrench,
+  CalendarCheck,
+  ShieldCheck,
+} from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 const NAV_ITEMS = [
@@ -12,6 +21,8 @@ const NAV_ITEMS = [
   { href: '/compradores', label: 'Compradores', icon: ShoppingCart },
   { href: '/vehiculos', label: 'Vehículos', icon: Truck },
   { href: '/taller', label: 'Taller', icon: Wrench },
+  { href: '/entregas', label: 'Entregas', icon: CalendarCheck },
+  { href: '/postventa', label: 'Postventa', icon: ShieldCheck },
 ]
 
 interface SidebarProps {

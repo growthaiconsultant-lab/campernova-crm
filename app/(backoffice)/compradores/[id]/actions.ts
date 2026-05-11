@@ -50,6 +50,22 @@ export async function updateBuyerLead(leadId: string, data: unknown) {
     }
   }
 
+  if (status === 'CERRADO' && currentLead.status !== 'CERRADO') {
+    const delivery = await db.delivery.findFirst({
+      where: { buyerLeadId: leadId, status: 'COMPLETADA' },
+    })
+    if (!delivery) {
+      return {
+        error: {
+          formErrors: [
+            'El comprador no puede marcarse como CERRADO sin una entrega completada del vehículo asociado.',
+          ],
+          fieldErrors: {},
+        },
+      }
+    }
+  }
+
   const agentChanging = agentId !== currentLead.agentId
   const statusChanging = status !== currentLead.status
 

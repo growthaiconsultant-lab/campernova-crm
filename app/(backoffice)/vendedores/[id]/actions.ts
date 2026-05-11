@@ -138,6 +138,28 @@ export async function updateVehicle(vehicleId: string, data: unknown) {
     }
   }
 
+  if (status === 'VENDIDO' && vehicle.status !== 'VENDIDO') {
+    const delivery = await db.delivery.findFirst({
+      where: {
+        vehicleId,
+        status: 'COMPLETADA',
+        signedByName: { not: null },
+        signedByDni: { not: null },
+        signatureUrl: { not: null },
+      },
+    })
+    if (!delivery) {
+      return {
+        error: {
+          formErrors: [
+            'El vehículo no puede marcarse como VENDIDO sin una entrega completada y firmada. Crea la entrega desde /entregas.',
+          ],
+          fieldErrors: {},
+        },
+      }
+    }
+  }
+
   const statusChanging = status !== vehicle.status
 
   await db.$transaction(async (tx) => {

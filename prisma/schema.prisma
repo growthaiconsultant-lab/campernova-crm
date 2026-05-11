@@ -91,6 +91,16 @@ enum ActivityType {
   ORDEN_TALLER_APROBADA
   ORDEN_TALLER_RECHAZADA
   PRECIO_VENTA_AJUSTADO
+  ENTREGA_PROGRAMADA
+  ENTREGA_COMPLETADA
+  ENTREGA_CANCELADA
+  GARANTIA_ACTIVADA
+  GARANTIA_AMPLIADA
+  TICKET_POSTVENTA_ABIERTO
+  TICKET_POSTVENTA_RESUELTO
+  TICKET_POSTVENTA_CERRADO
+  FOLLOWUP_ENVIADO
+  FOLLOWUP_RESPONDIDO
 }
 
 enum VehicleCostCategory {
@@ -164,6 +174,66 @@ enum DocumentType {
   OTROS
 }
 
+enum DeliveryStatus {
+  PROGRAMADA
+  EN_CURSO
+  COMPLETADA
+  CANCELADA
+}
+
+enum DeliveryChecklistCategory {
+  PRE_ENTREGA
+  EXPLICACION
+  FIRMA_SALIDA
+}
+
+enum DeliveryChecklistResult {
+  PENDIENTE
+  OK
+  INCIDENCIA
+  NO_APLICA
+}
+
+enum DeliveryDocumentCategory {
+  CONTRATO_FINAL
+  FACTURA
+  DOCUMENTO_ENTREGA
+  FOTO_ENTREGA
+  OTRO
+}
+
+enum TicketStatus {
+  ABIERTO
+  EN_PROGRESO
+  RESUELTO
+  CERRADO
+  ANULADO
+}
+
+enum TicketPriority {
+  BAJA
+  MEDIA
+  ALTA
+  CRITICA
+}
+
+enum TicketPhotoType {
+  PROBLEMA
+  SOLUCION
+}
+
+enum FollowupType {
+  DIA_7
+  DIA_30
+}
+
+enum FollowupStatus {
+  PENDIENTE
+  ENVIADO
+  RESPONDIDO
+  FALLIDO
+}
+
 // ─────────────────────────────────────────────────────────────
 // MODELS
 // ─────────────────────────────────────────────────────────────
@@ -190,7 +260,12 @@ model User {
   assignedWorkOrders    WorkOrder[]          @relation("AssignedWorkOrders")
   approvedWorkOrders    WorkOrder[]          @relation("ApprovedWorkOrders")
   workOrderTimeEntries  WorkOrderTimeEntry[]
-  vehicleCostsCreated   VehicleCost[]
+  vehicleCostsCreated     VehicleCost[]
+  deliveriesResponsable   Delivery[]              @relation("ResponsableDeliveries")
+  warrantiesExtended      Warranty[]
+  deliveryDocsUploaded    DeliveryDocument[]
+  postventaTicketsResp    PostventaTicket[]       @relation("ResponsibleTickets")
+  postventaPhotosUploaded PostventaTicketPhoto[]
 
   @@map("users")
 }
@@ -258,6 +333,8 @@ model Vehicle {
   ads         VehicleAd[]
   costs       VehicleCost[]
   workOrders  WorkOrder[]
+  deliveries  Delivery[]
+  warranty    Warranty?
 
   @@index([brand, model])
   @@index([status])
@@ -324,6 +401,8 @@ model BuyerLead {
   activities  Activity[]
   documents   Document[]
   chatSession BuyerChatSession?
+  deliveries  Delivery[]
+  warranty    Warranty?
 
   @@index([status])
   @@index([agentId])
@@ -550,6 +629,168 @@ model WorkOrderPart {
 
   @@index([workOrderId])
   @@map("work_order_parts")
+}
+
+/// Entrega física del vehículo al comprador. Ligada a un Vehicle + BuyerLead.
+model Delivery {
+  id                 String         @id @default(cuid())
+  vehicleId          String         @map("vehicle_id")
+  buyerLeadId        String         @map("buyer_lead_id")
+  responsableId      String?        @map("responsable_id")
+  scheduledAt        DateTime       @map("scheduled_at")
+  startedAt          DateTime?      @map("started_at")
+  completedAt        DateTime?      @map("completed_at")
+  status             DeliveryStatus @default(PROGRAMADA)
+  signedByName       String?        @map("signed_by_name")
+  signedByDni        String?        @map("signed_by_dni")
+  signatureUrl       String?        @map("signature_url")
+  notes              String?
+  cancellationReason String?        @map("cancellation_reason")
+  createdAt          DateTime       @default(now()) @map("created_at")
+  updatedAt          DateTime       @updatedAt @map("updated_at")
+
+  vehicle     Vehicle                 @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+  buyerLead   BuyerLead               @relation(fields: [buyerLeadId], references: [id])
+  responsable User?                   @relation("ResponsableDeliveries", fields: [responsableId], references: [id])
+  checklist   DeliveryChecklistItem[]
+  documents   DeliveryDocument[]
+  warranty    Warranty?
+
+  @@index([vehicleId])
+  @@index([buyerLeadId])
+  @@index([responsableId, status])
+  @@index([status, scheduledAt])
+  @@map("deliveries")
+}
+
+/// Ítem del checklist de pre-entrega y explicación al comprador.
+model DeliveryChecklistItem {
+  id         String                  @id @default(cuid())
+  deliveryId String                  @map("delivery_id")
+  category   DeliveryChecklistCategory
+  item       String
+  result     DeliveryChecklistResult @default(PENDIENTE)
+  notes      String?
+  createdAt  DateTime                @default(now()) @map("created_at")
+  updatedAt  DateTime                @updatedAt @map("updated_at")
+
+  delivery Delivery @relation(fields: [deliveryId], references: [id], onDelete: Cascade)
+
+  @@index([deliveryId, category])
+  @@map("delivery_checklist_items")
+}
+
+/// Documento adjunto generado en la entrega (contratos, facturas, fotos).
+model DeliveryDocument {
+  id           String                   @id @default(cuid())
+  deliveryId   String                   @map("delivery_id")
+  category     DeliveryDocumentCategory
+  name         String
+  url          String
+  uploadedById String?                  @map("uploaded_by_id")
+  createdAt    DateTime                 @default(now()) @map("created_at")
+
+  delivery   Delivery @relation(fields: [deliveryId], references: [id], onDelete: Cascade)
+  uploadedBy User?    @relation(fields: [uploadedById], references: [id])
+
+  @@index([deliveryId])
+  @@map("delivery_documents")
+}
+
+/// Garantía activada automáticamente al completar la entrega (12 meses, ampliable a 36).
+model Warranty {
+  id           String    @id @default(cuid())
+  vehicleId    String    @unique @map("vehicle_id")
+  deliveryId   String    @unique @map("delivery_id")
+  buyerLeadId  String    @unique @map("buyer_lead_id")
+  startDate    DateTime  @map("start_date")
+  endDate      DateTime  @map("end_date")
+  extendedTo   DateTime? @map("extended_to")
+  extendedAt   DateTime? @map("extended_at")
+  extendedById String?   @map("extended_by_id")
+  notes        String?
+  createdAt    DateTime  @default(now()) @map("created_at")
+  updatedAt    DateTime  @updatedAt @map("updated_at")
+
+  vehicle    Vehicle             @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+  delivery   Delivery            @relation(fields: [deliveryId], references: [id])
+  buyerLead  BuyerLead           @relation(fields: [buyerLeadId], references: [id])
+  extendedBy User?               @relation(fields: [extendedById], references: [id])
+  tickets    PostventaTicket[]
+  followups  PostventaFollowup[]
+
+  @@index([vehicleId])
+  @@index([endDate])
+  @@map("warranties")
+}
+
+/// Ticket de incidencia de garantía abierto por o para el comprador.
+/// Al cerrarse con costReal > 0 genera un VehicleCost category=POSTVENTA.
+model PostventaTicket {
+  id            String         @id @default(cuid())
+  warrantyId    String         @map("warranty_id")
+  status        TicketStatus   @default(ABIERTO)
+  priority      TicketPriority @default(MEDIA)
+  title         String
+  description   String
+  cause         String?
+  solution      String?
+  costEstimate  Decimal?       @map("cost_estimate") @db.Decimal(10, 2)
+  costReal      Decimal?       @map("cost_real") @db.Decimal(10, 2)
+  responsibleId String?        @map("responsible_id")
+  openedAt      DateTime       @default(now()) @map("opened_at")
+  dueAt         DateTime?      @map("due_at")
+  resolvedAt    DateTime?      @map("resolved_at")
+  closedAt      DateTime?      @map("closed_at")
+  createdAt     DateTime       @default(now()) @map("created_at")
+  updatedAt     DateTime       @updatedAt @map("updated_at")
+
+  warranty    Warranty                @relation(fields: [warrantyId], references: [id], onDelete: Cascade)
+  responsible User?                   @relation("ResponsibleTickets", fields: [responsibleId], references: [id])
+  photos      PostventaTicketPhoto[]
+
+  @@index([warrantyId, status])
+  @@index([responsibleId, status])
+  @@index([status, priority, dueAt])
+  @@map("postventa_tickets")
+}
+
+/// Foto adjunta a un ticket de postventa (problema o solución).
+model PostventaTicketPhoto {
+  id           String          @id @default(cuid())
+  ticketId     String          @map("ticket_id")
+  type         TicketPhotoType
+  url          String
+  uploadedById String?         @map("uploaded_by_id")
+  createdAt    DateTime        @default(now()) @map("created_at")
+
+  ticket     PostventaTicket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  uploadedBy User?           @relation(fields: [uploadedById], references: [id])
+
+  @@index([ticketId, type])
+  @@map("postventa_ticket_photos")
+}
+
+/// Seguimiento automático día 7 y día 30 tras la entrega.
+/// El cron diario procesa los PENDIENTE con scheduledFor <= now().
+model PostventaFollowup {
+  id            String         @id @default(cuid())
+  warrantyId    String         @map("warranty_id")
+  type          FollowupType
+  status        FollowupStatus @default(PENDIENTE)
+  scheduledFor  DateTime       @map("scheduled_for")
+  sentAt        DateTime?      @map("sent_at")
+  respondedAt   DateTime?      @map("responded_at")
+  responseNotes String?        @map("response_notes")
+  failureReason String?        @map("failure_reason")
+  createdAt     DateTime       @default(now()) @map("created_at")
+  updatedAt     DateTime       @updatedAt @map("updated_at")
+
+  warranty Warranty @relation(fields: [warrantyId], references: [id], onDelete: Cascade)
+
+  @@unique([warrantyId, type])
+  @@index([status, scheduledFor])
+  @@map("postventa_followups")
 }
 
 /// Tabla de precios de referencia para el algoritmo de tasación.

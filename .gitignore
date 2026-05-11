@@ -59,3 +59,5 @@ playwright/.cache/
 
 # Claude Code (local user settings — project settings.json se commitea si aplica)
 .claude/settings.local.json
+
+.vercel

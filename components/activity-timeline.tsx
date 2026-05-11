@@ -10,6 +10,9 @@ import {
   Download,
   Wrench,
   DollarSign,
+  CalendarCheck,
+  ShieldCheck,
+  Ticket,
 } from 'lucide-react'
 import type { ActivityType } from '@prisma/client'
 import { DeleteNoteButton } from './delete-note-button'
@@ -31,6 +34,16 @@ const ACTIVITY_LABELS: Record<ActivityType, string> = {
   ORDEN_TALLER_COMPLETADA: 'Taller completado',
   ORDEN_TALLER_APROBADA: 'Taller aprobado',
   ORDEN_TALLER_RECHAZADA: 'Taller rechazado',
+  ENTREGA_PROGRAMADA: 'Entrega programada',
+  ENTREGA_COMPLETADA: 'Entrega completada',
+  ENTREGA_CANCELADA: 'Entrega cancelada',
+  GARANTIA_ACTIVADA: 'Garantía activada',
+  GARANTIA_AMPLIADA: 'Garantía ampliada',
+  TICKET_POSTVENTA_ABIERTO: 'Ticket abierto',
+  TICKET_POSTVENTA_RESUELTO: 'Ticket resuelto',
+  TICKET_POSTVENTA_CERRADO: 'Ticket cerrado',
+  FOLLOWUP_ENVIADO: 'Follow-up enviado',
+  FOLLOWUP_RESPONDIDO: 'Follow-up respondido',
 }
 
 const ICON_CLASSES: Record<ActivityType, string> = {
@@ -50,6 +63,17 @@ const ICON_CLASSES: Record<ActivityType, string> = {
   ORDEN_TALLER_COMPLETADA: 'bg-teal-100 text-teal-700 dark:bg-teal-900/40 dark:text-teal-300',
   ORDEN_TALLER_APROBADA: 'bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300',
   ORDEN_TALLER_RECHAZADA: 'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300',
+  ENTREGA_PROGRAMADA: 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300',
+  ENTREGA_COMPLETADA: 'bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300',
+  ENTREGA_CANCELADA: 'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300',
+  GARANTIA_ACTIVADA: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300',
+  GARANTIA_AMPLIADA: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300',
+  TICKET_POSTVENTA_ABIERTO:
+    'bg-orange-100 text-orange-700 dark:bg-orange-900/40 dark:text-orange-300',
+  TICKET_POSTVENTA_RESUELTO: 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300',
+  TICKET_POSTVENTA_CERRADO: 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300',
+  FOLLOWUP_ENVIADO: 'bg-sky-100 text-sky-700 dark:bg-sky-900/40 dark:text-sky-300',
+  FOLLOWUP_RESPONDIDO: 'bg-teal-100 text-teal-700 dark:bg-teal-900/40 dark:text-teal-300',
 }
 
 function ActivityIcon({ type }: { type: ActivityType }) {
@@ -83,6 +107,19 @@ function ActivityIcon({ type }: { type: ActivityType }) {
     case 'ORDEN_TALLER_APROBADA':
     case 'ORDEN_TALLER_RECHAZADA':
       return <Wrench className={cls} />
+    case 'ENTREGA_PROGRAMADA':
+    case 'ENTREGA_COMPLETADA':
+    case 'ENTREGA_CANCELADA':
+      return <CalendarCheck className={cls} />
+    case 'GARANTIA_ACTIVADA':
+    case 'GARANTIA_AMPLIADA':
+      return <ShieldCheck className={cls} />
+    case 'TICKET_POSTVENTA_ABIERTO':
+    case 'TICKET_POSTVENTA_RESUELTO':
+    case 'TICKET_POSTVENTA_CERRADO':
+    case 'FOLLOWUP_ENVIADO':
+    case 'FOLLOWUP_RESPONDIDO':
+      return <Ticket className={cls} />
   }
 }
 
