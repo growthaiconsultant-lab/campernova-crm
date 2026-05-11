@@ -77,7 +77,7 @@ export function SearchMethod() {
             >
               <span
                 className="mb-4 block font-mono text-[2rem] font-bold leading-none"
-                style={{ color: 'rgba(38,77,73,0.18)' }}
+                style={{ color: 'rgba(88,71,56,0.12)' }}
               >
                 {num}
               </span>

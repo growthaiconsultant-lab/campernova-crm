@@ -35,7 +35,7 @@ function YesIcon() {
   return (
     <span
       className="inline-flex h-7 w-7 items-center justify-center rounded-full"
-      style={{ background: 'rgba(38,77,73,0.10)', color: 'var(--cn-teal-700)' }}
+      style={{ background: 'rgba(88,71,56,0.10)', color: 'var(--cn-teal-700)' }}
       aria-label="sí"
     >
       <svg
@@ -59,7 +59,7 @@ function NoIcon() {
   return (
     <span
       className="inline-flex h-7 w-7 items-center justify-center rounded-full"
-      style={{ background: 'rgba(194,106,74,0.10)', color: 'var(--cn-terra-500)' }}
+      style={{ background: 'rgba(181,158,125,0.12)', color: 'var(--cn-terra-500)' }}
       aria-label="no"
     >
       <svg
@@ -221,7 +221,7 @@ export default function VenderPage() {
                   <li key={b} className="flex items-start gap-3">
                     <span
                       className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full"
-                      style={{ background: 'rgba(38,77,73,0.10)', color: 'var(--cn-teal-700)' }}
+                      style={{ background: 'rgba(88,71,56,0.10)', color: 'var(--cn-teal-700)' }}
                     >
                       <CheckIcon />
                     </span>
@@ -308,7 +308,7 @@ export default function VenderPage() {
                       className="px-4 py-4 text-center text-[12px] font-bold uppercase tracking-[0.08em]"
                       style={{
                         color: 'var(--cn-teal-900)',
-                        background: 'rgba(38,77,73,0.04)',
+                        background: 'rgba(88,71,56,0.04)',
                         width: '21%',
                       }}
                     >
@@ -346,7 +346,7 @@ export default function VenderPage() {
                       </td>
                       <td
                         className="px-4 py-4 text-center"
-                        style={{ background: 'rgba(38,77,73,0.04)' }}
+                        style={{ background: 'rgba(88,71,56,0.04)' }}
                       >
                         {nova}
                       </td>

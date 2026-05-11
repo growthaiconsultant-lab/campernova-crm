@@ -1,5 +1,5 @@
 import type { Metadata } from 'next'
-import { Inter, Fraunces, JetBrains_Mono } from 'next/font/google'
+import { Inter, Fraunces, JetBrains_Mono, Cormorant_Garamond } from 'next/font/google'
 import './globals.css'
 import { CookieBanner } from '@/components/cookie-banner'
 import { PostHogProvider } from '@/components/posthog-provider'
@@ -23,6 +23,13 @@ const jetbrainsMono = JetBrains_Mono({
   display: 'swap',
 })
 
+const cormorant = Cormorant_Garamond({
+  subsets: ['latin'],
+  weight: ['400', '600', '700'],
+  variable: '--font-cormorant',
+  display: 'swap',
+})
+
 export const metadata: Metadata = {
   title: 'CampersNova CRM',
   description: 'CRM interno para gestión de compraventa de autocaravanas y campers',
@@ -36,7 +43,7 @@ export default function RootLayout({
   return (
     <html lang="es">
       <body
-        className={`${inter.variable} ${fraunces.variable} ${jetbrainsMono.variable} min-h-screen font-sans antialiased`}
+        className={`${inter.variable} ${fraunces.variable} ${jetbrainsMono.variable} ${cormorant.variable} min-h-screen font-sans antialiased`}
       >
         <PostHogProvider>{children}</PostHogProvider>
         <CookieBanner />

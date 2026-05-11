@@ -38,7 +38,7 @@ const ROWS: Row[] = [
 
 function MarkIcon({ value }: { value: Mark | string }) {
   if (value === 'yes')
-    return <CheckCircle2 className="mx-auto h-5 w-5 text-[#294e4c]" aria-label="Incluido" />
+    return <CheckCircle2 className="mx-auto h-5 w-5 text-[#0a0a0a]" aria-label="Incluido" />
   if (value === 'no')
     return <XCircle className="mx-auto h-5 w-5 text-red-400" aria-label="No incluido" />
   if (value === 'partial')
@@ -51,7 +51,7 @@ export function ComparisonSection() {
     <section className="bg-background px-4 py-20">
       <div className="container mx-auto max-w-4xl">
         <FadeIn className="mb-12 text-center">
-          <p className="mb-3 text-xs font-semibold uppercase tracking-widest text-[#cc6119]">
+          <p className="mb-3 text-xs font-semibold uppercase tracking-widest text-[#584738]">
             Por qué CampersNova
           </p>
           <h2 className="mb-3 font-display text-3xl font-bold text-foreground md:text-4xl">
@@ -70,7 +70,7 @@ export function ComparisonSection() {
                 <tr>
                   <th className="w-[35%] px-4 py-3 text-left text-sm font-normal text-muted-foreground" />
                   {/* CampersNova highlighted */}
-                  <th className="w-[22%] rounded-t-xl bg-[#294e4c] px-4 py-3 text-sm font-semibold text-white">
+                  <th className="w-[22%] rounded-t-xl bg-[#0a0a0a] px-4 py-3 text-sm font-semibold text-white">
                     CampersNova
                   </th>
                   <th className="w-[22%] px-4 py-3 text-sm font-medium text-muted-foreground">
@@ -93,7 +93,7 @@ export function ComparisonSection() {
                       </td>
                       {/* CampersNova column — highlighted bg */}
                       <td
-                        className={`border-x border-b border-[#294e4c]/15 bg-[#294e4c]/5 px-4 py-3.5 text-center ${isLast ? 'rounded-b-xl border-b border-[#294e4c]/15' : ''}`}
+                        className={`border-x border-b border-[#584738]/15 bg-[#584738]/5 px-4 py-3.5 text-center ${isLast ? 'rounded-b-xl border-b border-[#584738]/15' : ''}`}
                       >
                         <MarkIcon value={row.campernova} />
                       </td>

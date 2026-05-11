@@ -118,7 +118,7 @@ export default function PrivacidadPage() {
         <h2 className="mb-3 text-xl font-semibold text-foreground">5. Tus derechos</h2>
         <p className="text-muted-foreground">
           Puedes ejercer en cualquier momento los siguientes derechos enviando un email a{' '}
-          <a href="mailto:info@campersnova.com" className="text-[#294e4c] hover:underline">
+          <a href="mailto:info@campersnova.com" className="text-[#584738] hover:underline">
             info@campersnova.com
           </a>{' '}
           con asunto &ldquo;Protección de datos&rdquo;:

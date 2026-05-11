@@ -1,10 +1,8 @@
 'use client'
 
-import { useState } from 'react'
-import Image from 'next/image'
 import Link from 'next/link'
+import { LogoCampersNova } from '@/components/logo-campers-nova'
 import { usePathname } from 'next/navigation'
-import { Menu, X } from 'lucide-react'
 
 const NAV_LINKS: { href: string; label: string; activePath?: string }[] = [
   { href: '/', label: 'Inicio' },
@@ -15,7 +13,6 @@ const NAV_LINKS: { href: string; label: string; activePath?: string }[] = [
 ]
 
 export function PublicNav() {
-  const [open, setOpen] = useState(false)
   const pathname = usePathname()
 
   const isActive = (href: string, activePath?: string) => {
@@ -25,135 +22,76 @@ export function PublicNav() {
   }
 
   return (
-    <>
-      <header
-        className="sticky top-0 z-50 border-b"
-        style={{
-          background: 'rgba(245,240,230,0.86)',
-          backdropFilter: 'saturate(140%) blur(12px)',
-          WebkitBackdropFilter: 'saturate(140%) blur(12px)',
-          borderColor: 'rgba(38,77,73,0.08)',
-        }}
-      >
-        <div className="mx-auto flex h-[76px] max-w-[1280px] items-center justify-between gap-5 px-8 max-[640px]:px-5">
-          {/* Logo */}
-          <Link href="/" className="flex shrink-0 items-center">
-            <Image
-              src="/images/brand/Logo Campers Nova.png"
-              alt="CampersNova"
-              width={186}
-              height={48}
-              className="h-[48px] w-auto object-contain"
-              priority
-            />
-          </Link>
+    <header
+      className="sticky top-0 z-50 border-b"
+      style={{
+        background: 'rgba(245,240,230,0.86)',
+        backdropFilter: 'saturate(140%) blur(12px)',
+        WebkitBackdropFilter: 'saturate(140%) blur(12px)',
+        borderColor: 'rgba(88,71,56,0.10)',
+      }}
+    >
+      <div className="mx-auto flex h-[72px] max-w-[1280px] items-center justify-between gap-4 px-8 max-[640px]:px-5">
+        {/* Logo — responsive: 22px mobile → 30px desktop */}
+        <Link href="/" className="flex shrink-0 items-center">
+          <LogoCampersNova
+            variant="dark"
+            className="[--logo-campers:8px] [--logo-nova:22px] lg:[--logo-campers:11px] lg:[--logo-nova:30px]"
+          />
+        </Link>
 
-          {/* Desktop nav */}
-          <nav className="hidden items-center gap-7 lg:flex" aria-label="Navegación principal">
-            {NAV_LINKS.map(({ href, label, activePath }) => {
-              const active = isActive(href, activePath)
-              return (
-                <Link
-                  key={label}
-                  href={href}
-                  className="relative py-1.5 text-[14px] font-medium transition-colors hover:text-cn-teal-900"
-                  style={{ color: active ? 'var(--cn-teal-900)' : 'var(--cn-ink-700)' }}
-                >
-                  {label}
-                  {active && (
-                    <span
-                      className="absolute -bottom-0.5 left-0 right-0 h-0.5 rounded-full"
-                      style={{ background: 'var(--cn-terra-500)' }}
-                    />
-                  )}
-                </Link>
-              )
-            })}
-          </nav>
+        {/* Desktop nav links */}
+        <nav className="hidden items-center gap-7 lg:flex" aria-label="Navegación principal">
+          {NAV_LINKS.map(({ href, label, activePath }) => {
+            const active = isActive(href, activePath)
+            return (
+              <Link
+                key={label}
+                href={href}
+                className="relative py-1.5 text-[14px] font-medium transition-colors hover:text-cn-teal-900"
+                style={{ color: active ? 'var(--cn-teal-900)' : 'var(--cn-ink-700)' }}
+              >
+                {label}
+                {active && (
+                  <span
+                    className="absolute -bottom-0.5 left-0 right-0 h-0.5 rounded-full"
+                    style={{ background: 'var(--cn-terra-500)' }}
+                  />
+                )}
+              </Link>
+            )
+          })}
+        </nav>
 
-          {/* Desktop CTAs */}
-          <div className="hidden items-center gap-2.5 lg:flex">
-            <Link
-              href="/comprar"
-              className="inline-flex items-center justify-center rounded-full border px-4 py-2.5 text-[13px] font-medium transition-all"
-              style={{
-                borderColor: 'var(--cn-teal-900)',
-                color: 'var(--cn-teal-900)',
-              }}
-              onMouseEnter={(e) => {
-                const el = e.currentTarget as HTMLElement
-                el.style.background = 'var(--cn-teal-900)'
-                el.style.color = 'var(--cn-cream-50)'
-              }}
-              onMouseLeave={(e) => {
-                const el = e.currentTarget as HTMLElement
-                el.style.background = ''
-                el.style.color = 'var(--cn-teal-900)'
-              }}
-            >
-              Comprar
-            </Link>
-            <Link
-              href="/vender"
-              className="inline-flex items-center justify-center rounded-full px-4 py-2.5 text-[13px] font-medium text-white transition-all hover:opacity-90"
-              style={{ background: 'var(--cn-terra-500)' }}
-            >
-              Vender mi vehículo
-            </Link>
-          </div>
-
-          {/* Mobile: CTA + hamburger */}
-          <div className="flex items-center gap-2 lg:hidden">
-            <Link
-              href="/vender"
-              className="inline-flex items-center rounded-full px-3 py-2 text-xs font-medium text-white"
-              style={{ background: 'var(--cn-terra-500)' }}
-            >
-              Vender
-            </Link>
-            <button
-              onClick={() => setOpen((v) => !v)}
-              aria-label={open ? 'Cerrar menú' : 'Abrir menú'}
-              aria-expanded={open}
-              className="rounded-md p-1.5 transition-colors"
-              style={{ color: 'var(--cn-ink-700)' }}
-            >
-              {open ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
-            </button>
-          </div>
-        </div>
-
-        {/* Mobile drawer */}
-        {open && (
-          <div
-            className="border-t lg:hidden"
-            style={{
-              borderColor: 'rgba(38,77,73,0.08)',
-              background: 'rgba(245,240,230,0.97)',
+        {/* CTAs — always visible, scale down on mobile */}
+        <div className="flex shrink-0 items-center gap-2 lg:gap-2.5">
+          <Link
+            href="/comprar"
+            className="inline-flex items-center justify-center rounded-full border px-3.5 py-2 text-[12px] font-medium transition-all lg:px-4 lg:py-2.5 lg:text-[13px]"
+            style={{ borderColor: 'var(--cn-teal-900)', color: 'var(--cn-teal-900)' }}
+            onMouseEnter={(e) => {
+              const el = e.currentTarget as HTMLElement
+              el.style.background = 'var(--cn-teal-900)'
+              el.style.color = 'var(--cn-cream-50)'
+            }}
+            onMouseLeave={(e) => {
+              const el = e.currentTarget as HTMLElement
+              el.style.background = ''
+              el.style.color = 'var(--cn-teal-900)'
             }}
           >
-            <nav
-              className="mx-auto flex max-w-[1280px] flex-col px-8 py-4 max-[640px]:px-5"
-              aria-label="Menú móvil"
-            >
-              {NAV_LINKS.map(({ href, label }) => (
-                <Link
-                  key={label}
-                  href={href}
-                  onClick={() => setOpen(false)}
-                  className="border-b py-3 text-sm font-medium transition-colors last:border-0 hover:text-cn-teal-900"
-                  style={{
-                    borderColor: 'rgba(38,77,73,0.08)',
-                    color: 'var(--cn-ink-700)',
-                  }}
-                >
-                  {label}
-                </Link>
-              ))}
-            </nav>
-          </div>
-        )}
-      </header>
-    </>
+            Comprar
+          </Link>
+          <Link
+            href="/vender"
+            className="inline-flex items-center justify-center rounded-full px-3.5 py-2 text-[12px] font-medium text-white transition-all hover:opacity-90 lg:px-4 lg:py-2.5 lg:text-[13px]"
+            style={{ background: 'var(--cn-terra-500)' }}
+          >
+            <span className="hidden sm:inline">Vender mi vehículo</span>
+            <span className="sm:hidden">Vender</span>
+          </Link>
+        </div>
+      </div>
+    </header>
   )
 }

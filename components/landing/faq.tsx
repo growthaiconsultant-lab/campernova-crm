@@ -47,7 +47,7 @@ export function FaqSection() {
     <section id="preguntas" className="scroll-mt-16 bg-muted/30 px-4 py-20">
       <div className="container mx-auto max-w-3xl">
         <FadeIn className="mb-12 text-center">
-          <p className="mb-3 text-xs font-semibold uppercase tracking-widest text-[#cc6119]">
+          <p className="mb-3 text-xs font-semibold uppercase tracking-widest text-[#584738]">
             Preguntas frecuentes
           </p>
           <h2 className="mb-3 font-display text-3xl font-bold text-foreground md:text-4xl">
@@ -57,7 +57,7 @@ export function FaqSection() {
             Sin letra pequeña. Si algo no está aquí,{' '}
             <a
               href="/contacto"
-              className="text-[#294e4c] underline underline-offset-2 transition-colors hover:text-[#cc6119]"
+              className="text-[#584738] underline underline-offset-2 transition-colors hover:text-[#0a0a0a]"
             >
               escríbenos
             </a>

@@ -4,43 +4,45 @@
 
 @layer base {
   :root {
-    /* ── Campernova palette ───────────────────────────────────────
-       Primary teal:   #294e4c  →  hsl(177, 31%, 23%)
-       Accent orange:  #cc6119  →  hsl(24,  78%, 45%)
-       Deep teal:      #153e4d  →  hsl(196, 57%, 19%)
-       Sand/cream:     #f5f0e6  →  hsl(40, 53%, 93%)
-       Forest green:   #2d4a3e  →  hsl(155, 24%, 23%)
+    /* ── Campers Nova — identidad 2026 ───────────────────────────────
+       Negro estructural:  #0A0A0A  — tipografía, logo, botones primarios
+       Marrón cálido:      #584738  — hover, eyebrows, iconos
+       Tan acento:         #B59E7D  — badges, CTA secundario, detalles
+       Crema fondo:        #F5F0E6  — background general de página
+       Crema suave:        #FAF6ED  — fondos de cards, secciones alternas
+       Crema profundo:     #ECE4D2  — divisores, bandas suaves
     ─────────────────────────────────────────────────────────────── */
-    --background: 210 20% 97%;
+    --background: 36 40% 96%;
 
-    /* ── CN Design System — full token palette ────────────────────
-       Source: docs/design-claude/styles.css
+    /* ── CN Design System — tokens semánticos (valores 2026) ─────────
+       Los nombres de token se mantienen; los valores se remapean.
     ─────────────────────────────────────────────────────────────── */
-    /* Teal scale */
-    --cn-teal-900: #1a3a37;
-    --cn-teal-700: #264d49;
-    --cn-teal-500: #3a6b66;
-    --cn-teal-300: #7ea29d;
+    /* Escala estructural (reemplaza teal — ahora negro/marrón) */
+    --cn-teal-900: #0a0a0a;
+    --cn-teal-700: #584738;
+    --cn-teal-500: #7a6450;
+    --cn-teal-300: #a89683;
 
     /* Cream / warm neutral */
     --cn-cream-50: #faf6ed;
     --cn-cream-100: #f5f0e6;
     --cn-cream-200: #ece4d2;
+    --cn-brand-cream: #efe9d8;
 
     /* Sand / wood */
     --cn-sand-300: #d9c9a8;
-    --cn-sand-500: #b89c6e;
-    --cn-wood-700: #8a6a3f;
+    --cn-sand-500: #b59e7d;
+    --cn-wood-700: #584738;
 
-    /* Terra / accent */
-    --cn-terra-500: #c26a4a;
-    --cn-terra-600: #a85636;
+    /* Tan / acento (reemplaza terra/naranja) */
+    --cn-terra-500: #b59e7d;
+    --cn-terra-600: #9d8666;
 
     /* Ink / text scale */
-    --cn-ink-900: #1f211f;
-    --cn-ink-700: #3a3a38;
-    --cn-ink-500: #6b6b67;
-    --cn-ink-300: #b3b1aa;
+    --cn-ink-900: #0a0a0a;
+    --cn-ink-700: #2a2622;
+    --cn-ink-500: #6b645c;
+    --cn-ink-300: #b3aca0;
 
     /* Divider */
     --cn-line: #e6dfd0;
@@ -51,91 +53,91 @@
     --r-lg: 20px;
     --r-xl: 28px;
 
-    /* Shadow scale */
-    --sh-sm: 0 1px 2px rgba(26, 58, 55, 0.06), 0 2px 8px rgba(26, 58, 55, 0.04);
-    --sh-md: 0 4px 12px rgba(26, 58, 55, 0.08), 0 12px 28px rgba(26, 58, 55, 0.06);
-    --sh-lg: 0 20px 60px rgba(26, 58, 55, 0.18);
+    /* Shadow scale (tintadas con marrón) */
+    --sh-sm: 0 1px 2px rgba(61, 47, 36, 0.06), 0 2px 8px rgba(61, 47, 36, 0.04);
+    --sh-md: 0 4px 12px rgba(61, 47, 36, 0.08), 0 12px 28px rgba(61, 47, 36, 0.06);
+    --sh-lg: 0 20px 60px rgba(61, 47, 36, 0.18);
 
-    /* ── Landing tokens ──────────────────────────────────────────── */
-    --sand: 40 53% 93%;
-    --forest: 155 24% 23%;
-    --foreground: 210 10% 14%;
+    /* ── shadcn/ui tokens ────────────────────────────────────────── */
+    --sand: 36 40% 93%;
+    --forest: 28 22% 28%;
+    --foreground: 0 0% 4%;
 
-    --card: 0 0% 100%;
-    --card-foreground: 210 10% 14%;
+    --card: 36 40% 98%;
+    --card-foreground: 0 0% 4%;
 
-    --popover: 0 0% 100%;
-    --popover-foreground: 210 10% 14%;
+    --popover: 36 40% 98%;
+    --popover-foreground: 0 0% 4%;
 
-    --primary: 177 31% 23%;
+    --primary: 0 0% 4%;
     --primary-foreground: 0 0% 98%;
 
-    --secondary: 177 15% 92%;
-    --secondary-foreground: 177 31% 23%;
+    --secondary: 36 40% 93%;
+    --secondary-foreground: 0 0% 4%;
 
-    --muted: 210 15% 93%;
-    --muted-foreground: 210 10% 46%;
+    --muted: 36 30% 91%;
+    --muted-foreground: 28 10% 40%;
 
-    --accent: 24 78% 45%;
-    --accent-foreground: 0 0% 98%;
+    --accent: 35 28% 60%;
+    --accent-foreground: 0 0% 4%;
 
     --destructive: 0 84% 60%;
     --destructive-foreground: 0 0% 98%;
 
-    --border: 210 15% 88%;
-    --input: 210 15% 88%;
-    --ring: 177 31% 23%;
+    --border: 36 20% 86%;
+    --input: 36 20% 86%;
+    --ring: 0 0% 4%;
 
     --radius: 0.5rem;
 
-    /* ── Sidebar (dark teal) ─────────────────────────────────────── */
-    --sidebar-background: 177 31% 23%;
-    --sidebar-foreground: 177 20% 85%;
-    --sidebar-primary: 24 78% 45%;
-    --sidebar-primary-foreground: 0 0% 98%;
-    --sidebar-accent: 177 25% 30%;
-    --sidebar-accent-foreground: 0 0% 98%;
-    --sidebar-border: 177 25% 19%;
-    --sidebar-ring: 24 78% 45%;
+    /* ── Sidebar (negro estructural) ─────────────────────────────── */
+    --sidebar-background: 0 0% 4%;
+    --sidebar-foreground: 36 30% 80%;
+    --sidebar-primary: 35 28% 60%;
+    --sidebar-primary-foreground: 0 0% 4%;
+    --sidebar-accent: 0 0% 9%;
+    --sidebar-accent-foreground: 36 30% 88%;
+    --sidebar-border: 0 0% 11%;
+    --sidebar-ring: 35 28% 60%;
   }
 
   .dark {
-    --background: 210 10% 8%;
-    --foreground: 0 0% 95%;
+    --background: 0 0% 4%;
+    --foreground: 36 30% 90%;
 
-    --card: 210 10% 11%;
-    --card-foreground: 0 0% 95%;
+    --card: 0 0% 7%;
+    --card-foreground: 36 30% 90%;
 
-    --popover: 210 10% 11%;
-    --popover-foreground: 0 0% 95%;
+    --popover: 0 0% 7%;
+    --popover-foreground: 36 30% 90%;
 
-    --primary: 177 40% 50%;
-    --primary-foreground: 177 31% 10%;
+    --primary: 35 28% 60%;
+    --primary-foreground: 0 0% 4%;
 
-    --secondary: 177 15% 18%;
-    --secondary-foreground: 0 0% 90%;
+    --secondary: 0 0% 11%;
+    --secondary-foreground: 36 30% 85%;
 
-    --muted: 210 10% 18%;
-    --muted-foreground: 210 10% 55%;
+    --muted: 0 0% 11%;
+    --muted-foreground: 36 20% 55%;
 
-    --accent: 24 78% 55%;
+    --accent: 35 28% 50%;
     --accent-foreground: 0 0% 98%;
 
     --destructive: 0 62% 40%;
     --destructive-foreground: 0 0% 98%;
 
-    --border: 210 10% 20%;
-    --input: 210 10% 20%;
-    --ring: 177 40% 50%;
+    --border: 0 0% 16%;
+    --input: 0 0% 16%;
+    --ring: 35 28% 60%;
 
-    --sidebar-background: 196 57% 12%;
-    --sidebar-foreground: 177 20% 80%;
-    --sidebar-primary: 24 78% 55%;
-    --sidebar-primary-foreground: 0 0% 98%;
-    --sidebar-accent: 196 50% 18%;
-    --sidebar-accent-foreground: 0 0% 95%;
-    --sidebar-border: 196 50% 10%;
-    --sidebar-ring: 24 78% 55%;
+    --sidebar-background: 0 0% 3%;
+    --sidebar-foreground: 36 30% 80%;
+    --sidebar-primary: 35 28% 60%;
+    --sidebar-primary-foreground: 0 0% 4%;
+    --sidebar-accent: 0 0% 7%;
+    --sidebar-accent-foreground: 36 30% 85%;
+    --sidebar-border: 0 0% 8%;
+    --sidebar-ring: 35 28% 60%;
   }
 }
 

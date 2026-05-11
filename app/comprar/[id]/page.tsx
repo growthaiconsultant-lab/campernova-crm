@@ -134,7 +134,7 @@ export default function VehicleDetailPage({ params }: Props) {
               >
                 <span
                   className="rounded-full px-3 py-1.5 font-mono text-[11px] tracking-[0.08em] text-white"
-                  style={{ background: 'rgba(38,77,73,0.85)' }}
+                  style={{ background: 'rgba(10,10,10,0.82)' }}
                 >
                   + 12 fotos
                 </span>
@@ -363,14 +363,14 @@ export default function VehicleDetailPage({ params }: Props) {
                   className="pointer-events-none absolute inset-0"
                   style={{
                     background:
-                      'radial-gradient(ellipse 60% 80% at 100% 0%, rgba(194,106,74,0.25), transparent 70%)',
+                      'radial-gradient(ellipse 60% 80% at 100% 0%, rgba(181,158,125,0.20), transparent 70%)',
                   }}
                 />
                 <div
                   className="relative z-10 grid h-9 w-9 flex-shrink-0 place-items-center rounded-[10px]"
                   style={{
-                    background: 'rgba(194,106,74,0.18)',
-                    border: '1px solid rgba(194,106,74,0.4)',
+                    background: 'rgba(181,158,125,0.15)',
+                    border: '1px solid rgba(181,158,125,0.35)',
                     color: '#f5d4c2',
                   }}
                 >

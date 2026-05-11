@@ -97,7 +97,7 @@ export default function CookiesPage() {
               href="https://support.google.com/chrome/answer/95647"
               target="_blank"
               rel="noopener noreferrer"
-              className="text-[#294e4c] hover:underline"
+              className="text-[#584738] hover:underline"
             >
               Google Chrome
             </a>
@@ -107,7 +107,7 @@ export default function CookiesPage() {
               href="https://support.mozilla.org/es/kb/habilitar-y-deshabilitar-cookies-que-los-sitios-we"
               target="_blank"
               rel="noopener noreferrer"
-              className="text-[#294e4c] hover:underline"
+              className="text-[#584738] hover:underline"
             >
               Mozilla Firefox
             </a>
@@ -117,7 +117,7 @@ export default function CookiesPage() {
               href="https://support.apple.com/es-es/guide/safari/sfri11471/mac"
               target="_blank"
               rel="noopener noreferrer"
-              className="text-[#294e4c] hover:underline"
+              className="text-[#584738] hover:underline"
             >
               Safari
             </a>
@@ -127,7 +127,7 @@ export default function CookiesPage() {
               href="https://support.microsoft.com/es-es/windows/eliminar-y-administrar-cookies-168dab11-0753-043d-7c16-ede5947fc64d"
               target="_blank"
               rel="noopener noreferrer"
-              className="text-[#294e4c] hover:underline"
+              className="text-[#584738] hover:underline"
             >
               Microsoft Edge
             </a>
@@ -139,11 +139,11 @@ export default function CookiesPage() {
         <h2 className="mb-3 text-xl font-semibold text-foreground">4. Más información</h2>
         <p className="text-muted-foreground">
           Para más información sobre cómo tratamos tus datos personales, consulta nuestra{' '}
-          <Link href="/privacidad" className="text-[#294e4c] hover:underline">
+          <Link href="/privacidad" className="text-[#584738] hover:underline">
             Política de Privacidad
           </Link>
           . Si tienes dudas, escríbenos a{' '}
-          <a href="mailto:info@campersnova.com" className="text-[#294e4c] hover:underline">
+          <a href="mailto:info@campersnova.com" className="text-[#584738] hover:underline">
             info@campersnova.com
           </a>
           .

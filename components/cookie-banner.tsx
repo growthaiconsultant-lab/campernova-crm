@@ -39,7 +39,7 @@ export function CookieBanner() {
       className="fixed bottom-0 left-0 right-0 z-50 p-4 md:p-6"
     >
       <div className="container mx-auto max-w-4xl">
-        <div className="flex flex-col items-start gap-4 rounded-xl border border-[#153e4d] bg-[#294e4c] p-5 text-white shadow-2xl sm:flex-row sm:items-center">
+        <div className="flex flex-col items-start gap-4 rounded-xl border border-[#1a1a1a] bg-[#0a0a0a] p-5 text-white shadow-2xl sm:flex-row sm:items-center">
           <div className="flex-1 text-sm leading-relaxed text-white/85">
             <p>
               Usamos cookies propias <strong className="text-white">técnicas</strong> (necesarias
@@ -47,7 +47,7 @@ export function CookieBanner() {
               (PostHog, para mejorar el servicio). Puedes aceptar todas o solo las esenciales.{' '}
               <Link
                 href="/cookies"
-                className="text-[#cc6119] underline underline-offset-2 hover:text-[#cc6119]/80"
+                className="text-[#b59e7d] underline underline-offset-2 hover:text-[#b59e7d]/80"
               >
                 Más información
               </Link>
@@ -66,7 +66,7 @@ export function CookieBanner() {
             <Button
               size="sm"
               onClick={() => accept('all')}
-              className="h-8 bg-[#cc6119] text-xs font-medium text-white hover:bg-[#cc6119]/90"
+              className="h-8 bg-[#b59e7d] text-xs font-medium text-white hover:bg-[#b59e7d]/90"
             >
               Aceptar todas
             </Button>

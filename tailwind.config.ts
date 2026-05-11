@@ -21,11 +21,12 @@ const config: Config = {
       colors: {
         /* CN design system palette — matches docs/design-claude/styles.css */
         cn: {
+          /* Escala estructural — negro/marrón (reemplaza teal) */
           teal: {
-            900: '#1a3a37',
-            700: '#264d49',
-            500: '#3a6b66',
-            300: '#7ea29d',
+            900: '#0a0a0a',
+            700: '#584738',
+            500: '#7a6450',
+            300: '#a89683',
           },
           cream: {
             50: '#faf6ed',
@@ -34,17 +35,18 @@ const config: Config = {
           },
           sand: {
             300: '#d9c9a8',
-            500: '#b89c6e',
+            500: '#b59e7d',
           },
+          /* Tan / acento (reemplaza terra/naranja) */
           terra: {
-            500: '#c26a4a',
-            600: '#a85636',
+            500: '#b59e7d',
+            600: '#9d8666',
           },
           ink: {
-            900: '#1f211f',
-            700: '#3a3a38',
-            500: '#6b6b67',
-            300: '#b3b1aa',
+            900: '#0a0a0a',
+            700: '#2a2622',
+            500: '#6b645c',
+            300: '#b3aca0',
           },
           line: '#e6dfd0',
         },

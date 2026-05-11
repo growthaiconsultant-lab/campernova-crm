@@ -110,7 +110,7 @@ export function ValuationCalculator() {
       <div className="container mx-auto max-w-3xl">
         <FadeIn>
           <div className="mb-10 text-center">
-            <p className="mb-3 text-xs font-semibold uppercase tracking-widest text-[#cc6119]">
+            <p className="mb-3 text-xs font-semibold uppercase tracking-widest text-[#584738]">
               Tasación gratuita
             </p>
             <h2 className="mb-3 font-display text-3xl font-bold text-foreground md:text-4xl">
@@ -137,8 +137,8 @@ export function ValuationCalculator() {
                       onClick={() => handleTypeChange(t)}
                       className={`rounded-xl border-2 px-4 py-3 text-sm font-semibold transition-all duration-150 ${
                         type === t
-                          ? 'border-[#294e4c] bg-[#294e4c] text-white'
-                          : 'border-border text-muted-foreground hover:border-[#294e4c]/40'
+                          ? 'border-[#0a0a0a] bg-[#0a0a0a] text-white'
+                          : 'border-border text-muted-foreground hover:border-[#0a0a0a]/40'
                       }`}
                     >
                       {t === 'CAMPER' ? '🚐 Camper / Furgoneta' : '🏠 Autocaravana'}
@@ -155,7 +155,7 @@ export function ValuationCalculator() {
                     value={brand}
                     onChange={(e) => handleBrandChange(e.target.value)}
                     required
-                    className="h-10 w-full rounded-lg border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#294e4c]/40"
+                    className="h-10 w-full rounded-lg border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#0a0a0a]/25"
                   >
                     <option value="">Selecciona marca</option>
                     {brands.map((b) => (
@@ -178,7 +178,7 @@ export function ValuationCalculator() {
                     }}
                     required
                     disabled={!brand}
-                    className="h-10 w-full rounded-lg border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#294e4c]/40 disabled:cursor-not-allowed disabled:opacity-50"
+                    className="h-10 w-full rounded-lg border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#0a0a0a]/25 disabled:cursor-not-allowed disabled:opacity-50"
                   >
                     <option value="">Selecciona modelo</option>
                     {models.map((m) => (
@@ -202,7 +202,7 @@ export function ValuationCalculator() {
                       setError('')
                     }}
                     required
-                    className="h-10 w-full rounded-lg border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#294e4c]/40"
+                    className="h-10 w-full rounded-lg border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#0a0a0a]/25"
                   >
                     <option value="">Selecciona año</option>
                     {YEARS.map((y) => (
@@ -230,7 +230,7 @@ export function ValuationCalculator() {
                       min={0}
                       max={999999}
                       required
-                      className="h-10 w-full rounded-lg border border-input bg-background px-3 pr-10 text-sm focus:outline-none focus:ring-2 focus:ring-[#294e4c]/40"
+                      className="h-10 w-full rounded-lg border border-input bg-background px-3 pr-10 text-sm focus:outline-none focus:ring-2 focus:ring-[#0a0a0a]/25"
                     />
                     <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">
                       km
@@ -243,7 +243,7 @@ export function ValuationCalculator() {
               <Button
                 type="submit"
                 disabled={loading || !brand || !model || !year || !km}
-                className="h-11 w-full bg-[#cc6119] text-base font-semibold text-white hover:bg-[#cc6119]/90 disabled:opacity-50"
+                className="h-11 w-full bg-[#0a0a0a] text-base font-semibold text-white hover:bg-[#0a0a0a]/85 disabled:opacity-50"
               >
                 {loading ? (
                   <>
@@ -268,9 +268,9 @@ export function ValuationCalculator() {
 
             {/* Result card */}
             {result && (
-              <div className="mt-6 rounded-xl border border-[#294e4c]/20 bg-[#294e4c]/5 p-5">
+              <div className="mt-6 rounded-xl border border-[#584738]/15 bg-[#584738]/5 p-5">
                 <div className="mb-4 flex items-center gap-2">
-                  <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#294e4c]">
+                  <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#584738]">
                     <TrendingUp className="h-4 w-4 text-white" />
                   </div>
                   <p className="font-semibold text-foreground">Estimación de precio</p>
@@ -284,9 +284,9 @@ export function ValuationCalculator() {
                     <p className="mb-1 text-xs text-muted-foreground">Mínimo</p>
                     <p className="text-lg font-bold text-foreground">{formatPrice(result.min)}</p>
                   </div>
-                  <div className="border-x border-[#294e4c]/15 text-center">
-                    <p className="mb-1 text-xs font-medium text-[#cc6119]">Recomendado</p>
-                    <p className="text-2xl font-bold text-[#294e4c]">
+                  <div className="border-x border-[#584738]/15 text-center">
+                    <p className="mb-1 text-xs font-medium text-[#584738]">Recomendado</p>
+                    <p className="text-2xl font-bold text-[#0a0a0a]">
                       {formatPrice(result.recommended)}
                     </p>
                   </div>
@@ -308,7 +308,7 @@ export function ValuationCalculator() {
                     posthog.capture('calculator_to_form', { type, brand, model, year, km })
                   }
                 >
-                  <Button className="w-full bg-[#cc6119] font-semibold text-white hover:bg-[#cc6119]/90">
+                  <Button className="w-full bg-[#0a0a0a] font-semibold text-white hover:bg-[#0a0a0a]/85">
                     Vender mi camper a este precio
                     <ArrowRight className="ml-2 h-4 w-4" />
                   </Button>

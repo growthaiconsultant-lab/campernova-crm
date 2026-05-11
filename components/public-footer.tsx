@@ -1,5 +1,5 @@
-import Image from 'next/image'
 import Link from 'next/link'
+import { LogoCampersNova } from '@/components/logo-campers-nova'
 
 const NAV_LINKS = [
   { href: '/comprar', label: 'Comprar' },
@@ -24,13 +24,7 @@ export function PublicFooter() {
           {/* Brand column */}
           <div className="col-span-2 max-[640px]:col-span-1 lg:col-span-1">
             <Link href="/" className="inline-block">
-              <Image
-                src="/images/brand/Logo Campers Nova.png"
-                alt="CampersNova"
-                width={148}
-                height={38}
-                className="h-[38px] w-auto object-contain"
-              />
+              <LogoCampersNova variant="dark" novaSize={24} />
             </Link>
             <p className="mt-3.5 max-w-[32ch] text-sm leading-relaxed text-cn-ink-500">
               Compraventa de campers y autocaravanas con acompañamiento profesional, transparente y

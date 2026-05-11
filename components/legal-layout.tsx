@@ -13,7 +13,7 @@ export function LegalLayout({ title, lastUpdated, children }: LegalLayoutProps) 
       <PublicNav />
 
       {/* Header */}
-      <section className="bg-[#294e4c] px-4 pb-12 pt-36">
+      <section className="bg-[#0a0a0a] px-4 pb-12 pt-36">
         <div className="container mx-auto max-w-3xl">
           <h1 className="mb-2 text-3xl font-bold text-white md:text-4xl">{title}</h1>
           <p className="text-sm text-white/60">Última actualización: {lastUpdated}</p>

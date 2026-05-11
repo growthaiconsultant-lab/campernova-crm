@@ -49,13 +49,13 @@ export function TwoRoutes() {
               className="absolute inset-0"
               style={{
                 background:
-                  'linear-gradient(to top, rgba(26,58,55,0.88) 0%, rgba(26,58,55,0.3) 55%, transparent 100%)',
+                  'linear-gradient(to top, rgba(10,10,10,0.88) 0%, rgba(10,10,10,0.30) 55%, transparent 100%)',
               }}
             />
             <div className="relative p-8">
               <span
                 className="mb-4 inline-block rounded-full px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.1em] text-white"
-                style={{ background: 'rgba(194,106,74,0.95)' }}
+                style={{ background: 'rgba(88,71,56,0.92)' }}
               >
                 Comprar
               </span>

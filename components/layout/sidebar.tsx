@@ -1,8 +1,8 @@
 'use client'
 
 import Link from 'next/link'
-import Image from 'next/image'
 import { usePathname } from 'next/navigation'
+import { LogoCampersNova } from '@/components/logo-campers-nova'
 import { LayoutDashboard, Users, ShoppingCart, Truck } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
@@ -19,19 +19,12 @@ export function Sidebar() {
   return (
     <aside className="flex h-screen w-60 flex-col bg-sidebar text-sidebar-foreground">
       {/* Logo */}
-      <div className="flex h-16 shrink-0 items-center border-b border-sidebar-border px-4">
-        <div className="flex items-center gap-2.5">
-          <div className="overflow-hidden rounded-lg bg-white px-2.5 py-1.5">
-            <Image
-              src="/images/brand/Logo Campers Nova.png"
-              alt="CampersNova"
-              width={110}
-              height={28}
-              className="h-7 w-auto object-contain"
-              priority
-            />
-          </div>
-          <span className="text-[10px] font-medium text-sidebar-foreground/50">CRM</span>
+      <div className="flex h-16 shrink-0 items-center border-b border-sidebar-border px-5">
+        <div className="flex items-center gap-3">
+          <LogoCampersNova variant="cream" novaSize={20} />
+          <span className="text-[9px] font-semibold uppercase tracking-widest text-sidebar-foreground/40">
+            CRM
+          </span>
         </div>
       </div>
 

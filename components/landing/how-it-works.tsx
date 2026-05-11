@@ -76,7 +76,7 @@ export function HowItWorksSection() {
           {/* Tab toggle */}
           <div
             className="inline-flex rounded-full p-1"
-            style={{ background: 'rgba(38,77,73,0.08)' }}
+            style={{ background: 'rgba(88,71,56,0.08)' }}
             role="tablist"
             aria-label="Selecciona proceso"
           >
@@ -111,7 +111,7 @@ export function HowItWorksSection() {
               className="rounded-[20px] p-7"
               style={{
                 background: 'white',
-                border: '1px solid rgba(38,77,73,0.09)',
+                border: '1px solid rgba(88,71,56,0.09)',
               }}
             >
               <span

@@ -807,6 +807,63 @@ Los textos legales (`/aviso-legal`, `/privacidad`) ya tienen los datos reales:
 
 No quedan badges `[PENDIENTE_*]` en las páginas legales.
 
+### Identidad visual — logo y sistema de color
+
+#### Logo tipográfico `components/logo-campers-nova.tsx`
+
+El logo es tipográfico (sin PNG): Cormorant Garamond, dos líneas apiladas.
+
+```
+CAMPERS   ← peso 400, tracking 0.22em, tamaño = nova × 0.38
+NOVA      ← peso 700, tracking 0.04em, tamaño controlado por --logo-nova
+```
+
+**Fuente**: `Cormorant_Garamond` cargada en `app/layout.tsx` con `next/font/google` (weights 400, 600, 700) y expuesta como `--font-cormorant`.
+
+**Variantes de color** — prop `variant`:
+
+- `'dark'` → `var(--cn-teal-900)` (#0a0a0a) — fondos claros (nav, footer)
+- `'cream'` → `#efe9d8` — fondos oscuros (sidebar backoffice)
+- `'white'` → `#ffffff` — sobre fotos o fondos muy oscuros
+
+**Sizing responsivo via CSS custom properties**: el componente usa internamente `--logo-nova` (tamaño de "NOVA") y `--logo-campers` (tamaño de "CAMPERS"). El caller puede sobreescribirlos con Tailwind arbitrary-value classes:
+
+```tsx
+// Responsive: 24px mobile → 30px desktop (usado en public-nav.tsx)
+<LogoCampersNova
+  className="[--logo-nova:24px] [--logo-campers:9px] lg:[--logo-nova:30px] lg:[--logo-campers:11px]"
+  variant="dark"
+/>
+
+// Tamaño fijo via prop novaSize (footer, sidebar)
+<LogoCampersNova variant="dark" novaSize={24} />
+<LogoCampersNova variant="cream" novaSize={20} />
+```
+
+Los defaults internos del componente son `--logo-nova: 30px` / `--logo-campers: 11px`.
+
+**Usos actuales:**
+
+- `components/public-nav.tsx` — responsive 24px→30px con clases Tailwind
+- `components/public-footer.tsx` — fijo `novaSize={24}`
+- `components/layout/sidebar.tsx` — cream, fijo `novaSize={20}`
+
+#### Sistema de color — tokens CSS
+
+Los tokens `--cn-*` en `app/globals.css` usan los colores de la nueva identidad (no teal/naranja). Los nombres de variables se mantienen igual para no romper componentes existentes:
+
+| Token              | Valor nuevo             | Uso                                                |
+| ------------------ | ----------------------- | -------------------------------------------------- |
+| `--cn-teal-900`    | `#0a0a0a` negro         | Textos principales, fondos oscuros, CTAs primarios |
+| `--cn-teal-700`    | `#584738` marrón cálido | Eyebrows, acentos secundarios                      |
+| `--cn-teal-500`    | `#7a6450`               | Elementos medios                                   |
+| `--cn-terra-500`   | `#b59e7d` tan acento    | CTAs secundarios, badges                           |
+| `--cn-brand-cream` | `#efe9d8`               | Cream de marca (logo variant cream)                |
+| `--cn-cream-100`   | `#f5f0e6`               | Fondo principal páginas públicas                   |
+| `--cn-cream-50`    | `#faf7f2`               | Fondo cards                                        |
+
+Los tokens shadcn (`--primary`, `--accent`, `--sidebar-background`) también apuntan a los nuevos valores en `app/globals.css`.
+
 ### Diseño visual páginas públicas (iteración post-sprint 5)
 
 #### Landing `app/page.tsx` — orden de secciones y eliminaciones
@@ -867,9 +924,12 @@ El hero teal oscuro ("Nacimos viajando...") fue eliminado. No restaurar.
 
 **"¿Prefieres otro canal?"**: eyebrow mono uppercase terra. Items con `borderBottom: '1px solid var(--cn-line)'` entre ellos (no `gap-3`).
 
-#### `public-nav.tsx` — enlace skip eliminado
+#### `public-nav.tsx` — estructura y decisiones
 
-El enlace "Saltar al contenido" (`<a href="#main-content" className="sr-only ...">`) fue eliminado. No restaurar.
+- El enlace "Saltar al contenido" (`sr-only`) fue eliminado. No restaurar.
+- **Sin hamburguesa**: el menú móvil (drawer + hamburger) fue eliminado. Los links de navegación están en el footer — son suficientes para una web de marketing.
+- **CTAs siempre visibles**: "Comprar" (outline) y "Vender mi vehículo" (filled tan) aparecen en todas las resoluciones. En `< sm` el botón de vender muestra "Vender" (texto corto); en `sm+` muestra "Vender mi vehículo".
+- **Links de nav**: visibles solo en `lg:` (1024px+), centrales entre logo y CTAs.
 
 ### Portal comprador — chat UI y páginas de catálogo
 
