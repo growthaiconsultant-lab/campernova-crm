@@ -7,7 +7,6 @@ import { advanceLeadStatus } from './quick-advance-actions'
 
 type Props = {
   leadId: string
-  currentStatus: string
   nextStatus: string
   label: string
 }

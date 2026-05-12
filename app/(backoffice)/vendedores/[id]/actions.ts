@@ -301,9 +301,11 @@ export async function overrideValuation(vehicleId: string, data: unknown) {
 
   const vehicle = await db.vehicle.findUnique({
     where: { id: vehicleId },
-    select: { sellerLeadId: true },
+    select: { sellerLeadId: true, status: true },
   })
   if (!vehicle) return { error: { formErrors: ['Vehículo no encontrado'], fieldErrors: {} } }
+
+  const wasNuevo = vehicle.status === 'NUEVO'
 
   // Escritura directa — la tasación manual no pasa por el algoritmo
   await db.$transaction([
@@ -321,14 +323,24 @@ export async function overrideValuation(vehicleId: string, data: unknown) {
     }),
     db.vehicle.update({
       where: { id: vehicleId },
-      data: { valuationMin: min, valuationRecommended: recommended, valuationMax: max },
+      data: {
+        valuationMin: min,
+        valuationRecommended: recommended,
+        valuationMax: max,
+        ...(wasNuevo ? { status: 'TASADO' } : {}),
+      },
+    }),
+    db.activity.create({
+      data: {
+        type: 'CAMBIO_ESTADO',
+        content: wasNuevo
+          ? 'Tasación manual registrada → Estado cambiado: Nuevo → Tasado'
+          : 'Tasación manual sobreescrita por el agente',
+        agentId: actor.id,
+        sellerLeadId: vehicle.sellerLeadId,
+      },
     }),
   ])
-
-  await db.vehicle.updateMany({
-    where: { id: vehicleId, status: 'NUEVO' },
-    data: { status: 'TASADO' },
-  })
 
   await recalculateMatchesForVehicle(vehicleId, db)
 

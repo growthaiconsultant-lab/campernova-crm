@@ -17,7 +17,7 @@ interface Cost {
   supplier: string | null
   invoiceUrl: string | null
   createdAt: Date
-  createdBy: { name: string } | null
+  createdBy: { id: string; name: string } | null
 }
 
 interface Props {
@@ -257,7 +257,7 @@ export function VehicleCostsTable({ vehicleId, costs, currentUserId, isAdmin }: 
                     {cost.createdBy?.name ?? '—'}
                   </td>
                   <td className="px-4 py-3 text-right">
-                    {(isAdmin || cost.createdBy?.name === currentUserId) && (
+                    {(isAdmin || cost.createdBy?.id === currentUserId) && (
                       <button
                         onClick={() => handleDelete(cost.id)}
                         disabled={isPending}

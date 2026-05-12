@@ -1,10 +1,10 @@
 import { notFound } from 'next/navigation'
+import { Suspense } from 'react'
 import Link from 'next/link'
 import { db } from '@/lib/db'
 import { requireAuth } from '@/lib/auth'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { CardDescription } from '@/components/ui/card'
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { VehiclePhotoUploader } from '@/components/vehicle-photo-uploader'
 import { ValuationTimeline } from '@/components/valuation-timeline'
 import { SellerLeadEditForm } from './seller-lead-edit-form'
@@ -102,7 +102,7 @@ export default async function FichaVendedorPage({
               take: 6,
             },
             costs: {
-              include: { createdBy: { select: { name: true } } },
+              include: { createdBy: { select: { id: true, name: true } } },
               orderBy: { createdAt: 'desc' },
             },
             documents: {
@@ -239,7 +239,7 @@ export default async function FichaVendedorPage({
     supplier: c.supplier,
     invoiceUrl: c.invoiceUrl,
     createdAt: c.createdAt,
-    createdBy: c.createdBy,
+    createdBy: c.createdBy ? { id: c.createdBy.id, name: c.createdBy.name } : null,
   }))
 
   const margin = v
@@ -262,17 +262,15 @@ export default async function FichaVendedorPage({
   const tabs: LeadTab[] = [
     { key: 'resumen', label: 'Resumen' },
     { key: 'vehiculo', label: 'Vehículo' },
-    { key: 'fotos', label: 'Fotos', badge: v?.photos.length ?? 0 },
-    { key: 'compradores', label: 'Compradores', badge: vehicleMatches.length },
+    ...(v ? [{ key: 'fotos', label: 'Fotos', badge: v.photos.length }] : []),
+    ...(v ? [{ key: 'compradores', label: 'Compradores', badge: vehicleMatches.length }] : []),
     { key: 'actividad', label: 'Actividad', badge: activities.length },
-    {
-      key: 'expediente',
-      label: 'Expediente legal',
-      badge: legalInput ? `${completionPct}%` : '',
-    },
-    { key: 'publicacion', label: 'Publicación' },
-    ...(isAdmin ? [{ key: 'costes', label: 'Costes' }] : []),
-    { key: 'tasacion', label: 'Tasación' },
+    ...(v && legalInput
+      ? [{ key: 'expediente', label: 'Expediente legal', badge: `${completionPct}%` }]
+      : []),
+    ...(v ? [{ key: 'publicacion', label: 'Publicación' }] : []),
+    ...(isAdmin && v ? [{ key: 'costes', label: 'Costes' }] : []),
+    ...(v ? [{ key: 'tasacion', label: 'Tasación' }] : []),
   ]
 
   // ── Form default values ────────────────────────────────────────────────────
@@ -401,7 +399,6 @@ export default async function FichaVendedorPage({
             {primaryNextStatus && (
               <QuickAdvanceButton
                 leadId={lead.id}
-                currentStatus={lead.status}
                 nextStatus={primaryNextStatus}
                 label={`Mover a ${SELLER_LEAD_STATUS_LABELS[primaryNextStatus as SellerLeadStatus]}`}
               />
@@ -554,7 +551,9 @@ export default async function FichaVendedorPage({
 
         {/* Tabs */}
         <div className="mt-2">
-          <LeadTabNav tabs={tabs} />
+          <Suspense fallback={<div className="h-12 border-b border-border" />}>
+            <LeadTabNav tabs={tabs} />
+          </Suspense>
         </div>
       </div>
 
@@ -649,7 +648,7 @@ export default async function FichaVendedorPage({
                           Campería
                         </p>
                         <p className="font-medium">
-                          {v.length ? `${v.length} m²` : '—'}
+                          {v.length ? `${v.length} m` : '—'}
                           {v.seats ? ` · ${v.seats} plazas` : ''}
                         </p>
                       </div>
@@ -1200,8 +1199,8 @@ export default async function FichaVendedorPage({
                   <div>
                     <p className="text-[10px] text-muted-foreground">Nuestra tasación</p>
                     <p className="text-base font-bold text-sidebar-primary">
-                      {EUR((Number(v.valuationMin) / 1000) * 1000).replace('€', '')}–
-                      {EUR(Number(v.valuationMax))}
+                      {Math.round(Number(v.valuationMin) / 1000)}k–
+                      {Math.round(Number(v.valuationMax) / 1000)}k €
                     </p>
                   </div>
                 </div>
