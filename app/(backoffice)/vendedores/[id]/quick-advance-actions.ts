@@ -45,5 +45,6 @@ export async function advanceLeadStatus(leadId: string, nextStatus: string) {
   })
 
   revalidatePath(`/vendedores/${leadId}`)
+  revalidatePath('/vendedores')
   return { error: null }
 }
