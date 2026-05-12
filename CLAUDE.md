@@ -92,7 +92,7 @@ claude mcp add-json linear '{\"command\":\"npx\",\"args\":[\"-y\",\"mcp-linear@l
 
 `.claude/settings.json` y `.claude/settings.local.json` se mantienen como referencia de la estructura, pero la fuente de verdad funcional es el registro de la CLI.
 
-## Estado actual (Block 8 — Listado Vendedores Rediseñado COMPLETADO ✅)
+## Estado actual (Block 8 v2 — Listado Vendedores Visual System Unificado COMPLETADO ✅)
 
 ### Sprint 1 — COMPLETADO ✅
 
@@ -235,23 +235,26 @@ Rediseño completo de `app/(backoffice)/vendedores/[id]/page.tsx` siguiendo el s
   - **Costes y margen** (admin): línea compra + gastos + total + badge neto verde/rojo.
   - **Resumen**: métricas de origen, días, etapa, actividad, probabilidad cierre.
 
-### Block 8 — Listado Vendedores Rediseñado — COMPLETADO ✅
+### Block 8 — Listado Vendedores Visual System Unificado — COMPLETADO ✅
 
-Rediseño completo de `/vendedores` (listado) desde tabla básica a una interfaz CRM de alto rendimiento con pipeline strip, vistas guardadas, filtros tipo chip, tabla rica con avatares/pills de estado brand/acciones hover/flags de riesgo.
+Dos iteraciones de rediseño de `/vendedores`. La v2 final unifica el visual system con `/compradores` (fondo blanco, bordes `#e2e8f0`, tipografía `#0a0a0a`/`#64748b`), añade columna TASACIÓN, badges de vehículo por tipo, vista "Sin tasar" y filtros chip via `<label>`+`<select>`.
 
-**Archivos modificados:**
+**Archivos modificados (v2 final):**
 
-- ✅ **`app/(backoffice)/vendedores/page.tsx`** — RSC completo. Pipeline strip con CSS grid `auto repeat(6,1fr) auto`, 11 queries paralelas en `Promise.all`, serialización de `Decimal` → `number`, cálculo de flags (`hot` >7d / `warn` >2d sin actividad), vistas guardadas (mis-leads, sin-asignar, necesitan-accion, esta-semana), paginación, `Suspense` en los filtros.
-- ✅ **`app/(backoffice)/vendedores/leads-filters.tsx`** — Reescrito completamente. Exporta `ViewCounts` type + `LeadsFilters` component. Tabs de vistas guardadas como `<a href>` (no botones) que preservan filtros activos. Barra de chips: búsqueda (↵ para buscar), Estado, Agente, Canal, Ordenar, dirección. `ChipSelect` con `DropdownMenu` shadcn.
-- ✅ **`app/(backoffice)/vendedores/seller-leads-table.tsx`** — Nuevo componente client. Tabla con checkboxes + barra de selección masiva (`sticky top-[73px]`), avatares con iniciales, pills de estado con paleta brand, hover actions (WhatsApp / Llamar / Más DropdownMenu), flags de 3px en borde izquierdo, filas clickables → ficha.
+- ✅ **`app/(backoffice)/vendedores/page.tsx`** — RSC con tabla inline (sin `seller-leads-table.tsx`). Visual system compradores (blanco, `#e2e8f0`). Pipeline strip con `CUALIFICADO` relabelado "Tasado". 11 queries paralelas incluida `sinTasarCount`. TASACIÓN col con rango verde / "Sin tasar" / aviso sobreprecio. Badges vehículo por tipo (CAMPER azul / AUTOCARAVANA morado). Canal: CN → "BACKOFFICE" slate, PRO → "FORMULARIO WEB" amber. `getAvatarGradient` por initial. Row flags `#dc2626`/>7d y `#d97706`/>2d.
+- ✅ **`app/(backoffice)/vendedores/leads-filters.tsx`** — Reescrito con `<label>`+`<select className="absolute inset-0 opacity-0">` overlay (no DropdownMenu). Chips: Buscar (form submit), Estado (con dot coloreado), Marca (10 marcas), Precio máx., Agente, Limpiar, Ordenar. `chipBase`/`chipActive` idénticos a `compradores/buyer-list-filters.tsx`.
 
-**Funcionalidades clave:**
+**Funcionalidades clave v2:**
 
-- ✅ **Pipeline strip clicable** — Clic en etapa activa la quita (toggle), clic en etapa inactiva filtra por ella. Preserva vista y otros filtros vía `stageUrl()`.
-- ✅ **Row flags** — Borde 3px abs-left: amber (`#8a6a3f`) si >2d sin actividad, rojo (`#a85636`) si >7d. Solo en leads no terminales. Sub-label "Sin contacto Xd" en font-mono.
-- ✅ **Status pills brand** — Paletas RGBA específicas por estado (no colores Tailwind genéricos). Ver `STATUS_STYLES` en `seller-leads-table.tsx`.
-- ✅ **"Necesitan acción"** — Prisma `activities: { none: { createdAt: { gte: twoDaysAgo } } }` — leads sin actividad en los últimos 2 días.
-- ✅ **Serialización Decimal** — `Number(lead.vehicle.desiredPrice)` en el RSC antes de pasar al Client Component (boundary RSC→Client no serializa Decimal de Prisma).
+- ✅ **Visual system unificado** — Fondo `#fff`, header `h-[73px] sticky`, bordes `border-[#e2e8f0]`, textos `#0a0a0a`/`#64748b`, tabla inline en RSC. Mismo look que compradores.
+- ✅ **TASACIÓN column** — Verde: `valuationMin`–`valuationMax` range. Amber: si `desiredPrice > valuationMax × 1.15` + badge "⚠ sobreprecio". Dashed: "— Sin tasar" si `valuationRecommended === null`.
+- ✅ **Vista "Sin tasar"** — Prisma: `{ OR: [{ vehicle: null }, { vehicle: { valuationRecommended: null } }] }`. Tab en área de vistas guardadas.
+- ✅ **CUALIFICADO → "Tasado"** — Solo en display. DB status `CUALIFICADO` sin cambios. `PIPELINE_STAGES` tiene `{ key: 'CUALIFICADO', label: 'Tasado', color: '#0891b2' }`.
+- ✅ **Vehicle type badges** — CAMPER: `bg #eff6ff`/`text #2563eb`. AUTOCARAVANA: `bg #f5f3ff`/`text #7c3aed`. Otro: slate.
+- ✅ **Pipeline strip clicable** — Toggle: clic en etapa activa la quita, clic en inactiva filtra. `stageUrl()` preserva view y otros filtros.
+- ✅ **Row flags** — Borde izquierdo 3px: `#dc2626` si >7d, `#d97706` si >2d sin actividad. Terminales excluidos. `relativeDays()` helper.
+- ✅ **"Necesitan acción"** — Prisma `activities: { none: { createdAt: { gte: twoDaysAgo } } }`.
+- ✅ **Tabla inline en RSC** — No usa `seller-leads-table.tsx` (sigue existiendo pero no se importa). WhatsApp/call como `<a href>` directos — sin server actions en el listado.
 
 ### Block 7 — Fichas CRM Completamente Funcionales — COMPLETADO ✅
 
@@ -1879,28 +1882,124 @@ export default async function Page({ searchParams }: { searchParams: { tab?: str
 
 El sidebar (ProximaAccionCard, asignación, preferencias, resumen) está **fuera** del condicional de tabs — siempre visible.
 
-### Listado Vendedores — diseño Block 8
+### Listado Vendedores — diseño Block 8 (v2)
 
-#### Pipeline strip
+La v2 abandona el visual system cream/brand y adopta exactamente el mismo diseño que `/compradores`. La tabla ya no es un Client Component separado — está inline en el RSC.
+
+#### Visual system (v2)
+
+| Elemento        | Valor                                             |
+| --------------- | ------------------------------------------------- |
+| Fondo página    | `#fff`                                            |
+| Bordes          | `#e2e8f0`                                         |
+| Texto principal | `#0a0a0a`                                         |
+| Texto muted     | `#64748b`                                         |
+| Header height   | `h-[73px]` sticky                                 |
+| Tabla           | Grid inline en RSC, sin `<table>` element         |
+| Grid cols       | `'32px 2fr 1.6fr 2.2fr 1.5fr 1fr 1fr 1.1fr 60px'` |
+
+#### Pipeline strip (v2)
 
 ```tsx
-// CSS Grid: columna "Total" (auto) + 6 etapas (1fr cada una) + columna "Conv.30d" (auto)
+// CSS Grid: columna "Total" (auto) + 6 etapas (1fr cada una) + columna "Sin tasar" (auto)
 <div style={{ display: 'grid', gridTemplateColumns: 'auto repeat(6,1fr) auto' }}>
 ```
 
-Cada etapa es un `<a href={stageUrl(key)}>` que filtra por `?status=KEY`. `stageUrl()` implementa toggle: si la etapa ya está activa, elimina el filtro; si no, lo aplica. Preserva `view` y otros filtros activos.
+Barras de progreso normalizadas con `pipelineMax = Math.max(...stages.map(s => s.count), 1)`. CUALIFICADO se muestra como "Tasado". La última columna es "Sin tasar".
 
-**Separador visual**: `border-l` entre columnas — primero "Total" sin borde, resto con `borderLeft: '1px solid #e6dfd0'`.
+**Separador visual**: `borderLeft: '1px solid #e6dfd0'` entre columnas.
 
-#### Vistas guardadas (tabs)
+#### CUALIFICADO → "Tasado" en UI
 
-Las tabs usan `<a href={viewUrl(view.key)}>` (no botones + `router.push`) para:
+```typescript
+const PIPELINE_STAGES = [
+  { key: 'CUALIFICADO', label: 'Tasado', color: '#0891b2' }, // relabel solo en display
+]
+const STATUS_LABELS: Record<string, string> = { CUALIFICADO: 'Tasado' /* ... */ }
+```
 
-1. Ser crawleables
-2. Preservar el estado activo en recarga
-3. `viewUrl()` copiar los filtros activos al cambiar de vista
+El DB enum permanece `CUALIFICADO`. Solo cambia la cadena mostrada en UI.
 
-Lógica `viewUrl(viewKey)`: construye `URLSearchParams` desde cero copiando q/status/agentId/canal/sort/dir si existen. Para `'todos'` no añade `?view=`. Para el resto añade `?view=KEY`.
+#### Columna TASACIÓN — lógica
+
+```typescript
+const valuationMin = Number(vehicle.valuationMin)
+const valuationMax = Number(vehicle.valuationMax)
+const desiredPrice = Number(vehicle.desiredPrice)
+const hasValuation = !!vehicle.valuationRecommended
+const overpriced = hasValuation && desiredPrice > 0 && desiredPrice > valuationMax * 1.15
+// Sin tasación: dashed "— Sin tasar"
+// Con tasación: "{formatK(min)}k – {formatK(max)}k" en verde
+// Sobreprecio: pill amber + "⚠ sobreprecio"
+```
+
+`formatK(n)` = `Math.round(n / 1000)`.
+
+#### Vehicle type badges
+
+CAMPER → `bg #eff6ff`/`text #2563eb`. AUTOCARAVANA → `bg #f5f3ff`/`text #7c3aed`. Otro → slate. Badge muestra `{brand} {model}`.
+
+#### Canal display (v2)
+
+| DB value | Display          | Color           |
+| -------- | ---------------- | --------------- |
+| `CN`     | `BACKOFFICE`     | slate `#64748b` |
+| `PRO`    | `FORMULARIO WEB` | amber `#d97706` |
+
+#### Avatar gradient
+
+```typescript
+function getAvatarGradient(name: string): string {
+  const gradients = [
+    'from-blue-500 to-indigo-600',
+    'from-violet-500 to-purple-600',
+    'from-teal-500 to-cyan-600',
+    'from-amber-500 to-orange-600',
+    'from-rose-500 to-pink-600',
+  ]
+  return gradients[(name.charCodeAt(0) ?? 0) % 5]
+}
+```
+
+#### Row flags (v2)
+
+```typescript
+const lastAct = activities[0]?.createdAt ?? createdAt
+const daysSince = Math.floor((Date.now() - new Date(lastAct).getTime()) / 86400000)
+const isTerminal = ['CERRADO', 'DESCARTADO'].includes(status)
+// Rojo #dc2626 si >7d, amber #d97706 si >2d, null si terminal o reciente
+```
+
+Flag: `borderLeft: '3px solid {color}'` en la fila. Cálculo en el RSC.
+
+#### Vistas guardadas (v2)
+
+```typescript
+const SAVED_VIEWS = [
+  { key: 'todos', label: 'Todos' },
+  { key: 'mis-leads', label: 'Mis leads' },
+  { key: 'sin-asignar', label: 'Sin asignar' },
+  { key: 'necesitan-accion', label: 'Necesitan acción' },
+  { key: 'sin-tasar', label: 'Sin tasar' }, // nuevo en v2
+]
+```
+
+Filtro `sin-tasar`: `OR: [{ vehicle: null }, { vehicle: { valuationRecommended: null } }]`.
+
+#### Chip filters (v2) — `<label>` + `<select>` overlay
+
+```tsx
+<label className="relative cursor-pointer">
+  <span className={isActive ? chipActive : chipBase}>{displayLabel}<ChevronDownIcon /></span>
+  <select className="absolute inset-0 cursor-pointer opacity-0" value={currentValue}
+    onChange={(e) => push({ key: e.target.value === '__all__' ? '' : e.target.value })}>
+    <option value="__all__">Todos</option>
+    {options.map(...)}
+  </select>
+</label>
+```
+
+Chips: Búsqueda (form `onSubmit`), Estado (dot coloreado), Marca, Precio máx., Agente, Limpiar, Ordenar.
 
 #### "Necesitan acción" — query Prisma
 
@@ -1913,52 +2012,20 @@ db.sellerLead.count({
 })
 ```
 
-`activities: { none: { ... } }` devuelve leads donde NINGUNA actividad cumple la condición — es decir, leads donde no hay actividad en los últimos 2 días. Esto incluye leads sin ninguna actividad nunca (que también son candidatos a "necesitan acción").
+Incluye leads sin ninguna actividad nunca.
 
-#### Row flags — cálculo
-
-```typescript
-const lastAct = lead.activities[0]?.createdAt ?? lead.createdAt
-const now = new Date()
-const daysSince = Math.floor((now.getTime() - new Date(lastAct).getTime()) / 86400000)
-const isTerminal = TERMINAL_STATUSES.includes(lead.status as SellerLeadStatus)
-const flag: 'hot' | 'warn' | null = isTerminal
-  ? null
-  : daysSince > 7
-    ? 'hot'
-    : daysSince > 2
-      ? 'warn'
-      : null
-```
-
-El cálculo ocurre en el RSC (page.tsx) antes de serializar a `LeadRow`. Los terminales nunca tienen flag.
-
-#### `SellerLeadsTable` — patrón hover CSS
-
-Las filas usan `className="group relative transition-colors"`. Las acciones usan `className="opacity-0 group-hover:opacity-100"`. El cambio de fondo en hover usa `onMouseEnter`/`onMouseLeave` con `style.background` en lugar de CSS puro para evitar conflicto con el estado `isSelected`.
-
-**No mezclar** `group-hover:bg-*` en el `<tr>` con `isSelected` inline: el CSS class siempre gana sobre el inline style. Usar siempre `onMouseEnter/Leave` cuando el background varía según estado de selección.
-
-#### `LeadRow` — serialización
-
-Antes de pasar datos al Client Component, el RSC convierte:
-
-- `Decimal` → `number`: `Number(lead.vehicle?.desiredPrice)`, `Number(lead.vehicle?.valuationRecommended)`
-- `Date` → `string`: `.toISOString()`
-- Campos calculados: `daysSince`, `flag`, `lastActivityAt`
-
-#### Archivos clave — Block 8
+#### Archivos clave — Block 8 v2
 
 ```
 app/(backoffice)/vendedores/
-  page.tsx                    — RSC: pipeline strip + 11 queries paralelas + serialización + render
-  leads-filters.tsx           — Client: tabs vistas + barra chips (Estado/Agente/Canal/Ordenar/Dir)
-  seller-leads-table.tsx      — Client: tabla rica (checkboxes/flags/pills/hover-actions/bulk-bar)
+  page.tsx                    — RSC: pipeline + 11 queries + tabla inline + TASACIÓN col
+  leads-filters.tsx           — Client: chips <label>+<select> (Estado/Marca/Precio/Agente/Ordenar)
+  seller-leads-table.tsx      — Obsoleto (no importado). Mantenido por referencia.
 ```
 
 #### CANAL_OPTIONS — solo CN y PRO
 
-El enum `LeadCanal` en Prisma solo tiene `CN` y `PRO`. El valor `CHAT` no existe. En `leads-filters.tsx` y en `validCanals: LeadCanal[]` de `page.tsx`, usar siempre solo estos dos valores.
+El enum `LeadCanal` en Prisma solo tiene `CN` y `PRO`. El valor `CHAT` no existe. En `leads-filters.tsx` y en la query de `page.tsx`, usar siempre solo estos dos valores.
 
 ## Pendientes externos
 
