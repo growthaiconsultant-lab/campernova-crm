@@ -22,10 +22,8 @@ import {
   SELLER_LEAD_TRANSITIONS,
   SELLER_LEAD_STATUS_LABELS,
   SELLER_LEAD_STATUS_CLASSES,
-  VEHICLE_STATUS_LABELS,
-  VEHICLE_STATUS_CLASSES,
 } from '@/lib/state-machine'
-import type { SellerLeadStatus, VehicleStatus } from '@prisma/client'
+import type { SellerLeadStatus } from '@prisma/client'
 import { PublicNotesEditor } from '@/components/vehicle-ads/public-notes-editor'
 import { GenerateAdButton } from '@/components/vehicle-ads/generate-ad-button'
 import { DownloadPhotosButton } from '@/components/vehicle-ads/download-photos-button'
@@ -49,6 +47,7 @@ import { LeadTabNav } from './lead-tab-nav'
 import type { LeadTab } from './lead-tab-nav'
 import { AlertTriangle, Info, CheckCircle2, Phone, Mail, MapPin, ChevronRight } from 'lucide-react'
 import { QuickAdvanceButton } from './quick-advance-button'
+import { InfoTooltip } from '@/components/info-tooltip'
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -410,117 +409,146 @@ export default async function FichaVendedorPage({
           </div>
         </div>
 
-        {/* KPI bar */}
+        {/* KPI bar — full width, no wrap */}
         {v && (
-          <div className="mt-4 flex flex-wrap items-stretch divide-x divide-border border-t">
-            {/* Vehículo */}
-            <div className="flex flex-col justify-center px-4 py-2 first:pl-0">
-              <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
-                Vehículo
-              </p>
-              <p className="mt-0.5 text-sm font-semibold leading-tight">
+          <div className="mt-0 flex items-stretch divide-x divide-border border-t">
+            {/* ── Vehículo ── */}
+            <div className="flex min-w-0 flex-1 flex-col justify-center px-5 py-4">
+              <div className="mb-1 flex items-center gap-1">
+                <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
+                  Vehículo
+                </p>
+                <InfoTooltip
+                  text="Marca, modelo, año y kilometraje del vehículo en consignación."
+                  side="bottom"
+                />
+              </div>
+              <p className="text-sm font-bold leading-snug">
                 {v.brand} {v.model}
               </p>
-              <p className="text-xs text-muted-foreground">
+              <p className="mt-0.5 text-xs text-muted-foreground">
                 {v.year} · {v.km?.toLocaleString('es-ES')} km
+                {v.length ? ` · ${v.length}m` : ''}
               </p>
             </div>
 
-            {/* Precio salida */}
-            {(v.salePrice ?? v.desiredPrice) && (
-              <div className="flex flex-col justify-center px-4 py-2">
-                <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+            {/* ── Precio salida ── */}
+            <div className="flex min-w-0 flex-1 flex-col justify-center px-5 py-4">
+              <div className="mb-1 flex items-center gap-1">
+                <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
                   Precio salida
                 </p>
-                <p className="mt-0.5 text-lg font-bold text-sidebar-primary">
-                  {EUR(Number(v.salePrice ?? v.desiredPrice))}
-                </p>
-                {v.valuationRecommended && (
-                  <p className="text-[10px] text-muted-foreground">
-                    Tasación: {EUR(Number(v.valuationRecommended) * 0.85)}–
-                    {EUR(Number(v.valuationRecommended) * 1.1)}
-                  </p>
-                )}
+                <InfoTooltip
+                  text="Precio de venta al público fijado. Si aún no hay precio de venta, muestra el precio deseado por el vendedor."
+                  side="bottom"
+                />
               </div>
-            )}
+              <p className="text-xl font-bold text-sidebar-primary">
+                {(v.salePrice ?? v.desiredPrice) ? EUR(Number(v.salePrice ?? v.desiredPrice)) : '—'}
+              </p>
+              {v.valuationRecommended && (
+                <p className="mt-0.5 text-[11px] text-muted-foreground">
+                  Tasación: {Math.round(Number(v.valuationMin ?? v.valuationRecommended) / 1000)}k–
+                  {Math.round(Number(v.valuationMax ?? v.valuationRecommended) / 1000)}k
+                </p>
+              )}
+            </div>
 
-            {/* Margen objetivo (solo admin) */}
-            {isAdmin && margin?.netMargin !== null && margin?.netMargin !== undefined && (
-              <div className="flex flex-col justify-center px-4 py-2">
-                <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
-                  Margen objetivo
-                </p>
+            {/* ── Margen objetivo (solo admin) ── */}
+            {isAdmin && margin && (
+              <div className="flex min-w-0 flex-1 flex-col justify-center px-5 py-4">
+                <div className="mb-1 flex items-center gap-1">
+                  <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
+                    Margen objetivo
+                  </p>
+                  <InfoTooltip
+                    text="Beneficio neto estimado: precio venta − compra − todos los costes imputados (taller, gestión, publicación…). Solo visible para administradores."
+                    side="bottom"
+                  />
+                </div>
                 <p
-                  className={`mt-0.5 text-lg font-bold ${margin.netMargin >= 0 ? 'text-green-600' : 'text-red-500'}`}
+                  className={`text-xl font-bold ${(margin.netMargin ?? 0) >= 0 ? 'text-green-600' : 'text-red-500'}`}
                 >
-                  {EUR(margin.netMargin)}
+                  {margin.netMargin !== null ? EUR(margin.netMargin) : '—'}
                 </p>
-                <p className="text-[10px] text-muted-foreground">
+                <p className="mt-0.5 text-[11px] text-muted-foreground">
                   {margin.marginPercentReal !== null
-                    ? `${margin.marginPercentReal.toFixed(1)}% s/PVP`
+                    ? `${margin.marginPercentReal.toFixed(1)}% sobre PVP`
                     : `${margin.marginPercentTarget}% objetivo`}
                 </p>
               </div>
             )}
 
-            {/* Días en pipeline */}
-            <div className="flex flex-col justify-center px-4 py-2">
-              <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
-                Días en pipeline
-              </p>
+            {/* ── Días en pipeline ── */}
+            <div className="flex min-w-0 flex-1 flex-col justify-center px-5 py-4">
+              <div className="mb-1 flex items-center gap-1">
+                <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
+                  Días en pipeline
+                </p>
+                <InfoTooltip
+                  text="Días desde que entró el lead hasta hoy. Más de 60 días sin cierre reduce significativamente la probabilidad de conversión."
+                  side="bottom"
+                />
+              </div>
               <p
-                className={`mt-0.5 text-lg font-bold ${daysPipeline > 60 ? 'text-red-500' : daysPipeline > 30 ? 'text-amber-500' : 'text-foreground'}`}
+                className={`text-xl font-bold ${daysPipeline > 60 ? 'text-red-500' : daysPipeline > 30 ? 'text-amber-500' : 'text-foreground'}`}
               >
                 {daysPipeline} días
               </p>
-              <p className="text-[10px] text-muted-foreground">
+              <p
+                className={`mt-0.5 text-[11px] ${daysSinceActivity > 7 ? 'text-red-500' : 'text-muted-foreground'}`}
+              >
                 {lastActivity
                   ? `Contacto hace ${daysSinceActivity}d`
                   : 'Sin contacto desde entrada'}
               </p>
             </div>
 
-            {/* Lead score */}
-            <div className="flex flex-col justify-center px-4 py-2">
-              <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
-                Lead score
-              </p>
-              <div className="mt-0.5 flex items-baseline gap-1">
-                <span className={`text-lg font-bold ${leadScoreColor(leadScore)}`}>
+            {/* ── Lead score ── */}
+            <div className="flex min-w-0 flex-1 flex-col justify-center px-5 py-4">
+              <div className="mb-1 flex items-center gap-1">
+                <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
+                  Lead score
+                </p>
+                <InfoTooltip
+                  text="Puntuación de calidad 0-100 calculada automáticamente: completud del vehículo, fotos, matches activos, actividad reciente y canal de entrada."
+                  side="bottom"
+                />
+              </div>
+              <div className="flex items-baseline gap-1">
+                <span className={`text-xl font-bold ${leadScoreColor(leadScore)}`}>
                   {leadScore}
                 </span>
-                <span className="text-xs text-muted-foreground">/ 100</span>
+                <span className="text-sm text-muted-foreground">/ 100</span>
               </div>
-              {/* Barra segmentada */}
-              <div className="mt-1 flex h-1.5 w-24 gap-px overflow-hidden rounded-full bg-muted">
-                {[0, 20, 40, 60, 80].map((threshold) => (
+              <div className="mt-1.5 flex h-1.5 w-28 gap-0.5">
+                {[20, 40, 60, 80, 100].map((threshold) => (
                   <div
                     key={threshold}
-                    className={`flex-1 rounded-sm ${leadScore > threshold ? (leadScore >= 75 ? 'bg-green-500' : leadScore >= 50 ? 'bg-amber-400' : 'bg-red-400') : ''}`}
+                    className={`flex-1 rounded-sm transition-colors ${
+                      leadScore >= threshold
+                        ? leadScore >= 75
+                          ? 'bg-green-500'
+                          : leadScore >= 50
+                            ? 'bg-sidebar-primary'
+                            : 'bg-amber-400'
+                        : 'bg-muted'
+                    }`}
                   />
                 ))}
               </div>
             </div>
 
-            {/* Estado vehículo */}
-            {v.status && (
-              <div className="flex flex-col justify-center px-4 py-2">
-                <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
-                  Estado vehículo
-                </p>
-                <span
-                  className={`mt-0.5 inline-flex w-fit items-center rounded-full px-2 py-0.5 text-xs font-medium ${VEHICLE_STATUS_CLASSES[v.status as VehicleStatus] ?? ''}`}
-                >
-                  {VEHICLE_STATUS_LABELS[v.status as VehicleStatus] ?? v.status}
-                </span>
-                <Link
-                  href={`/vendedores/${lead.id}?tab=vehiculo`}
-                  className="mt-0.5 text-[10px] text-sidebar-primary hover:underline"
-                >
-                  Cambiar estado →
-                </Link>
-              </div>
-            )}
+            {/* ── Cambiar estado ── */}
+            <div className="flex shrink-0 items-center px-5 py-4">
+              <Link
+                href={`/vendedores/${lead.id}?tab=vehiculo`}
+                className="flex items-center gap-0.5 text-sm text-muted-foreground transition-colors hover:text-foreground"
+              >
+                <ChevronRight className="h-4 w-4" />
+                <span>Cambiar estado</span>
+              </Link>
+            </div>
           </div>
         )}
 
