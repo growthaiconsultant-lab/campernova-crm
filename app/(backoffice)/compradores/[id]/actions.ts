@@ -10,6 +10,7 @@ import {
   BUYER_LEAD_STATUS_LABELS,
   isValidTransition,
 } from '@/lib/state-machine'
+import type { BuyerLeadStatus } from '@prisma/client'
 
 export async function updateBuyerLead(leadId: string, data: unknown) {
   const actor = await requireAgente()
@@ -134,6 +135,39 @@ export async function updateBuyerLead(leadId: string, data: unknown) {
   revalidatePath(`/compradores/${leadId}`)
   revalidatePath('/compradores')
   return { ok: true }
+}
+
+export async function archiveBuyerLead(leadId: string) {
+  const actor = await requireAgente()
+
+  const lead = await db.buyerLead.findUnique({
+    where: { id: leadId },
+    select: { status: true },
+  })
+  if (!lead) return { error: 'Lead no encontrado' }
+
+  if (!isValidTransition(BUYER_LEAD_TRANSITIONS, lead.status, 'PERDIDO')) {
+    return { error: 'Este lead ya está en estado final' }
+  }
+
+  await db.$transaction(async (tx) => {
+    await tx.buyerLead.update({
+      where: { id: leadId },
+      data: { status: 'PERDIDO' },
+    })
+    await tx.activity.create({
+      data: {
+        type: 'CAMBIO_ESTADO',
+        content: `Estado cambiado: ${BUYER_LEAD_STATUS_LABELS[lead.status as BuyerLeadStatus]} → ${BUYER_LEAD_STATUS_LABELS['PERDIDO']}`,
+        agentId: actor.id,
+        buyerLeadId: leadId,
+      },
+    })
+  })
+
+  revalidatePath(`/compradores/${leadId}`)
+  revalidatePath('/compradores')
+  return { error: null }
 }
 
 export async function addBuyerLeadNote(leadId: string, content: string) {

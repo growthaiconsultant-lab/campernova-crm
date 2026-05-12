@@ -11,13 +11,14 @@ export type LeadTab = {
 
 type Props = {
   tabs: LeadTab[]
+  defaultTab?: string
 }
 
-export function LeadTabNav({ tabs }: Props) {
+export function LeadTabNav({ tabs, defaultTab = 'resumen' }: Props) {
   const sp = useSearchParams()
   const router = useRouter()
   const pathname = usePathname()
-  const active = sp.get('tab') ?? 'resumen'
+  const active = sp.get('tab') ?? defaultTab
 
   return (
     <div className="flex overflow-x-auto border-b border-border bg-background">

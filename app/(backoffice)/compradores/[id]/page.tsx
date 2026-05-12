@@ -1,8 +1,11 @@
 import { notFound } from 'next/navigation'
+import { Suspense } from 'react'
 import Link from 'next/link'
 import { db } from '@/lib/db'
 import { requireAuth } from '@/lib/auth'
 import { BuyerLeadEditForm } from './buyer-lead-edit-form'
+import { BuyerTopbarActions } from './buyer-topbar-actions'
+import { ProximaAccionCard } from './proxima-accion-card'
 import { MatchesSection } from '@/components/matches-section'
 import type { BuyerMatchData } from '@/components/matches-section'
 import { ActivityTimeline } from '@/components/activity-timeline'
@@ -11,21 +14,15 @@ import { NoteForm } from '@/components/note-form'
 import { addBuyerLeadNote } from './actions'
 import { WhatsAppButton } from '@/components/whatsapp-button'
 import { buyerWhatsAppMessage } from '@/lib/whatsapp'
+import { LeadTabNav } from '@/app/(backoffice)/vendedores/[id]/lead-tab-nav'
+import type { LeadTab } from '@/app/(backoffice)/vendedores/[id]/lead-tab-nav'
 import {
   BUYER_LEAD_STATUS_LABELS,
   BUYER_LEAD_STATUS_CLASSES,
   BUYER_LEAD_TRANSITIONS,
 } from '@/lib/state-machine'
 import type { BuyerLeadStatus } from '@prisma/client'
-import {
-  ChevronLeft,
-  Phone,
-  Mail,
-  MessageCircle,
-  Archive,
-  MoreHorizontal,
-  Shield,
-} from 'lucide-react'
+import { ChevronLeft, Phone, Mail, Shield } from 'lucide-react'
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
@@ -71,21 +68,17 @@ function calcBuyerScore(
   bestMatchScore: number
 ): number {
   let score = 0
-  // Contact (15)
   if (lead.phone) score += 10
-  score += 5 // always has name+email
-  // Preferences (35)
+  score += 5
   if (lead.vehicleType) score += 8
   if (lead.maxBudget) score += 12
   if (lead.minSeats) score += 5
   if (lead.useZone) score += 5
   if (lead.purchaseTimeline) score += 5
-  // Matches (25)
   if (bestMatchScore >= 80) score += 25
   else if (bestMatchScore >= 60) score += 18
   else if (bestMatchScore >= 40) score += 10
   else if (bestMatchScore > 0) score += 5
-  // Status (25)
   const statusBonus: Record<string, number> = {
     NUEVO: 0,
     CONTACTADO: 8,
@@ -100,7 +93,15 @@ function calcBuyerScore(
 
 // ── Page ──────────────────────────────────────────────────────────────────────
 
-export default async function FichaCompradorPage({ params }: { params: { id: string } }) {
+export default async function FichaCompradorPage({
+  params,
+  searchParams,
+}: {
+  params: { id: string }
+  searchParams: { tab?: string }
+}) {
+  const activeTab = searchParams.tab ?? 'ficha'
+
   const [currentUser, lead, agents, activities] = await Promise.all([
     requireAuth(),
     db.buyerLead.findUnique({
@@ -111,7 +112,7 @@ export default async function FichaCompradorPage({ params }: { params: { id: str
           include: {
             tickets: {
               where: { status: { in: ['ABIERTO', 'EN_PROGRESO'] } },
-              select: { id: true, priority: true, title: true },
+              select: { id: true, priority: true, title: true, status: true },
             },
           },
         },
@@ -233,7 +234,6 @@ export default async function FichaCompradorPage({ params }: { params: { id: str
     }
   })
 
-  // Score breakdown (0-100 each)
   const scoreContacto = lead.phone ? 100 : 70
   const prefCount = [
     lead.vehicleType,
@@ -253,8 +253,16 @@ export default async function FichaCompradorPage({ params }: { params: { id: str
     PERDIDO: 0,
   }
   const scoreEngagement = statusEngagementMap[lead.status] ?? 15
-
   const scoreColor = (s: number) => (s >= 70 ? '#1f8a5b' : s >= 45 ? '#d97706' : '#94a3b8')
+
+  // Tabs definition
+  const tabs: LeadTab[] = [
+    { key: 'ficha', label: 'Ficha' },
+    { key: 'actividad', label: 'Actividad', badge: activities.length },
+    { key: 'matches', label: 'Vehículos sugeridos', badge: lead.matches.length },
+    { key: 'postventa', label: 'Postventa', badge: hasAlert ? '!' : undefined },
+    { key: 'documentos', label: 'Documentos' },
+  ]
 
   return (
     <div className="-mx-6 -mt-6 flex min-h-full flex-col">
@@ -273,18 +281,7 @@ export default async function FichaCompradorPage({ params }: { params: { id: str
         </span>
         <div className="flex-1" />
         <div className="flex items-center gap-2">
-          <button
-            className="flex h-8 w-8 items-center justify-center rounded-lg border border-[#e2e8f0] text-[#64748b] transition-colors hover:bg-[#f8fafc]"
-            title="Archivar"
-          >
-            <Archive className="h-4 w-4" />
-          </button>
-          <button
-            className="flex h-8 w-8 items-center justify-center rounded-lg border border-[#e2e8f0] text-[#64748b] transition-colors hover:bg-[#f8fafc]"
-            title="Más acciones"
-          >
-            <MoreHorizontal className="h-4 w-4" />
-          </button>
+          <BuyerTopbarActions leadId={lead.id} isTerminal={isTerminal} />
           {lead.phone && (
             <WhatsAppButton
               phone={lead.phone}
@@ -300,7 +297,6 @@ export default async function FichaCompradorPage({ params }: { params: { id: str
       <section className="border-b border-[#e2e8f0] bg-white px-8 pb-0 pt-6">
         {/* Identity row */}
         <div className="flex items-start gap-5">
-          {/* Avatar circle */}
           <div
             className="relative flex h-[76px] w-[76px] shrink-0 items-center justify-center rounded-full text-[28px] font-semibold text-white"
             style={{
@@ -312,7 +308,6 @@ export default async function FichaCompradorPage({ params }: { params: { id: str
           </div>
 
           <div className="min-w-0 flex-1">
-            {/* Name + status */}
             <div className="flex flex-wrap items-center gap-2">
               <h1 className="text-[28px] font-semibold leading-tight text-[#0a0a0a]">
                 {lead.name}
@@ -325,7 +320,6 @@ export default async function FichaCompradorPage({ params }: { params: { id: str
               {isTerminal && <span className="text-[11px] text-[#94a3b8]">🔒 Estado final</span>}
             </div>
 
-            {/* Meta row */}
             <div className="mt-1 flex flex-wrap items-center gap-x-4 gap-y-1 text-[12px] text-[#64748b]">
               <span>#{lead.id.slice(-8)}</span>
               <span>
@@ -351,7 +345,6 @@ export default async function FichaCompradorPage({ params }: { params: { id: str
               )}
             </div>
 
-            {/* Contact bar */}
             <div className="mt-2 flex flex-wrap items-center gap-2">
               {lead.email && (
                 <a
@@ -371,7 +364,6 @@ export default async function FichaCompradorPage({ params }: { params: { id: str
                   {lead.phone}
                 </a>
               )}
-              {/* Preferences tags */}
               {activeEquipment.slice(0, 3).map((e) => (
                 <span
                   key={e}
@@ -429,7 +421,6 @@ export default async function FichaCompradorPage({ params }: { params: { id: str
               </p>
             </div>
           ))}
-          {/* Garantía */}
           <div className="border-l border-[#f1f5f9] px-6 py-4">
             <p className="font-mono text-[10px] uppercase tracking-[0.12em] text-[#94a3b8]">
               Garantía
@@ -440,132 +431,225 @@ export default async function FichaCompradorPage({ params }: { params: { id: str
           </div>
         </div>
 
-        {/* Tabs bar */}
-        <div className="-mx-8 flex items-center border-t border-[#e2e8f0] px-8">
-          {[
-            { label: 'Ficha', active: true },
-            { label: 'Actividad', count: activities.length },
-            { label: 'Vehículos sugeridos', count: lead.matches.length },
-            { label: 'Postventa', alert: hasAlert },
-            { label: 'Documentos' },
-          ].map((tab) => (
-            <button
-              key={tab.label}
-              className={`relative flex items-center gap-1.5 px-4 py-3 text-[13px] font-medium transition-colors ${
-                tab.active
-                  ? 'text-[#0a0a0a] after:absolute after:bottom-0 after:left-0 after:right-0 after:h-[2px] after:bg-[#0a0a0a]'
-                  : 'text-[#64748b] hover:text-[#0a0a0a]'
-              }`}
-            >
-              {tab.label}
-              {tab.count !== undefined && tab.count > 0 && (
-                <span className="flex h-4 min-w-[16px] items-center justify-center rounded-full bg-[#f1f5f9] px-1 font-mono text-[10px] text-[#64748b]">
-                  {tab.count}
-                </span>
-              )}
-              {tab.alert && <span className="h-1.5 w-1.5 rounded-full bg-amber-500" />}
-            </button>
-          ))}
+        {/* Tabs — via LeadTabNav (client, URL-driven) */}
+        <div className="-mx-8">
+          <Suspense fallback={<div className="h-12 border-t border-[#e2e8f0]" />}>
+            <LeadTabNav tabs={tabs} defaultTab="ficha" />
+          </Suspense>
         </div>
       </section>
 
       {/* ── Body grid ── */}
       <div className="grid flex-1 grid-cols-[1fr_320px]">
         {/* ── Main content ── */}
-        <div className="min-w-0 space-y-5 p-8 pb-16">
-          {/* Datos del comprador + Preferencias (single form) */}
-          <BuyerLeadEditForm
-            leadId={lead.id}
-            defaultValues={defaultValues}
-            agents={agents}
-            isAdmin={isAdmin}
-          />
+        <div className="min-w-0 p-8 pb-16">
+          {/* ── TAB: FICHA ── */}
+          {activeTab === 'ficha' && (
+            <BuyerLeadEditForm
+              leadId={lead.id}
+              defaultValues={defaultValues}
+              agents={agents}
+              isAdmin={isAdmin}
+            />
+          )}
 
-          {/* Actividad */}
-          <div className="overflow-hidden rounded-xl border border-[#e2e8f0] bg-white">
-            <div className="border-b border-[#e2e8f0] px-6 py-4">
-              <h2 className="text-[14px] font-semibold text-[#0a0a0a]">
-                Actividad
-                <span className="ml-2 font-mono text-[11px] font-normal text-[#94a3b8]">
-                  {activities.length} entradas
-                </span>
-              </h2>
+          {/* ── TAB: ACTIVIDAD ── */}
+          {activeTab === 'actividad' && (
+            <div className="overflow-hidden rounded-xl border border-[#e2e8f0] bg-white">
+              <div className="border-b border-[#e2e8f0] px-6 py-4">
+                <h2 className="text-[14px] font-semibold text-[#0a0a0a]">
+                  Actividad
+                  <span className="ml-2 font-mono text-[11px] font-normal text-[#94a3b8]">
+                    {activities.length} entradas
+                  </span>
+                </h2>
+              </div>
+              <div className="space-y-4 p-6">
+                <NoteForm addNote={addBuyerLeadNote.bind(null, lead.id)} />
+                {activities.length > 0 && (
+                  <div className="border-t border-[#f1f5f9] pt-4">
+                    <ActivityTimeline
+                      activities={activities as ActivityItem[]}
+                      currentUserId={currentUser.id}
+                    />
+                  </div>
+                )}
+                {activities.length === 0 && (
+                  <p className="text-center text-[13px] text-[#94a3b8]">
+                    Sin actividad registrada todavía
+                  </p>
+                )}
+              </div>
             </div>
-            <div className="space-y-4 p-6">
-              <NoteForm addNote={addBuyerLeadNote.bind(null, lead.id)} />
-              {activities.length > 0 && (
-                <div className="border-t border-[#f1f5f9] pt-4">
-                  <ActivityTimeline
-                    activities={activities as ActivityItem[]}
-                    currentUserId={currentUser.id}
-                  />
+          )}
+
+          {/* ── TAB: MATCHES ── */}
+          {activeTab === 'matches' && (
+            <>
+              {buyerMatches.length > 0 ? (
+                <MatchesSection side="buyer" matches={buyerMatches} />
+              ) : (
+                <div className="flex flex-col items-center justify-center rounded-xl border border-[#e2e8f0] bg-white py-16">
+                  <p className="text-[15px] font-medium text-[#0a0a0a]">Sin vehículos sugeridos</p>
+                  <p className="mt-1 text-[13px] text-[#94a3b8]">
+                    Los matches se calculan automáticamente cuando hay vehículos compatibles
+                  </p>
                 </div>
               )}
-            </div>
-          </div>
+            </>
+          )}
 
-          {/* Vehículos sugeridos */}
-          {buyerMatches.length > 0 && <MatchesSection side="buyer" matches={buyerMatches} />}
+          {/* ── TAB: POSTVENTA ── */}
+          {activeTab === 'postventa' && (
+            <>
+              {warranty ? (
+                <div className="space-y-5">
+                  {/* Warranty card */}
+                  <div className="overflow-hidden rounded-xl border border-[#e2e8f0] bg-white">
+                    <div className="border-b border-[#e2e8f0] px-6 py-4">
+                      <div className="flex items-center justify-between">
+                        <h2 className="flex items-center gap-2 text-[14px] font-semibold text-[#0a0a0a]">
+                          <Shield className="h-4 w-4 text-[#294e4c]" />
+                          Garantía activa
+                        </h2>
+                        <span className="rounded-full bg-[#f0f7f6] px-2.5 py-1 text-[11px] font-medium text-[#294e4c]">
+                          {warrantyMonthsLeft} meses restantes
+                        </span>
+                      </div>
+                    </div>
+                    <div className="p-6">
+                      <div className="mb-4 grid grid-cols-2 gap-4 sm:grid-cols-4">
+                        {[
+                          {
+                            label: 'Inicio',
+                            value: new Date(warranty.startDate).toLocaleDateString('es-ES'),
+                          },
+                          {
+                            label: 'Vencimiento',
+                            value: new Date(warranty.endDate).toLocaleDateString('es-ES'),
+                          },
+                          {
+                            label: 'Meses restantes',
+                            value: `${warrantyMonthsLeft}`,
+                          },
+                          {
+                            label: 'Estado',
+                            value: warrantyMonthsLeft! > 0 ? 'Activa' : 'Vencida',
+                          },
+                        ].map((row) => (
+                          <div key={row.label}>
+                            <p className="font-mono text-[10px] uppercase tracking-[0.1em] text-[#94a3b8]">
+                              {row.label}
+                            </p>
+                            <p className="mt-1 text-[14px] font-medium text-[#0a0a0a]">
+                              {row.value}
+                            </p>
+                          </div>
+                        ))}
+                      </div>
+                      <div className="h-2 overflow-hidden rounded-full bg-[#f1f5f9]">
+                        <div
+                          className="h-full rounded-full bg-[#294e4c] transition-all"
+                          style={{ width: `${Math.max(2, 100 - warrantyElapsedPct)}%` }}
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Tickets */}
+                  {openTickets.length > 0 && (
+                    <div className="overflow-hidden rounded-xl border border-amber-200 bg-white">
+                      <div className="border-b border-amber-200 bg-amber-50 px-6 py-4">
+                        <h2 className="text-[14px] font-semibold text-amber-800">
+                          Incidencias abiertas ({openTickets.length})
+                        </h2>
+                      </div>
+                      <div className="divide-y divide-[#f1f5f9]">
+                        {openTickets.map((t) => (
+                          <div key={t.id} className="flex items-center justify-between px-6 py-4">
+                            <p className="text-[13px] font-medium text-[#0a0a0a]">{t.title}</p>
+                            <div className="flex items-center gap-2">
+                              <span
+                                className={`rounded-full px-2 py-0.5 text-[10px] font-medium ${
+                                  t.priority === 'CRITICA'
+                                    ? 'bg-red-100 text-red-700'
+                                    : t.priority === 'ALTA'
+                                      ? 'bg-amber-100 text-amber-700'
+                                      : 'bg-[#f1f5f9] text-[#64748b]'
+                                }`}
+                              >
+                                {t.priority}
+                              </span>
+                              <span className="rounded-full bg-[#f1f5f9] px-2 py-0.5 text-[10px] text-[#64748b]">
+                                {t.status}
+                              </span>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                      <div className="border-t border-[#f1f5f9] px-6 py-3">
+                        <Link
+                          href={`/postventa/${warranty.id}`}
+                          className="text-[12px] font-medium text-[#294e4c] hover:underline"
+                        >
+                          Ver en módulo postventa →
+                        </Link>
+                      </div>
+                    </div>
+                  )}
+
+                  {openTickets.length === 0 && (
+                    <div className="flex items-center gap-3 rounded-xl border border-[#e2e8f0] bg-white px-6 py-4">
+                      <span className="flex h-8 w-8 items-center justify-center rounded-full bg-[#f0f7f6] text-[#294e4c]">
+                        ✓
+                      </span>
+                      <div>
+                        <p className="text-[13px] font-medium text-[#0a0a0a]">
+                          Sin incidencias abiertas
+                        </p>
+                        <Link
+                          href={`/postventa/${warranty.id}`}
+                          className="text-[12px] text-[#294e4c] hover:underline"
+                        >
+                          Ver historial completo →
+                        </Link>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div className="flex flex-col items-center justify-center rounded-xl border border-[#e2e8f0] bg-white py-16">
+                  <Shield className="mb-3 h-8 w-8 text-[#e2e8f0]" />
+                  <p className="text-[15px] font-medium text-[#0a0a0a]">Sin garantía activa</p>
+                  <p className="mt-1 text-[13px] text-[#94a3b8]">
+                    La garantía se genera automáticamente al completar la entrega del vehículo
+                  </p>
+                </div>
+              )}
+            </>
+          )}
+
+          {/* ── TAB: DOCUMENTOS ── */}
+          {activeTab === 'documentos' && (
+            <div className="flex flex-col items-center justify-center rounded-xl border border-[#e2e8f0] bg-white py-16">
+              <p className="text-[15px] font-medium text-[#0a0a0a]">Próximamente</p>
+              <p className="mt-1 text-[13px] text-[#94a3b8]">
+                La gestión documental del comprador estará disponible en una próxima versión
+              </p>
+            </div>
+          )}
         </div>
 
         {/* ── Right sidebar ── */}
         <aside className="border-l border-[#e2e8f0]">
           <div className="sticky top-[130px] space-y-4 p-5">
-            {/* Próxima acción — dark gradient card */}
-            <div
-              className="relative overflow-hidden rounded-xl p-5"
-              style={{ background: 'linear-gradient(135deg, #0a0a0a 0%, #2a221c 100%)' }}
-            >
-              {/* Glow blob */}
-              <div
-                className="pointer-events-none absolute right-[-40px] top-[-40px] h-[140px] w-[140px] rounded-full opacity-40"
-                style={{ background: '#294e4c', filter: 'blur(40px)' }}
-              />
-              <p
-                className="font-mono text-[10px] uppercase tracking-[0.12em]"
-                style={{ color: '#b59e7d' }}
-              >
-                Próxima acción
-              </p>
-              <p className="relative mt-2 text-[15px] font-semibold leading-snug text-white">
-                {lead.status === 'NUEVO'
-                  ? 'Contactar al comprador'
-                  : lead.status === 'CONTACTADO'
-                    ? 'Cualificar sus necesidades'
-                    : lead.status === 'CUALIFICADO'
-                      ? 'Presentar vehículos match'
-                      : lead.status === 'EN_NEGOCIACION'
-                        ? 'Cerrar la operación'
-                        : lead.status === 'CERRADO'
-                          ? 'Coordinar la entrega'
-                          : 'Revisar el lead'}
-              </p>
-              {lead.phone && (
-                <div className="relative mt-4 flex gap-2">
-                  <a
-                    href={`https://wa.me/${lead.phone.replace(/\D/g, '')}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="flex flex-1 items-center justify-center gap-1.5 rounded-lg py-2 text-[12.5px] font-medium text-[#0a0a0a] transition-opacity hover:opacity-90"
-                    style={{ background: '#b59e7d' }}
-                  >
-                    <MessageCircle className="h-3.5 w-3.5" />
-                    WhatsApp
-                  </a>
-                  <a
-                    href={`tel:${lead.phone}`}
-                    className="flex flex-1 items-center justify-center gap-1.5 rounded-lg py-2 text-[12.5px] font-medium text-white transition-opacity hover:opacity-80"
-                    style={{
-                      background: 'rgba(255,255,255,0.08)',
-                      border: '1px solid rgba(255,255,255,0.15)',
-                    }}
-                  >
-                    <Phone className="h-3.5 w-3.5" />
-                    Llamar
-                  </a>
-                </div>
-              )}
-            </div>
+            {/* Próxima acción — dark gradient card (client, logs WhatsApp) */}
+            <ProximaAccionCard
+              phone={lead.phone}
+              leadId={lead.id}
+              leadName={lead.name}
+              status={lead.status}
+            />
 
             {/* Alert: open tickets */}
             {hasAlert && (
@@ -593,7 +677,7 @@ export default async function FichaCompradorPage({ params }: { params: { id: str
               </div>
             )}
 
-            {/* Operación — only when delivery exists */}
+            {/* Operación */}
             {delivery && delivery.vehicle && (
               <div className="rounded-xl border border-[#e2e8f0] bg-white p-5">
                 <p className="mb-3 font-mono text-[10px] uppercase tracking-[0.12em] text-[#94a3b8]">
@@ -683,7 +767,6 @@ export default async function FichaCompradorPage({ params }: { params: { id: str
               <p className="mb-4 font-mono text-[10px] uppercase tracking-[0.12em] text-[#94a3b8]">
                 Calidad del lead
               </p>
-              {/* Score donut */}
               <div className="flex items-center gap-4">
                 <div
                   className="relative flex h-16 w-16 shrink-0 items-center justify-center rounded-full"
@@ -718,7 +801,6 @@ export default async function FichaCompradorPage({ params }: { params: { id: str
                   </p>
                 </div>
               </div>
-              {/* Breakdown bars */}
               <div className="mt-4 space-y-2.5">
                 {[
                   { label: 'Contacto', value: scoreContacto },

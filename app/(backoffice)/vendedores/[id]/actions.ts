@@ -14,6 +14,7 @@ import {
   VEHICLE_STATUS_LABELS,
   isValidTransition,
 } from '@/lib/state-machine'
+import type { SellerLeadStatus } from '@prisma/client'
 import {
   getVehicleLegalInput,
   getVehicleDocumentSummary,
@@ -252,6 +253,39 @@ export async function updateVehicle(vehicleId: string, data: unknown) {
 
   revalidatePath(`/vendedores/${vehicle.sellerLeadId}`)
   return { ok: true }
+}
+
+export async function archiveSellerLead(leadId: string) {
+  const actor = await requireAgente()
+
+  const lead = await db.sellerLead.findUnique({
+    where: { id: leadId },
+    select: { status: true },
+  })
+  if (!lead) return { error: 'Lead no encontrado' }
+
+  if (!isValidTransition(SELLER_LEAD_TRANSITIONS, lead.status, 'DESCARTADO')) {
+    return { error: 'Este lead ya está en estado final' }
+  }
+
+  await db.$transaction(async (tx) => {
+    await tx.sellerLead.update({
+      where: { id: leadId },
+      data: { status: 'DESCARTADO' },
+    })
+    await tx.activity.create({
+      data: {
+        type: 'CAMBIO_ESTADO',
+        content: `Estado cambiado: ${SELLER_LEAD_STATUS_LABELS[lead.status as SellerLeadStatus]} → ${SELLER_LEAD_STATUS_LABELS['DESCARTADO']}`,
+        agentId: actor.id,
+        sellerLeadId: leadId,
+      },
+    })
+  })
+
+  revalidatePath(`/vendedores/${leadId}`)
+  revalidatePath('/vendedores')
+  return { error: null }
 }
 
 export async function addSellerLeadNote(leadId: string, content: string) {
