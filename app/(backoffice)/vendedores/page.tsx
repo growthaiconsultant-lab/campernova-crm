@@ -2,97 +2,159 @@ import Link from 'next/link'
 import { Suspense } from 'react'
 import { db } from '@/lib/db'
 import { requireAuth } from '@/lib/auth'
-import { Button } from '@/components/ui/button'
 import { LeadsFilters } from './leads-filters'
-import { SellerLeadsTable } from './seller-leads-table'
-import type { LeadRow } from './seller-leads-table'
+import { buildWhatsAppUrl } from '@/lib/whatsapp'
 import type { Prisma, SellerLeadStatus, LeadCanal } from '@prisma/client'
-
-// ─── Constants ───────────────────────────────────────────────────────────────
 
 const PAGE_SIZE = 50
 
+// ── Pipeline stages ───────────────────────────────────────────────────────────
+
 const PIPELINE_STAGES = [
-  { key: 'NUEVO', label: 'Nuevo', color: '#0a0a0a' },
-  { key: 'CONTACTADO', label: 'Contactado', color: '#584738' },
-  { key: 'CUALIFICADO', label: 'Cualificado', color: '#7a6450' },
-  { key: 'EN_NEGOCIACION', label: 'Negociación', color: '#b59e7d' },
-  { key: 'CERRADO', label: 'Cerrado', color: '#6b7a4e' },
-  { key: 'DESCARTADO', label: 'Desc.', color: '#b3aca0' },
-] as const
+  { key: 'NUEVO', label: 'Nuevo', color: '#2563eb' },
+  { key: 'CONTACTADO', label: 'Contactado', color: '#7c3aed' },
+  { key: 'CUALIFICADO', label: 'Tasado', color: '#0891b2' },
+  { key: 'EN_NEGOCIACION', label: 'Negociación', color: '#d97706' },
+  { key: 'CERRADO', label: 'Cerrado', color: '#1f8a5b' },
+  { key: 'DESCARTADO', label: 'Descartado', color: '#94a3b8' },
+]
 
 const TERMINAL_STATUSES: SellerLeadStatus[] = ['CERRADO', 'DESCARTADO']
 
-const MONO = {
-  fontFamily: '"JetBrains Mono", ui-monospace, monospace',
+// ── Status pills ──────────────────────────────────────────────────────────────
+
+const STATUS_PILLS: Record<string, { bg: string; text: string; dot: string }> = {
+  NUEVO: { bg: '#eff6ff', text: '#2563eb', dot: '#2563eb' },
+  CONTACTADO: { bg: '#f5f3ff', text: '#7c3aed', dot: '#7c3aed' },
+  CUALIFICADO: { bg: '#ecfeff', text: '#0891b2', dot: '#0891b2' },
+  EN_NEGOCIACION: { bg: '#fffbeb', text: '#d97706', dot: '#d97706' },
+  CERRADO: { bg: '#f0fdf4', text: '#1f8a5b', dot: '#1f8a5b' },
+  DESCARTADO: { bg: '#f1f5f9', text: '#64748b', dot: '#cbd5e1' },
 }
 
-// ─── Types ───────────────────────────────────────────────────────────────────
+const STATUS_LABELS: Record<string, string> = {
+  NUEVO: 'Nuevo',
+  CONTACTADO: 'Contactado',
+  CUALIFICADO: 'Tasado',
+  EN_NEGOCIACION: 'En negociación',
+  CERRADO: 'Cerrado',
+  DESCARTADO: 'Descartado',
+}
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
+function initials(name: string): string {
+  return name
+    .trim()
+    .split(/\s+/)
+    .slice(0, 2)
+    .map((w) => w[0]?.toUpperCase() ?? '')
+    .join('')
+}
+
+function relativeDays(date: Date): string {
+  const days = Math.floor((Date.now() - date.getTime()) / 86400000)
+  if (days === 0) return 'hoy'
+  if (days === 1) return 'ayer'
+  return `hace ${days} d`
+}
+
+function formatDate(date: Date): string {
+  return date
+    .toLocaleDateString('es-ES', { day: '2-digit', month: 'short', year: '2-digit' })
+    .toUpperCase()
+}
+
+function formatK(n: number): string {
+  return n >= 1000 ? `${Math.round(n / 1000)}k` : String(Math.round(n))
+}
+
+function formatPrice(n: number): string {
+  return new Intl.NumberFormat('es-ES', {
+    style: 'currency',
+    currency: 'EUR',
+    maximumFractionDigits: 0,
+  }).format(n)
+}
+
+function getAvatarGradient(name: string): string {
+  const colors: [string, string][] = [
+    ['#2563eb', '#7c3aed'],
+    ['#7c3aed', '#0891b2'],
+    ['#1f8a5b', '#0891b2'],
+    ['#d97706', '#dc2626'],
+    ['#0891b2', '#2563eb'],
+  ]
+  const idx = name.charCodeAt(0) % colors.length
+  const pair = colors[idx]
+  const a = pair[0]
+  const b = pair[1]
+  return `linear-gradient(135deg, ${a}, ${b})`
+}
+
+function getRowFlag(status: string, lastActivityAt: Date | null, createdAt: Date): string | null {
+  if (TERMINAL_STATUSES.includes(status as SellerLeadStatus)) return null
+  const ref = lastActivityAt ?? createdAt
+  const days = Math.floor((Date.now() - ref.getTime()) / 86400000)
+  if (days > 7) return '#dc2626'
+  if (days > 2) return '#d97706'
+  return null
+}
+
+// ── SearchParams ──────────────────────────────────────────────────────────────
 
 type SearchParams = {
   q?: string
   status?: string
   agentId?: string
   canal?: string
-  view?: string
+  brand?: string
+  priceMax?: string
   sort?: string
   dir?: string
   page?: string
-  dateFrom?: string
-  dateTo?: string
+  view?: string
 }
 
-// ─── Helpers ─────────────────────────────────────────────────────────────────
+// ── buildWhere ────────────────────────────────────────────────────────────────
 
-function getStartOfWeek(now: Date): Date {
-  const d = new Date(now)
-  d.setHours(0, 0, 0, 0)
-  const day = d.getDay()
-  d.setDate(d.getDate() - (day === 0 ? 6 : day - 1))
-  return d
-}
-
-function buildViewWhere(
-  view: string | undefined,
+function buildViewConditions(
+  view: string | null,
   currentUserId: string,
-  now: Date
+  twoDaysAgo: Date,
+  startOfWeek: Date
 ): Prisma.SellerLeadWhereInput {
-  const twoDaysAgo = new Date(now.getTime() - 2 * 24 * 60 * 60 * 1000)
-  switch (view) {
-    case 'mis-leads':
-      return { agentId: currentUserId, status: { notIn: TERMINAL_STATUSES } }
-    case 'sin-asignar':
-      return { agentId: null, status: { notIn: TERMINAL_STATUSES } }
-    case 'necesitan-accion':
-      return {
-        status: { notIn: TERMINAL_STATUSES },
-        activities: { none: { createdAt: { gte: twoDaysAgo } } },
-      }
-    case 'esta-semana':
-      return { createdAt: { gte: getStartOfWeek(now) } }
-    default:
-      return {}
-  }
+  if (view === 'mis-leads') return { agentId: currentUserId, status: { notIn: TERMINAL_STATUSES } }
+  if (view === 'sin-asignar') return { agentId: null, status: { notIn: TERMINAL_STATUSES } }
+  if (view === 'sin-tasar')
+    return {
+      status: { notIn: TERMINAL_STATUSES },
+      OR: [{ vehicle: null }, { vehicle: { valuationRecommended: null } }],
+    }
+  if (view === 'necesitan-accion')
+    return {
+      status: { notIn: TERMINAL_STATUSES },
+      activities: { none: { createdAt: { gte: twoDaysAgo } } },
+    }
+  if (view === 'esta-semana') return { createdAt: { gte: startOfWeek } }
+  return {}
 }
 
-function buildFilterWhere(sp: SearchParams): Prisma.SellerLeadWhereInput {
-  const c: Prisma.SellerLeadWhereInput[] = []
+function buildWhere(
+  sp: SearchParams,
+  viewConditions: Prisma.SellerLeadWhereInput
+): Prisma.SellerLeadWhereInput {
+  const conditions: Prisma.SellerLeadWhereInput[] = []
 
   if (sp.q) {
     const q = sp.q.trim()
-    c.push({
+    conditions.push({
       OR: [
         { name: { contains: q, mode: 'insensitive' } },
         { email: { contains: q, mode: 'insensitive' } },
         { phone: { contains: q, mode: 'insensitive' } },
-        {
-          vehicle: {
-            OR: [
-              { brand: { contains: q, mode: 'insensitive' } },
-              { model: { contains: q, mode: 'insensitive' } },
-            ],
-          },
-        },
+        { vehicle: { brand: { contains: q, mode: 'insensitive' } } },
+        { vehicle: { model: { contains: q, mode: 'insensitive' } } },
       ],
     })
   }
@@ -107,34 +169,38 @@ function buildFilterWhere(sp: SearchParams): Prisma.SellerLeadWhereInput {
       'DESCARTADO',
     ]
     if (valid.includes(sp.status as SellerLeadStatus)) {
-      c.push({ status: sp.status as SellerLeadStatus })
+      conditions.push({ status: sp.status as SellerLeadStatus })
     }
   }
 
   if (sp.agentId) {
-    c.push(sp.agentId === '__none__' ? { agentId: null } : { agentId: sp.agentId })
+    if (sp.agentId === '__none__') {
+      conditions.push({ agentId: null })
+    } else {
+      conditions.push({ agentId: sp.agentId })
+    }
   }
 
   if (sp.canal) {
     const validCanals: LeadCanal[] = ['CN', 'PRO']
     if (validCanals.includes(sp.canal as LeadCanal)) {
-      c.push({ canal: sp.canal as LeadCanal })
+      conditions.push({ canal: sp.canal as LeadCanal })
     }
   }
 
-  if (sp.dateFrom) {
-    const d = new Date(sp.dateFrom)
-    if (!isNaN(d.getTime())) c.push({ createdAt: { gte: d } })
+  if (sp.brand) {
+    conditions.push({ vehicle: { brand: { contains: sp.brand, mode: 'insensitive' } } })
   }
-  if (sp.dateTo) {
-    const d = new Date(sp.dateTo)
-    if (!isNaN(d.getTime())) {
-      d.setHours(23, 59, 59, 999)
-      c.push({ createdAt: { lte: d } })
+
+  if (sp.priceMax) {
+    const n = parseFloat(sp.priceMax)
+    if (!isNaN(n)) {
+      conditions.push({ vehicle: { desiredPrice: { lte: n } } })
     }
   }
 
-  return c.length > 0 ? { AND: c } : {}
+  const all = [...(Object.keys(viewConditions).length > 0 ? [viewConditions] : []), ...conditions]
+  return all.length > 0 ? { AND: all } : {}
 }
 
 function buildOrderBy(sp: SearchParams): Prisma.SellerLeadOrderByWithRelationInput {
@@ -144,45 +210,46 @@ function buildOrderBy(sp: SearchParams): Prisma.SellerLeadOrderByWithRelationInp
   return { createdAt: dir }
 }
 
-function mergeWhere(
-  a: Prisma.SellerLeadWhereInput,
-  b: Prisma.SellerLeadWhereInput
-): Prisma.SellerLeadWhereInput {
-  const hasA = Object.keys(a).length > 0
-  const hasB = Object.keys(b).length > 0
-  if (!hasA && !hasB) return {}
-  if (!hasA) return b
-  if (!hasB) return a
-  return { AND: [a, b] }
-}
-
-// ─── Page ─────────────────────────────────────────────────────────────────────
+// ── Page ──────────────────────────────────────────────────────────────────────
 
 export default async function VendedoresPage({ searchParams }: { searchParams: SearchParams }) {
   const currentUser = await requireAuth()
   const page = Math.max(1, parseInt(searchParams.page ?? '1', 10) || 1)
-  const now = new Date()
-  const twoDaysAgo = new Date(now.getTime() - 2 * 24 * 60 * 60 * 1000)
-  const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000)
+  const view = searchParams.view ?? 'todos'
 
-  const viewWhere = buildViewWhere(searchParams.view, currentUser.id, now)
-  const filterWhere = buildFilterWhere(searchParams)
-  const where = mergeWhere(viewWhere, filterWhere)
+  const now = new Date()
+  const twoDaysAgo = new Date(now.getTime() - 2 * 86400000)
+  const thirtyDaysAgo = new Date(now.getTime() - 30 * 86400000)
+  const startOfWeek = (() => {
+    const d = new Date(now)
+    d.setHours(0, 0, 0, 0)
+    d.setDate(d.getDate() - d.getDay())
+    return d
+  })()
+
+  const viewConditions = buildViewConditions(
+    view === 'todos' ? null : view,
+    currentUser.id,
+    twoDaysAgo,
+    startOfWeek
+  )
+  const where = buildWhere(searchParams, viewConditions)
   const orderBy = buildOrderBy(searchParams)
 
   const [
-    pipelineCounts,
+    pipelineGroups,
     misLeadsCount,
     sinAsignarCount,
+    sinTasarCount,
     necesitanAccionCount,
-    estaSemanaCount,
-    closedLast30,
-    createdLast30,
+    estaSemanaCout,
+    closed30,
+    created30,
     total,
     leads,
     agents,
   ] = await Promise.all([
-    db.sellerLead.groupBy({ by: ['status'], _count: { id: true } }),
+    db.sellerLead.groupBy({ by: ['status'], _count: { _all: true } }),
     db.sellerLead.count({
       where: { agentId: currentUser.id, status: { notIn: TERMINAL_STATUSES } },
     }),
@@ -192,10 +259,16 @@ export default async function VendedoresPage({ searchParams }: { searchParams: S
     db.sellerLead.count({
       where: {
         status: { notIn: TERMINAL_STATUSES },
+        OR: [{ vehicle: null }, { vehicle: { valuationRecommended: null } }],
+      },
+    }),
+    db.sellerLead.count({
+      where: {
+        status: { notIn: TERMINAL_STATUSES },
         activities: { none: { createdAt: { gte: twoDaysAgo } } },
       },
     }),
-    db.sellerLead.count({ where: { createdAt: { gte: getStartOfWeek(now) } } }),
+    db.sellerLead.count({ where: { createdAt: { gte: startOfWeek } } }),
     db.sellerLead.count({ where: { status: 'CERRADO', updatedAt: { gte: thirtyDaysAgo } } }),
     db.sellerLead.count({ where: { createdAt: { gte: thirtyDaysAgo } } }),
     db.sellerLead.count({ where }),
@@ -205,8 +278,15 @@ export default async function VendedoresPage({ searchParams }: { searchParams: S
       skip: (page - 1) * PAGE_SIZE,
       take: PAGE_SIZE,
       include: {
+        agent: { select: { id: true, name: true } },
+        activities: {
+          orderBy: { createdAt: 'desc' },
+          take: 1,
+          select: { createdAt: true },
+        },
         vehicle: {
           select: {
+            id: true,
             brand: true,
             model: true,
             year: true,
@@ -214,14 +294,11 @@ export default async function VendedoresPage({ searchParams }: { searchParams: S
             seats: true,
             type: true,
             desiredPrice: true,
+            valuationMin: true,
             valuationRecommended: true,
+            valuationMax: true,
+            status: true,
           },
-        },
-        agent: { select: { id: true, name: true } },
-        activities: {
-          orderBy: { createdAt: 'desc' },
-          take: 1,
-          select: { createdAt: true },
         },
       },
     }),
@@ -232,228 +309,164 @@ export default async function VendedoresPage({ searchParams }: { searchParams: S
     }),
   ])
 
-  // ── Derived data ──────────────────────────────────────────────────────────
+  // ── Derived ───────────────────────────────────────────────────────────────
 
   const totalPages = Math.ceil(total / PAGE_SIZE)
   const from = total === 0 ? 0 : (page - 1) * PAGE_SIZE + 1
   const to = Math.min(page * PAGE_SIZE, total)
 
-  const countByStatus = Object.fromEntries(pipelineCounts.map((c) => [c.status, c._count.id]))
-  const pipelineTotal = pipelineCounts.reduce((s, c) => s + c._count.id, 0)
-  const convRate30 = createdLast30 > 0 ? Math.round((closedLast30 / createdLast30) * 100) : 0
+  const pipelineMap: Record<string, number> = {}
+  let pipelineTotal = 0
+  for (const g of pipelineGroups) {
+    pipelineMap[g.status] = g._count._all
+    pipelineTotal += g._count._all
+  }
+  const pipelineMax = Math.max(...Array.from(Object.values(pipelineMap)), 1)
+  const convRate30 = created30 > 0 ? Math.round((closed30 / created30) * 100) : 0
 
-  const todosCount = pipelineTotal
-
-  // ── Serialize for client ──────────────────────────────────────────────────
-
-  const serializedLeads: LeadRow[] = leads.map((lead) => {
-    const lastActivityAt = lead.activities[0]?.createdAt ?? lead.createdAt
-    const daysSince = Math.floor((now.getTime() - lastActivityAt.getTime()) / (1000 * 60 * 60 * 24))
-    const isTerminal = TERMINAL_STATUSES.includes(lead.status as SellerLeadStatus)
-    const flag: 'hot' | 'warn' | null = isTerminal
-      ? null
-      : daysSince > 7
-        ? 'hot'
-        : daysSince > 2
-          ? 'warn'
-          : null
-
-    return {
-      id: lead.id,
-      name: lead.name,
-      email: lead.email,
-      phone: lead.phone,
-      status: lead.status,
-      canal: lead.canal as string,
-      createdAt: lead.createdAt.toISOString(),
-      lastActivityAt: lastActivityAt.toISOString(),
-      daysSince,
-      flag,
-      vehicle: lead.vehicle
-        ? {
-            brand: lead.vehicle.brand,
-            model: lead.vehicle.model,
-            year: lead.vehicle.year,
-            km: lead.vehicle.km != null ? Number(lead.vehicle.km) : null,
-            seats: lead.vehicle.seats,
-            type: lead.vehicle.type as string | null,
-            price: lead.vehicle.desiredPrice
-              ? Number(lead.vehicle.desiredPrice)
-              : lead.vehicle.valuationRecommended
-                ? Number(lead.vehicle.valuationRecommended)
-                : null,
-          }
-        : null,
-      agent: lead.agent ? { id: lead.agent.id, name: lead.agent.name } : null,
-    }
-  })
+  // Needs action count (flag !== null in the visible page)
+  const needsActionCount = leads.filter((lead) => {
+    const lastAct = lead.activities[0]?.createdAt ?? null
+    return getRowFlag(lead.status, lastAct, lead.createdAt) !== null
+  }).length
 
   // ── URL helpers ───────────────────────────────────────────────────────────
 
-  function buildUrl(overrides: Record<string, string | undefined>): string {
+  function pageUrl(p: number) {
     const sp = new URLSearchParams()
-    const merged = {
-      view: searchParams.view,
-      q: searchParams.q,
-      status: searchParams.status,
-      agentId: searchParams.agentId,
-      canal: searchParams.canal,
-      sort: searchParams.sort,
-      dir: searchParams.dir,
-      ...overrides,
-    }
-    Object.entries(merged).forEach(([k, v]) => {
-      if (v && !(k === 'view' && v === 'todos') && !(k === 'sort' && v === 'createdAt')) {
-        sp.set(k, v)
-      }
-    })
+    if (searchParams.q) sp.set('q', searchParams.q)
+    if (searchParams.status) sp.set('status', searchParams.status)
+    if (searchParams.agentId) sp.set('agentId', searchParams.agentId)
+    if (searchParams.canal) sp.set('canal', searchParams.canal)
+    if (searchParams.brand) sp.set('brand', searchParams.brand)
+    if (searchParams.priceMax) sp.set('priceMax', searchParams.priceMax)
+    if (searchParams.sort) sp.set('sort', searchParams.sort)
+    if (searchParams.dir) sp.set('dir', searchParams.dir)
+    if (view && view !== 'todos') sp.set('view', view)
+    if (p > 1) sp.set('page', String(p))
     const qs = sp.toString()
     return `/vendedores${qs ? `?${qs}` : ''}`
   }
 
-  function stageUrl(stageKey: string): string {
-    // Toggle: clicking the active stage removes the filter
-    return searchParams.status === stageKey
-      ? buildUrl({ status: undefined, page: undefined })
-      : buildUrl({ status: stageKey, page: undefined })
+  function viewUrl(v: string) {
+    const sp = new URLSearchParams()
+    if (searchParams.q) sp.set('q', searchParams.q)
+    if (searchParams.status) sp.set('status', searchParams.status)
+    if (searchParams.agentId) sp.set('agentId', searchParams.agentId)
+    if (searchParams.canal) sp.set('canal', searchParams.canal)
+    if (searchParams.brand) sp.set('brand', searchParams.brand)
+    if (searchParams.priceMax) sp.set('priceMax', searchParams.priceMax)
+    if (searchParams.sort) sp.set('sort', searchParams.sort)
+    if (v !== 'todos') sp.set('view', v)
+    const qs = sp.toString()
+    return `/vendedores${qs ? `?${qs}` : ''}`
   }
 
-  function pageUrl(p: number): string {
-    return buildUrl({ page: p > 1 ? String(p) : undefined })
+  function stageUrl(stageKey: string) {
+    const sp = new URLSearchParams()
+    if (searchParams.q) sp.set('q', searchParams.q)
+    if (searchParams.agentId) sp.set('agentId', searchParams.agentId)
+    if (searchParams.canal) sp.set('canal', searchParams.canal)
+    if (searchParams.brand) sp.set('brand', searchParams.brand)
+    if (searchParams.priceMax) sp.set('priceMax', searchParams.priceMax)
+    if (searchParams.sort) sp.set('sort', searchParams.sort)
+    if (view && view !== 'todos') sp.set('view', view)
+    // Toggle: clicking active stage removes filter
+    if (searchParams.status !== stageKey) sp.set('status', stageKey)
+    const qs = sp.toString()
+    return `/vendedores${qs ? `?${qs}` : ''}`
   }
 
   // ── Render ────────────────────────────────────────────────────────────────
 
   return (
-    <div className="-mx-6 -mt-6 flex min-h-full flex-col">
-      {/* ── Page header ── */}
-      <div className="flex items-center justify-between border-b border-border px-6 py-5">
+    <div className="-mx-6 -mt-6">
+      {/* ── Topbar ─────────────────────────────────────────────── */}
+      <header className="sticky top-0 z-20 flex h-[73px] items-center justify-between border-b border-[#e2e8f0] bg-white px-10">
         <div>
-          <h1
-            className="text-[26px] font-semibold leading-tight"
-            style={{ fontFamily: 'var(--font-cormorant, serif)', color: '#0a0a0a' }}
-          >
-            Vendedores
-          </h1>
-          <p
-            style={{
-              ...MONO,
-              fontSize: '10.5px',
-              letterSpacing: '0.08em',
-              color: '#6b645c',
-              marginTop: '2px',
-            }}
-          >
-            {pipelineTotal} leads activos
-            {total !== pipelineTotal && (
-              <>
-                {' '}
-                · <span style={{ color: '#584738' }}>{total} resultados</span>
-              </>
-            )}
-          </p>
+          <div className="font-mono text-[10px] uppercase tracking-[0.14em] text-[#64748b]">
+            CRM · Oferta
+          </div>
+          <h1 className="mt-1 text-[22px] font-bold tracking-tight text-[#0a0a0a]">Vendedores</h1>
         </div>
-        <Link
-          href="/vendedores/nuevo"
-          className="inline-flex items-center gap-1.5 rounded-md px-4 py-2 text-sm font-medium text-white transition-opacity hover:opacity-80"
-          style={{ background: '#0a0a0a' }}
-        >
-          + Nuevo lead
-        </Link>
-      </div>
+        <div className="flex items-center gap-3">
+          <button className="inline-flex items-center gap-2 rounded-lg border border-[#e2e8f0] bg-white px-4 py-2 text-[13px] font-medium text-[#1e293b] transition-colors hover:border-[#0a0a0a]">
+            <svg
+              viewBox="0 0 24 24"
+              className="h-4 w-4"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth={1.6}
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+              <polyline points="7 10 12 15 17 10" />
+              <line x1="12" y1="15" x2="12" y2="3" />
+            </svg>
+            Exportar
+          </button>
+          <Link
+            href="/vendedores/nuevo"
+            className="inline-flex items-center gap-2 rounded-lg bg-[#0a0a0a] px-4 py-2.5 text-[13px] font-semibold text-white transition-colors hover:bg-[#2563eb]"
+          >
+            <svg
+              viewBox="0 0 24 24"
+              className="h-4 w-4"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth={1.6}
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <line x1="12" y1="5" x2="12" y2="19" />
+              <line x1="5" y1="12" x2="19" y2="12" />
+            </svg>
+            Nuevo lead
+          </Link>
+        </div>
+      </header>
 
-      {/* ── Pipeline strip ── */}
-      <div className="border-b border-border px-6 py-4" style={{ background: '#faf6ed' }}>
+      <div className="px-10 pb-16 pt-6">
+        {/* ── Pipeline strip ─────────────────────────────────────── */}
         <div
+          className="mb-5 flex items-stretch overflow-hidden rounded-xl border border-[#e2e8f0] bg-white"
           style={{
             display: 'grid',
             gridTemplateColumns: 'auto repeat(6, 1fr) auto',
-            alignItems: 'end',
-            gap: 0,
           }}
         >
           {/* Total */}
-          <div className="mr-5 flex flex-col border-r border-border pb-1 pr-5">
-            <span
-              style={{
-                ...MONO,
-                fontSize: '10px',
-                textTransform: 'uppercase',
-                letterSpacing: '0.1em',
-                color: '#6b645c',
-              }}
-            >
+          <div className="flex flex-col justify-center border-r border-[#e2e8f0] px-6 py-4">
+            <div className="font-mono text-[10px] uppercase tracking-[0.12em] text-[#64748b]">
               Total
-            </span>
-            <span
-              style={{
-                fontFamily: 'var(--font-cormorant, serif)',
-                fontSize: '32px',
-                fontWeight: 600,
-                color: '#0a0a0a',
-                lineHeight: 1,
-              }}
-            >
+            </div>
+            <div className="mt-1 font-mono text-[26px] font-bold leading-none tracking-tight text-[#0a0a0a]">
               {pipelineTotal}
-            </span>
+            </div>
           </div>
 
           {/* Stages */}
           {PIPELINE_STAGES.map((stage) => {
-            const count = countByStatus[stage.key] ?? 0
-            const pct = pipelineTotal > 0 ? Math.round((count / pipelineTotal) * 100) : 0
-            const isActive = searchParams.status === stage.key
-
+            const count = pipelineMap[stage.key] ?? 0
+            const pct = Math.round((count / pipelineMax) * 100)
             return (
               <Link
                 key={stage.key}
                 href={stageUrl(stage.key)}
-                className="group flex flex-col px-3 transition-opacity hover:opacity-80"
+                className="group cursor-pointer rounded-lg px-4 py-3 transition-colors hover:bg-[#f8fafc]"
               >
-                <span
-                  style={{
-                    ...MONO,
-                    fontSize: '10.5px',
-                    textTransform: 'uppercase',
-                    letterSpacing: '0.08em',
-                    color: isActive ? stage.color : '#6b645c',
-                    display: 'block',
-                    fontWeight: isActive ? 700 : 400,
-                  }}
-                >
-                  {stage.label}
-                </span>
-                <span
-                  style={{
-                    fontFamily: 'var(--font-cormorant, serif)',
-                    fontSize: '22px',
-                    fontWeight: 600,
-                    color: isActive ? stage.color : '#0a0a0a',
-                    lineHeight: 1.1,
-                    display: 'block',
-                  }}
+                <div className="text-[11.5px] font-medium text-[#64748b]">{stage.label}</div>
+                <div
+                  className="mt-0.5 text-[22px] font-bold leading-none tracking-tight"
+                  style={{ color: count > 0 ? stage.color : '#cbd5e1' }}
                 >
                   {count}
-                </span>
-                {/* Progress bar */}
-                <div
-                  style={{
-                    height: '3px',
-                    background: '#e6dfd0',
-                    borderRadius: '2px',
-                    marginTop: '6px',
-                    overflow: 'hidden',
-                  }}
-                >
+                </div>
+                <div className="mt-2 h-[3px] overflow-hidden rounded-full bg-[#f1f5f9]">
                   <div
-                    style={{
-                      height: '100%',
-                      width: `${pct}%`,
-                      background: stage.color,
-                      opacity: isActive ? 1 : 0.55,
-                      borderRadius: '2px',
-                      transition: 'width 0.4s ease',
-                    }}
+                    className="h-full rounded-full"
+                    style={{ width: `${pct}%`, background: stage.color }}
                   />
                 </div>
               </Link>
@@ -461,90 +474,501 @@ export default async function VendedoresPage({ searchParams }: { searchParams: S
           })}
 
           {/* Conv. 30d */}
-          <div className="ml-3 flex flex-col border-l border-border pb-1 pl-5">
-            <span
-              style={{
-                ...MONO,
-                fontSize: '10px',
-                textTransform: 'uppercase',
-                letterSpacing: '0.1em',
-                color: '#6b645c',
-              }}
-            >
+          <div className="flex flex-col justify-center border-l border-[#e2e8f0] px-5 py-4">
+            <div className="font-mono text-[10px] uppercase tracking-[0.12em] text-[#64748b]">
               Conv. 30d
-            </span>
-            <span
-              style={{
-                fontFamily: 'var(--font-cormorant, serif)',
-                fontSize: '22px',
-                fontWeight: 600,
-                color: '#6b7a4e',
-                lineHeight: 1.1,
-              }}
+            </div>
+            <div
+              className="mt-1 font-mono text-[22px] font-bold leading-none tracking-tight"
+              style={{ color: '#1f8a5b' }}
             >
               {convRate30}%
-            </span>
-            <div style={{ height: '3px', marginTop: '6px' }} />
+            </div>
           </div>
         </div>
-      </div>
 
-      {/* ── Saved views + chip filters ── */}
-      <Suspense>
-        <LeadsFilters
-          agents={agents}
-          currentView={searchParams.view ?? 'todos'}
-          viewCounts={{
-            todos: todosCount,
-            misLeads: misLeadsCount,
-            sinAsignar: sinAsignarCount,
-            necesitanAccion: necesitanAccionCount,
-            estaSemana: estaSemanaCount,
-          }}
-        />
-      </Suspense>
+        {/* ── Views tabs ─────────────────────────────────────────── */}
+        <div className="-mx-10 mb-4 flex items-center justify-between border-b border-[#e2e8f0] px-10">
+          <div className="flex items-center">
+            {[
+              { key: 'todos', label: 'Todos', count: pipelineTotal },
+              { key: 'mis-leads', label: 'Mis leads', count: misLeadsCount },
+              { key: 'sin-asignar', label: 'Sin asignar', count: sinAsignarCount },
+              { key: 'sin-tasar', label: 'Sin tasar', count: sinTasarCount },
+              { key: 'necesitan-accion', label: 'Necesitan acción', count: necesitanAccionCount },
+              { key: 'esta-semana', label: 'Esta semana', count: estaSemanaCout },
+            ].map(({ key, label, count }) => {
+              const isActive = view === key
+              return (
+                <Link
+                  key={key}
+                  href={viewUrl(key)}
+                  className={`flex items-center gap-2 border-b-2 px-4 py-3 text-[13px] font-medium transition-colors ${
+                    isActive
+                      ? 'border-[#0a0a0a] text-[#0a0a0a]'
+                      : 'border-transparent text-[#64748b] hover:text-[#0a0a0a]'
+                  }`}
+                  style={{ marginBottom: '-1px' }}
+                >
+                  {label}
+                  <span
+                    className="rounded-full px-1.5 py-0.5 font-mono text-[11px] font-medium"
+                    style={
+                      isActive
+                        ? { background: '#0a0a0a', color: '#fff' }
+                        : { background: '#f1f5f9', color: '#64748b' }
+                    }
+                  >
+                    {count}
+                  </span>
+                </Link>
+              )
+            })}
+          </div>
+          {/* Decorative "Guardar vista" */}
+          <div className="flex shrink-0 items-center gap-1.5 pb-2 text-[11px] font-medium text-[#64748b]">
+            <svg
+              viewBox="0 0 24 24"
+              className="h-3.5 w-3.5"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth={1.6}
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z" />
+            </svg>
+            Guardar vista actual
+          </div>
+        </div>
 
-      {/* ── Table ── */}
-      <div className="flex-1 px-6 pb-8 pt-5">
-        <SellerLeadsTable leads={serializedLeads} />
+        {/* ── Filter bar ─────────────────────────────────────────── */}
+        <Suspense>
+          <LeadsFilters agents={agents} />
+        </Suspense>
 
-        {/* Pagination */}
-        {total > 0 && (
-          <div className="mt-4 flex items-center justify-between">
-            <span style={{ ...MONO, fontSize: '11px', color: '#6b645c' }}>
-              Mostrando {from}–{to} de {total} lead{total !== 1 ? 's' : ''}
-              {searchParams.status ? (
+        {/* ── Table ──────────────────────────────────────────────── */}
+        <div className="overflow-hidden rounded-xl border border-[#e2e8f0] bg-white">
+          {/* Header */}
+          <div
+            className="border-b border-[#e2e8f0] bg-[#f8fafc] font-mono text-[10px] uppercase tracking-[0.12em] text-[#64748b]"
+            style={{
+              display: 'grid',
+              gridTemplateColumns: '32px 2fr 1.6fr 2.2fr 1.5fr 1fr 1fr 1.1fr 60px',
+              gap: '14px',
+              padding: '14px 20px',
+              alignItems: 'center',
+            }}
+          >
+            <div />
+            <div>Vendedor</div>
+            <div>Contacto</div>
+            <div>Vehículo</div>
+            <div>Tasación</div>
+            <div>Estado</div>
+            <div>Agente</div>
+            <div>Entrada</div>
+            <div />
+          </div>
+
+          {/* Empty state */}
+          {leads.length === 0 && (
+            <div className="px-6 py-14 text-center text-sm text-[#64748b]">
+              No hay vendedores con los filtros aplicados.
+            </div>
+          )}
+
+          {/* Rows */}
+          {leads.map((lead) => {
+            const inits = initials(lead.name)
+            const avatarGrad = getAvatarGradient(lead.name)
+            const pill = STATUS_PILLS[lead.status] ?? STATUS_PILLS.NUEVO
+            const lastAct = lead.activities[0]?.createdAt ?? null
+            const flag = getRowFlag(lead.status, lastAct, lead.createdAt)
+
+            // Days since last activity (for flag label)
+            const refDate = lastAct ?? lead.createdAt
+            const daysSince = Math.floor((Date.now() - refDate.getTime()) / 86400000)
+
+            const vehicle = lead.vehicle
+            const desiredPrice = vehicle?.desiredPrice ? Number(vehicle.desiredPrice) : null
+            const valuationMin = vehicle?.valuationMin ? Number(vehicle.valuationMin) : null
+            const valuationMax = vehicle?.valuationMax ? Number(vehicle.valuationMax) : null
+            const valuationRecommended = vehicle?.valuationRecommended
+              ? Number(vehicle.valuationRecommended)
+              : null
+
+            const hasValuation = valuationRecommended !== null
+            const isOverpriced =
+              desiredPrice !== null && valuationMax !== null && desiredPrice > valuationMax * 1.15
+
+            // Canal labels
+            const canalLabel = lead.canal === 'PRO' ? 'FORMULARIO WEB' : 'BACKOFFICE'
+            const canalColor = lead.canal === 'PRO' ? '#d97706' : '#64748b'
+
+            const waUrl = lead.phone
+              ? buildWhatsAppUrl(lead.phone, `Hola ${lead.name.split(' ')[0]}, soy de CampersNova.`)
+              : null
+
+            // Vehicle type colors
+            const typeColors: Record<string, { bg: string; text: string; border: string }> = {
+              CAMPER: { bg: '#eff6ff', text: '#2563eb', border: 'rgba(37,99,235,0.25)' },
+              AUTOCARAVANA: { bg: '#f5f3ff', text: '#7c3aed', border: 'rgba(124,58,237,0.25)' },
+            }
+            const typeStyle = vehicle?.type
+              ? (typeColors[vehicle.type] ?? {
+                  bg: '#f1f5f9',
+                  text: '#475569',
+                  border: '#e2e8f0',
+                })
+              : null
+
+            return (
+              <div
+                key={lead.id}
+                className="group relative border-b border-[#f1f5f9] text-[13.5px] transition-colors last:border-0 hover:bg-[#f8fafc]"
+                style={{
+                  display: 'grid',
+                  gridTemplateColumns: '32px 2fr 1.6fr 2.2fr 1.5fr 1fr 1fr 1.1fr 60px',
+                  gap: '14px',
+                  padding: '14px 20px',
+                  alignItems: 'center',
+                }}
+              >
+                {/* Row flag bar */}
+                {flag && (
+                  <div
+                    className="absolute left-0 top-1/2 -translate-y-1/2 rounded-r-sm"
+                    style={{ width: '3px', height: '60%', background: flag }}
+                  />
+                )}
+
+                {/* Checkbox */}
+                <div className="h-4 w-4 rounded border border-[#cbd5e1] bg-white" />
+
+                {/* VENDEDOR */}
+                <Link href={`/vendedores/${lead.id}`} className="min-w-0">
+                  <div className="flex items-center gap-3">
+                    <div
+                      className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-[13px] font-bold text-white"
+                      style={{ background: avatarGrad }}
+                    >
+                      {inits}
+                    </div>
+                    <div className="min-w-0 leading-snug">
+                      <div className="truncate text-[14px] font-semibold text-[#0a0a0a]">
+                        {lead.name}
+                      </div>
+                      <div className="mt-0.5 font-mono text-[10.5px] text-[#64748b]">
+                        #{lead.id.slice(-8)}{' '}
+                        <span className="font-semibold" style={{ color: canalColor }}>
+                          {canalLabel}
+                        </span>
+                        {flag && (
+                          <span className="ml-2 font-semibold" style={{ color: flag }}>
+                            Sin contacto {daysSince}d
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </Link>
+
+                {/* CONTACTO */}
+                <div className="min-w-0 leading-snug">
+                  <div className="flex items-center gap-1.5 overflow-hidden text-[13px] text-[#0a0a0a]">
+                    <svg
+                      viewBox="0 0 24 24"
+                      className="h-3 w-3 shrink-0 text-[#64748b]"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth={1.6}
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    >
+                      <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" />
+                      <polyline points="22,6 12,13 2,6" />
+                    </svg>
+                    <span className="truncate">{lead.email}</span>
+                  </div>
+                  <div className="mt-0.5 flex items-center gap-1.5 font-mono text-[12px] text-[#64748b]">
+                    <svg
+                      viewBox="0 0 24 24"
+                      className="h-3 w-3 shrink-0"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth={1.6}
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    >
+                      <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.13.96.37 1.9.72 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.91.35 1.85.59 2.81.72A2 2 0 0 1 22 16.92z" />
+                    </svg>
+                    {lead.phone ?? '—'}
+                  </div>
+                </div>
+
+                {/* VEHÍCULO */}
+                <div className="min-w-0">
+                  {vehicle ? (
+                    <>
+                      <div className="flex flex-wrap items-center gap-1">
+                        {/* Brand+model pill */}
+                        {(vehicle.brand || vehicle.model) && typeStyle && (
+                          <span
+                            className="truncate border font-bold"
+                            style={{
+                              background: typeStyle.bg,
+                              color: typeStyle.text,
+                              borderColor: typeStyle.border,
+                              borderRadius: '4px',
+                              padding: '2px 6px',
+                              fontSize: '11px',
+                              maxWidth: '120px',
+                              display: 'inline-block',
+                              overflow: 'hidden',
+                              textOverflow: 'ellipsis',
+                              whiteSpace: 'nowrap',
+                            }}
+                          >
+                            {`${vehicle.brand ?? ''} ${vehicle.model ?? ''}`.trim().toUpperCase()}
+                          </span>
+                        )}
+                        {/* Year badge */}
+                        {vehicle.year && (
+                          <span
+                            className="border font-medium"
+                            style={{
+                              background: '#f1f5f9',
+                              color: '#475569',
+                              borderColor: '#e2e8f0',
+                              borderRadius: '4px',
+                              padding: '2px 6px',
+                              fontSize: '11px',
+                            }}
+                          >
+                            {vehicle.year}
+                          </span>
+                        )}
+                        {/* KM badge */}
+                        {vehicle.km != null && (
+                          <span
+                            className="border font-medium"
+                            style={{
+                              background: Number(vehicle.km) > 150000 ? '#fffbeb' : '#f1f5f9',
+                              color: Number(vehicle.km) > 150000 ? '#d97706' : '#475569',
+                              borderColor:
+                                Number(vehicle.km) > 150000 ? 'rgba(217,119,6,0.25)' : '#e2e8f0',
+                              borderRadius: '4px',
+                              padding: '2px 6px',
+                              fontSize: '11px',
+                            }}
+                          >
+                            {Number(vehicle.km).toLocaleString('es-ES')} km
+                          </span>
+                        )}
+                      </div>
+                      {desiredPrice && (
+                        <div className="mt-1 font-mono text-[12px] font-bold text-[#1f8a5b]">
+                          Pide {formatPrice(desiredPrice)}
+                        </div>
+                      )}
+                    </>
+                  ) : (
+                    <span className="text-[13px] italic text-[#94a3b8]">Sin vehículo</span>
+                  )}
+                </div>
+
+                {/* TASACIÓN */}
+                <div className="flex flex-col items-start gap-0.5">
+                  {hasValuation && valuationMin !== null && valuationMax !== null ? (
+                    <>
+                      <span
+                        className="inline-flex items-center rounded-md border font-mono text-[12px] font-bold"
+                        style={{
+                          background: isOverpriced ? '#fffbeb' : '#f0fdf4',
+                          color: isOverpriced ? '#d97706' : '#1f8a5b',
+                          borderColor: isOverpriced
+                            ? 'rgba(217,119,6,0.25)'
+                            : 'rgba(31,138,91,0.25)',
+                          padding: '4px 8px',
+                        }}
+                      >
+                        {formatK(valuationMin)}k – {formatK(valuationMax)}k
+                      </span>
+                      {isOverpriced && (
+                        <span className="font-mono text-[11px]" style={{ color: '#d97706' }}>
+                          ⚠ sobreprecio
+                        </span>
+                      )}
+                    </>
+                  ) : (
+                    <>
+                      <span
+                        className="inline-flex items-center rounded-md border border-dashed font-mono text-[12px] font-bold"
+                        style={{
+                          background: '#f8fafc',
+                          color: '#94a3b8',
+                          borderColor: '#e2e8f0',
+                          padding: '4px 8px',
+                        }}
+                      >
+                        — Sin tasar
+                      </span>
+                      {vehicle && (
+                        <span className="font-mono text-[11px] text-[#94a3b8]">
+                          Solicitar tasación
+                        </span>
+                      )}
+                    </>
+                  )}
+                </div>
+
+                {/* ESTADO */}
+                <div>
+                  <span
+                    className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11.5px] font-semibold"
+                    style={{ background: pill.bg, color: pill.text }}
+                  >
+                    <span className="h-1.5 w-1.5 rounded-full" style={{ background: pill.dot }} />
+                    {STATUS_LABELS[lead.status] ?? lead.status}
+                  </span>
+                </div>
+
+                {/* AGENTE */}
+                <div className="flex items-center gap-2">
+                  {lead.agent ? (
+                    <>
+                      <div
+                        className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[10px] font-bold text-white"
+                        style={{ background: 'linear-gradient(135deg, #2563eb, #7c3aed)' }}
+                      >
+                        {initials(lead.agent.name)}
+                      </div>
+                      <span className="text-[12.5px] text-[#1e293b]">{lead.agent.name}</span>
+                    </>
+                  ) : (
+                    <>
+                      <div
+                        className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-dashed text-[14px] text-[#64748b]"
+                        style={{ borderColor: '#cbd5e1', background: '#f1f5f9' }}
+                      >
+                        +
+                      </div>
+                      <span className="text-[12.5px] italic text-[#64748b]">Sin asignar</span>
+                    </>
+                  )}
+                </div>
+
+                {/* ENTRADA */}
+                <div>
+                  <div className="font-mono text-[12px] text-[#1e293b]">
+                    {formatDate(lead.createdAt)}
+                  </div>
+                  <div className="mt-0.5 font-mono text-[10.5px] text-[#64748b]">
+                    {relativeDays(lead.createdAt)}
+                  </div>
+                </div>
+
+                {/* ACTIONS */}
+                <div className="flex items-center justify-end gap-1 opacity-0 transition-opacity group-hover:opacity-100">
+                  {waUrl && (
+                    <a
+                      href={waUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="flex h-7 w-7 items-center justify-center rounded-md border border-transparent text-[#64748b] hover:border-[#e2e8f0] hover:bg-white hover:text-[#25D366]"
+                    >
+                      <svg
+                        viewBox="0 0 24 24"
+                        className="h-3.5 w-3.5"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth={1.6}
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      >
+                        <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8z" />
+                      </svg>
+                    </a>
+                  )}
+                  <Link
+                    href={`/vendedores/${lead.id}`}
+                    className="flex h-7 w-7 items-center justify-center rounded-md border border-transparent text-[#64748b] hover:border-[#e2e8f0] hover:bg-white hover:text-[#0a0a0a]"
+                  >
+                    <svg
+                      viewBox="0 0 24 24"
+                      className="h-3.5 w-3.5"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth={1.6}
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    >
+                      <circle cx="12" cy="12" r="1" />
+                      <circle cx="19" cy="12" r="1" />
+                      <circle cx="5" cy="12" r="1" />
+                    </svg>
+                  </Link>
+                </div>
+              </div>
+            )
+          })}
+
+          {/* ── Table footer ─────────────────────────────────────── */}
+          <div className="flex items-center justify-between border-t border-[#e2e8f0] px-6 py-4">
+            <div className="text-[12.5px] text-[#64748b]">
+              Mostrando{' '}
+              <strong className="text-[#0a0a0a]">
+                {from}–{to}
+              </strong>{' '}
+              de <strong className="text-[#0a0a0a]">{total}</strong> vendedores
+              {needsActionCount > 0 && (
                 <>
                   {' '}
-                  · Filtro: <span style={{ color: '#0a0a0a' }}>{searchParams.status}</span>
+                  ·{' '}
+                  <span className="font-semibold text-[#dc2626]">
+                    {needsActionCount} requieren acción
+                  </span>
                 </>
-              ) : null}
-            </span>
+              )}
+            </div>
             <div className="flex items-center gap-1.5">
               {page > 1 ? (
-                <Button asChild variant="outline" size="sm">
-                  <Link href={pageUrl(page - 1)}>← Anterior</Link>
-                </Button>
-              ) : (
-                <Button variant="outline" size="sm" disabled>
+                <Link
+                  href={pageUrl(page - 1)}
+                  className="rounded-md border border-[#e2e8f0] px-3 py-1.5 text-[12.5px] font-medium text-[#1e293b] hover:border-[#2563eb]"
+                >
                   ← Anterior
-                </Button>
+                </Link>
+              ) : (
+                <button
+                  disabled
+                  className="rounded-md border border-[#e2e8f0] px-3 py-1.5 text-[12.5px] font-medium text-[#1e293b] opacity-40"
+                >
+                  ← Anterior
+                </button>
               )}
-              <span className="px-2" style={{ ...MONO, fontSize: '11px', color: '#6b645c' }}>
-                {page} / {totalPages || 1}
+              <span className="rounded-md bg-[#0a0a0a] px-2.5 py-1.5 font-mono text-[12px] text-white">
+                {page}
               </span>
               {page < totalPages ? (
-                <Button asChild variant="outline" size="sm">
-                  <Link href={pageUrl(page + 1)}>Siguiente →</Link>
-                </Button>
-              ) : (
-                <Button variant="outline" size="sm" disabled>
+                <Link
+                  href={pageUrl(page + 1)}
+                  className="rounded-md border border-[#e2e8f0] px-3 py-1.5 text-[12.5px] font-medium text-[#1e293b] hover:border-[#2563eb]"
+                >
                   Siguiente →
-                </Button>
+                </Link>
+              ) : (
+                <button
+                  disabled
+                  className="rounded-md border border-[#e2e8f0] px-3 py-1.5 text-[12.5px] font-medium text-[#1e293b] opacity-40"
+                >
+                  Siguiente →
+                </button>
               )}
             </div>
           </div>
-        )}
+        </div>
       </div>
     </div>
   )
