@@ -1,13 +1,9 @@
 import { db } from '@/lib/db'
 import { requireAuth } from '@/lib/auth'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import {
   SELLER_LEAD_STATUS_LABELS,
-  SELLER_LEAD_STATUS_CLASSES,
   BUYER_LEAD_STATUS_LABELS,
-  BUYER_LEAD_STATUS_CLASSES,
   VEHICLE_STATUS_LABELS,
-  VEHICLE_STATUS_CLASSES,
 } from '@/lib/state-machine'
 import {
   getSellerLeadCounts,
@@ -37,24 +33,21 @@ import {
 } from '@/lib/dashboard/metrics'
 import { DashboardFilters } from './dashboard-filters'
 import { ForbiddenToast } from '@/components/forbidden-toast'
-import {
-  TrendingUp,
-  TrendingDown,
-  Minus,
-  AlertTriangle,
-  FileWarning,
-  ShieldAlert,
-} from 'lucide-react'
+import { AlertTriangle, FileWarning, ShieldAlert } from 'lucide-react'
 import type { SellerLeadStatus, BuyerLeadStatus, VehicleStatus } from '@prisma/client'
 import { calculateCompletionPercent } from '@/lib/vehicle-legal'
 import type { VehicleLegalInput, DocumentSummary } from '@/lib/vehicle-legal'
 import type { VehicleDocumentCategory } from '@prisma/client'
 import Link from 'next/link'
 import { StockEvolutionChart } from '@/components/dashboard/stock-evolution-chart'
-import { FunnelComparison } from '@/components/dashboard/funnel-comparison'
-import { StagnantVehiclesTable } from '@/components/dashboard/stagnant-vehicles-table'
-import { VehiclesPerCommercial } from '@/components/dashboard/vehicles-per-commercial'
-import { InfoTooltip } from '@/components/info-tooltip'
+
+// ── Constants ─────────────────────────────────────────────────────────────────
+
+const EUR = new Intl.NumberFormat('es-ES', {
+  style: 'currency',
+  currency: 'EUR',
+  maximumFractionDigits: 0,
+})
 
 const ACTIVE_SELLER_STATUSES: SellerLeadStatus[] = [
   'NUEVO',
@@ -69,11 +62,24 @@ const ACTIVE_BUYER_STATUSES: BuyerLeadStatus[] = [
   'EN_NEGOCIACION',
 ]
 
-const EUR = new Intl.NumberFormat('es-ES', {
-  style: 'currency',
-  currency: 'EUR',
-  maximumFractionDigits: 0,
-})
+// Dot colors per status (CSS color strings)
+const STATUS_DOTS: Record<string, string> = {
+  NUEVO: '#2563eb',
+  CONTACTADO: '#7c3aed',
+  CUALIFICADO: '#0891b2',
+  EN_NEGOCIACION: '#d97706',
+  CERRADO: '#1f8a5b',
+  DESCARTADO: '#b3aca0',
+  TASADO: '#7c3aed',
+  PUBLICADO: '#0891b2',
+  RESERVADO: '#d97706',
+  VENDIDO: '#1f8a5b',
+  PERDIDO: '#b3aca0',
+}
+
+const TIME_DOTS = ['#2563eb', '#7c3aed', '#0891b2', '#d97706', '#1f8a5b', '#b3aca0']
+
+// ── Page ──────────────────────────────────────────────────────────────────────
 
 export default async function DashboardPage({
   searchParams,
@@ -94,7 +100,7 @@ export default async function DashboardPage({
 
   const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)
 
-  // ── Base queries (all roles) ─────────────────────────────────────────────
+  // ── Base queries ─────────────────────────────────────────────────────────
   const [sellerCounts, buyerCounts, vehicleCounts, salesMoM, proFunnel, agents] = await Promise.all(
     [
       getSellerLeadCounts(db, filter),
@@ -116,7 +122,7 @@ export default async function DashboardPage({
   const totalBuyerActive = sumWhere(buyerCounts, ACTIVE_BUYER_STATUSES)
   const totalPublicados = sumWhere(vehicleCounts, ['PUBLICADO'])
 
-  // ── Postventa queries ────────────────────────────────────────────────────
+  // ── Postventa ────────────────────────────────────────────────────────────
   const [activeWarranties, openTickets, pendingFollowups] = await Promise.all([
     db.warranty.count({ where: { endDate: { gt: new Date() } } }),
     db.postventaTicket.count({ where: { status: { in: ['ABIERTO', 'EN_PROGRESO'] } } }),
@@ -254,13 +260,13 @@ export default async function DashboardPage({
       showFinancials ? getStockHistorySnapshot() : Promise.resolve([]),
     ])
 
-  // ── Operational metrics (ADMIN + AGENTE + MARKETING) ─────────────────────
+  // ── Operational metrics ───────────────────────────────────────────────────
   const showOperational = isAdmin || isAgente || isMarketing
   const [stagnantVehicles] = await Promise.all([
     showOperational || isEntregas ? getStagnantVehicles(db, filter) : Promise.resolve([]),
   ])
 
-  // ── Workshop metrics (ADMIN + TALLER) ────────────────────────────────────
+  // ── Workshop metrics ──────────────────────────────────────────────────────
   const showWorkshop = isAdmin || isTaller
   const [avgWorkshopHours, workshopCostsLast30, vehiclesPerCommercial] = await Promise.all([
     showWorkshop ? getAverageWorkshopHoursPerVehicle(db, filter) : Promise.resolve(null),
@@ -277,10 +283,9 @@ export default async function DashboardPage({
     isAdmin ? getVehiclesPerCommercial(db) : Promise.resolve([]),
   ])
 
-  // ── Postventa costs (ADMIN) ───────────────────────────────────────────────
   const avgPostventaCost = isAdmin ? await getAveragePostventaCostPerVehicle(db, filter) : null
 
-  // ── Margin table (ADMIN) ─────────────────────────────────────────────────
+  // ── Margin table ──────────────────────────────────────────────────────────
   const vehiclesWithMargin = isAdmin
     ? await db.vehicle.findMany({
         where: {
@@ -337,7 +342,7 @@ export default async function DashboardPage({
     return { belowTarget, rows }
   }
 
-  const { belowTarget, rows: marginRows } = computeMargins(vehiclesWithMargin)
+  const { rows: marginRows } = computeMargins(vehiclesWithMargin)
   const top5Rentabilidad = isAdmin
     ? marginRows.sort((a, b) => b.netMarginPct - a.netMarginPct).slice(0, 5)
     : []
@@ -349,432 +354,863 @@ export default async function DashboardPage({
 
   const now = new Date()
 
+  // ── Derived / computed values ─────────────────────────────────────────────
+
+  // Funnel values
+  const totalLeads = sellerCounts.reduce((a, c) => a + c.count, 0)
+  const cualificadosPlus = sumWhere(sellerCounts, ['CUALIFICADO', 'EN_NEGOCIACION', 'CERRADO'])
+  const vehiclesTotal = vehicleCounts.reduce((a, c) => a + c.count, 0)
+  const pubPlus = sumWhere(vehicleCounts, ['PUBLICADO', 'RESERVADO', 'VENDIDO'])
+  const resvPlus = sumWhere(vehicleCounts, ['RESERVADO', 'VENDIDO'])
+  const soldCount = sumWhere(vehicleCounts, ['VENDIDO'])
+  const funnelMax = Math.max(totalLeads, 1)
+
+  const funnelStages = [
+    {
+      label: 'Leads',
+      value: totalLeads,
+      pct: 100,
+      grad: 'linear-gradient(180deg, #6366f1, #4f46e5)',
+    },
+    {
+      label: 'Cualificados',
+      value: cualificadosPlus,
+      pct: (cualificadosPlus / funnelMax) * 100,
+      grad: 'linear-gradient(180deg, #06b6d4, #0891b2)',
+    },
+    {
+      label: 'Publicados',
+      value: pubPlus,
+      pct: (pubPlus / funnelMax) * 100,
+      grad: 'linear-gradient(180deg, #14b8a6, #0d9488)',
+    },
+    {
+      label: 'Reservados',
+      value: resvPlus,
+      pct: (resvPlus / funnelMax) * 100,
+      grad: 'linear-gradient(180deg, #f59e0b, #d97706)',
+    },
+    {
+      label: 'Vendidos',
+      value: soldCount,
+      pct: (soldCount / funnelMax) * 100,
+      grad: 'linear-gradient(180deg, #22c55e, #16a34a)',
+    },
+  ]
+
+  // Requires-action count
+  const requiresAction =
+    incompleteExpedientes.length +
+    stagnantVehicles.length +
+    (vehiclesItvExpiring as typeof vehiclesItvExpiring).length +
+    (vehiclesChargesPending as typeof vehiclesChargesPending).length
+
+  // Agenda items
+  type AgendaItem = {
+    dot: 'bad' | 'warn' | 'info' | 'ok'
+    title: string
+    meta: string
+    cta: string
+    href: string
+  }
+  const agendaItems: AgendaItem[] = []
+
+  for (const v of incompleteExpedientes.slice(0, 2)) {
+    agendaItems.push({
+      dot: 'bad',
+      title: `${v.brand} ${v.model} ${v.year ?? ''} · expediente al ${v.completionPct}%`,
+      meta: 'TASADO · SIN DOCUMENTACIÓN COMPLETA',
+      cta: 'Completar',
+      href: v.sellerLeadId ? `/vendedores/${v.sellerLeadId}` : '/vendedores',
+    })
+  }
+  for (const v of stagnantVehicles.slice(0, 2)) {
+    agendaItems.push({
+      dot: v.daysInStatus > 180 ? 'bad' : 'warn',
+      title: `${v.brand} ${v.model} en nave hace ${v.daysInStatus} días`,
+      meta: 'SUGERENCIA: BAJAR PRECIO O REUBICAR',
+      cta: 'Decidir',
+      href: v.sellerLeadId ? `/vendedores/${v.sellerLeadId}` : '/vendedores',
+    })
+  }
+  for (const v of (vehiclesItvExpiring as typeof vehiclesItvExpiring).slice(0, 1)) {
+    const daysLeft = v.itvValidUntil
+      ? Math.floor((v.itvValidUntil.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
+      : null
+    agendaItems.push({
+      dot: 'warn',
+      title: `ITV de ${v.brand} ${v.model} vence en ${daysLeft ?? '?'}d`,
+      meta: 'VEHÍCULO PUBLICADO · REQUIERE RENOVACIÓN',
+      cta: 'Gestionar',
+      href: v.sellerLead?.id ? `/vendedores/${v.sellerLead.id}` : '/vendedores',
+    })
+  }
+  if (openTickets > 0) {
+    agendaItems.push({
+      dot: 'info',
+      title: `${openTickets} ticket${openTickets !== 1 ? 's' : ''} abierto${openTickets !== 1 ? 's' : ''} en postventa`,
+      meta: 'INCIDENCIAS SIN RESOLVER',
+      cta: 'Abrir',
+      href: '/postventa',
+    })
+  }
+  if (pendingFollowups > 0) {
+    agendaItems.push({
+      dot: 'info',
+      title: `${pendingFollowups} follow-up${pendingFollowups !== 1 ? 's' : ''} pendiente${pendingFollowups !== 1 ? 's' : ''}`,
+      meta: 'SEGUIMIENTO POST-ENTREGA DÍA 7 Y DÍA 30',
+      cta: 'Revisar',
+      href: '/postventa',
+    })
+  }
+  const agendaSlice = agendaItems.slice(0, 6)
+
+  const dotClass = {
+    bad: { bg: '#dc2626', shadow: '0 0 0 4px #fde8e8' },
+    warn: { bg: '#d97706', shadow: '0 0 0 4px #fef3e2' },
+    info: { bg: '#2563eb', shadow: '0 0 0 4px #e6efff' },
+    ok: { bg: '#1f8a5b', shadow: '0 0 0 4px #e3f5ec' },
+  } as const
+
+  // Seller counts map
+  const sellerMap = new Map(sellerCounts.map((c) => [c.status, c.count]))
+  const buyerMap = new Map(buyerCounts.map((c) => [c.status, c.count]))
+  const vehicleMap = new Map(vehicleCounts.map((c) => [c.status, c.count]))
+
+  const sellerTotal = sellerCounts.reduce((a, c) => a + c.count, 0)
+  const buyerTotal = buyerCounts.reduce((a, c) => a + c.count, 0)
+
+  // Stocks active
+  const stockActiveCount = showFinancials
+    ? (stockValue?.vehicleCount ??
+      sumWhere(vehicleCounts, ['NUEVO', 'TASADO', 'PUBLICADO', 'RESERVADO']))
+    : sumWhere(vehicleCounts, ['NUEVO', 'TASADO', 'PUBLICADO', 'RESERVADO'])
+
+  // Bar chart max (vehicles per commercial)
+  const barMax =
+    vehiclesPerCommercial.length > 0
+      ? Math.max(...vehiclesPerCommercial.map((r) => r.active), 1)
+      : 1
+
+  const barGrads = [
+    'linear-gradient(90deg,#2563eb,#7c3aed)',
+    'linear-gradient(90deg,#0891b2,#14b8a6)',
+    'linear-gradient(90deg,#d97706,#f59e0b)',
+    'linear-gradient(90deg,#db2777,#ec4899)',
+    'linear-gradient(90deg,#1f8a5b,#22c55e)',
+  ]
+
+  // Sales delta
+  const salesDelta = salesMoM.delta
+  const salesTrend = salesDelta > 0 ? 'up' : salesDelta < 0 ? 'down' : 'flat'
+
   return (
-    <div className="space-y-8">
+    <div>
       <ForbiddenToast />
 
-      {/* Header */}
-      <div className="flex flex-wrap items-start justify-between gap-3">
+      {/* ── Topbar ─────────────────────────────────────────────────────────── */}
+      <div className="flex items-start justify-between pb-0 pt-1">
         <div>
-          <h1 className="text-2xl font-bold">Dashboard</h1>
-          <p className="mt-0.5 text-sm text-muted-foreground">
-            Resumen del pipeline · {now.toLocaleDateString('es-ES')}
+          <p className="font-mono text-[11px] uppercase tracking-[0.14em] text-[#6b645c]">
+            Vista general ·{' '}
+            {now.toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' })}
           </p>
+          <h1 className="mt-1 text-[24px] font-semibold leading-tight tracking-[-0.015em]">
+            Buenos días, {currentUser.name?.split(' ')[0] ?? 'Joel'}.
+          </h1>
         </div>
-        {isAdmin && <DashboardFilters agents={agents} currentAgentId={requestedAgentId} />}
+        {isAdmin && (
+          <div className="mt-1">
+            <DashboardFilters agents={agents} currentAgentId={requestedAgentId} />
+          </div>
+        )}
       </div>
 
-      {/* ── Sección 1: Resumen operativo ─────────────────────────────────── */}
-      <section className="space-y-4">
-        <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-          Resumen operativo
-        </h2>
-        <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
-          <KPICard
-            label="Vendedores activos"
-            value={totalSellerActive}
-            hint="excluye cerrados/descartados"
-            info="Leads de vendedores en estados activos (Nuevo, Contactado, Cualificado, En negociación). No cuenta los cerrados ni descartados."
-          />
-          <KPICard
-            label="Compradores activos"
-            value={totalBuyerActive}
-            hint="excluye cerrados/perdidos"
-            info="Leads de compradores en estados activos (Nuevo, Contactado, Cualificado, En negociación). No cuenta los cerrados ni perdidos."
-          />
-          <KPICard
-            label="Vehículos publicados"
-            value={totalPublicados}
-            hint="ahora mismo"
-            info="Vehículos con estado Publicado en este momento. Son los que están visibles en los portales de venta."
-          />
-          <SalesKPI
-            current={salesMoM.current}
-            previous={salesMoM.previous}
-            delta={salesMoM.delta}
-            pctChange={salesMoM.pctChange}
-            info="Vehículos cuyo estado cambió a Vendido durante el mes en curso, comparado con el mes anterior. El porcentaje muestra la variación relativa."
-          />
-        </div>
-
-        {/* Postventa KPIs */}
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-          <Card>
-            <CardContent className="pt-6">
-              <div className="flex items-center gap-1">
-                <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                  Garantías activas
-                </p>
-                <InfoTooltip text="Garantías postventa cuya fecha de fin aún no ha llegado. Cada vehículo entregado genera automáticamente una garantía de 12 meses, ampliable hasta 36." />
-              </div>
-              <p className="mt-1 text-3xl font-bold">{activeWarranties}</p>
-              <p className="mt-0.5 text-xs text-muted-foreground">no expiradas</p>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="pt-6">
-              <div className="flex items-center gap-1">
-                <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                  Tickets abiertos
-                </p>
-                <InfoTooltip text="Incidencias postventa en estado Abierto o En progreso que requieren atención. Los tickets de prioridad Alta o Crítica generan una notificación al equipo al abrirse." />
-              </div>
-              <p className={`mt-1 text-3xl font-bold ${openTickets > 0 ? 'text-amber-600' : ''}`}>
-                {openTickets}
-              </p>
-              <p className="mt-0.5 text-xs text-muted-foreground">abiertos o en progreso</p>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="pt-6">
-              <div className="flex items-center gap-1">
-                <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                  Follow-ups pendientes
-                </p>
-                <InfoTooltip text="Emails de seguimiento automáticos programados al día 7 y día 30 post-entrega que aún no se han enviado. El cron los procesa cada día a las 9:00." />
-              </div>
-              <p
-                className={`mt-1 text-3xl font-bold ${pendingFollowups > 0 ? 'text-blue-600' : ''}`}
+      {/* ── Hero KPIs ──────────────────────────────────────────────────────── */}
+      <SectionEyebrow label="Lo que importa hoy" color="info" />
+      <div className="grid grid-cols-2 gap-[14px] lg:grid-cols-4">
+        {/* 1 — Margen neto (dark gradient) — ADMIN/MARKETING only */}
+        {showFinancials ? (
+          <div
+            className="flex flex-col gap-3.5 rounded-[14px] p-6"
+            style={{ background: 'linear-gradient(135deg, #1f8a5b, #0f5132)', color: '#fff' }}
+          >
+            <div className="flex items-start justify-between">
+              <span
+                className="font-mono text-[10px] font-medium uppercase tracking-[0.14em]"
+                style={{ color: 'rgba(255,255,255,0.8)' }}
               >
-                {pendingFollowups}
-              </p>
-              <p className="mt-0.5 text-xs text-muted-foreground">día 7 y día 30 sin enviar</p>
-            </CardContent>
-          </Card>
-        </div>
-      </section>
-
-      {/* ── Sección 2: Resumen financiero (ADMIN + MARKETING) ─────────────── */}
-      {showFinancials && stockValue && (
-        <section className="space-y-4">
-          <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-            Resumen financiero
-          </h2>
-          <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
-            <Card>
-              <CardContent className="pt-6">
-                <div className="flex items-center gap-1">
-                  <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                    Valor en stock
-                  </p>
-                  <InfoTooltip text="Suma del precio de venta (o tasación recomendada si no hay precio) de todos los vehículos activos en nave. Es el valor potencial si se vendieran todos al precio actual." />
-                </div>
-                <p className="mt-1 text-2xl font-bold">{EUR.format(stockValue.totalStockValue)}</p>
-                <p className="mt-0.5 text-xs text-muted-foreground">
-                  {stockValue.vehicleCount} vehículos
-                </p>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardContent className="pt-6">
-                <div className="flex items-center gap-1">
-                  <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                    Capital comprometido
-                  </p>
-                  <InfoTooltip text="Suma de los precios de compra de todos los vehículos activos en nave. Representa el capital que CampersNova tiene inmovilizado en stock." />
-                </div>
-                <p className="mt-1 text-2xl font-bold">
-                  {EUR.format(stockValue.committedInvestment)}
-                </p>
-                <p className="mt-0.5 text-xs text-muted-foreground">suma de precios de compra</p>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardContent className="pt-6">
-                <div className="flex items-center gap-1">
-                  <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                    Margen potencial stock
-                  </p>
-                  <InfoTooltip text="Diferencia entre el valor en stock y el capital comprometido, descontando costes ya registrados. Es el margen bruto que se obtendría si se vendiera todo al precio actual. No incluye ventas futuras." />
-                </div>
-                <p
-                  className={`mt-1 text-2xl font-bold ${stockValue.potentialMargin >= 0 ? 'text-green-600' : 'text-red-600'}`}
+                Margen neto · mes
+              </span>
+              <div
+                className="grid h-8 w-8 place-items-center rounded-lg"
+                style={{ background: 'rgba(255,255,255,0.08)' }}
+              >
+                <svg
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.6"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  className="h-4 w-4"
+                  style={{ opacity: 0.9 }}
                 >
-                  {EUR.format(stockValue.potentialMargin)}
-                </p>
-                <p className="mt-0.5 text-xs text-muted-foreground">
-                  precio venta − compra − costes
-                </p>
-              </CardContent>
-            </Card>
-            {isAdmin && monthlyMargin && (
-              <Card>
-                <CardContent className="pt-6">
-                  <div className="flex items-center gap-1">
-                    <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                      Margen neto este mes
-                    </p>
-                    <InfoTooltip text="Suma de (precio venta − precio compra − costes) de los vehículos vendidos durante el mes en curso. Refleja el beneficio real generado este mes." />
-                  </div>
-                  <p
-                    className={`mt-1 text-2xl font-bold ${monthlyMargin.netMargin >= 0 ? 'text-green-600' : 'text-red-600'}`}
-                  >
-                    {EUR.format(monthlyMargin.netMargin)}
-                  </p>
-                  <p className="mt-0.5 text-xs text-muted-foreground">
-                    {monthlyMargin.vehiclesSold} vehículo
-                    {monthlyMargin.vehiclesSold !== 1 ? 's' : ''} vendido
-                    {monthlyMargin.vehiclesSold !== 1 ? 's' : ''}
-                  </p>
-                </CardContent>
-              </Card>
-            )}
-          </div>
-
-          {/* Segunda fila financiera — solo ADMIN */}
-          {isAdmin && (
-            <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
-              {monthlyMargin?.averageTicket != null && (
-                <Card>
-                  <CardContent className="pt-6">
-                    <div className="flex items-center gap-1">
-                      <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                        Ticket medio este mes
-                      </p>
-                      <InfoTooltip text="Precio de venta promedio de los vehículos vendidos durante el mes en curso. Útil para seguir si el mix de ventas se orienta hacia vehículos de mayor o menor valor." />
-                    </div>
-                    <p className="mt-1 text-2xl font-bold">
-                      {EUR.format(monthlyMargin.averageTicket)}
-                    </p>
-                    <p className="mt-0.5 text-xs text-muted-foreground">precio venta promedio</p>
-                  </CardContent>
-                </Card>
-              )}
-              {pubToSoldRate && (
-                <Card>
-                  <CardContent className="pt-6">
-                    <div className="flex items-center gap-1">
-                      <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                        Tasa publicado → vendido
-                      </p>
-                      <InfoTooltip text="Porcentaje de vehículos vendidos sobre el total que llegaron a estar publicados (incluye Publicado, Reservado y Vendido). Mide la eficacia comercial una vez el vehículo entra al mercado." />
-                    </div>
-                    <p className="mt-1 text-2xl font-bold">
-                      {pubToSoldRate.rate !== null ? `${pubToSoldRate.rate.toFixed(1)}%` : '—'}
-                    </p>
-                    <p className="mt-0.5 text-xs text-muted-foreground">
-                      {pubToSoldRate.sold} vendidos de {pubToSoldRate.published} publicados
-                    </p>
-                  </CardContent>
-                </Card>
-              )}
-              <Card>
-                <CardContent className="pt-6">
-                  <div className="flex items-center gap-1">
-                    <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                      Margen promedio (con precios)
-                    </p>
-                    <InfoTooltip text="Margen neto porcentual promedio calculado sobre todos los vehículos que tienen precio de compra y venta registrados. Descuenta costes imputados. Cuanto mayor, mejor rentabilidad general." />
-                  </div>
-                  <p className="mt-1 text-2xl font-bold">
-                    {avgMargin !== null ? `${avgMargin.toFixed(1)}%` : '—'}
-                  </p>
-                  <p className="mt-0.5 text-xs text-muted-foreground">
-                    {vehiclesWithMargin.length} vehículo{vehiclesWithMargin.length !== 1 ? 's' : ''}
-                  </p>
-                </CardContent>
-              </Card>
-              <Card>
-                <CardContent className="pt-6">
-                  <div className="flex items-center gap-1">
-                    <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                      Bajo objetivo de margen
-                    </p>
-                    <InfoTooltip text="Vehículos cuyo margen neto real está por debajo del objetivo configurado en la ficha (campo 'Margen objetivo %'). Si el número es alto, conviene revisar precios de venta o reducir costes." />
-                  </div>
-                  <p
-                    className={`mt-1 text-2xl font-bold ${belowTarget > 0 ? 'text-red-600' : 'text-green-600'}`}
-                  >
-                    {belowTarget}
-                  </p>
-                  <p className="mt-0.5 text-xs text-muted-foreground">
-                    de {vehiclesWithMargin.length} configurados
-                  </p>
-                </CardContent>
-              </Card>
+                  <line x1="12" y1="1" x2="12" y2="23" />
+                  <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
+                </svg>
+              </div>
             </div>
-          )}
-        </section>
-      )}
+            <div className="text-[32px] font-bold tabular-nums leading-none tracking-[-0.025em]">
+              {monthlyMargin ? EUR.format(monthlyMargin.netMargin) : '—'}
+            </div>
+            {/* Spark */}
+            <svg
+              viewBox="0 0 200 40"
+              preserveAspectRatio="none"
+              className="-mx-1 mb-[-4px] mt-1 h-9"
+            >
+              <path
+                d="M0,30 L25,28 L50,22 L75,24 L100,18 L125,14 L150,16 L175,10 L200,6"
+                fill="none"
+                stroke="rgba(255,255,255,0.8)"
+                strokeWidth="2"
+              />
+              <path
+                d="M0,30 L25,28 L50,22 L75,24 L100,18 L125,14 L150,16 L175,10 L200,6 L200,40 L0,40 Z"
+                fill="rgba(255,255,255,0.12)"
+              />
+            </svg>
+            <div className="mt-auto flex items-center justify-between">
+              <span
+                className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11.5px] font-semibold"
+                style={{ background: 'rgba(255,255,255,0.18)' }}
+              >
+                {salesTrend === 'up' ? '↑' : salesTrend === 'down' ? '↓' : '→'}{' '}
+                {salesMoM.pctChange !== null
+                  ? `${salesMoM.pctChange > 0 ? '+' : ''}${salesMoM.pctChange.toFixed(0)}% vs anterior`
+                  : 'sin cambio'}
+              </span>
+              <span className="text-[11.5px]" style={{ color: 'rgba(255,255,255,0.75)' }}>
+                {monthlyMargin?.vehiclesSold ?? 0} venta
+                {monthlyMargin?.vehiclesSold !== 1 ? 's' : ''}
+              </span>
+            </div>
+          </div>
+        ) : (
+          /* Non-financial roles: show stock value placeholder */
+          <div className="flex flex-col gap-3.5 rounded-[14px] border border-[#e6dfd0] bg-white p-6">
+            <div className="flex items-start justify-between">
+              <span className="font-mono text-[10px] font-medium uppercase tracking-[0.14em] text-[#6b645c]">
+                Stock activo
+              </span>
+              <div className="grid h-8 w-8 place-items-center rounded-lg bg-cyan-50 text-cyan-600">
+                <svg
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.6"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  className="h-4 w-4"
+                >
+                  <path d="M3 17h11l3-7H6" />
+                  <circle cx="7" cy="20" r="2" />
+                  <circle cx="17" cy="20" r="2" />
+                </svg>
+              </div>
+            </div>
+            <div className="text-[32px] font-bold tabular-nums leading-none tracking-[-0.025em]">
+              {stockActiveCount}
+              <span className="ml-1 text-[18px] font-medium text-[#6b645c]">veh.</span>
+            </div>
+            <div className="mt-auto flex items-center justify-between">
+              <span className="inline-flex items-center gap-1 rounded-full bg-[#e3f5ec] px-2 py-0.5 text-[11.5px] font-semibold text-[#1f8a5b]">
+                ↑ en nave
+              </span>
+              <span className="text-[11.5px] text-[#6b645c]">
+                {avgDaysInStock?.averageDays != null
+                  ? `${avgDaysInStock.averageDays}d medios`
+                  : '—'}
+              </span>
+            </div>
+          </div>
+        )}
 
-      {/* ── Sección 3: Stock y rotación (ADMIN + AGENTE + MARKETING + ENTREGAS) ── */}
-      {(showOperational || isEntregas) && (
-        <section className="space-y-4">
-          <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-            Stock y rotación
-          </h2>
-          <div className="grid grid-cols-2 gap-4 md:grid-cols-3">
-            {avgDaysInStock && (
+        {/* 2 — Stock activo */}
+        <div className="flex flex-col gap-3.5 rounded-[14px] border border-[#e6dfd0] bg-white p-6">
+          <div className="flex items-start justify-between">
+            <span className="font-mono text-[10px] font-medium uppercase tracking-[0.14em] text-[#6b645c]">
+              Stock activo
+            </span>
+            <div className="grid h-8 w-8 place-items-center rounded-lg bg-cyan-50 text-cyan-600">
+              <svg
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.6"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                className="h-4 w-4"
+              >
+                <path d="M3 17h11l3-7H6" />
+                <circle cx="7" cy="20" r="2" />
+                <circle cx="17" cy="20" r="2" />
+              </svg>
+            </div>
+          </div>
+          <div className="text-[32px] font-bold tabular-nums leading-none tracking-[-0.025em]">
+            {stockActiveCount}
+            <span className="ml-1 text-[18px] font-medium text-[#6b645c]">veh.</span>
+          </div>
+          <svg viewBox="0 0 200 40" preserveAspectRatio="none" className="-mx-1 mb-[-4px] mt-1 h-9">
+            <path
+              d="M0,20 L25,18 L50,22 L75,16 L100,20 L125,14 L150,18 L175,12 L200,16"
+              fill="none"
+              stroke="#0891b2"
+              strokeWidth="2"
+            />
+          </svg>
+          <div className="mt-auto flex items-center justify-between">
+            <span className="inline-flex items-center gap-1 rounded-full bg-cyan-50 px-2 py-0.5 text-[11.5px] font-semibold text-cyan-600">
+              ↑{' '}
+              {avgDaysInStock?.averageDays != null
+                ? `${avgDaysInStock.averageDays}d medios`
+                : 'en nave'}
+            </span>
+            <span className="text-[11.5px] text-[#6b645c]">
+              {showFinancials && stockValue
+                ? EUR.format(stockValue.totalStockValue) + ' valor'
+                : `${totalPublicados} publicados`}
+            </span>
+          </div>
+        </div>
+
+        {/* 3 — Pipeline activo */}
+        <div className="flex flex-col gap-3.5 rounded-[14px] border border-[#e6dfd0] bg-white p-6">
+          <div className="flex items-start justify-between">
+            <span className="font-mono text-[10px] font-medium uppercase tracking-[0.14em] text-[#6b645c]">
+              Pipeline activo
+            </span>
+            <div className="grid h-8 w-8 place-items-center rounded-lg bg-violet-100 text-violet-700">
+              <svg
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.6"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                className="h-4 w-4"
+              >
+                <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
+                <circle cx="9" cy="7" r="4" />
+                <path d="M22 21v-2a4 4 0 0 0-3-3.87" />
+                <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+              </svg>
+            </div>
+          </div>
+          <div className="text-[32px] font-bold tabular-nums leading-none tracking-[-0.025em]">
+            {totalSellerActive + totalBuyerActive}
+            <span className="ml-1 text-[18px] font-medium text-[#6b645c]">leads</span>
+          </div>
+          <div className="mt-auto flex gap-[14px] text-[12px]">
+            <div>
+              <div className="font-mono text-[10px] tracking-[0.06em] text-[#6b645c]">
+                VENDEDORES
+              </div>
+              <div className="mt-0.5 font-semibold">{totalSellerActive} activos</div>
+            </div>
+            <div>
+              <div className="font-mono text-[10px] tracking-[0.06em] text-[#6b645c]">
+                COMPRADORES
+              </div>
+              <div className="mt-0.5 font-semibold">{totalBuyerActive} activos</div>
+            </div>
+          </div>
+          <div className="flex items-center justify-between">
+            <span className="inline-flex items-center gap-1 rounded-full bg-violet-100 px-2 py-0.5 text-[11.5px] font-semibold text-violet-700">
+              {salesMoM.current} vendidos este mes
+            </span>
+          </div>
+        </div>
+
+        {/* 4 — Requieren acción */}
+        <div
+          className="flex flex-col gap-3.5 rounded-[14px] p-6"
+          style={{
+            border: requiresAction > 0 ? '1px solid #dc2626' : '1px solid #e6dfd0',
+            background: requiresAction > 0 ? 'linear-gradient(180deg, #fff, #fef5f5)' : '#fff',
+          }}
+        >
+          <div className="flex items-start justify-between">
+            <span
+              className="font-mono text-[10px] font-medium uppercase tracking-[0.14em]"
+              style={{ color: requiresAction > 0 ? '#dc2626' : '#6b645c' }}
+            >
+              Requieren acción
+            </span>
+            <div
+              className="grid h-8 w-8 place-items-center rounded-lg"
+              style={{
+                background: requiresAction > 0 ? '#fde8e8' : '#f5f0e6',
+                color: requiresAction > 0 ? '#dc2626' : '#6b645c',
+              }}
+            >
+              <AlertTriangle className="h-4 w-4" />
+            </div>
+          </div>
+          <div
+            className="text-[32px] font-bold tabular-nums leading-none tracking-[-0.025em]"
+            style={{ color: requiresAction > 0 ? '#dc2626' : '#0a0a0a' }}
+          >
+            {requiresAction}
+          </div>
+          <div className="mt-auto text-[12px] leading-relaxed text-[#2a2622]">
+            {incompleteExpedientes.length > 0 && (
+              <span>
+                {incompleteExpedientes.length} expediente
+                {incompleteExpedientes.length !== 1 ? 's' : ''}
+              </span>
+            )}
+            {stagnantVehicles.length > 0 && (
               <>
-                <Card>
-                  <CardContent className="pt-6">
-                    <div className="flex items-center gap-1">
-                      <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                        Días medios en stock
-                      </p>
-                      <InfoTooltip text="Media de días que llevan en nave los vehículos activos (Nuevo, Tasado, Publicado, Reservado). Se calcula desde la fecha de entrada registrada o la fecha de creación del expediente." />
-                    </div>
-                    <p className="mt-1 text-3xl font-bold">
-                      {avgDaysInStock.averageDays !== null ? `${avgDaysInStock.averageDays}d` : '—'}
-                    </p>
-                    <p className="mt-0.5 text-xs text-muted-foreground">vehículos activos</p>
-                  </CardContent>
-                </Card>
-                <Card>
-                  <CardContent className="pt-6">
-                    <div className="flex items-center gap-1">
-                      <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                        Más de 90 días en nave
-                      </p>
-                      <InfoTooltip text="Vehículos activos que llevan más de 90 días sin venderse. Por encima de este umbral es recomendable revisar el precio o la estrategia de publicación." />
-                    </div>
-                    <p
-                      className={`mt-1 text-3xl font-bold ${avgDaysInStock.over90Count > 0 ? 'text-amber-600' : ''}`}
-                    >
-                      {avgDaysInStock.over90Count}
-                    </p>
-                    <p className="mt-0.5 text-xs text-muted-foreground">
-                      requieren acción comercial
-                    </p>
-                  </CardContent>
-                </Card>
+                {incompleteExpedientes.length > 0 ? ' · ' : ''}
+                {stagnantVehicles.length} estancado{stagnantVehicles.length !== 1 ? 's' : ''}
               </>
             )}
-            {isAdmin && workshopCostsLast30 && (
-              <Card>
-                <CardContent className="pt-6">
-                  <div className="flex items-center gap-1">
-                    <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                      Costes taller (30d)
-                    </p>
-                    <InfoTooltip text="Suma de costes generados por órdenes de taller completadas en los últimos 30 días. Incluye mano de obra y piezas imputadas a los vehículos." />
-                  </div>
-                  <p className="mt-1 text-3xl font-bold">
-                    {workshopTotal.toLocaleString('es-ES', {
-                      style: 'currency',
-                      currency: 'EUR',
-                      maximumFractionDigits: 0,
-                    })}
-                  </p>
-                  <p className="mt-0.5 text-xs text-muted-foreground">solo costes de órdenes</p>
-                </CardContent>
-              </Card>
+            {openTickets > 0 && (
+              <>
+                {incompleteExpedientes.length > 0 || stagnantVehicles.length > 0 ? '\n' : ''}
+                {openTickets} ticket{openTickets !== 1 ? 's' : ''} abierto
+                {openTickets !== 1 ? 's' : ''}
+              </>
+            )}
+            {requiresAction === 0 && <span className="text-[#6b645c]">Todo en orden 🎉</span>}
+          </div>
+          {requiresAction > 0 && (
+            <div className="flex items-center justify-between">
+              <span className="inline-flex items-center gap-1 rounded-full bg-red-50 px-2 py-0.5 text-[11.5px] font-semibold text-red-600">
+                ↓ {Math.max(incompleteExpedientes.length, 1)} críticos
+              </span>
+              <Link href="/vendedores" className="text-[12px] font-semibold text-red-600">
+                Ver todo →
+              </Link>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* ── Resumen Operativo ──────────────────────────────────────────────── */}
+      <SectionEyebrow label="Resumen operativo" color="info" />
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+        <MiniKPI
+          label="Vehículos publicados"
+          value={totalPublicados}
+          unit={`/ ${stockActiveCount} stock`}
+          sub={totalPublicados === 0 ? '↓ ninguno publicado' : `${totalPublicados} en portales`}
+          subColor={totalPublicados === 0 ? 'down' : 'default'}
+        />
+        <MiniKPI
+          label="Ventas este mes"
+          value={salesMoM.current}
+          unit="veh."
+          valueColor="ok"
+          sub={`${salesTrend === 'up' ? '↑' : salesTrend === 'down' ? '↓' : '→'} vs ${salesMoM.previous} mes anterior`}
+          subColor={salesTrend === 'up' ? 'up' : salesTrend === 'down' ? 'down' : 'default'}
+        />
+        <MiniKPI label="Garantías activas" value={activeWarranties} sub="no expiradas" />
+        <MiniKPI
+          label="+90 días en nave"
+          value={avgDaysInStock?.over90Count ?? 0}
+          unit="veh."
+          valueColor={avgDaysInStock && avgDaysInStock.over90Count > 0 ? 'warn' : 'default'}
+          sub="acción comercial"
+          variant={avgDaysInStock && avgDaysInStock.over90Count > 0 ? 'alert' : 'default'}
+        />
+        {isAdmin && (
+          <MiniKPI
+            label="Costes taller 30d"
+            value={workshopTotal > 0 ? EUR.format(workshopTotal) : '0 €'}
+            sub="órdenes cerradas"
+          />
+        )}
+        {!isAdmin && (
+          <MiniKPI
+            label="Follow-ups"
+            value={pendingFollowups}
+            valueColor={pendingFollowups > 0 ? 'info' : 'default'}
+            sub="día 7 y día 30 sin enviar"
+          />
+        )}
+      </div>
+
+      {/* ── Resumen Financiero (ADMIN + MARKETING) ──────────────────────────── */}
+      {showFinancials && stockValue && (
+        <>
+          <SectionEyebrow label="Resumen financiero" color="ok" />
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+            <MiniKPI
+              label="Capital comprometido"
+              value={EUR.format(stockValue.committedInvestment)}
+              sub={`precio compra · ${stockValue.vehicleCount} veh.`}
+            />
+            <MiniKPI
+              label="Margen potencial stock"
+              value={EUR.format(stockValue.potentialMargin)}
+              valueColor={stockValue.potentialMargin >= 0 ? 'ok' : 'bad'}
+              sub="venta − compra − costes"
+            />
+            {isAdmin && pubToSoldRate && (
+              <MiniKPI
+                label="Tasa publicado → vendido"
+                value={pubToSoldRate.rate !== null ? `${pubToSoldRate.rate.toFixed(1)}%` : '—'}
+                valueColor="ok"
+                sub={`${pubToSoldRate.sold} vendidos / ${pubToSoldRate.published} pub.`}
+              />
+            )}
+            {isAdmin && (
+              <MiniKPI
+                label="Margen promedio"
+                value={avgMargin !== null ? `${avgMargin.toFixed(1)}%` : '—'}
+                valueColor={avgMargin !== null && avgMargin >= 4 ? 'ok' : 'default'}
+                sub={`${vehiclesWithMargin.length} vehículos`}
+              />
             )}
           </div>
-
-          {/* Evolución de stock (chart) — ADMIN + MARKETING */}
-          {showFinancials && stockHistory.length > 0 && (
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-1.5 text-base">
-                  Evolución del stock (12 meses)
-                  <InfoTooltip
-                    text="Historial mensual aproximado del número de vehículos en nave y su valor total. Los datos se recalculan cada 5 minutos. Es una estimación basada en fechas de creación y último estado."
-                    side="right"
-                  />
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <StockEvolutionChart data={stockHistory} />
-              </CardContent>
-            </Card>
-          )}
-        </section>
+        </>
       )}
 
-      {/* ── Sección 4: Operativas — alertas + distribución + funnels ─────────── */}
-      <section className="space-y-4">
-        <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-          Operativas
-        </h2>
+      {/* ── Hoy: Agenda + Pipeline ─────────────────────────────────────────── */}
+      {(isAdmin || isAgente) && (
+        <>
+          <SectionEyebrow label="Hoy" color="info" />
+          <div className="grid gap-[14px] lg:grid-cols-[1.15fr_1fr]">
+            {/* Action stack */}
+            <div className="overflow-hidden rounded-[14px] border border-[#e6dfd0] bg-white">
+              <div className="flex items-center justify-between border-b border-[#e6dfd0] px-6 py-[18px]">
+                <h3 className="text-[16px] font-semibold tracking-[-0.01em]">Tu agenda</h3>
+                {agendaSlice.length > 0 && (
+                  <span className="rounded-full bg-red-600 px-2.5 py-1 font-mono text-[10px] font-semibold uppercase tracking-[0.12em] text-white">
+                    {agendaSlice.length} pendientes
+                  </span>
+                )}
+              </div>
+              {agendaSlice.length === 0 ? (
+                <div className="px-6 py-8 text-center text-sm text-[#6b645c]">
+                  Todo en orden. No hay tareas pendientes 🎉
+                </div>
+              ) : (
+                agendaSlice.map((item, i) => (
+                  <Link
+                    key={i}
+                    href={item.href}
+                    className="grid items-center gap-[14px] border-b border-[#e6dfd0] px-6 py-4 transition-colors last:border-b-0 hover:bg-[#faf6ed]"
+                    style={{ gridTemplateColumns: '32px 1fr auto' }}
+                  >
+                    <div className="flex justify-center">
+                      <span
+                        className="h-2 w-2 rounded-full"
+                        style={{
+                          background: dotClass[item.dot].bg,
+                          boxShadow: dotClass[item.dot].shadow,
+                        }}
+                      />
+                    </div>
+                    <div>
+                      <div className="text-[14px] font-semibold leading-tight">{item.title}</div>
+                      <div className="mt-0.5 font-mono text-[12px] tracking-[0.02em] text-[#6b645c]">
+                        {item.meta}
+                      </div>
+                    </div>
+                    <span className="whitespace-nowrap text-[12px] font-semibold text-blue-600">
+                      {item.cta} →
+                    </span>
+                  </Link>
+                ))
+              )}
+            </div>
 
-        {/* Alertas legales */}
-        {(isAdmin || isAgente) &&
-          (incompleteExpedientes.length > 0 ||
-            (vehiclesItvExpiring as typeof vehiclesItvExpiring).length > 0 ||
-            (vehiclesChargesPending as typeof vehiclesChargesPending).length > 0) && (
-            <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+            {/* Pipeline funnel */}
+            <div className="rounded-[14px] border border-[#e6dfd0] bg-white p-6">
+              <div className="mb-[22px] flex items-center justify-between">
+                <h3 className="text-[16px] font-semibold tracking-[-0.01em]">
+                  Funnel de conversión
+                </h3>
+                <span className="font-mono text-[10px] uppercase tracking-[0.12em] text-[#6b645c]">
+                  Acumulado
+                </span>
+              </div>
+              {/* Bars */}
+              <div
+                className="h-[220px]"
+                style={{
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(5, 1fr)',
+                  gap: '8px',
+                  alignItems: 'end',
+                }}
+              >
+                {funnelStages.map((stage) => (
+                  <div
+                    key={stage.label}
+                    className="flex flex-col items-center gap-2.5"
+                    style={{ height: '100%', justifyContent: 'flex-end' }}
+                  >
+                    <div
+                      className="relative w-full rounded-t-lg"
+                      style={{
+                        background: stage.grad,
+                        height: `${Math.max(stage.pct, 5)}%`,
+                        minHeight: '16px',
+                      }}
+                    >
+                      <span
+                        className="absolute text-[20px] font-bold leading-none tracking-[-0.02em] text-[#0a0a0a]"
+                        style={{
+                          top: '-28px',
+                          left: '50%',
+                          transform: 'translateX(-50%)',
+                        }}
+                      >
+                        {stage.value}
+                      </span>
+                    </div>
+                    <div className="text-center">
+                      <div className="text-[12px] font-semibold">{stage.label}</div>
+                      <div className="mt-0.5 font-mono text-[10px] tracking-[0.06em] text-[#6b645c]">
+                        {stage.pct > 0 ? `${Math.round(stage.pct)}%` : '0%'}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Canal PRO / CN */}
+              {isAdmin && (
+                <div
+                  className="mt-6 border-t border-[#e6dfd0] pt-5"
+                  style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}
+                >
+                  <div>
+                    <div className="font-mono text-[10px] font-semibold uppercase tracking-[0.12em] text-blue-600">
+                      Canal PRO
+                    </div>
+                    <div className="mt-1.5 flex items-baseline gap-2">
+                      <span className="text-[20px] font-bold tracking-[-0.02em]">
+                        {funnelComparison?.pro.total ?? proFunnel.leadsPro}
+                      </span>
+                      <span className="text-[12px] text-[#6b645c]">
+                        leads ·{' '}
+                        <span className="font-semibold text-[#1f8a5b]">
+                          {funnelComparison?.pro.soldRate != null
+                            ? `${funnelComparison.pro.soldRate.toFixed(0)}% conv`
+                            : proFunnel.totalRate != null
+                              ? `${proFunnel.totalRate.toFixed(0)}% conv`
+                              : '—'}
+                        </span>
+                      </span>
+                    </div>
+                    <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-blue-50">
+                      <div
+                        className="h-full rounded-full bg-blue-600"
+                        style={{
+                          width: `${Math.min(
+                            ((funnelComparison?.pro.soldRate ?? proFunnel.totalRate ?? 0) / 100) *
+                              100,
+                            100
+                          )}%`,
+                        }}
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <div className="font-mono text-[10px] font-semibold uppercase tracking-[0.12em] text-violet-700">
+                      Canal CN
+                    </div>
+                    <div className="mt-1.5 flex items-baseline gap-2">
+                      <span className="text-[20px] font-bold tracking-[-0.02em]">
+                        {funnelComparison?.cn.total ?? totalLeads - proFunnel.leadsPro}
+                      </span>
+                      <span className="text-[12px] text-[#6b645c]">
+                        leads ·{' '}
+                        <span
+                          className="font-semibold"
+                          style={{
+                            color: (funnelComparison?.cn.soldRate ?? 0) > 0 ? '#1f8a5b' : '#dc2626',
+                          }}
+                        >
+                          {funnelComparison?.cn.soldRate != null
+                            ? `${funnelComparison.cn.soldRate.toFixed(0)}% conv`
+                            : '—'}
+                        </span>
+                      </span>
+                    </div>
+                    <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-violet-100">
+                      <div
+                        className="h-full rounded-full bg-violet-600"
+                        style={{
+                          width: `${Math.min(
+                            ((funnelComparison?.cn.soldRate ?? 0) / 100) * 100,
+                            100
+                          )}%`,
+                        }}
+                      />
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        </>
+      )}
+
+      {/* ── Tendencias (ADMIN + MARKETING) ────────────────────────────────── */}
+      {showFinancials && stockHistory.length > 0 && (
+        <>
+          <SectionEyebrow label="Tendencias" color="info" />
+          <div className="rounded-[14px] border border-[#e6dfd0] bg-white p-6">
+            <div className="mb-5 flex items-center justify-between">
+              <div>
+                <h3 className="text-[16px] font-semibold tracking-[-0.01em]">
+                  Evolución del stock
+                </h3>
+                <p className="mt-1 text-[12px] text-[#6b645c]">
+                  Valor inmovilizado · últimos 12 meses
+                </p>
+              </div>
+            </div>
+            <div className="h-[220px]">
+              <StockEvolutionChart data={stockHistory} />
+            </div>
+            {stockValue && (
+              <div className="mt-4 flex gap-6 border-t border-[#e6dfd0] pt-4">
+                <div>
+                  <div className="font-mono text-[10px] uppercase tracking-[0.12em] text-[#6b645c]">
+                    Valor actual
+                  </div>
+                  <div className="mt-1 text-[20px] font-bold tracking-[-0.02em]">
+                    {EUR.format(stockValue.totalStockValue)}
+                    <span className="ml-1.5 rounded bg-[#e3f5ec] px-1 py-0.5 text-[11px] font-semibold text-[#1f8a5b]">
+                      ↑ activo
+                    </span>
+                  </div>
+                </div>
+                {avgDaysInStock && (
+                  <div>
+                    <div className="font-mono text-[10px] uppercase tracking-[0.12em] text-[#6b645c]">
+                      Días medios stock
+                    </div>
+                    <div className="mt-1 text-[20px] font-bold tracking-[-0.02em]">
+                      {avgDaysInStock.averageDays ?? '—'}d
+                    </div>
+                  </div>
+                )}
+                <div>
+                  <div className="font-mono text-[10px] uppercase tracking-[0.12em] text-[#6b645c]">
+                    Vehículos en nave
+                  </div>
+                  <div className="mt-1 text-[20px] font-bold tracking-[-0.02em]">
+                    {stockValue.vehicleCount}
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        </>
+      )}
+
+      {/* ── Alertas legales (ADMIN + AGENTE) ──────────────────────────────── */}
+      {(isAdmin || isAgente) &&
+        (incompleteExpedientes.length > 0 ||
+          (vehiclesItvExpiring as typeof vehiclesItvExpiring).length > 0 ||
+          (vehiclesChargesPending as typeof vehiclesChargesPending).length > 0) && (
+          <>
+            <SectionEyebrow label="Alertas legales" color="bad" />
+            <div className="grid grid-cols-1 gap-[14px] lg:grid-cols-3">
               {incompleteExpedientes.length > 0 && (
-                <Card className="border-amber-200">
-                  <CardHeader className="pb-3">
-                    <CardTitle className="flex items-center gap-2 text-sm text-amber-700">
-                      <FileWarning className="h-4 w-4" />
-                      Expedientes incompletos ({incompleteExpedientes.length})
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-2">
+                <div
+                  className="rounded-[14px] p-[22px]"
+                  style={{
+                    border: '1px solid #d97706',
+                    background: 'linear-gradient(180deg, #fff, #fffbf2)',
+                  }}
+                >
+                  <div className="mb-4 flex items-center gap-2 text-[14px] font-semibold text-amber-700">
+                    <FileWarning className="h-4 w-4" />
+                    Expedientes incompletos ({incompleteExpedientes.length})
+                  </div>
+                  <div className="space-y-2">
                     {incompleteExpedientes.map((v) => (
                       <div key={v.id} className="flex items-center justify-between gap-2">
                         <Link
                           href={v.sellerLeadId ? `/vendedores/${v.sellerLeadId}` : '#'}
-                          className="truncate text-sm hover:underline"
+                          className="truncate text-[13px] text-[#2a2622] hover:underline"
                         >
                           {v.brand} {v.model} {v.year ?? ''}
                         </Link>
                         <span
-                          className={`shrink-0 rounded-full px-2 py-0.5 text-xs font-medium ${v.completionPct >= 60 ? 'bg-amber-100 text-amber-700' : 'bg-red-100 text-red-700'}`}
+                          className={`shrink-0 rounded-full px-2 py-0.5 text-[11px] font-semibold ${v.completionPct >= 60 ? 'bg-amber-100 text-amber-700' : 'bg-red-100 text-red-700'}`}
                         >
                           {v.completionPct}%
                         </span>
                       </div>
                     ))}
-                    <p className="pt-1 text-xs text-muted-foreground">
-                      Vehículos TASADOS sin expediente completo
-                    </p>
-                  </CardContent>
-                </Card>
+                  </div>
+                </div>
               )}
-
               {(vehiclesItvExpiring as typeof vehiclesItvExpiring).length > 0 && (
-                <Card className="border-orange-200">
-                  <CardHeader className="pb-3">
-                    <CardTitle className="flex items-center gap-2 text-sm text-orange-700">
-                      <AlertTriangle className="h-4 w-4" />
-                      ITV próxima a vencer (
-                      {(vehiclesItvExpiring as typeof vehiclesItvExpiring).length})
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-2">
+                <div
+                  className="rounded-[14px] p-[22px]"
+                  style={{
+                    border: '1px solid #f97316',
+                    background: 'linear-gradient(180deg, #fff, #fff7f2)',
+                  }}
+                >
+                  <div className="mb-4 flex items-center gap-2 text-[14px] font-semibold text-orange-700">
+                    <AlertTriangle className="h-4 w-4" />
+                    ITV próxima a vencer (
+                    {(vehiclesItvExpiring as typeof vehiclesItvExpiring).length})
+                  </div>
+                  <div className="space-y-2">
                     {(vehiclesItvExpiring as typeof vehiclesItvExpiring).map((v) => {
                       const daysLeft = v.itvValidUntil
                         ? Math.floor(
                             (v.itvValidUntil.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)
                           )
                         : null
-                      const isCritical = daysLeft !== null && daysLeft < 15
                       return (
                         <div key={v.id} className="flex items-center justify-between gap-2">
                           <Link
                             href={v.sellerLead?.id ? `/vendedores/${v.sellerLead.id}` : '#'}
-                            className="truncate text-sm hover:underline"
+                            className="truncate text-[13px] text-[#2a2622] hover:underline"
                           >
                             {v.brand} {v.model} {v.year ?? ''}
                           </Link>
                           <span
-                            className={`shrink-0 rounded-full px-2 py-0.5 text-xs font-medium ${isCritical ? 'bg-red-100 text-red-700' : 'bg-orange-100 text-orange-700'}`}
+                            className={`shrink-0 rounded-full px-2 py-0.5 text-[11px] font-semibold ${daysLeft !== null && daysLeft < 15 ? 'bg-red-100 text-red-700' : 'bg-orange-100 text-orange-700'}`}
                           >
                             {daysLeft !== null ? (daysLeft < 0 ? 'Vencida' : `${daysLeft}d`) : '—'}
                           </span>
                         </div>
                       )
                     })}
-                    <p className="pt-1 text-xs text-muted-foreground">
-                      Vehículos PUBLICADOS · ITV &lt; 60 días
-                    </p>
-                  </CardContent>
-                </Card>
+                  </div>
+                </div>
               )}
-
               {(vehiclesChargesPending as typeof vehiclesChargesPending).length > 0 && (
-                <Card className="border-red-200">
-                  <CardHeader className="pb-3">
-                    <CardTitle className="flex items-center gap-2 text-sm text-red-700">
-                      <ShieldAlert className="h-4 w-4" />
-                      Cargas DGT pendientes (
-                      {(vehiclesChargesPending as typeof vehiclesChargesPending).length})
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-2">
+                <div
+                  className="rounded-[14px] p-[22px]"
+                  style={{
+                    border: '1px solid #dc2626',
+                    background: 'linear-gradient(180deg, #fff, #fef5f5)',
+                  }}
+                >
+                  <div className="mb-4 flex items-center gap-2 text-[14px] font-semibold text-red-700">
+                    <ShieldAlert className="h-4 w-4" />
+                    Cargas DGT pendientes (
+                    {(vehiclesChargesPending as typeof vehiclesChargesPending).length})
+                  </div>
+                  <div className="space-y-2">
                     {(vehiclesChargesPending as typeof vehiclesChargesPending).map((v) => {
                       const daysSince = Math.floor(
                         (now.getTime() - v.createdAt.getTime()) / (1000 * 60 * 60 * 24)
@@ -783,298 +1219,299 @@ export default async function DashboardPage({
                         <div key={v.id} className="flex items-center justify-between gap-2">
                           <Link
                             href={v.sellerLead?.id ? `/vendedores/${v.sellerLead.id}` : '#'}
-                            className="truncate text-sm hover:underline"
+                            className="truncate text-[13px] text-[#2a2622] hover:underline"
                           >
                             {v.brand} {v.model} {v.year ?? ''}
                           </Link>
-                          <span className="shrink-0 rounded-full bg-red-100 px-2 py-0.5 text-xs font-medium text-red-700">
+                          <span className="shrink-0 rounded-full bg-red-100 px-2 py-0.5 text-[11px] font-semibold text-red-700">
                             {daysSince}d
                           </span>
                         </div>
                       )
                     })}
-                    <p className="pt-1 text-xs text-muted-foreground">
-                      Sin verificar cargas desde hace +72h
-                    </p>
-                  </CardContent>
-                </Card>
+                  </div>
+                </div>
               )}
             </div>
-          )}
+          </>
+        )}
 
-        {/* Distribución por estado */}
-        <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-          <DistributionCard
-            title="Vendedores por estado"
-            counts={sellerCounts}
-            labels={SELLER_LEAD_STATUS_LABELS}
-            classes={SELLER_LEAD_STATUS_CLASSES}
-            order={[
+      {/* ── Detalle por estado ─────────────────────────────────────────────── */}
+      <SectionEyebrow label="Detalle por estado" color="info" />
+      <div className="grid grid-cols-1 gap-[14px] sm:grid-cols-3">
+        {/* Vendedores */}
+        <div className="rounded-[14px] border border-[#e6dfd0] bg-white p-[22px]">
+          <div className="mb-4 flex items-baseline justify-between">
+            <h4 className="text-[14px] font-semibold tracking-[-0.005em]">Vendedores</h4>
+            <span className="font-mono text-[10px] tracking-[0.1em] text-[#6b645c]">
+              TOTAL {sellerTotal}
+            </span>
+          </div>
+          {(
+            [
               'NUEVO',
               'CONTACTADO',
               'CUALIFICADO',
               'EN_NEGOCIACION',
               'CERRADO',
               'DESCARTADO',
-            ]}
-          />
-          <DistributionCard
-            title="Compradores por estado"
-            counts={buyerCounts}
-            labels={BUYER_LEAD_STATUS_LABELS}
-            classes={BUYER_LEAD_STATUS_CLASSES}
-            order={['NUEVO', 'CONTACTADO', 'CUALIFICADO', 'EN_NEGOCIACION', 'CERRADO', 'PERDIDO']}
-          />
-          <DistributionCard
-            title="Vehículos por estado"
-            counts={vehicleCounts}
-            labels={VEHICLE_STATUS_LABELS}
-            classes={VEHICLE_STATUS_CLASSES}
-            order={['NUEVO', 'TASADO', 'PUBLICADO', 'RESERVADO', 'VENDIDO', 'DESCARTADO']}
-          />
+            ] as SellerLeadStatus[]
+          ).map((status, i) => (
+            <div
+              key={status}
+              className="flex items-center gap-3 py-2 text-[13px]"
+              style={{ borderTop: i > 0 ? '1px solid #e6dfd0' : 'none' }}
+            >
+              <span
+                className="h-1.5 w-1.5 flex-shrink-0 rounded-full"
+                style={{ background: STATUS_DOTS[status] }}
+              />
+              <span className="flex-1 text-[#2a2622]">{SELLER_LEAD_STATUS_LABELS[status]}</span>
+              <span className="font-mono font-semibold text-[#0a0a0a]">
+                {sellerMap.get(status) ?? 0}
+              </span>
+            </div>
+          ))}
         </div>
 
-        {/* Funnel Pro vs CN — solo ADMIN */}
-        {isAdmin && funnelComparison && (
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-1.5 text-base">
-                Comparativa funnels Pro vs CN
-                <InfoTooltip
-                  text="Embudo de conversión del canal Pro (leads del formulario web /vender) frente al canal CN (leads captados directamente por el equipo). Muestra cuántos leads llegan a publicado y a vendido en cada canal."
-                  side="right"
-                />
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <FunnelComparison data={funnelComparison} />
-            </CardContent>
-          </Card>
-        )}
-
-        {/* Funnel Pro (legado) */}
-        {!isAdmin && (
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-1.5 text-base">
-                Conversión canal Pro
-                <InfoTooltip
-                  text="Leads recibidos por el formulario web (/vender) que llegaron a publicado y a vendido. Mide la eficacia del canal de captación online."
-                  side="right"
-                />
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <ProFunnelView
-                leadsPro={proFunnel.leadsPro}
-                publicados={proFunnel.publicados}
-                vendidos={proFunnel.vendidos}
-                pubRate={proFunnel.pubRate}
-                vendRate={proFunnel.vendRate}
-                totalRate={proFunnel.totalRate}
+        {/* Compradores */}
+        <div className="rounded-[14px] border border-[#e6dfd0] bg-white p-[22px]">
+          <div className="mb-4 flex items-baseline justify-between">
+            <h4 className="text-[14px] font-semibold tracking-[-0.005em]">Compradores</h4>
+            <span className="font-mono text-[10px] tracking-[0.1em] text-[#6b645c]">
+              TOTAL {buyerTotal}
+            </span>
+          </div>
+          {(
+            [
+              'NUEVO',
+              'CONTACTADO',
+              'CUALIFICADO',
+              'EN_NEGOCIACION',
+              'CERRADO',
+              'PERDIDO',
+            ] as BuyerLeadStatus[]
+          ).map((status, i) => (
+            <div
+              key={status}
+              className="flex items-center gap-3 py-2 text-[13px]"
+              style={{ borderTop: i > 0 ? '1px solid #e6dfd0' : 'none' }}
+            >
+              <span
+                className="h-1.5 w-1.5 flex-shrink-0 rounded-full"
+                style={{ background: STATUS_DOTS[status] }}
               />
-            </CardContent>
-          </Card>
-        )}
-      </section>
+              <span className="flex-1 text-[#2a2622]">{BUYER_LEAD_STATUS_LABELS[status]}</span>
+              <span className="font-mono font-semibold text-[#0a0a0a]">
+                {buyerMap.get(status) ?? 0}
+              </span>
+            </div>
+          ))}
+        </div>
 
-      {/* ── Sección 5: Gráficos y tablas (ADMIN) ─────────────────────────── */}
+        {/* Vehículos */}
+        <div className="rounded-[14px] border border-[#e6dfd0] bg-white p-[22px]">
+          <div className="mb-4 flex items-baseline justify-between">
+            <h4 className="text-[14px] font-semibold tracking-[-0.005em]">Vehículos</h4>
+            <span className="font-mono text-[10px] tracking-[0.1em] text-[#6b645c]">
+              TOTAL {vehiclesTotal}
+            </span>
+          </div>
+          {(
+            [
+              'NUEVO',
+              'TASADO',
+              'PUBLICADO',
+              'RESERVADO',
+              'VENDIDO',
+              'DESCARTADO',
+            ] as VehicleStatus[]
+          ).map((status, i) => (
+            <div
+              key={status}
+              className="flex items-center gap-3 py-2 text-[13px]"
+              style={{ borderTop: i > 0 ? '1px solid #e6dfd0' : 'none' }}
+            >
+              <span
+                className="h-1.5 w-1.5 flex-shrink-0 rounded-full"
+                style={{ background: STATUS_DOTS[status] }}
+              />
+              <span className="flex-1 text-[#2a2622]">{VEHICLE_STATUS_LABELS[status]}</span>
+              <span className="font-mono font-semibold text-[#0a0a0a]">
+                {vehicleMap.get(status) ?? 0}
+              </span>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* ── Análisis avanzado (ADMIN) ──────────────────────────────────────── */}
       {isAdmin && (
-        <section className="space-y-4">
-          <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-            Análisis avanzado
-          </h2>
-
-          <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-            {/* Vehículos por comercial */}
-            {vehiclesPerCommercial.length > 0 && (
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-1.5 text-base">
-                    Vehículos por comercial
-                    <InfoTooltip
-                      text="Vehículos en stock activo (Nuevo, Tasado, Publicado, Reservado) y publicados actualmente, agrupados por el agente comercial responsable del expediente."
-                      side="right"
-                    />
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <VehiclesPerCommercial data={vehiclesPerCommercial} />
-                </CardContent>
-              </Card>
-            )}
-
-            {/* KPIs taller + postventa */}
-            <div className="space-y-4">
-              {avgWorkshopHours && (
-                <Card>
-                  <CardContent className="pt-6">
-                    <div className="flex items-center gap-1">
-                      <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                        Horas taller promedio / vehículo
-                      </p>
-                      <InfoTooltip text="Media de horas de taller invertidas por vehículo, calculada sobre todas las órdenes de trabajo completadas. Sirve para estimar el coste de preparación de nuevos ingresos." />
+        <>
+          <SectionEyebrow label="Análisis avanzado" color="purple" />
+          <div className="grid gap-[14px] lg:grid-cols-[1.4fr_1fr]">
+            {/* Horizontal bar chart — vehículos por comercial */}
+            <div className="rounded-[14px] border border-[#e6dfd0] bg-white p-[22px]">
+              <h3 className="mb-[18px] text-[16px] font-semibold tracking-[-0.01em]">
+                Vehículos por comercial
+              </h3>
+              {vehiclesPerCommercial.length === 0 ? (
+                <p className="text-[13px] text-[#6b645c]">Sin datos.</p>
+              ) : (
+                <div className="flex flex-col gap-3">
+                  {vehiclesPerCommercial.map((row, i) => (
+                    <div
+                      key={row.agentId}
+                      className="grid items-center gap-3"
+                      style={{ gridTemplateColumns: '100px 1fr 36px' }}
+                    >
+                      <span className="truncate text-[13px] font-medium">
+                        {row.agentName.split(' ')[0]} {row.agentName.split(' ')[1]?.[0]}.
+                      </span>
+                      <div className="h-3.5 overflow-hidden rounded bg-[#f5f0e6]">
+                        <div
+                          className="h-full rounded"
+                          style={{
+                            width: `${(row.active / barMax) * 100}%`,
+                            background: barGrads[i % barGrads.length],
+                          }}
+                        />
+                      </div>
+                      <span className="text-right text-[14px] font-bold tabular-nums">
+                        {row.active}
+                      </span>
                     </div>
-                    <p className="mt-1 text-3xl font-bold">
-                      {avgWorkshopHours.averageHours !== null
-                        ? `${avgWorkshopHours.averageHours.toFixed(1)}h`
-                        : '—'}
-                    </p>
-                    <p className="mt-0.5 text-xs text-muted-foreground">
-                      {avgWorkshopHours.vehicleCount} vehículos con órdenes completadas
-                    </p>
-                  </CardContent>
-                </Card>
-              )}
-              {avgPostventaCost && (
-                <Card>
-                  <CardContent className="pt-6">
-                    <div className="flex items-center gap-1">
-                      <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                        Coste postventa promedio / vehículo
-                      </p>
-                      <InfoTooltip text="Media del coste real de tickets de postventa por vehículo afectado. Ayuda a calibrar el impacto real de la garantía en el margen neto de cada venta." />
-                    </div>
-                    <p className="mt-1 text-3xl font-bold">
-                      {avgPostventaCost.averageCost !== null
-                        ? EUR.format(avgPostventaCost.averageCost)
-                        : '—'}
-                    </p>
-                    <p className="mt-0.5 text-xs text-muted-foreground">
-                      {avgPostventaCost.vehicleCount} vehículos con incidencias
-                    </p>
-                  </CardContent>
-                </Card>
+                  ))}
+                </div>
               )}
             </div>
+
+            {/* Mini stat cards */}
+            <div className="flex flex-col gap-[14px]">
+              <div className="rounded-[14px] border border-[#e6dfd0] bg-white px-[22px] py-[18px]">
+                <div className="font-mono text-[10px] font-semibold uppercase tracking-[0.12em] text-[#6b645c]">
+                  Horas taller promedio / vehículo
+                </div>
+                <div className="mt-1.5 text-[26px] font-bold tabular-nums tracking-[-0.025em]">
+                  {avgWorkshopHours?.averageHours != null
+                    ? `${avgWorkshopHours.averageHours.toFixed(1)} h`
+                    : '—'}
+                </div>
+                <div className="mt-0.5 text-[11.5px] text-[#6b645c]">
+                  {avgWorkshopHours?.vehicleCount ?? 0} vehículos con órdenes completadas
+                </div>
+              </div>
+              <div className="rounded-[14px] border border-[#e6dfd0] bg-white px-[22px] py-[18px]">
+                <div className="font-mono text-[10px] font-semibold uppercase tracking-[0.12em] text-[#6b645c]">
+                  Coste postventa promedio / vehículo
+                </div>
+                <div
+                  className="mt-1.5 text-[26px] font-bold tabular-nums tracking-[-0.025em]"
+                  style={{
+                    color:
+                      avgPostventaCost?.averageCost != null && avgPostventaCost.averageCost > 200
+                        ? '#dc2626'
+                        : '#0a0a0a',
+                  }}
+                >
+                  {avgPostventaCost?.averageCost != null
+                    ? EUR.format(avgPostventaCost.averageCost)
+                    : '—'}
+                </div>
+                <div className="mt-0.5 text-[11.5px] text-[#6b645c]">
+                  {avgPostventaCost?.vehicleCount ?? 0} vehículos con incidencias en garantía
+                </div>
+              </div>
+            </div>
           </div>
+        </>
+      )}
 
-          {/* Top 5 rentabilidad */}
-          {top5Rentabilidad.length > 0 && (
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-1.5 text-base">
-                  Top 5 vehículos por margen neto
-                  <InfoTooltip
-                    text="Los 5 vehículos con mayor margen neto porcentual entre todos los que tienen precio de compra y venta registrados. El % se calcula como (venta − compra − costes) / venta."
-                    side="right"
-                  />
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="border-b text-left text-xs text-muted-foreground">
-                      <th className="py-1.5 font-medium">Vehículo</th>
-                      <th className="py-1.5 text-right font-medium">Margen neto</th>
-                      <th className="py-1.5 text-right font-medium">%</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {top5Rentabilidad.map((v) => (
-                      <tr key={v.id} className="border-b last:border-0">
-                        <td className="py-1.5">
-                          {v.sellerLeadId ? (
-                            <a
-                              href={`/vendedores/${v.sellerLeadId}`}
-                              className="font-medium hover:underline"
-                            >
-                              {v.brand} {v.model} {v.year ?? ''}
-                            </a>
-                          ) : (
-                            <span className="font-medium">
-                              {v.brand} {v.model} {v.year ?? ''}
-                            </span>
-                          )}
-                        </td>
-                        <td
-                          className={`py-1.5 text-right font-semibold ${v.netMargin < 0 ? 'text-red-600' : 'text-green-600'}`}
-                        >
-                          {v.netMargin.toLocaleString('es-ES', {
-                            style: 'currency',
-                            currency: 'EUR',
-                            maximumFractionDigits: 0,
-                          })}
-                        </td>
-                        <td
-                          className={`py-1.5 text-right text-xs font-medium ${v.netMarginPct < 0 ? 'text-red-600' : 'text-cn-ink-700'}`}
-                        >
-                          {v.netMarginPct.toFixed(1)}%
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </CardContent>
-            </Card>
-          )}
+      {/* ── Tiempo medio por estado ────────────────────────────────────────── */}
+      <SectionEyebrow label="Tiempo medio por estado" color="teal" />
+      <div className="grid grid-cols-1 gap-[14px] sm:grid-cols-3">
+        <TimeCard title="Vendedores" rows={sellerStateMedians} labels={SELLER_LEAD_STATUS_LABELS} />
+        <TimeCard title="Compradores" rows={buyerStateMedians} labels={BUYER_LEAD_STATUS_LABELS} />
+        <TimeCard title="Vehículos" rows={vehicleStateMedians} labels={VEHICLE_STATUS_LABELS} />
+      </div>
 
-          {/* Tiempo medio por estado */}
-          <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-            <StateMediansCard
-              title="Tiempo medio · vendedores"
-              rows={sellerStateMedians}
-              labels={SELLER_LEAD_STATUS_LABELS}
-              info="Mediana del tiempo que los leads de vendedores han permanecido en cada estado antes de avanzar al siguiente. Solo incluye transiciones ya completadas."
-            />
-            <StateMediansCard
-              title="Tiempo medio · compradores"
-              rows={buyerStateMedians}
-              labels={BUYER_LEAD_STATUS_LABELS}
-              info="Mediana del tiempo que los leads de compradores han permanecido en cada estado antes de avanzar. Solo incluye transiciones ya completadas."
-            />
-            <StateMediansCard
-              title="Tiempo medio · vehículos"
-              rows={vehicleStateMedians}
-              labels={VEHICLE_STATUS_LABELS}
-              info="Mediana del tiempo que los vehículos han permanecido en cada estado (Nuevo, Tasado, Publicado…) antes de transicionar al siguiente. Solo incluye transiciones ya completadas."
-            />
+      {/* ── Top vehículos por margen (ADMIN) ──────────────────────────────── */}
+      {isAdmin && top5Rentabilidad.length > 0 && (
+        <>
+          <div className="mb-0 mt-9" />
+          <div className="rounded-[14px] border border-[#e6dfd0] bg-white p-6">
+            <h3 className="text-[16px] font-semibold tracking-[-0.01em]">
+              Top vehículos por margen neto
+            </h3>
+            <p className="mb-[18px] mt-1 text-[12px] text-[#6b645c]">
+              Ordenado por margen neto porcentual
+            </p>
+            {top5Rentabilidad.map((v, i) => {
+              const maxMargin = top5Rentabilidad[0]?.netMarginPct ?? 1
+              const barPct = maxMargin > 0 ? (v.netMarginPct / maxMargin) * 100 : 0
+              return (
+                <div
+                  key={v.id}
+                  className="grid items-center gap-[18px] py-3.5"
+                  style={{
+                    gridTemplateColumns: '24px 1fr 140px auto auto',
+                    borderBottom: i < top5Rentabilidad.length - 1 ? '1px solid #e6dfd0' : 'none',
+                  }}
+                >
+                  <span className="font-mono text-[11px] font-medium text-[#6b645c]">
+                    {String(i + 1).padStart(2, '0')}
+                  </span>
+                  <div>
+                    {v.sellerLeadId ? (
+                      <Link
+                        href={`/vendedores/${v.sellerLeadId}`}
+                        className="text-[14px] font-semibold hover:underline"
+                      >
+                        {v.brand} {v.model} {v.year ?? ''}
+                      </Link>
+                    ) : (
+                      <span className="text-[14px] font-semibold">
+                        {v.brand} {v.model} {v.year ?? ''}
+                      </span>
+                    )}
+                  </div>
+                  <div className="h-1.5 overflow-hidden rounded-full bg-[#f5f0e6]">
+                    <div
+                      className="h-full rounded-full"
+                      style={{
+                        width: `${Math.max(barPct, 2)}%`,
+                        background: 'linear-gradient(90deg, #1f8a5b, #16a34a)',
+                      }}
+                    />
+                  </div>
+                  <span
+                    className="text-[16px] font-bold tracking-[-0.02em]"
+                    style={{ color: v.netMargin < 0 ? '#dc2626' : '#1f8a5b' }}
+                  >
+                    {v.netMargin >= 0 ? '+' : ''}
+                    {v.netMargin.toLocaleString('es-ES', {
+                      style: 'currency',
+                      currency: 'EUR',
+                      maximumFractionDigits: 0,
+                    })}
+                  </span>
+                  <span className="w-[44px] text-right font-mono text-[12px] text-[#6b645c]">
+                    {v.netMarginPct.toFixed(1)}%
+                  </span>
+                </div>
+              )
+            })}
           </div>
-        </section>
+        </>
       )}
 
-      {/* ── Sección 6: Vehículos estancados ──────────────────────────────── */}
-      {stagnantVehicles.length > 0 && (
-        <section className="space-y-4">
-          <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-            Vehículos estancados (&gt;90 días en estado actual)
-          </h2>
-          <Card>
-            <CardContent className="pt-6">
-              <StagnantVehiclesTable vehicles={stagnantVehicles} />
-            </CardContent>
-          </Card>
-        </section>
-      )}
-
-      {/* Tiempo medio — no-admin roles */}
-      {!isAdmin && (
-        <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-          <StateMediansCard
-            title="Tiempo medio · vendedores"
-            rows={sellerStateMedians}
-            labels={SELLER_LEAD_STATUS_LABELS}
-            info="Mediana del tiempo que los leads de vendedores han permanecido en cada estado antes de avanzar al siguiente. Solo incluye transiciones ya completadas."
-          />
-          <StateMediansCard
-            title="Tiempo medio · compradores"
-            rows={buyerStateMedians}
-            labels={BUYER_LEAD_STATUS_LABELS}
-            info="Mediana del tiempo que los leads de compradores han permanecido en cada estado antes de avanzar. Solo incluye transiciones ya completadas."
-          />
-          <StateMediansCard
-            title="Tiempo medio · vehículos"
-            rows={vehicleStateMedians}
-            labels={VEHICLE_STATUS_LABELS}
-            info="Mediana del tiempo que los vehículos han permanecido en cada estado (Nuevo, Tasado, Publicado…) antes de transicionar al siguiente. Solo incluye transiciones ya completadas."
-          />
-        </div>
-      )}
+      {/* bottom spacer */}
+      <div className="h-16" />
     </div>
   )
 }
 
-// ── helpers ───────────────────────────────────────────────────────────────────
+// ── Helpers ───────────────────────────────────────────────────────────────────
 
 function sumWhere<T extends string>(counts: { status: T; count: number }[], statuses: T[]): number {
   const set = new Set(statuses)
@@ -1151,236 +1588,145 @@ async function fetchVehicleStateMedians(
   return aggregateMediansByState<VehicleStatus>(entities, VEHICLE_STATUS_LABELS)
 }
 
-// ── subcomponentes ────────────────────────────────────────────────────────────
+// ── Sub-components ────────────────────────────────────────────────────────────
 
-function KPICard({
+function SectionEyebrow({
   label,
-  value,
-  hint,
-  info,
+  color = 'info',
 }: {
   label: string
-  value: number
-  hint?: string
-  info?: string
+  color?: 'info' | 'ok' | 'purple' | 'teal' | 'bad'
 }) {
+  const colorMap = {
+    info: '#2563eb',
+    ok: '#1f8a5b',
+    purple: '#7c3aed',
+    teal: '#0891b2',
+    bad: '#dc2626',
+  }
+  const c = colorMap[color]
   return (
-    <Card>
-      <CardContent className="pt-6">
-        <div className="flex items-center gap-1">
-          <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-            {label}
-          </p>
-          {info && <InfoTooltip text={info} />}
-        </div>
-        <p className="mt-1 text-3xl font-bold">{value}</p>
-        {hint && <p className="mt-0.5 text-xs text-muted-foreground">{hint}</p>}
-      </CardContent>
-    </Card>
+    <div
+      className="mb-4 mt-9 flex items-center gap-2.5 font-mono text-[10px] font-semibold uppercase tracking-[0.16em]"
+      style={{ color: c }}
+    >
+      <span className="inline-block h-[2px] w-3.5 rounded-sm" style={{ background: c }} />
+      {label}
+    </div>
   )
 }
 
-function SalesKPI({
-  current,
-  previous,
-  delta,
-  pctChange,
-  info,
+function MiniKPI({
+  label,
+  value,
+  unit,
+  sub,
+  valueColor = 'default',
+  subColor = 'default',
+  variant = 'default',
 }: {
-  current: number
-  previous: number
-  delta: number
-  pctChange: number | null
-  info?: string
+  label: string
+  value: string | number
+  unit?: string
+  sub?: string
+  valueColor?: 'default' | 'ok' | 'bad' | 'warn' | 'info'
+  subColor?: 'default' | 'up' | 'down'
+  variant?: 'default' | 'alert' | 'danger'
 }) {
-  const trend = delta > 0 ? 'up' : delta < 0 ? 'down' : 'flat'
-  const Icon = trend === 'up' ? TrendingUp : trend === 'down' ? TrendingDown : Minus
-  const color =
-    trend === 'up' ? 'text-green-600' : trend === 'down' ? 'text-red-600' : 'text-muted-foreground'
-  return (
-    <Card>
-      <CardContent className="pt-6">
-        <div className="flex items-center gap-1">
-          <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-            Ventas este mes
-          </p>
-          {info && <InfoTooltip text={info} />}
-        </div>
-        <p className="mt-1 text-3xl font-bold">{current}</p>
-        <div className={`mt-1 flex items-center gap-1 text-xs ${color}`}>
-          <Icon className="h-3 w-3" />
-          <span>
-            {delta > 0 ? '+' : ''}
-            {delta} vs mes anterior ({previous})
-            {pctChange !== null && ` · ${pctChange > 0 ? '+' : ''}${pctChange.toFixed(0)}%`}
-          </span>
-        </div>
-      </CardContent>
-    </Card>
-  )
-}
+  const borderStyle =
+    variant === 'alert'
+      ? { border: '1px solid #d97706', background: 'linear-gradient(180deg, #fff, #fffbf2)' }
+      : variant === 'danger'
+        ? { border: '1px solid #dc2626', background: 'linear-gradient(180deg, #fff, #fef5f5)' }
+        : {}
 
-function DistributionCard<T extends string>({
-  title,
-  counts,
-  labels,
-  classes,
-  order,
-}: {
-  title: string
-  counts: { status: T; count: number }[]
-  labels: Record<T, string>
-  classes: Record<T, string>
-  order: T[]
-}) {
-  const total = counts.reduce((a, c) => a + c.count, 0)
-  const map = new Map(counts.map((c) => [c.status, c.count]))
-  return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="text-base">{title}</CardTitle>
-      </CardHeader>
-      <CardContent>
-        {total === 0 ? (
-          <p className="text-sm text-muted-foreground">Sin datos.</p>
-        ) : (
-          <ul className="space-y-2">
-            {order.map((status) => {
-              const count = map.get(status) ?? 0
-              const pct = total === 0 ? 0 : (count / total) * 100
-              return (
-                <li key={status}>
-                  <div className="mb-1 flex items-center justify-between gap-2">
-                    <span
-                      className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${classes[status]}`}
-                    >
-                      {labels[status]}
-                    </span>
-                    <span className="text-sm font-semibold">{count}</span>
-                  </div>
-                  <div className="h-1.5 overflow-hidden rounded-full bg-muted">
-                    <div
-                      className="bg-campernova-accent h-full transition-all"
-                      style={{ width: `${pct}%` }}
-                    />
-                  </div>
-                </li>
-              )
-            })}
-            <li className="border-t pt-2 text-xs text-muted-foreground">Total: {total}</li>
-          </ul>
-        )}
-      </CardContent>
-    </Card>
-  )
-}
+  const valueColorMap = {
+    default: '#0a0a0a',
+    ok: '#1f8a5b',
+    bad: '#dc2626',
+    warn: '#d97706',
+    info: '#2563eb',
+  }
 
-function ProFunnelView({
-  leadsPro,
-  publicados,
-  vendidos,
-  pubRate,
-  vendRate,
-  totalRate,
-}: {
-  leadsPro: number
-  publicados: number
-  vendidos: number
-  pubRate: number | null
-  vendRate: number | null
-  totalRate: number | null
-}) {
-  if (leadsPro === 0)
-    return <p className="text-sm text-muted-foreground">Aún no hay leads del canal Pro.</p>
-  const max = leadsPro
-  const stages = [
-    { label: 'Leads recibidos (Pro)', value: leadsPro, pct: 100, rate: null as number | null },
-    {
-      label: 'Llegaron a publicado',
-      value: publicados,
-      pct: (publicados / max) * 100,
-      rate: pubRate,
-    },
-    { label: 'Vendidos', value: vendidos, pct: (vendidos / max) * 100, rate: vendRate },
-  ]
+  const subColorMap = {
+    default: '#6b645c',
+    up: '#1f8a5b',
+    down: '#dc2626',
+  }
+
   return (
-    <div className="space-y-3">
-      {stages.map((s) => (
-        <div key={s.label}>
-          <div className="mb-1 flex items-center justify-between gap-2">
-            <span className="text-sm font-medium">{s.label}</span>
-            <span className="text-sm">
-              <span className="font-semibold">{s.value}</span>
-              {s.rate !== null && (
-                <span className="ml-2 text-xs text-muted-foreground">
-                  {s.rate.toFixed(0)}% del paso anterior
-                </span>
-              )}
-            </span>
-          </div>
-          <div className="h-3 overflow-hidden rounded-md bg-muted">
-            <div
-              className="bg-campernova-primary h-full transition-all"
-              style={{ width: `${Math.max(s.pct, 0)}%` }}
-            />
-          </div>
-        </div>
-      ))}
-      {totalRate !== null && (
-        <p className="border-t pt-3 text-sm text-muted-foreground">
-          Conversión total lead Pro → venta:{' '}
-          <strong className="text-foreground">{totalRate.toFixed(1)}%</strong>
-        </p>
+    <div
+      className="flex flex-col gap-1 rounded-[12px] px-[18px] py-4"
+      style={
+        variant !== 'default' ? borderStyle : { border: '1px solid #e6dfd0', background: '#fff' }
+      }
+    >
+      <span
+        className={`font-mono text-[10px] font-semibold uppercase tracking-[0.12em]`}
+        style={{ color: variant === 'alert' ? '#d97706' : '#6b645c' }}
+      >
+        {label}
+      </span>
+      <span
+        className="mt-1 text-[22px] font-bold tabular-nums leading-[1.05] tracking-[-0.025em]"
+        style={{ color: valueColorMap[valueColor] }}
+      >
+        {value}
+        {unit && <span className="ml-0.5 text-[14px] font-medium text-[#6b645c]"> {unit}</span>}
+      </span>
+      {sub && (
+        <span className="mt-0.5 text-[11.5px]" style={{ color: subColorMap[subColor] }}>
+          <span className="font-semibold">{sub}</span>
+        </span>
       )}
     </div>
   )
 }
 
-function StateMediansCard<T extends string>({
+function TimeCard<T extends string>({
   title,
   rows,
   labels,
-  info,
 }: {
   title: string
   rows: StateMedianRow<T>[]
   labels: Record<T, string>
-  info?: string
 }) {
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-1.5 text-base">
-          {title}
-          {info && <InfoTooltip text={info} side="right" />}
-        </CardTitle>
-      </CardHeader>
-      <CardContent>
-        {rows.length === 0 ? (
-          <p className="text-sm text-muted-foreground">Sin transiciones completadas todavía.</p>
-        ) : (
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b text-left text-xs text-muted-foreground">
-                <th className="py-1.5 font-medium">Estado</th>
-                <th className="py-1.5 text-right font-medium">Mediana</th>
-                <th className="py-1.5 text-right font-medium">n</th>
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((r) => (
-                <tr key={r.status} className="border-b last:border-0">
-                  <td className="py-1.5">{labels[r.status]}</td>
-                  <td className="py-1.5 text-right font-medium">{formatDuration(r.medianMs)}</td>
-                  <td className="py-1.5 text-right text-xs text-muted-foreground">
-                    {r.sampleSize}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
-      </CardContent>
-    </Card>
+    <div className="rounded-[14px] border border-[#e6dfd0] bg-white p-[22px]">
+      <h4 className="mb-3.5 text-[14px] font-semibold tracking-[-0.005em]">{title}</h4>
+      {/* Column header */}
+      <div
+        className="grid items-center gap-3 pb-2 font-mono text-[10px] font-semibold uppercase tracking-[0.1em] text-[#b3aca0]"
+        style={{ gridTemplateColumns: '12px 1fr 60px 30px' }}
+      >
+        <span />
+        <span>Estado</span>
+        <span className="text-right">Mediana</span>
+        <span className="text-right">n</span>
+      </div>
+      {rows.length === 0 ? (
+        <p className="py-3 text-[13px] text-[#6b645c]">Sin transiciones completadas.</p>
+      ) : (
+        rows.map((r, i) => (
+          <div
+            key={r.status}
+            className="grid items-center gap-3 py-[9px] text-[13px]"
+            style={{
+              gridTemplateColumns: '12px 1fr 60px 30px',
+              borderTop: '1px solid #e6dfd0',
+            }}
+          >
+            <span
+              className="h-1.5 w-1.5 rounded-full"
+              style={{ background: TIME_DOTS[i % TIME_DOTS.length] }}
+            />
+            <span className="text-[#2a2622]">{labels[r.status]}</span>
+            <span className="text-right font-bold tabular-nums">{formatDuration(r.medianMs)}</span>
+            <span className="text-right font-mono text-[11px] text-[#6b645c]">{r.sampleSize}</span>
+          </div>
+        ))
+      )}
+    </div>
   )
 }
