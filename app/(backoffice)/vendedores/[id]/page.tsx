@@ -45,7 +45,19 @@ import { calculateLeadScore, calculateClosureProbability, leadScoreColor } from 
 import { generateLeadInsights, getNextAction } from '@/lib/lead-insights'
 import { LeadTabNav } from './lead-tab-nav'
 import type { LeadTab } from './lead-tab-nav'
-import { AlertTriangle, Info, CheckCircle2, Phone, Mail, MapPin, ChevronRight } from 'lucide-react'
+import {
+  AlertTriangle,
+  Info,
+  CheckCircle2,
+  Phone,
+  Mail,
+  MapPin,
+  ChevronRight,
+  ChevronLeft,
+  Archive,
+  MoreHorizontal,
+  MessageCircle,
+} from 'lucide-react'
 import { QuickAdvanceButton } from './quick-advance-button'
 import { InfoTooltip } from '@/components/info-tooltip'
 
@@ -319,100 +331,148 @@ export default async function FichaVendedorPage({
   // ── Layout ─────────────────────────────────────────────────────────────────
   return (
     <div className="-mx-6 -mt-6 flex min-h-full flex-col">
-      {/* ── Cabecera ── */}
-      <div className="border-b bg-background px-6 pb-0 pt-4">
-        {/* Breadcrumb */}
-        <nav className="mb-3 flex items-center gap-1 text-xs text-muted-foreground">
-          <span className="font-semibold text-sidebar-primary">CRM</span>
-          <ChevronRight className="h-3 w-3" />
-          <Link href="/vendedores" className="hover:text-foreground">
+      {/* ── Topbar sticky ── */}
+      <header className="sticky top-0 z-20 flex h-[73px] shrink-0 items-center justify-between border-b border-border bg-card px-8">
+        <nav className="flex items-center gap-2 font-mono text-[11px] uppercase tracking-[0.12em] text-muted-foreground">
+          <Link
+            href="/vendedores"
+            className="flex items-center gap-1 transition-colors hover:text-foreground"
+          >
+            <ChevronLeft className="h-3.5 w-3.5" />
             Vendedores
           </Link>
-          <ChevronRight className="h-3 w-3" />
-          <span className="text-foreground">{lead.name}</span>
+          <span className="text-muted-foreground/40">/</span>
+          <span className="font-semibold text-foreground">{lead.name}</span>
         </nav>
+        <div className="flex items-center gap-2">
+          <button className="flex h-8 w-8 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-muted hover:text-foreground">
+            <Archive className="h-4 w-4" />
+          </button>
+          <button className="flex h-8 w-8 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-muted hover:text-foreground">
+            <MoreHorizontal className="h-4 w-4" />
+          </button>
+          {lead.phone && (
+            <WhatsAppButton
+              phone={lead.phone}
+              message={sellerWhatsAppMessage(
+                lead.name,
+                v ? { type: v.type, brand: v.brand, model: v.model } : undefined
+              )}
+              leadId={lead.id}
+              leadType="seller"
+            />
+          )}
+          {primaryNextStatus && (
+            <QuickAdvanceButton
+              leadId={lead.id}
+              nextStatus={primaryNextStatus}
+              label={`Mover a ${SELLER_LEAD_STATUS_LABELS[primaryNextStatus as SellerLeadStatus]}`}
+            />
+          )}
+        </div>
+      </header>
 
-        {/* Lead identity row */}
-        <div className="flex items-start justify-between gap-4">
-          <div className="flex items-start gap-4">
-            {/* Avatar */}
-            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-foreground text-lg font-bold text-background">
-              {lead.name
-                .split(' ')
-                .slice(0, 2)
-                .map((w) => w[0])
-                .join('')
-                .toUpperCase()}
+      {/* ── Hero ── */}
+      <section className="border-b border-border bg-background px-10 pb-0 pt-7">
+        {/* Identity row */}
+        <div className="mb-6 flex items-center gap-6">
+          {/* Avatar 84px with status ring */}
+          <div
+            className={`flex h-[84px] w-[84px] shrink-0 items-center justify-center rounded-full border-4 text-2xl font-bold text-background ${
+              lead.status === 'CERRADO'
+                ? 'border-green-500 bg-green-600'
+                : lead.status === 'DESCARTADO'
+                  ? 'border-red-400 bg-slate-500'
+                  : lead.status === 'EN_NEGOCIACION'
+                    ? 'border-amber-400 bg-foreground'
+                    : 'border-sidebar-primary/30 bg-foreground'
+            }`}
+          >
+            {lead.name
+              .split(' ')
+              .slice(0, 2)
+              .map((w: string) => w[0])
+              .join('')
+              .toUpperCase()}
+          </div>
+
+          {/* Name + sub-info */}
+          <div className="min-w-0 flex-1">
+            <div className="flex flex-wrap items-center gap-3">
+              <h1 className="text-[28px] font-bold leading-tight tracking-[-0.02em]">
+                {lead.name}
+              </h1>
+              <span
+                className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-medium ${SELLER_LEAD_STATUS_CLASSES[lead.status as SellerLeadStatus] ?? ''}`}
+              >
+                {SELLER_LEAD_STATUS_LABELS[lead.status as SellerLeadStatus] ?? lead.status}
+              </span>
             </div>
-
-            {/* Name + info */}
-            <div>
-              <div className="flex items-center gap-2">
-                <h1 className="text-xl font-bold leading-tight">{lead.name}</h1>
-                <span
-                  className={`inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium ${SELLER_LEAD_STATUS_CLASSES[lead.status as SellerLeadStatus] ?? ''}`}
+            <div className="mt-1.5 flex flex-wrap items-center gap-4 text-sm text-muted-foreground">
+              {lead.email && (
+                <a
+                  href={`mailto:${lead.email}`}
+                  className="flex items-center gap-1.5 transition-colors hover:text-foreground"
                 >
-                  {SELLER_LEAD_STATUS_LABELS[lead.status as SellerLeadStatus] ?? lead.status}
-                </span>
-              </div>
-              <div className="mt-1 flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
-                {lead.email && (
-                  <span className="flex items-center gap-1">
-                    <Mail className="h-3 w-3" />
-                    {lead.email}
-                  </span>
-                )}
-                {lead.phone && (
-                  <span className="flex items-center gap-1">
-                    <Phone className="h-3 w-3" />
-                    {lead.phone}
-                  </span>
-                )}
-                {v?.location && (
-                  <span className="flex items-center gap-1">
-                    <MapPin className="h-3 w-3" />
-                    {v.location}
-                  </span>
-                )}
-                <span
-                  className={`rounded px-1.5 py-0.5 font-semibold uppercase tracking-wide ${lead.canal === 'PRO' ? 'bg-teal-100 text-teal-700' : 'bg-slate-100 text-slate-600'}`}
+                  <Mail className="h-3.5 w-3.5" />
+                  {lead.email}
+                </a>
+              )}
+              {lead.phone && (
+                <a
+                  href={`tel:${lead.phone}`}
+                  className="flex items-center gap-1.5 transition-colors hover:text-foreground"
                 >
-                  Canal {lead.canal}
+                  <Phone className="h-3.5 w-3.5" />
+                  {lead.phone}
+                </a>
+              )}
+              {v?.location && (
+                <span className="flex items-center gap-1.5">
+                  <MapPin className="h-3.5 w-3.5" />
+                  {v.location}
                 </span>
-              </div>
+              )}
+              <span
+                className={`rounded-md px-2 py-0.5 text-xs font-semibold uppercase tracking-wide ${
+                  lead.canal === 'PRO' ? 'bg-teal-100 text-teal-700' : 'bg-slate-100 text-slate-600'
+                }`}
+              >
+                Canal {lead.canal}
+              </span>
             </div>
           </div>
 
-          {/* Actions */}
+          {/* Circle contact buttons */}
           <div className="flex shrink-0 items-center gap-2">
             {lead.phone && (
-              <WhatsAppButton
-                phone={lead.phone}
-                message={sellerWhatsAppMessage(
-                  lead.name,
-                  v ? { type: v.type, brand: v.brand, model: v.model } : undefined
-                )}
-                leadId={lead.id}
-                leadType="seller"
-              />
+              <a
+                href={`tel:${lead.phone}`}
+                title="Llamar"
+                className="flex h-10 w-10 items-center justify-center rounded-full border border-border bg-background text-muted-foreground transition-colors hover:border-green-500 hover:bg-green-500 hover:text-white"
+              >
+                <Phone className="h-4 w-4" />
+              </a>
             )}
-            {primaryNextStatus && (
-              <QuickAdvanceButton
-                leadId={lead.id}
-                nextStatus={primaryNextStatus}
-                label={`Mover a ${SELLER_LEAD_STATUS_LABELS[primaryNextStatus as SellerLeadStatus]}`}
-              />
+            {lead.email && (
+              <a
+                href={`mailto:${lead.email}`}
+                title="Email"
+                className="flex h-10 w-10 items-center justify-center rounded-full border border-border bg-background text-muted-foreground transition-colors hover:border-foreground hover:bg-foreground hover:text-background"
+              >
+                <Mail className="h-4 w-4" />
+              </a>
             )}
           </div>
         </div>
 
-        {/* KPI bar — full width, no wrap */}
+        {/* KPI metrics bar */}
         {v && (
-          <div className="mt-0 flex items-stretch divide-x divide-border border-t">
-            {/* ── Vehículo ── */}
-            <div className="flex min-w-0 flex-1 flex-col justify-center px-5 py-4">
+          <div className="grid grid-cols-[repeat(5,1fr)_auto] divide-x divide-border border-t">
+            {/* Vehículo */}
+            <div className="flex flex-col justify-center px-5 py-4">
               <div className="mb-1 flex items-center gap-1">
-                <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
+                <p className="font-mono text-[10px] uppercase tracking-[0.12em] text-muted-foreground">
                   Vehículo
                 </p>
                 <InfoTooltip
@@ -420,7 +480,7 @@ export default async function FichaVendedorPage({
                   side="bottom"
                 />
               </div>
-              <p className="text-sm font-bold leading-snug">
+              <p className="text-[22px] font-bold leading-snug tracking-[-0.02em]">
                 {v.brand} {v.model}
               </p>
               <p className="mt-0.5 text-xs text-muted-foreground">
@@ -429,10 +489,10 @@ export default async function FichaVendedorPage({
               </p>
             </div>
 
-            {/* ── Precio salida ── */}
-            <div className="flex min-w-0 flex-1 flex-col justify-center px-5 py-4">
+            {/* Precio salida */}
+            <div className="flex flex-col justify-center px-5 py-4">
               <div className="mb-1 flex items-center gap-1">
-                <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
+                <p className="font-mono text-[10px] uppercase tracking-[0.12em] text-muted-foreground">
                   Precio salida
                 </p>
                 <InfoTooltip
@@ -440,31 +500,31 @@ export default async function FichaVendedorPage({
                   side="bottom"
                 />
               </div>
-              <p className="text-xl font-bold text-sidebar-primary">
+              <p className="text-[22px] font-bold leading-snug tracking-[-0.02em] text-sidebar-primary">
                 {(v.salePrice ?? v.desiredPrice) ? EUR(Number(v.salePrice ?? v.desiredPrice)) : '—'}
               </p>
               {v.valuationRecommended && (
                 <p className="mt-0.5 text-[11px] text-muted-foreground">
                   Tasación: {Math.round(Number(v.valuationMin ?? v.valuationRecommended) / 1000)}k–
-                  {Math.round(Number(v.valuationMax ?? v.valuationRecommended) / 1000)}k
+                  {Math.round(Number(v.valuationMax ?? v.valuationRecommended) / 1000)}k €
                 </p>
               )}
             </div>
 
-            {/* ── Margen objetivo (solo admin) ── */}
-            {isAdmin && margin && (
-              <div className="flex min-w-0 flex-1 flex-col justify-center px-5 py-4">
+            {/* Margen (admin) or placeholder */}
+            {isAdmin && margin ? (
+              <div className="flex flex-col justify-center px-5 py-4">
                 <div className="mb-1 flex items-center gap-1">
-                  <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
+                  <p className="font-mono text-[10px] uppercase tracking-[0.12em] text-muted-foreground">
                     Margen objetivo
                   </p>
                   <InfoTooltip
-                    text="Beneficio neto estimado: precio venta − compra − todos los costes imputados (taller, gestión, publicación…). Solo visible para administradores."
+                    text="Beneficio neto estimado: precio venta − compra − todos los costes imputados. Solo visible para administradores."
                     side="bottom"
                   />
                 </div>
                 <p
-                  className={`text-xl font-bold ${(margin.netMargin ?? 0) >= 0 ? 'text-green-600' : 'text-red-500'}`}
+                  className={`text-[22px] font-bold leading-snug tracking-[-0.02em] ${(margin.netMargin ?? 0) >= 0 ? 'text-green-600' : 'text-red-500'}`}
                 >
                   {margin.netMargin !== null ? EUR(margin.netMargin) : '—'}
                 </p>
@@ -474,56 +534,63 @@ export default async function FichaVendedorPage({
                     : `${margin.marginPercentTarget}% objetivo`}
                 </p>
               </div>
+            ) : (
+              <div className="flex flex-col justify-center px-5 py-4">
+                <p className="font-mono text-[10px] uppercase tracking-[0.12em] text-muted-foreground">
+                  Margen
+                </p>
+                <p className="mt-1 text-[22px] font-bold text-muted-foreground/30">—</p>
+              </div>
             )}
 
-            {/* ── Días en pipeline ── */}
-            <div className="flex min-w-0 flex-1 flex-col justify-center px-5 py-4">
+            {/* Días pipeline */}
+            <div className="flex flex-col justify-center px-5 py-4">
               <div className="mb-1 flex items-center gap-1">
-                <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
-                  Días en pipeline
+                <p className="font-mono text-[10px] uppercase tracking-[0.12em] text-muted-foreground">
+                  Días pipeline
                 </p>
                 <InfoTooltip
-                  text="Días desde que entró el lead hasta hoy. Más de 60 días sin cierre reduce significativamente la probabilidad de conversión."
+                  text="Días desde que entró el lead hasta hoy. Más de 60 días sin cierre reduce la probabilidad de conversión."
                   side="bottom"
                 />
               </div>
               <p
-                className={`text-xl font-bold ${daysPipeline > 60 ? 'text-red-500' : daysPipeline > 30 ? 'text-amber-500' : 'text-foreground'}`}
+                className={`text-[22px] font-bold leading-snug tracking-[-0.02em] ${daysPipeline > 60 ? 'text-red-500' : daysPipeline > 30 ? 'text-amber-500' : 'text-foreground'}`}
               >
-                {daysPipeline} días
+                {daysPipeline}d
               </p>
               <p
                 className={`mt-0.5 text-[11px] ${daysSinceActivity > 7 ? 'text-red-500' : 'text-muted-foreground'}`}
               >
-                {lastActivity
-                  ? `Contacto hace ${daysSinceActivity}d`
-                  : 'Sin contacto desde entrada'}
+                {lastActivity ? `Contacto hace ${daysSinceActivity}d` : 'Sin contacto'}
               </p>
             </div>
 
-            {/* ── Lead score ── */}
-            <div className="flex min-w-0 flex-1 flex-col justify-center px-5 py-4">
+            {/* Lead score */}
+            <div className="flex flex-col justify-center px-5 py-4">
               <div className="mb-1 flex items-center gap-1">
-                <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
+                <p className="font-mono text-[10px] uppercase tracking-[0.12em] text-muted-foreground">
                   Lead score
                 </p>
                 <InfoTooltip
-                  text="Puntuación de calidad 0-100 calculada automáticamente: completud del vehículo, fotos, matches activos, actividad reciente y canal de entrada."
+                  text="Puntuación de calidad 0-100: completud del vehículo, fotos, matches activos, actividad reciente y canal de entrada."
                   side="bottom"
                 />
               </div>
               <div className="flex items-baseline gap-1">
-                <span className={`text-xl font-bold ${leadScoreColor(leadScore)}`}>
+                <span
+                  className={`text-[22px] font-bold leading-snug tracking-[-0.02em] ${leadScoreColor(leadScore)}`}
+                >
                   {leadScore}
                 </span>
-                <span className="text-sm text-muted-foreground">/ 100</span>
+                <span className="text-sm text-muted-foreground">/100</span>
               </div>
-              <div className="mt-1.5 flex h-1.5 w-28 gap-0.5">
-                {[20, 40, 60, 80, 100].map((threshold) => (
+              <div className="mt-1.5 flex h-1.5 w-20 gap-0.5">
+                {[20, 40, 60, 80, 100].map((t) => (
                   <div
-                    key={threshold}
+                    key={t}
                     className={`flex-1 rounded-sm transition-colors ${
-                      leadScore >= threshold
+                      leadScore >= t
                         ? leadScore >= 75
                           ? 'bg-green-500'
                           : leadScore >= 50
@@ -536,31 +603,31 @@ export default async function FichaVendedorPage({
               </div>
             </div>
 
-            {/* ── Cambiar estado ── */}
+            {/* Estado link */}
             <div className="flex shrink-0 items-center px-5 py-4">
               <Link
                 href={`/vendedores/${lead.id}?tab=vehiculo`}
                 className="flex items-center gap-0.5 text-sm text-muted-foreground transition-colors hover:text-foreground"
               >
                 <ChevronRight className="h-4 w-4" />
-                <span>Cambiar estado</span>
+                <span>Estado</span>
               </Link>
             </div>
           </div>
         )}
 
-        {/* Tabs */}
-        <div className="mt-2">
+        {/* Tabs — sticky at top-[73px] via the wrapper div below */}
+        <div className="-mx-10">
           <Suspense fallback={<div className="h-12 border-b border-border" />}>
             <LeadTabNav tabs={tabs} />
           </Suspense>
         </div>
-      </div>
+      </section>
 
       {/* ── Contenido principal ── */}
-      <div className="flex flex-1 gap-0">
+      <div className="grid flex-1 grid-cols-[1fr_360px]">
         {/* Main content */}
-        <div className="min-w-0 flex-1 p-6">
+        <div className="min-w-0 p-8 pb-16">
           {/* ─────────────── RESUMEN ─────────────── */}
           {activeTab === 'resumen' && (
             <div className="space-y-6">
@@ -1110,118 +1177,182 @@ export default async function FichaVendedorPage({
           )}
         </div>
 
-        {/* ── Sidebar derecha ── */}
-        <aside className="hidden w-72 shrink-0 border-l bg-muted/20 xl:block">
-          <div className="space-y-0 divide-y divide-border">
-            {/* Próxima acción */}
-            <div className="p-4">
-              <div className="mb-2 flex items-center gap-2">
-                <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
-                  Próxima acción
-                </p>
-                <span
-                  className={`rounded px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide ${
-                    nextAction.urgency === 'urgente'
-                      ? 'bg-red-100 text-red-600'
-                      : nextAction.urgency === 'alta'
-                        ? 'bg-amber-100 text-amber-600'
-                        : 'bg-blue-100 text-blue-600'
-                  }`}
-                >
-                  {nextAction.urgency}
-                </span>
-              </div>
-              <p className="text-sm font-semibold">{nextAction.title}</p>
-              <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
-                {nextAction.description}
-              </p>
-              <div className="mt-3 flex gap-2">
-                {lead.phone && (
-                  <Button asChild size="sm" className="flex-1 text-xs">
-                    <a href={`tel:${lead.phone}`}>📞 Llamar ahora</a>
-                  </Button>
-                )}
-                {lead.phone && (
-                  <WhatsAppButton
-                    phone={lead.phone}
-                    message={sellerWhatsAppMessage(
-                      lead.name,
-                      v ? { type: v.type, brand: v.brand, model: v.model } : undefined
+        {/* ── Sidebar derecha 360px ── */}
+        <aside className="border-l border-border">
+          <div className="sticky top-[130px] divide-y divide-border">
+            {/* ── Próxima acción — dark card ── */}
+            <div className="p-5">
+              <div
+                className="relative overflow-hidden rounded-[14px] p-5"
+                style={{ background: 'linear-gradient(135deg, #0a0a0a 0%, #2a221c 100%)' }}
+              >
+                {/* Glow blob */}
+                <div
+                  className="pointer-events-none absolute right-[-40px] top-[-40px] h-[140px] w-[140px] rounded-full opacity-40"
+                  style={{ background: 'var(--sidebar-primary)', filter: 'blur(40px)' }}
+                />
+                <div className="relative">
+                  <div className="mb-3 flex items-center gap-2">
+                    <p
+                      className="font-mono text-[10px] uppercase tracking-[0.12em]"
+                      style={{ color: '#b59e7d' }}
+                    >
+                      Próxima acción
+                    </p>
+                    <span
+                      className={`rounded px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide ${
+                        nextAction.urgency === 'urgente'
+                          ? 'bg-red-500/20 text-red-300'
+                          : nextAction.urgency === 'alta'
+                            ? 'bg-amber-500/20 text-amber-300'
+                            : 'bg-blue-500/20 text-blue-300'
+                      }`}
+                    >
+                      {nextAction.urgency}
+                    </span>
+                  </div>
+                  <p className="text-sm font-semibold text-white">{nextAction.title}</p>
+                  <p className="mt-1 text-xs leading-relaxed text-white/60">
+                    {nextAction.description}
+                  </p>
+                  <div className="mt-4 flex gap-2">
+                    {lead.phone && (
+                      <a
+                        href={`tel:${lead.phone}`}
+                        className="flex flex-1 items-center justify-center gap-1.5 rounded-lg py-2 text-xs font-semibold text-black"
+                        style={{ background: '#b59e7d' }}
+                      >
+                        <Phone className="h-3.5 w-3.5" />
+                        Llamar
+                      </a>
                     )}
-                    leadId={lead.id}
-                    leadType="seller"
-                  />
-                )}
+                    {lead.phone && (
+                      <a
+                        href={`https://wa.me/${lead.phone.replace(/\D/g, '')}`}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="flex flex-1 items-center justify-center gap-1.5 rounded-lg py-2 text-xs font-semibold text-white"
+                        style={{
+                          background: 'rgba(255,255,255,0.08)',
+                          border: '1px solid rgba(255,255,255,0.15)',
+                        }}
+                      >
+                        <MessageCircle className="h-3.5 w-3.5" />
+                        WhatsApp
+                      </a>
+                    )}
+                  </div>
+                </div>
               </div>
             </div>
 
-            {/* Asignación */}
-            <div className="p-4">
-              <p className="mb-2 text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+            {/* ── Asignación ── */}
+            <div className="p-5">
+              <p className="mb-3 font-mono text-[10px] uppercase tracking-[0.12em] text-muted-foreground">
                 Asignación
               </p>
               {lead.agent ? (
-                <div className="flex items-center gap-2">
-                  <div className="flex h-8 w-8 items-center justify-center rounded-full bg-sidebar-primary text-xs font-bold text-sidebar-primary-foreground">
+                <div className="flex items-center gap-3">
+                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-sidebar-primary text-sm font-bold text-sidebar-primary-foreground">
                     {lead.agent.name.charAt(0)}
                   </div>
                   <div>
-                    <p className="text-sm font-medium">{lead.agent.name}</p>
+                    <p className="text-sm font-semibold">{lead.agent.name}</p>
                     <p className="text-xs text-muted-foreground">Agente asignado</p>
                   </div>
                 </div>
               ) : (
-                <p className="text-sm text-muted-foreground">Sin agente asignado</p>
+                <div className="flex items-center gap-3">
+                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border-2 border-dashed border-border text-xl font-light text-muted-foreground">
+                    +
+                  </div>
+                  <p className="text-sm text-muted-foreground">Sin agente asignado</p>
+                </div>
               )}
               {isAdmin && (
-                <Button asChild variant="outline" size="sm" className="mt-2 w-full text-xs">
-                  <Link href={`/vendedores/${lead.id}?tab=vehiculo`}>
-                    {lead.agent ? 'Reasignar agente' : 'Asignar agente'}
-                  </Link>
-                </Button>
+                <div className="mt-3 flex gap-2">
+                  <Button asChild variant="outline" size="sm" className="flex-1 text-xs">
+                    <Link href={`/vendedores/${lead.id}?tab=vehiculo`}>
+                      {lead.agent ? 'Reasignar' : 'Asignarme'}
+                    </Link>
+                  </Button>
+                  {lead.agent && (
+                    <Button asChild variant="outline" size="sm" className="flex-1 text-xs">
+                      <Link href={`/vendedores/${lead.id}?tab=vehiculo`}>Asignar a otro</Link>
+                    </Button>
+                  )}
+                </div>
               )}
             </div>
 
-            {/* Tasación interna */}
+            {/* ── Tasación — 3 columnas ── */}
             {v && v.valuationRecommended && (
-              <div className="p-4">
-                <p className="mb-2 text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
-                  Tasación interna · Análisis de precio
+              <div className="p-5">
+                <p className="mb-3 font-mono text-[10px] uppercase tracking-[0.12em] text-muted-foreground">
+                  Tasación interna
                 </p>
-                <div className="flex items-end justify-between gap-2">
+                <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2">
                   <div>
-                    <p className="text-[10px] text-muted-foreground">Cliente pide</p>
-                    <p className="text-base font-bold">
+                    <p className="font-mono text-[9px] uppercase tracking-[0.08em] text-muted-foreground">
+                      Cliente pide
+                    </p>
+                    <p className="mt-1 text-base font-bold">
                       {v.desiredPrice ? EUR(Number(v.desiredPrice)) : '—'}
                     </p>
                   </div>
-                  <span className="mb-1 text-muted-foreground">→</span>
+                  <span className="text-muted-foreground/60">→</span>
                   <div>
-                    <p className="text-[10px] text-muted-foreground">Nuestra tasación</p>
-                    <p className="text-base font-bold text-sidebar-primary">
+                    <p className="font-mono text-[9px] uppercase tracking-[0.08em] text-muted-foreground">
+                      Nuestra tasación
+                    </p>
+                    <p className="mt-1 text-base font-bold text-sidebar-primary">
                       {Math.round(Number(v.valuationMin) / 1000)}k–
                       {Math.round(Number(v.valuationMax) / 1000)}k €
                     </p>
                   </div>
                 </div>
+                <div className="mt-3 grid grid-cols-3 gap-2 border-t border-border pt-3">
+                  <div className="text-center">
+                    <p className="font-mono text-[9px] uppercase tracking-wide text-muted-foreground">
+                      Mediana
+                    </p>
+                    <p className="mt-0.5 text-sm font-semibold">
+                      {EUR(Number(v.valuationRecommended))}
+                    </p>
+                  </div>
+                  <div className="text-center">
+                    <p className="font-mono text-[9px] uppercase tracking-wide text-muted-foreground">
+                      Tasaciones
+                    </p>
+                    <p className="mt-0.5 text-sm font-semibold">{v.valuations.length}</p>
+                  </div>
+                  <div className="text-center">
+                    <p className="font-mono text-[9px] uppercase tracking-wide text-muted-foreground">
+                      Confianza
+                    </p>
+                    <p className="mt-0.5 text-sm font-semibold">
+                      {v.valuations[0]?.confidence ?? '—'}
+                    </p>
+                  </div>
+                </div>
                 {v.desiredPrice && v.valuationRecommended && (
                   <p
-                    className={`mt-1 text-xs ${Number(v.desiredPrice) > Number(v.valuationRecommended) * 1.05 ? 'text-amber-600' : 'text-green-600'}`}
+                    className={`mt-2 text-xs ${Number(v.desiredPrice) > Number(v.valuationRecommended) * 1.05 ? 'text-amber-600' : 'text-green-600'}`}
                   >
                     {Number(v.desiredPrice) > Number(v.valuationRecommended) * 1.05
-                      ? `${Math.round(((Number(v.desiredPrice) - Number(v.valuationRecommended)) / Number(v.valuationRecommended)) * 100)}% por encima mediana`
+                      ? `${Math.round(((Number(v.desiredPrice) - Number(v.valuationRecommended)) / Number(v.valuationRecommended)) * 100)}% por encima de la mediana`
                       : 'Dentro del rango de mercado'}
                   </p>
                 )}
               </div>
             )}
 
-            {/* Estimación costes (admin) */}
+            {/* ── Costes y margen (admin) ── */}
             {isAdmin && margin && (
-              <div className="p-4">
-                <div className="mb-2 flex items-center justify-between">
-                  <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
-                    Estimación de costes · Margen objetivo
+              <div className="p-5">
+                <div className="mb-3 flex items-center justify-between">
+                  <p className="font-mono text-[10px] uppercase tracking-[0.12em] text-muted-foreground">
+                    Costes y margen
                   </p>
                   <Link
                     href={`/vendedores/${lead.id}?tab=costes`}
@@ -1233,18 +1364,18 @@ export default async function FichaVendedorPage({
                 <div className="space-y-1.5 text-xs">
                   {margin.purchasePrice && (
                     <div className="flex justify-between">
-                      <span className="text-muted-foreground">Precio compra a vendedor</span>
+                      <span className="text-muted-foreground">Precio compra</span>
                       <span className="font-medium">{EUR(margin.purchasePrice)}</span>
                     </div>
                   )}
                   {margin.totalCosts > 0 && (
                     <div className="flex justify-between">
-                      <span className="text-muted-foreground">Reacondicionado + gastos</span>
+                      <span className="text-muted-foreground">Gastos imputados</span>
                       <span className="font-medium">{EUR(margin.totalCosts)}</span>
                     </div>
                   )}
-                  <div className="flex justify-between border-t pt-1.5">
-                    <span className="font-semibold">Coste total estimado</span>
+                  <div className="flex justify-between border-t border-border pt-1.5">
+                    <span className="font-semibold">Coste total</span>
                     <span className="font-bold">
                       {EUR((margin.purchasePrice ?? 0) + margin.totalCosts)}
                     </span>
@@ -1257,7 +1388,7 @@ export default async function FichaVendedorPage({
                       <span className="font-bold">
                         {EUR(margin.netMargin)}
                         {margin.marginPercentReal !== null
-                          ? ` · ${margin.marginPercentReal.toFixed(1)}% s/PVP`
+                          ? ` · ${margin.marginPercentReal.toFixed(1)}%`
                           : ''}
                       </span>
                     </div>
@@ -1266,9 +1397,9 @@ export default async function FichaVendedorPage({
               </div>
             )}
 
-            {/* Resumen stats */}
-            <div className="p-4">
-              <p className="mb-3 text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+            {/* ── Resumen ── */}
+            <div className="p-5">
+              <p className="mb-3 font-mono text-[10px] uppercase tracking-[0.12em] text-muted-foreground">
                 Resumen
               </p>
               <div className="space-y-2 text-xs">
