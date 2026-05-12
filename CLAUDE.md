@@ -211,6 +211,30 @@ Gestión documental completa del vehículo: campos legales en Vehicle, subida de
 - ✅ **Form `/vender`** — Campo matrícula opcional en step 1 (se guarda en `Vehicle.plate`).
 - ✅ **Tests** — `validate.test.ts` (17), `legal-actions.test.ts` (13), `actions.test.ts` guards (7). Suite total: 225 tests verdes.
 
+### Block 6 — Rediseño Ficha Vendedor — COMPLETADO ✅
+
+Rediseño completo de `app/(backoffice)/vendedores/[id]/page.tsx` siguiendo el spec `CRM Vendedor Detalle.html`. Además, corrección de varios bugs menores detectados durante la auditoría.
+
+**Bugs corregidos:**
+
+- ✅ **`quick-advance-actions.ts`** — `advanceLeadStatus` solo invalidaba la ficha (`/vendedores/${id}`), no el listado. Añadido `revalidatePath('/vendedores')` para que el estado se refleje inmediatamente en la lista.
+- ✅ **`quick-advance-button.tsx`** — Eliminada la prop `currentStatus` declarada en el tipo pero no usada en ningún sitio.
+- ✅ **`actions.ts` → `overrideValuation`** — La transición NUEVO→TASADO se hacía con un `updateMany` suelto fuera de la transacción y sin crear Activity. Consolidado en el `$transaction` existente: `db.vehicle.update` con `...(wasNuevo ? { status: 'TASADO' } : {})` + `db.activity.create` con el mensaje correspondiente.
+- ✅ **`vehicle-costs-table.tsx`** — El botón de borrar nunca aparecía para no-admins porque comparaba `cost.createdBy?.name === currentUserId` (string nombre ≠ cuid). Añadido `id` al select de Prisma y corregida la comparación a `cost.createdBy?.id === currentUserId`.
+
+**Nuevo diseño (`page.tsx`):**
+
+- ✅ **Topbar sticky 73px** — `header` con `sticky top-0 z-20 h-[73px]`. Breadcrumb font-mono uppercase con `ChevronLeft` + link "Vendedores". Derecha: botones icono Archive + MoreHorizontal + WhatsApp + QuickAdvance CTA.
+- ✅ **Hero section** — Avatar 84px con status-ring coloreado según estado del lead (teal/verde/rojo/amber). Nombre `text-[28px]` + pill de estado inline. Sub-info: email/phone como links clickables. Botones circulares call/email con hover de color. Hero no sticky — se desplaza al hacer scroll.
+- ✅ **KPI bar** — `grid-cols-[repeat(5,1fr)_auto]` (antes flex). Valores `text-[22px]`, labels `font-mono text-[10px] uppercase tracking-[0.12em]`. Columnas: Vehículo, Precio salida, Margen (admin/placeholder), Días pipeline, Lead score, + link Estado.
+- ✅ **Body layout** — `grid grid-cols-[1fr_360px]` (antes `flex gap-0`). Main `p-8 pb-16`, sidebar siempre visible a 360px.
+- ✅ **Sidebar 360px sticky** — `sticky top-[130px]` (73px topbar + ~57px tabs). Secciones:
+  - **Próxima acción**: card con `linear-gradient(135deg, #0a0a0a 0%, #2a221c 100%)`, blob de luz teal con `filter: blur(40px)`, eyebrow tan `#b59e7d`, texto blanco, botones Llamar (tan filled) + WhatsApp (glass `rgba(255,255,255,0.08)`).
+  - **Asignación**: avatar teal o placeholder dashed "+" si sin agente. Botones Reasignar + Asignar a otro (admin).
+  - **Tasación**: `grid-cols-[1fr_auto_1fr]` (Cliente pide → Nuestra tasación) + footer 3-col (Mediana / Tasaciones / Confianza).
+  - **Costes y margen** (admin): línea compra + gastos + total + badge neto verde/rojo.
+  - **Resumen**: métricas de origen, días, etapa, actividad, probabilidad cierre.
+
 ### Block 5 — Dashboard Financiero — COMPLETADO ✅
 
 Visibilidad financiera real del negocio: capital en nave, márgenes, rotación, funnels y vehículos estancados.
@@ -1597,6 +1621,53 @@ const vals = Array.from(map.values())
 | Análisis avanzado (gráficos)     | ✓     | —      | —      | —        | —         |
 | Vehículos estancados             | ✓     | ✓      | —      | ✓        | ✓         |
 | Tiempo medio por estado          | ✓     | ✓      | ✓      | ✓        | ✓         |
+
+### Ficha Vendedor — diseño Block 6
+
+#### Estructura de layout
+
+```
+<div className="-mx-6 -mt-6 flex min-h-full flex-col">
+  <header>                  ← sticky top-0 z-20 h-[73px]
+  <section>                 ← hero (identity + KPI bar + tabs), no sticky
+    <div className="-mx-10">  ← tabs con margen negativo para flush-edge
+  <div grid grid-cols-[1fr_360px]>   ← body
+    <div>                   ← main content p-8 pb-16
+    <aside>                 ← 360px, border-l
+      <div sticky top-[130px]>  ← sidebar widgets
+```
+
+El `top-[130px]` de la sidebar es la suma aproximada de topbar (73px) + tabs (~48px) + pequeño gap. Si se añaden más elementos sticky encima, ajustar este valor.
+
+#### Dark gradient card — próxima acción
+
+```tsx
+<div style={{ background: 'linear-gradient(135deg, #0a0a0a 0%, #2a221c 100%)' }}>
+  {/* Glow blob */}
+  <div style={{ background: 'var(--sidebar-primary)', filter: 'blur(40px)' }}
+       className="absolute right-[-40px] top-[-40px] h-[140px] w-[140px] rounded-full opacity-40" />
+```
+
+- Color eyebrow: `#b59e7d` (tan brand, `--cn-terra-500`)
+- Botón primario: `background: '#b59e7d'`, texto negro
+- Botón secundario: `background: rgba(255,255,255,0.08)`, `border: 1px solid rgba(255,255,255,0.15)`, texto blanco
+
+#### KPI bar — grid vs flex
+
+El diseño usa `grid-cols-[repeat(5,1fr)_auto]` para que las 5 columnas de métricas sean exactamente iguales independientemente del contenido. La columna `auto` final es el link "Estado". En el diseño anterior era `flex min-w-0 flex-1` — el grid es más predecible.
+
+#### Status ring del avatar
+
+El avatar de 84px tiene `border-4` + color dependiendo del estado del lead:
+
+- `CERRADO` → `border-green-500 bg-green-600`
+- `DESCARTADO` → `border-red-400 bg-slate-500`
+- `EN_NEGOCIACION` → `border-amber-400 bg-foreground`
+- Resto → `border-sidebar-primary/30 bg-foreground`
+
+#### Tabs flush-edge
+
+Las tabs usan `<div className="-mx-10">` para compensar el `px-10` de la sección hero y quedar alineadas a los bordes de la pantalla (igual que en el diseño).
 
 ## Pendientes externos
 
