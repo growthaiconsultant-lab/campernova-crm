@@ -92,7 +92,7 @@ claude mcp add-json linear '{\"command\":\"npx\",\"args\":[\"-y\",\"mcp-linear@l
 
 `.claude/settings.json` y `.claude/settings.local.json` se mantienen como referencia de la estructura, pero la fuente de verdad funcional es el registro de la CLI.
 
-## Estado actual (Block 5 — Dashboard Financiero COMPLETADO ✅)
+## Estado actual (Block 8 — Listado Vendedores Rediseñado COMPLETADO ✅)
 
 ### Sprint 1 — COMPLETADO ✅
 
@@ -234,6 +234,50 @@ Rediseño completo de `app/(backoffice)/vendedores/[id]/page.tsx` siguiendo el s
   - **Tasación**: `grid-cols-[1fr_auto_1fr]` (Cliente pide → Nuestra tasación) + footer 3-col (Mediana / Tasaciones / Confianza).
   - **Costes y margen** (admin): línea compra + gastos + total + badge neto verde/rojo.
   - **Resumen**: métricas de origen, días, etapa, actividad, probabilidad cierre.
+
+### Block 8 — Listado Vendedores Rediseñado — COMPLETADO ✅
+
+Rediseño completo de `/vendedores` (listado) desde tabla básica a una interfaz CRM de alto rendimiento con pipeline strip, vistas guardadas, filtros tipo chip, tabla rica con avatares/pills de estado brand/acciones hover/flags de riesgo.
+
+**Archivos modificados:**
+
+- ✅ **`app/(backoffice)/vendedores/page.tsx`** — RSC completo. Pipeline strip con CSS grid `auto repeat(6,1fr) auto`, 11 queries paralelas en `Promise.all`, serialización de `Decimal` → `number`, cálculo de flags (`hot` >7d / `warn` >2d sin actividad), vistas guardadas (mis-leads, sin-asignar, necesitan-accion, esta-semana), paginación, `Suspense` en los filtros.
+- ✅ **`app/(backoffice)/vendedores/leads-filters.tsx`** — Reescrito completamente. Exporta `ViewCounts` type + `LeadsFilters` component. Tabs de vistas guardadas como `<a href>` (no botones) que preservan filtros activos. Barra de chips: búsqueda (↵ para buscar), Estado, Agente, Canal, Ordenar, dirección. `ChipSelect` con `DropdownMenu` shadcn.
+- ✅ **`app/(backoffice)/vendedores/seller-leads-table.tsx`** — Nuevo componente client. Tabla con checkboxes + barra de selección masiva (`sticky top-[73px]`), avatares con iniciales, pills de estado con paleta brand, hover actions (WhatsApp / Llamar / Más DropdownMenu), flags de 3px en borde izquierdo, filas clickables → ficha.
+
+**Funcionalidades clave:**
+
+- ✅ **Pipeline strip clicable** — Clic en etapa activa la quita (toggle), clic en etapa inactiva filtra por ella. Preserva vista y otros filtros vía `stageUrl()`.
+- ✅ **Row flags** — Borde 3px abs-left: amber (`#8a6a3f`) si >2d sin actividad, rojo (`#a85636`) si >7d. Solo en leads no terminales. Sub-label "Sin contacto Xd" en font-mono.
+- ✅ **Status pills brand** — Paletas RGBA específicas por estado (no colores Tailwind genéricos). Ver `STATUS_STYLES` en `seller-leads-table.tsx`.
+- ✅ **"Necesitan acción"** — Prisma `activities: { none: { createdAt: { gte: twoDaysAgo } } }` — leads sin actividad en los últimos 2 días.
+- ✅ **Serialización Decimal** — `Number(lead.vehicle.desiredPrice)` en el RSC antes de pasar al Client Component (boundary RSC→Client no serializa Decimal de Prisma).
+
+### Block 7 — Fichas CRM Completamente Funcionales — COMPLETADO ✅
+
+Rediseño completo de la ficha de comprador + todos los botones e interacciones de ambas fichas (vendedor y comprador) completamente funcionales. Ningún elemento interactivo queda decorativo.
+
+**Ficha Comprador rediseñada (`compradores/[id]/page.tsx`):**
+
+- ✅ **Topbar sticky 73px** — Misma estructura que vendedor: breadcrumb font-mono + `ChevronLeft` + link "Compradores". Derecha: `BuyerTopbarActions` (Archive + MoreHorizontal). Hero section con avatar, nombre, pill de estado, email/phone como links, botones circulares call/email.
+- ✅ **KPI strip** — 4 columnas: Canal, Presupuesto, Días pipeline, Vehículos sugeridos (conteo de matches).
+- ✅ **5 tabs navegables** — `LeadTabNav` con `defaultTab="ficha"`: Ficha / Actividad / Vehículos sugeridos / Postventa / Documentos. URL-driven con `searchParams.tab`.
+- ✅ **Grid 2 columnas** — `grid-cols-[1fr_360px]`. Sidebar 360px siempre visible independientemente del tab activo.
+- ✅ **Sidebar comprador** — `ProximaAccionCard` (dark gradient con WhatsApp + Llamar), card de asignación, card de preferencias (tipo/plazas/presupuesto/zona/timeline), card de resumen (canal, días, actividad).
+- ✅ **Tab Actividad** — NoteForm + ActivityTimeline + empty state si sin actividad.
+- ✅ **Tab Vehículos sugeridos** — MatchesSection o empty state con icono Search.
+- ✅ **Tab Postventa** — Si hay garantía: grid 4-col (estado/vigencia/meses restantes/cobertura) + progress bar + tabla de tickets abiertos + link a `/postventa/${warrantyId}`. Si no hay garantía: empty state con escudo.
+- ✅ **Tab Documentos** — Empty state "Próximamente".
+
+**Botones funcionales — ambas fichas:**
+
+- ✅ **Archive (vendedor)** — `SellerTopbarActions`: Dialog de confirmación + `archiveSellerLead()` → DESCARTADO. Deshabilitado si ya es terminal (`!nextLeadStatuses.length`).
+- ✅ **Archive (comprador)** — `BuyerTopbarActions`: Dialog de confirmación + `archiveBuyerLead()` → PERDIDO. Deshabilitado si ya es terminal (`!BUYER_LEAD_TRANSITIONS[status]`).
+- ✅ **MoreHorizontal (ambas fichas)** — `DropdownMenu` shadcn con: "Copiar enlace" (clipboard API), "Abrir en nueva pestaña" (`window.open`), y opcionalmente "Marcar como perdido/Descartar" si no es terminal.
+- ✅ **WhatsApp botón sidebar dark card (ambas fichas)** — `ProximaAccionCard` (client component). Antes era `<a href>` sin tracking. Ahora llama `logWhatsApp()` antes de abrir wa.me → genera activity `WHATSAPP_INICIADO`.
+- ✅ **Tabs (compradores)** — Antes eran `<button>` con CSS hardcodeado sin ninguna acción. Ahora usan `LeadTabNav` con URL `?tab=xxx` y el RSC renderiza el contenido correcto.
+- ✅ **`archiveSellerLead` server action** — añadido en `vendedores/[id]/actions.ts` con `$transaction` (update status + `CAMBIO_ESTADO` activity) y `revalidatePath` de ficha + listado.
+- ✅ **`archiveBuyerLead` server action** — añadido en `compradores/[id]/actions.ts`, mismo patrón.
 
 ### Block 5 — Dashboard Financiero — COMPLETADO ✅
 
@@ -1668,6 +1712,253 @@ El avatar de 84px tiene `border-4` + color dependiendo del estado del lead:
 #### Tabs flush-edge
 
 Las tabs usan `<div className="-mx-10">` para compensar el `px-10` de la sección hero y quedar alineadas a los bordes de la pantalla (igual que en el diseño).
+
+### Ficha Comprador — diseño Block 7
+
+#### Estructura de layout
+
+Idéntica a la ficha vendedor pero `defaultTab="ficha"` (no `"resumen"`):
+
+```
+<div className="-mx-6 -mt-6 flex min-h-full flex-col">
+  <header>                  ← sticky top-0 z-20 h-[73px]
+  <section>                 ← hero (identity + KPI strip + tabs), no sticky
+  <div grid grid-cols-[1fr_360px]>   ← body
+    <div>                   ← main content p-8 pb-16 (contenido del tab activo)
+    <aside>                 ← 360px, border-l, siempre visible
+      <div sticky top-[130px]>  ← ProximaAccionCard + asignación + preferencias + resumen
+```
+
+#### KPI strip comprador — 4 columnas
+
+A diferencia del vendedor (5 KPIs + estado), el comprador tiene 4: Canal, Presupuesto, Días pipeline, Vehículos sugeridos. No hay columna de "Margen" ni "Vehículo".
+
+#### Sidebar comprador — widgets
+
+- **Próxima acción**: `ProximaAccionCard` con texto contextual según estado (NUEVO="Contactar al comprador", CUALIFICADO="Presentar vehículos match", etc.)
+- **Asignación**: mismo widget que vendedor
+- **Preferencias**: card con pills de tipo vehículo, plazas mínimas, presupuesto máximo, zona de uso, plazo de compra
+- **Resumen**: canal (badge CN/PRO/CHAT), días en pipeline, última actividad, nº matches
+
+#### Tab Postventa en ficha comprador
+
+Muestra la garantía si `lead.warranty` existe (relación directa via `delivery.buyerLeadId`). La query en `page.tsx` usa:
+
+```ts
+include: {
+  warranty: {
+    include: {
+      tickets: { where: { status: { notIn: ['CERRADO', 'ANULADO'] } }, orderBy: { createdAt: 'desc' }, take: 5 },
+    },
+  },
+}
+```
+
+Progress bar de vigencia: `daysElapsed / totalDays * 100%`, color verde/amber/rojo según % restante.
+
+### Patrón ProximaAccionCard (RSC → Client Component)
+
+**Problema**: el sidebar dark card necesita `onClick` para llamar `logWhatsApp()` antes de abrir WhatsApp. En un RSC no hay event handlers.
+
+**Solución**: extraer la card completa a un `'use client'` component (`proxima-accion-card.tsx`) dentro de la carpeta `[id]/` de cada ficha. El RSC pasa los datos como props; el cliente gestiona el evento.
+
+**Patrón general**: cuando un widget del sidebar de una ficha RSC necesite interactividad, crear `{nombre}-card.tsx` con `'use client'` en la carpeta `[id]/`, no convertir la página entera.
+
+```tsx
+// page.tsx (RSC) — solo pasa datos, sin lógica
+;<ProximaAccionCard phone={lead.phone} leadId={lead.id} leadName={lead.name} status={lead.status} />
+
+// proxima-accion-card.tsx ('use client') — gestiona eventos
+function handleWhatsApp() {
+  logWhatsApp({ leadId, leadType: 'buyer', phone }).catch(console.error)
+  window.open(
+    buildWhatsAppUrl(phone, buyerWhatsAppMessage(leadName)),
+    '_blank',
+    'noopener,noreferrer'
+  )
+}
+```
+
+**Texto próxima acción por estado** (`ProximaAccionCard` de compradores):
+
+```ts
+const NEXT_ACTION_TEXT: Record<string, string> = {
+  NUEVO: 'Contactar al comprador',
+  CONTACTADO: 'Cualificar sus necesidades',
+  CUALIFICADO: 'Presentar vehículos match',
+  EN_NEGOCIACION: 'Cerrar la operación',
+  CERRADO: 'Coordinar la entrega',
+  PERDIDO: 'Revisar si reactivar',
+}
+```
+
+### Patrón TopbarActions (Archive + MoreHorizontal)
+
+Los botones Archive y MoreHorizontal del topbar de ambas fichas viven en `{buyer|seller}-topbar-actions.tsx` (`'use client'`).
+
+**Archive** — Dialog de confirmación con `useTransition`:
+
+```tsx
+function handleArchive() {
+  startTransition(async () => {
+    const result = await archiveBuyerLead(leadId) // o archiveSellerLead
+    if (!result.error) {
+      setArchiveOpen(false)
+      router.refresh()
+    }
+  })
+}
+```
+
+- Deshabilitado cuando `isTerminal`. La página RSC calcula `isTerminal` y lo pasa como prop:
+  - Comprador: `!BUYER_LEAD_TRANSITIONS[lead.status as BuyerLeadStatus]` (sin entradas en el mapa de transiciones)
+  - Vendedor: `!nextLeadStatuses.length` (array de estados siguientes vacío)
+
+**MoreHorizontal** — `DropdownMenu` shadcn con 3 ítems:
+
+1. "Copiar enlace" → `navigator.clipboard.writeText(window.location.href)`
+2. "Abrir en nueva pestaña" → `window.open(window.location.href, '_blank', 'noopener,noreferrer')`
+3. (Opcional, solo si no terminal) "Marcar como perdido" / "Descartar" → abre el mismo Dialog del Archive
+
+**Archivos:**
+
+```
+app/(backoffice)/compradores/[id]/
+  buyer-topbar-actions.tsx     — BuyerTopbarActions
+  proxima-accion-card.tsx      — ProximaAccionCard (comprador)
+app/(backoffice)/vendedores/[id]/
+  seller-topbar-actions.tsx    — SellerTopbarActions
+  proxima-accion-card.tsx      — ProximaAccionCard (vendedor)
+```
+
+### `archiveSellerLead` y `archiveBuyerLead` server actions
+
+Ambas en las respectivas `actions.ts` de cada ficha. Patrón idéntico:
+
+1. `requireAgente()` — auth guard
+2. `findUnique` con `select: { status }` — verificar que existe
+3. `isValidTransition(transitions, lead.status, terminalStatus)` — guard máquina de estados (evita archivar lo ya archivado)
+4. `$transaction`: `update(status)` + `activity.create(CAMBIO_ESTADO)`
+5. `revalidatePath(ficha)` + `revalidatePath(listado)`
+
+Terminal state: `PERDIDO` para BuyerLead, `DESCARTADO` para SellerLead.
+
+### `LeadTabNav` — prop `defaultTab`
+
+Antes el componente tenía hardcodeado `?? 'resumen'` como tab por defecto. Añadida prop `defaultTab?: string` (default `'resumen'`) para que compradores pueda usar `'ficha'` como su primer tab.
+
+```tsx
+// vendedores/[id]/page.tsx
+<LeadTabNav tabs={tabs} />  // defaultTab='resumen' por defecto
+
+// compradores/[id]/page.tsx
+<LeadTabNav tabs={tabs} defaultTab="ficha" />
+```
+
+### Tabs URL-driven en ficha comprador
+
+El RSC de la ficha de comprador lee `searchParams.tab` y renderiza el contenido condicionalmente:
+
+```tsx
+// page.tsx (RSC)
+export default async function Page({ searchParams }: { searchParams: { tab?: string } }) {
+  const activeTab = searchParams.tab ?? 'ficha'
+  // ...
+  return (
+    <>
+      <LeadTabNav tabs={tabs} defaultTab="ficha" />
+      {activeTab === 'ficha' && <BuyerLeadEditForm ... />}
+      {activeTab === 'actividad' && <NoteForm ... />}
+      {activeTab === 'matches' && <MatchesSection ... />}
+      {activeTab === 'postventa' && (warranty ? <WarrantyCard ... /> : <EmptyState />)}
+      {activeTab === 'documentos' && <EmptyState ... />}
+    </>
+  )
+}
+```
+
+El sidebar (ProximaAccionCard, asignación, preferencias, resumen) está **fuera** del condicional de tabs — siempre visible.
+
+### Listado Vendedores — diseño Block 8
+
+#### Pipeline strip
+
+```tsx
+// CSS Grid: columna "Total" (auto) + 6 etapas (1fr cada una) + columna "Conv.30d" (auto)
+<div style={{ display: 'grid', gridTemplateColumns: 'auto repeat(6,1fr) auto' }}>
+```
+
+Cada etapa es un `<a href={stageUrl(key)}>` que filtra por `?status=KEY`. `stageUrl()` implementa toggle: si la etapa ya está activa, elimina el filtro; si no, lo aplica. Preserva `view` y otros filtros activos.
+
+**Separador visual**: `border-l` entre columnas — primero "Total" sin borde, resto con `borderLeft: '1px solid #e6dfd0'`.
+
+#### Vistas guardadas (tabs)
+
+Las tabs usan `<a href={viewUrl(view.key)}>` (no botones + `router.push`) para:
+
+1. Ser crawleables
+2. Preservar el estado activo en recarga
+3. `viewUrl()` copiar los filtros activos al cambiar de vista
+
+Lógica `viewUrl(viewKey)`: construye `URLSearchParams` desde cero copiando q/status/agentId/canal/sort/dir si existen. Para `'todos'` no añade `?view=`. Para el resto añade `?view=KEY`.
+
+#### "Necesitan acción" — query Prisma
+
+```typescript
+db.sellerLead.count({
+  where: {
+    status: { notIn: TERMINAL_STATUSES },
+    activities: { none: { createdAt: { gte: twoDaysAgo } } },
+  },
+})
+```
+
+`activities: { none: { ... } }` devuelve leads donde NINGUNA actividad cumple la condición — es decir, leads donde no hay actividad en los últimos 2 días. Esto incluye leads sin ninguna actividad nunca (que también son candidatos a "necesitan acción").
+
+#### Row flags — cálculo
+
+```typescript
+const lastAct = lead.activities[0]?.createdAt ?? lead.createdAt
+const now = new Date()
+const daysSince = Math.floor((now.getTime() - new Date(lastAct).getTime()) / 86400000)
+const isTerminal = TERMINAL_STATUSES.includes(lead.status as SellerLeadStatus)
+const flag: 'hot' | 'warn' | null = isTerminal
+  ? null
+  : daysSince > 7
+    ? 'hot'
+    : daysSince > 2
+      ? 'warn'
+      : null
+```
+
+El cálculo ocurre en el RSC (page.tsx) antes de serializar a `LeadRow`. Los terminales nunca tienen flag.
+
+#### `SellerLeadsTable` — patrón hover CSS
+
+Las filas usan `className="group relative transition-colors"`. Las acciones usan `className="opacity-0 group-hover:opacity-100"`. El cambio de fondo en hover usa `onMouseEnter`/`onMouseLeave` con `style.background` en lugar de CSS puro para evitar conflicto con el estado `isSelected`.
+
+**No mezclar** `group-hover:bg-*` en el `<tr>` con `isSelected` inline: el CSS class siempre gana sobre el inline style. Usar siempre `onMouseEnter/Leave` cuando el background varía según estado de selección.
+
+#### `LeadRow` — serialización
+
+Antes de pasar datos al Client Component, el RSC convierte:
+
+- `Decimal` → `number`: `Number(lead.vehicle?.desiredPrice)`, `Number(lead.vehicle?.valuationRecommended)`
+- `Date` → `string`: `.toISOString()`
+- Campos calculados: `daysSince`, `flag`, `lastActivityAt`
+
+#### Archivos clave — Block 8
+
+```
+app/(backoffice)/vendedores/
+  page.tsx                    — RSC: pipeline strip + 11 queries paralelas + serialización + render
+  leads-filters.tsx           — Client: tabs vistas + barra chips (Estado/Agente/Canal/Ordenar/Dir)
+  seller-leads-table.tsx      — Client: tabla rica (checkboxes/flags/pills/hover-actions/bulk-bar)
+```
+
+#### CANAL_OPTIONS — solo CN y PRO
+
+El enum `LeadCanal` en Prisma solo tiene `CN` y `PRO`. El valor `CHAT` no existe. En `leads-filters.tsx` y en `validCanals: LeadCanal[]` de `page.tsx`, usar siempre solo estos dos valores.
 
 ## Pendientes externos
 

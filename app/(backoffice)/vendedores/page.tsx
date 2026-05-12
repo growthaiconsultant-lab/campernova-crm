@@ -1,57 +1,104 @@
 import Link from 'next/link'
 import { Suspense } from 'react'
 import { db } from '@/lib/db'
+import { requireAuth } from '@/lib/auth'
 import { Button } from '@/components/ui/button'
 import { LeadsFilters } from './leads-filters'
-import type { Prisma } from '@prisma/client'
+import { SellerLeadsTable } from './seller-leads-table'
+import type { LeadRow } from './seller-leads-table'
+import type { Prisma, SellerLeadStatus, LeadCanal } from '@prisma/client'
+
+// ─── Constants ───────────────────────────────────────────────────────────────
 
 const PAGE_SIZE = 50
 
-const STATUS_LABELS: Record<string, string> = {
-  NUEVO: 'Nuevo',
-  CONTACTADO: 'Contactado',
-  CUALIFICADO: 'Cualificado',
-  EN_NEGOCIACION: 'En negociación',
-  CERRADO: 'Cerrado',
-  DESCARTADO: 'Descartado',
+const PIPELINE_STAGES = [
+  { key: 'NUEVO', label: 'Nuevo', color: '#0a0a0a' },
+  { key: 'CONTACTADO', label: 'Contactado', color: '#584738' },
+  { key: 'CUALIFICADO', label: 'Cualificado', color: '#7a6450' },
+  { key: 'EN_NEGOCIACION', label: 'Negociación', color: '#b59e7d' },
+  { key: 'CERRADO', label: 'Cerrado', color: '#6b7a4e' },
+  { key: 'DESCARTADO', label: 'Desc.', color: '#b3aca0' },
+] as const
+
+const TERMINAL_STATUSES: SellerLeadStatus[] = ['CERRADO', 'DESCARTADO']
+
+const MONO = {
+  fontFamily: '"JetBrains Mono", ui-monospace, monospace',
 }
 
-const STATUS_COLORS: Record<string, string> = {
-  NUEVO: 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300',
-  CONTACTADO: 'bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-300',
-  CUALIFICADO: 'bg-teal-100 text-teal-700 dark:bg-teal-900/40 dark:text-teal-300',
-  EN_NEGOCIACION: 'bg-orange-100 text-orange-700 dark:bg-orange-900/40 dark:text-orange-300',
-  CERRADO: 'bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300',
-  DESCARTADO: 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400',
-}
+// ─── Types ───────────────────────────────────────────────────────────────────
 
 type SearchParams = {
   q?: string
   status?: string
   agentId?: string
-  dateFrom?: string
-  dateTo?: string
+  canal?: string
+  view?: string
   sort?: string
   dir?: string
   page?: string
+  dateFrom?: string
+  dateTo?: string
 }
 
-function buildWhere(sp: SearchParams): Prisma.SellerLeadWhereInput {
-  const conditions: Prisma.SellerLeadWhereInput[] = []
+// ─── Helpers ─────────────────────────────────────────────────────────────────
+
+function getStartOfWeek(now: Date): Date {
+  const d = new Date(now)
+  d.setHours(0, 0, 0, 0)
+  const day = d.getDay()
+  d.setDate(d.getDate() - (day === 0 ? 6 : day - 1))
+  return d
+}
+
+function buildViewWhere(
+  view: string | undefined,
+  currentUserId: string,
+  now: Date
+): Prisma.SellerLeadWhereInput {
+  const twoDaysAgo = new Date(now.getTime() - 2 * 24 * 60 * 60 * 1000)
+  switch (view) {
+    case 'mis-leads':
+      return { agentId: currentUserId, status: { notIn: TERMINAL_STATUSES } }
+    case 'sin-asignar':
+      return { agentId: null, status: { notIn: TERMINAL_STATUSES } }
+    case 'necesitan-accion':
+      return {
+        status: { notIn: TERMINAL_STATUSES },
+        activities: { none: { createdAt: { gte: twoDaysAgo } } },
+      }
+    case 'esta-semana':
+      return { createdAt: { gte: getStartOfWeek(now) } }
+    default:
+      return {}
+  }
+}
+
+function buildFilterWhere(sp: SearchParams): Prisma.SellerLeadWhereInput {
+  const c: Prisma.SellerLeadWhereInput[] = []
 
   if (sp.q) {
     const q = sp.q.trim()
-    conditions.push({
+    c.push({
       OR: [
         { name: { contains: q, mode: 'insensitive' } },
         { email: { contains: q, mode: 'insensitive' } },
         { phone: { contains: q, mode: 'insensitive' } },
+        {
+          vehicle: {
+            OR: [
+              { brand: { contains: q, mode: 'insensitive' } },
+              { model: { contains: q, mode: 'insensitive' } },
+            ],
+          },
+        },
       ],
     })
   }
 
   if (sp.status) {
-    const validStatuses = [
+    const valid: SellerLeadStatus[] = [
       'NUEVO',
       'CONTACTADO',
       'CUALIFICADO',
@@ -59,35 +106,35 @@ function buildWhere(sp: SearchParams): Prisma.SellerLeadWhereInput {
       'CERRADO',
       'DESCARTADO',
     ]
-    if (validStatuses.includes(sp.status)) {
-      conditions.push({ status: sp.status as Prisma.EnumSellerLeadStatusFilter['equals'] })
+    if (valid.includes(sp.status as SellerLeadStatus)) {
+      c.push({ status: sp.status as SellerLeadStatus })
     }
   }
 
   if (sp.agentId) {
-    if (sp.agentId === '__none__') {
-      conditions.push({ agentId: null })
-    } else {
-      conditions.push({ agentId: sp.agentId })
+    c.push(sp.agentId === '__none__' ? { agentId: null } : { agentId: sp.agentId })
+  }
+
+  if (sp.canal) {
+    const validCanals: LeadCanal[] = ['CN', 'PRO']
+    if (validCanals.includes(sp.canal as LeadCanal)) {
+      c.push({ canal: sp.canal as LeadCanal })
     }
   }
 
   if (sp.dateFrom) {
     const d = new Date(sp.dateFrom)
-    if (!isNaN(d.getTime())) {
-      conditions.push({ createdAt: { gte: d } })
-    }
+    if (!isNaN(d.getTime())) c.push({ createdAt: { gte: d } })
   }
-
   if (sp.dateTo) {
     const d = new Date(sp.dateTo)
     if (!isNaN(d.getTime())) {
       d.setHours(23, 59, 59, 999)
-      conditions.push({ createdAt: { lte: d } })
+      c.push({ createdAt: { lte: d } })
     }
   }
 
-  return conditions.length > 0 ? { AND: conditions } : {}
+  return c.length > 0 ? { AND: c } : {}
 }
 
 function buildOrderBy(sp: SearchParams): Prisma.SellerLeadOrderByWithRelationInput {
@@ -97,12 +144,60 @@ function buildOrderBy(sp: SearchParams): Prisma.SellerLeadOrderByWithRelationInp
   return { createdAt: dir }
 }
 
+function mergeWhere(
+  a: Prisma.SellerLeadWhereInput,
+  b: Prisma.SellerLeadWhereInput
+): Prisma.SellerLeadWhereInput {
+  const hasA = Object.keys(a).length > 0
+  const hasB = Object.keys(b).length > 0
+  if (!hasA && !hasB) return {}
+  if (!hasA) return b
+  if (!hasB) return a
+  return { AND: [a, b] }
+}
+
+// ─── Page ─────────────────────────────────────────────────────────────────────
+
 export default async function VendedoresPage({ searchParams }: { searchParams: SearchParams }) {
+  const currentUser = await requireAuth()
   const page = Math.max(1, parseInt(searchParams.page ?? '1', 10) || 1)
-  const where = buildWhere(searchParams)
+  const now = new Date()
+  const twoDaysAgo = new Date(now.getTime() - 2 * 24 * 60 * 60 * 1000)
+  const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000)
+
+  const viewWhere = buildViewWhere(searchParams.view, currentUser.id, now)
+  const filterWhere = buildFilterWhere(searchParams)
+  const where = mergeWhere(viewWhere, filterWhere)
   const orderBy = buildOrderBy(searchParams)
 
-  const [total, leads, agents] = await Promise.all([
+  const [
+    pipelineCounts,
+    misLeadsCount,
+    sinAsignarCount,
+    necesitanAccionCount,
+    estaSemanaCount,
+    closedLast30,
+    createdLast30,
+    total,
+    leads,
+    agents,
+  ] = await Promise.all([
+    db.sellerLead.groupBy({ by: ['status'], _count: { id: true } }),
+    db.sellerLead.count({
+      where: { agentId: currentUser.id, status: { notIn: TERMINAL_STATUSES } },
+    }),
+    db.sellerLead.count({
+      where: { agentId: null, status: { notIn: TERMINAL_STATUSES } },
+    }),
+    db.sellerLead.count({
+      where: {
+        status: { notIn: TERMINAL_STATUSES },
+        activities: { none: { createdAt: { gte: twoDaysAgo } } },
+      },
+    }),
+    db.sellerLead.count({ where: { createdAt: { gte: getStartOfWeek(now) } } }),
+    db.sellerLead.count({ where: { status: 'CERRADO', updatedAt: { gte: thirtyDaysAgo } } }),
+    db.sellerLead.count({ where: { createdAt: { gte: thirtyDaysAgo } } }),
     db.sellerLead.count({ where }),
     db.sellerLead.findMany({
       where,
@@ -110,148 +205,347 @@ export default async function VendedoresPage({ searchParams }: { searchParams: S
       skip: (page - 1) * PAGE_SIZE,
       take: PAGE_SIZE,
       include: {
-        vehicle: { select: { brand: true, model: true, year: true } },
+        vehicle: {
+          select: {
+            brand: true,
+            model: true,
+            year: true,
+            km: true,
+            seats: true,
+            type: true,
+            desiredPrice: true,
+            valuationRecommended: true,
+          },
+        },
         agent: { select: { id: true, name: true } },
+        activities: {
+          orderBy: { createdAt: 'desc' },
+          take: 1,
+          select: { createdAt: true },
+        },
       },
     }),
-    db.user.findMany({ select: { id: true, name: true }, orderBy: { name: 'asc' } }),
+    db.user.findMany({
+      where: { active: true },
+      select: { id: true, name: true },
+      orderBy: { name: 'asc' },
+    }),
   ])
+
+  // ── Derived data ──────────────────────────────────────────────────────────
 
   const totalPages = Math.ceil(total / PAGE_SIZE)
   const from = total === 0 ? 0 : (page - 1) * PAGE_SIZE + 1
   const to = Math.min(page * PAGE_SIZE, total)
 
-  function pageUrl(p: number) {
+  const countByStatus = Object.fromEntries(pipelineCounts.map((c) => [c.status, c._count.id]))
+  const pipelineTotal = pipelineCounts.reduce((s, c) => s + c._count.id, 0)
+  const convRate30 = createdLast30 > 0 ? Math.round((closedLast30 / createdLast30) * 100) : 0
+
+  const todosCount = pipelineTotal
+
+  // ── Serialize for client ──────────────────────────────────────────────────
+
+  const serializedLeads: LeadRow[] = leads.map((lead) => {
+    const lastActivityAt = lead.activities[0]?.createdAt ?? lead.createdAt
+    const daysSince = Math.floor((now.getTime() - lastActivityAt.getTime()) / (1000 * 60 * 60 * 24))
+    const isTerminal = TERMINAL_STATUSES.includes(lead.status as SellerLeadStatus)
+    const flag: 'hot' | 'warn' | null = isTerminal
+      ? null
+      : daysSince > 7
+        ? 'hot'
+        : daysSince > 2
+          ? 'warn'
+          : null
+
+    return {
+      id: lead.id,
+      name: lead.name,
+      email: lead.email,
+      phone: lead.phone,
+      status: lead.status,
+      canal: lead.canal as string,
+      createdAt: lead.createdAt.toISOString(),
+      lastActivityAt: lastActivityAt.toISOString(),
+      daysSince,
+      flag,
+      vehicle: lead.vehicle
+        ? {
+            brand: lead.vehicle.brand,
+            model: lead.vehicle.model,
+            year: lead.vehicle.year,
+            km: lead.vehicle.km != null ? Number(lead.vehicle.km) : null,
+            seats: lead.vehicle.seats,
+            type: lead.vehicle.type as string | null,
+            price: lead.vehicle.desiredPrice
+              ? Number(lead.vehicle.desiredPrice)
+              : lead.vehicle.valuationRecommended
+                ? Number(lead.vehicle.valuationRecommended)
+                : null,
+          }
+        : null,
+      agent: lead.agent ? { id: lead.agent.id, name: lead.agent.name } : null,
+    }
+  })
+
+  // ── URL helpers ───────────────────────────────────────────────────────────
+
+  function buildUrl(overrides: Record<string, string | undefined>): string {
     const sp = new URLSearchParams()
-    if (searchParams.q) sp.set('q', searchParams.q)
-    if (searchParams.status) sp.set('status', searchParams.status)
-    if (searchParams.agentId) sp.set('agentId', searchParams.agentId)
-    if (searchParams.dateFrom) sp.set('dateFrom', searchParams.dateFrom)
-    if (searchParams.dateTo) sp.set('dateTo', searchParams.dateTo)
-    if (searchParams.sort) sp.set('sort', searchParams.sort)
-    if (searchParams.dir) sp.set('dir', searchParams.dir)
-    if (p > 1) sp.set('page', String(p))
+    const merged = {
+      view: searchParams.view,
+      q: searchParams.q,
+      status: searchParams.status,
+      agentId: searchParams.agentId,
+      canal: searchParams.canal,
+      sort: searchParams.sort,
+      dir: searchParams.dir,
+      ...overrides,
+    }
+    Object.entries(merged).forEach(([k, v]) => {
+      if (v && !(k === 'view' && v === 'todos') && !(k === 'sort' && v === 'createdAt')) {
+        sp.set(k, v)
+      }
+    })
     const qs = sp.toString()
     return `/vendedores${qs ? `?${qs}` : ''}`
   }
 
+  function stageUrl(stageKey: string): string {
+    // Toggle: clicking the active stage removes the filter
+    return searchParams.status === stageKey
+      ? buildUrl({ status: undefined, page: undefined })
+      : buildUrl({ status: stageKey, page: undefined })
+  }
+
+  function pageUrl(p: number): string {
+    return buildUrl({ page: p > 1 ? String(p) : undefined })
+  }
+
+  // ── Render ────────────────────────────────────────────────────────────────
+
   return (
-    <div className="space-y-5">
-      {/* Cabecera */}
-      <div className="flex items-center justify-between">
+    <div className="-mx-6 -mt-6 flex min-h-full flex-col">
+      {/* ── Page header ── */}
+      <div className="flex items-center justify-between border-b border-border px-6 py-5">
         <div>
-          <h1 className="text-2xl font-bold">Vendedores</h1>
-          <p className="mt-0.5 text-sm text-muted-foreground">
-            {total} lead{total !== 1 ? 's' : ''} en total
+          <h1
+            className="text-[26px] font-semibold leading-tight"
+            style={{ fontFamily: 'var(--font-cormorant, serif)', color: '#0a0a0a' }}
+          >
+            Vendedores
+          </h1>
+          <p
+            style={{
+              ...MONO,
+              fontSize: '10.5px',
+              letterSpacing: '0.08em',
+              color: '#6b645c',
+              marginTop: '2px',
+            }}
+          >
+            {pipelineTotal} leads activos
+            {total !== pipelineTotal && (
+              <>
+                {' '}
+                · <span style={{ color: '#584738' }}>{total} resultados</span>
+              </>
+            )}
           </p>
         </div>
-        <Button asChild>
-          <Link href="/vendedores/nuevo">+ Nuevo lead</Link>
-        </Button>
+        <Link
+          href="/vendedores/nuevo"
+          className="inline-flex items-center gap-1.5 rounded-md px-4 py-2 text-sm font-medium text-white transition-opacity hover:opacity-80"
+          style={{ background: '#0a0a0a' }}
+        >
+          + Nuevo lead
+        </Link>
       </div>
 
-      {/* Filtros */}
-      <Suspense>
-        <LeadsFilters agents={agents} />
-      </Suspense>
+      {/* ── Pipeline strip ── */}
+      <div className="border-b border-border px-6 py-4" style={{ background: '#faf6ed' }}>
+        <div
+          style={{
+            display: 'grid',
+            gridTemplateColumns: 'auto repeat(6, 1fr) auto',
+            alignItems: 'end',
+            gap: 0,
+          }}
+        >
+          {/* Total */}
+          <div className="mr-5 flex flex-col border-r border-border pb-1 pr-5">
+            <span
+              style={{
+                ...MONO,
+                fontSize: '10px',
+                textTransform: 'uppercase',
+                letterSpacing: '0.1em',
+                color: '#6b645c',
+              }}
+            >
+              Total
+            </span>
+            <span
+              style={{
+                fontFamily: 'var(--font-cormorant, serif)',
+                fontSize: '32px',
+                fontWeight: 600,
+                color: '#0a0a0a',
+                lineHeight: 1,
+              }}
+            >
+              {pipelineTotal}
+            </span>
+          </div>
 
-      {/* Tabla */}
-      <div className="overflow-x-auto rounded-lg border">
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="border-b bg-muted/50">
-              <th className="px-4 py-3 text-left font-medium text-muted-foreground">Nombre</th>
-              <th className="hidden px-4 py-3 text-left font-medium text-muted-foreground sm:table-cell">
-                Contacto
-              </th>
-              <th className="hidden px-4 py-3 text-left font-medium text-muted-foreground lg:table-cell">
-                Vehículo
-              </th>
-              <th className="px-4 py-3 text-left font-medium text-muted-foreground">Estado</th>
-              <th className="hidden px-4 py-3 text-left font-medium text-muted-foreground md:table-cell">
-                Agente
-              </th>
-              <th className="hidden px-4 py-3 text-left font-medium text-muted-foreground xl:table-cell">
-                Entrada
-              </th>
-            </tr>
-          </thead>
-          <tbody className="divide-y">
-            {leads.length === 0 && (
-              <tr>
-                <td colSpan={6} className="px-4 py-10 text-center text-muted-foreground">
-                  No hay leads con los filtros aplicados.
-                </td>
-              </tr>
-            )}
-            {leads.map((lead) => (
-              <tr key={lead.id} className="transition-colors hover:bg-muted/30">
-                <td className="px-4 py-3">
-                  <Link href={`/vendedores/${lead.id}`} className="font-medium hover:underline">
-                    {lead.name}
-                  </Link>
-                </td>
-                <td className="hidden px-4 py-3 text-muted-foreground sm:table-cell">
-                  <div>{lead.email}</div>
-                  <div className="text-xs">{lead.phone}</div>
-                </td>
-                <td className="hidden px-4 py-3 lg:table-cell">
-                  {lead.vehicle ? (
-                    <span className="text-muted-foreground">
-                      {lead.vehicle.brand} {lead.vehicle.model}{' '}
-                      <span className="text-xs">({lead.vehicle.year})</span>
-                    </span>
-                  ) : (
-                    <span className="text-xs text-muted-foreground">—</span>
-                  )}
-                </td>
-                <td className="px-4 py-3">
-                  <span
-                    className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${STATUS_COLORS[lead.status] ?? ''}`}
-                  >
-                    {STATUS_LABELS[lead.status] ?? lead.status}
-                  </span>
-                </td>
-                <td className="hidden px-4 py-3 text-muted-foreground md:table-cell">
-                  {lead.agent?.name ?? <span className="text-xs italic">Sin asignar</span>}
-                </td>
-                <td className="hidden px-4 py-3 text-xs text-muted-foreground xl:table-cell">
-                  {new Date(lead.createdAt).toLocaleDateString('es-ES')}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+          {/* Stages */}
+          {PIPELINE_STAGES.map((stage) => {
+            const count = countByStatus[stage.key] ?? 0
+            const pct = pipelineTotal > 0 ? Math.round((count / pipelineTotal) * 100) : 0
+            const isActive = searchParams.status === stage.key
 
-      {/* Paginación */}
-      {total > 0 && (
-        <div className="flex items-center justify-between text-sm text-muted-foreground">
-          <span>
-            {from}–{to} de {total}
-          </span>
-          <div className="flex gap-2">
-            {page > 1 ? (
-              <Button asChild variant="outline" size="sm">
-                <Link href={pageUrl(page - 1)}>← Anterior</Link>
-              </Button>
-            ) : (
-              <Button variant="outline" size="sm" disabled>
-                ← Anterior
-              </Button>
-            )}
-            {page < totalPages ? (
-              <Button asChild variant="outline" size="sm">
-                <Link href={pageUrl(page + 1)}>Siguiente →</Link>
-              </Button>
-            ) : (
-              <Button variant="outline" size="sm" disabled>
-                Siguiente →
-              </Button>
-            )}
+            return (
+              <Link
+                key={stage.key}
+                href={stageUrl(stage.key)}
+                className="group flex flex-col px-3 transition-opacity hover:opacity-80"
+              >
+                <span
+                  style={{
+                    ...MONO,
+                    fontSize: '10.5px',
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.08em',
+                    color: isActive ? stage.color : '#6b645c',
+                    display: 'block',
+                    fontWeight: isActive ? 700 : 400,
+                  }}
+                >
+                  {stage.label}
+                </span>
+                <span
+                  style={{
+                    fontFamily: 'var(--font-cormorant, serif)',
+                    fontSize: '22px',
+                    fontWeight: 600,
+                    color: isActive ? stage.color : '#0a0a0a',
+                    lineHeight: 1.1,
+                    display: 'block',
+                  }}
+                >
+                  {count}
+                </span>
+                {/* Progress bar */}
+                <div
+                  style={{
+                    height: '3px',
+                    background: '#e6dfd0',
+                    borderRadius: '2px',
+                    marginTop: '6px',
+                    overflow: 'hidden',
+                  }}
+                >
+                  <div
+                    style={{
+                      height: '100%',
+                      width: `${pct}%`,
+                      background: stage.color,
+                      opacity: isActive ? 1 : 0.55,
+                      borderRadius: '2px',
+                      transition: 'width 0.4s ease',
+                    }}
+                  />
+                </div>
+              </Link>
+            )
+          })}
+
+          {/* Conv. 30d */}
+          <div className="ml-3 flex flex-col border-l border-border pb-1 pl-5">
+            <span
+              style={{
+                ...MONO,
+                fontSize: '10px',
+                textTransform: 'uppercase',
+                letterSpacing: '0.1em',
+                color: '#6b645c',
+              }}
+            >
+              Conv. 30d
+            </span>
+            <span
+              style={{
+                fontFamily: 'var(--font-cormorant, serif)',
+                fontSize: '22px',
+                fontWeight: 600,
+                color: '#6b7a4e',
+                lineHeight: 1.1,
+              }}
+            >
+              {convRate30}%
+            </span>
+            <div style={{ height: '3px', marginTop: '6px' }} />
           </div>
         </div>
-      )}
+      </div>
+
+      {/* ── Saved views + chip filters ── */}
+      <Suspense>
+        <LeadsFilters
+          agents={agents}
+          currentView={searchParams.view ?? 'todos'}
+          viewCounts={{
+            todos: todosCount,
+            misLeads: misLeadsCount,
+            sinAsignar: sinAsignarCount,
+            necesitanAccion: necesitanAccionCount,
+            estaSemana: estaSemanaCount,
+          }}
+        />
+      </Suspense>
+
+      {/* ── Table ── */}
+      <div className="flex-1 px-6 pb-8 pt-5">
+        <SellerLeadsTable leads={serializedLeads} />
+
+        {/* Pagination */}
+        {total > 0 && (
+          <div className="mt-4 flex items-center justify-between">
+            <span style={{ ...MONO, fontSize: '11px', color: '#6b645c' }}>
+              Mostrando {from}–{to} de {total} lead{total !== 1 ? 's' : ''}
+              {searchParams.status ? (
+                <>
+                  {' '}
+                  · Filtro: <span style={{ color: '#0a0a0a' }}>{searchParams.status}</span>
+                </>
+              ) : null}
+            </span>
+            <div className="flex items-center gap-1.5">
+              {page > 1 ? (
+                <Button asChild variant="outline" size="sm">
+                  <Link href={pageUrl(page - 1)}>← Anterior</Link>
+                </Button>
+              ) : (
+                <Button variant="outline" size="sm" disabled>
+                  ← Anterior
+                </Button>
+              )}
+              <span className="px-2" style={{ ...MONO, fontSize: '11px', color: '#6b645c' }}>
+                {page} / {totalPages || 1}
+              </span>
+              {page < totalPages ? (
+                <Button asChild variant="outline" size="sm">
+                  <Link href={pageUrl(page + 1)}>Siguiente →</Link>
+                </Button>
+              ) : (
+                <Button variant="outline" size="sm" disabled>
+                  Siguiente →
+                </Button>
+              )}
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   )
 }
