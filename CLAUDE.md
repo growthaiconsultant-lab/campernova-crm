@@ -92,7 +92,23 @@ claude mcp add-json linear '{\"command\":\"npx\",\"args\":[\"-y\",\"mcp-linear@l
 
 `.claude/settings.json` y `.claude/settings.local.json` se mantienen como referencia de la estructura, pero la fuente de verdad funcional es el registro de la CLI.
 
-## Estado actual (Block 8 v2 — Listado Vendedores Visual System Unificado COMPLETADO ✅)
+## Estado actual (Block 9 — Calidad, Flujo y Entornos profesionales EN CURSO 🔄)
+
+### Block 9 — Calidad, Flujo y Entornos profesionales — EN CURSO 🔄
+
+Endurecimiento del proyecto a estándar senior. Documentación de entrada (`README.md`, `ARCHITECTURE.md`, `CHANGELOG.md`, `docs/adr/`) que complementa este log. Flujo de release profesional.
+
+- ✅ **Higiene**: `.gitignore` cubre `.codex/` (tokens MCP), `.claude/worktrees/`, docs legales y artefactos e2e. Eliminado `seller-leads-table.tsx` (huérfano) y el gitlink erróneo del worktree. `AGENTS.md` commiteado.
+- ✅ **Flujo Git trunk-based**: ramas cortas → PR → squash-merge a `main`. **`main` protegida** (branch protection): exige el check de CI `quality` + PR. Conventional Commits enforced (commitlint + hook `commit-msg`). Hook `pre-push` (typecheck + test). `CONTRIBUTING.md` + plantilla de PR.
+- ✅ **CI/CD** (GitHub Actions): `ci.yml` → job `quality` (typecheck + lint + test) en push a main y PRs. `e2e.yml` → e2e autenticado contra staging (manual/nightly, no bloqueante). `package.json` con `packageManager` pin + `engines node>=20`.
+- 🔄 **Entornos dev/staging/prod**: 2º proyecto Supabase gratuito como staging; Vercel Preview → staging, Production → prod. (Pendiente: crear proyecto staging + scoping env vars en Vercel.)
+- 🔄 **Cobertura de tests**: añadir tests de server actions sin cubrir (compradores, entregas, postventa, matches, chat API).
+- 🔄 **E2E autenticado**: bypass de auth vía `storageState` (admin API Supabase) contra staging — cierra CAM-42.
+- 🔄 **SEO sitio público**: metadata raíz orientada a cliente, `robots.ts`, `sitemap.ts`, manifest, OG, JSON-LD (AutoDealer + Vehicle), canonicals.
+
+> Decisiones estructurales en `docs/adr/`. Flujo de trabajo y comandos en `CONTRIBUTING.md`. Diseño del sistema en `ARCHITECTURE.md`.
+
+### Estado previo (Block 8 v2 — Listado Vendedores Visual System Unificado COMPLETADO ✅)
 
 ### Sprint 1 — COMPLETADO ✅
 
