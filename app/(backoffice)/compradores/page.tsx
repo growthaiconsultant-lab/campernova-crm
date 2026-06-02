@@ -130,6 +130,7 @@ type SearchParams = {
   status?: string
   agentId?: string
   vehicleType?: string
+  source?: string
   dateFrom?: string
   dateTo?: string
   budgetMin?: string
@@ -175,6 +176,18 @@ function buildWhere(
   if (sp.vehicleType) {
     if (sp.vehicleType === 'CAMPER' || sp.vehicleType === 'AUTOCARAVANA') {
       conditions.push({ vehicleType: sp.vehicleType })
+    }
+  }
+
+  if (sp.source) {
+    if (sp.source === '__none__') {
+      // "Backoffice" = leads creados a mano (sin source)
+      conditions.push({ source: null })
+    } else if (sp.source === 'CHAT') {
+      // Chat web cubre ambas variantes históricas
+      conditions.push({ source: { in: ['CHAT', 'CHAT_WEB'] } })
+    } else {
+      conditions.push({ source: sp.source })
     }
   }
 

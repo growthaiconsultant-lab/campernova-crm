@@ -17,6 +17,13 @@ const TYPE_OPTIONS = [
   { value: 'AUTOCARAVANA', label: 'Autocaravana' },
 ]
 
+const SOURCE_OPTIONS = [
+  { value: 'CHAT', label: 'Chat web' },
+  { value: 'PRO', label: 'Formulario web' },
+  { value: 'LLAMADA', label: 'Llamada' },
+  { value: '__none__', label: 'Backoffice' },
+]
+
 type Agent = { id: string; name: string }
 type Props = { agents: Agent[] }
 
@@ -53,6 +60,7 @@ export function BuyerListFilters({ agents }: Props) {
 
   const currentStatus = params.get('status') ?? ''
   const currentType = params.get('vehicleType') ?? ''
+  const currentSource = params.get('source') ?? ''
   const currentAgent = params.get('agentId') ?? ''
   const currentSort = params.get('sort') ?? 'createdAt'
   const currentBudget = params.get('budgetMin') ?? ''
@@ -60,7 +68,13 @@ export function BuyerListFilters({ agents }: Props) {
   const currentQ = params.get('q') ?? ''
 
   const hasFilters =
-    currentStatus || currentType || currentAgent || currentBudget || currentSeats || currentQ
+    currentStatus ||
+    currentType ||
+    currentSource ||
+    currentAgent ||
+    currentBudget ||
+    currentSeats ||
+    currentQ
 
   const sortLabel =
     currentSort === 'updatedAt'
@@ -180,6 +194,38 @@ export function BuyerListFilters({ agents }: Props) {
         >
           <option value="__all__">Cualquier tipo</option>
           {TYPE_OPTIONS.map((o) => (
+            <option key={o.value} value={o.value}>
+              {o.label}
+            </option>
+          ))}
+        </select>
+      </label>
+
+      {/* Origen chip */}
+      <label className="relative cursor-pointer">
+        <span className={currentSource ? chipActive : chipBase}>
+          {currentSource
+            ? (SOURCE_OPTIONS.find((o) => o.value === currentSource)?.label ?? 'Origen')
+            : 'Origen'}
+          <svg
+            viewBox="0 0 24 24"
+            className="h-3.5 w-3.5 opacity-60"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth={1.6}
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
+            <polyline points="6 9 12 15 18 9" />
+          </svg>
+        </span>
+        <select
+          className="absolute inset-0 cursor-pointer opacity-0"
+          value={currentSource}
+          onChange={(e) => push({ source: e.target.value === '__all__' ? '' : e.target.value })}
+        >
+          <option value="__all__">Cualquier origen</option>
+          {SOURCE_OPTIONS.map((o) => (
             <option key={o.value} value={o.value}>
               {o.label}
             </option>

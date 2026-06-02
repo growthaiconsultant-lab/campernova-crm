@@ -11,6 +11,8 @@ import type { BuyerMatchData } from '@/components/matches-section'
 import { ActivityTimeline } from '@/components/activity-timeline'
 import type { ActivityItem } from '@/components/activity-timeline'
 import { NoteForm } from '@/components/note-form'
+import { ChatTranscript } from '@/components/chat-transcript'
+import type { ChatMessage } from '@/components/chat-transcript'
 import { addBuyerLeadNote } from './actions'
 import { WhatsAppButton } from '@/components/whatsapp-button'
 import { buyerWhatsAppMessage } from '@/lib/whatsapp'
@@ -22,7 +24,7 @@ import {
   BUYER_LEAD_TRANSITIONS,
 } from '@/lib/state-machine'
 import type { BuyerLeadStatus } from '@prisma/client'
-import { ChevronLeft, Phone, Mail, Shield } from 'lucide-react'
+import { ChevronLeft, Phone, Mail, Shield, MessagesSquare } from 'lucide-react'
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
@@ -108,6 +110,17 @@ export default async function FichaCompradorPage({
       where: { id: params.id },
       include: {
         agent: true,
+        chatSession: {
+          select: {
+            messages: true,
+            status: true,
+            startedAt: true,
+            lastMessageAt: true,
+            completedAt: true,
+            totalTokens: true,
+            llmModel: true,
+          },
+        },
         warranty: {
           include: {
             tickets: {
@@ -255,11 +268,22 @@ export default async function FichaCompradorPage({
   const scoreEngagement = statusEngagementMap[lead.status] ?? 15
   const scoreColor = (s: number) => (s >= 70 ? '#1f8a5b' : s >= 45 ? '#d97706' : '#94a3b8')
 
+  // Chat session (CAM-55) — leads originados en el chat /comprar
+  const chatSession = lead.chatSession
+  const chatMessages: ChatMessage[] = Array.isArray(chatSession?.messages)
+    ? (chatSession.messages as unknown as ChatMessage[])
+    : []
+  const chatUserMsgCount = chatMessages.filter((m) => m.role === 'user').length
+  const hasChat = !!chatSession
+
   // Tabs definition
   const tabs: LeadTab[] = [
     { key: 'ficha', label: 'Ficha' },
     { key: 'actividad', label: 'Actividad', badge: activities.length },
     { key: 'matches', label: 'Vehículos sugeridos', badge: lead.matches.length },
+    ...(hasChat
+      ? [{ key: 'conversacion', label: 'Conversación', badge: chatUserMsgCount } as LeadTab]
+      : []),
     { key: 'postventa', label: 'Postventa', badge: hasAlert ? '!' : undefined },
     { key: 'documentos', label: 'Documentos' },
   ]
@@ -498,6 +522,28 @@ export default async function FichaCompradorPage({
               )}
             </>
           )}
+
+          {/* ── TAB: CONVERSACIÓN (CAM-55) ── */}
+          {activeTab === 'conversacion' &&
+            (hasChat ? (
+              <ChatTranscript
+                messages={chatMessages}
+                status={chatSession!.status}
+                startedAt={chatSession!.startedAt}
+                lastMessageAt={chatSession!.lastMessageAt}
+                completedAt={chatSession!.completedAt}
+                totalTokens={chatSession!.totalTokens}
+                llmModel={chatSession!.llmModel}
+              />
+            ) : (
+              <div className="flex flex-col items-center justify-center rounded-xl border border-[#e2e8f0] bg-white py-16">
+                <MessagesSquare className="mb-3 h-8 w-8 text-[#e2e8f0]" />
+                <p className="text-[15px] font-medium text-[#0a0a0a]">Sin conversación</p>
+                <p className="mt-1 text-[13px] text-[#94a3b8]">
+                  Este lead no se originó desde el chat del portal
+                </p>
+              </div>
+            ))}
 
           {/* ── TAB: POSTVENTA ── */}
           {activeTab === 'postventa' && (
