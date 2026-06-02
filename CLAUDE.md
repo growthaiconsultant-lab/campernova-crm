@@ -92,19 +92,28 @@ claude mcp add-json linear '{\"command\":\"npx\",\"args\":[\"-y\",\"mcp-linear@l
 
 `.claude/settings.json` y `.claude/settings.local.json` se mantienen como referencia de la estructura, pero la fuente de verdad funcional es el registro de la CLI.
 
-## Estado actual (Block 9 — Calidad, Flujo y Entornos profesionales EN CURSO 🔄)
+## Estado actual (Block 9 — Calidad, Flujo y Entornos profesionales — 6/8 COMPLETADO ✅)
 
-### Block 9 — Calidad, Flujo y Entornos profesionales — EN CURSO 🔄
+### Block 9 — Calidad, Flujo y Entornos profesionales
 
-Endurecimiento del proyecto a estándar senior. Documentación de entrada (`README.md`, `ARCHITECTURE.md`, `CHANGELOG.md`, `docs/adr/`) que complementa este log. Flujo de release profesional.
+Endurecimiento del proyecto a estándar senior. Documentación de entrada (`README.md`, `ARCHITECTURE.md`, `CHANGELOG.md`, `docs/adr/`) que complementa este log. Flujo de release profesional. Ejecutado vía PRs con CI (#2–#6).
 
 - ✅ **Higiene**: `.gitignore` cubre `.codex/` (tokens MCP), `.claude/worktrees/`, docs legales y artefactos e2e. Eliminado `seller-leads-table.tsx` (huérfano) y el gitlink erróneo del worktree. `AGENTS.md` commiteado.
-- ✅ **Flujo Git trunk-based**: ramas cortas → PR → squash-merge a `main`. **`main` protegida** (branch protection): exige el check de CI `quality` + PR. Conventional Commits enforced (commitlint + hook `commit-msg`). Hook `pre-push` (typecheck + test). `CONTRIBUTING.md` + plantilla de PR.
-- ✅ **CI/CD** (GitHub Actions): `ci.yml` → job `quality` (typecheck + lint + test) en push a main y PRs. `e2e.yml` → e2e autenticado contra staging (manual/nightly, no bloqueante). `package.json` con `packageManager` pin + `engines node>=20`.
-- 🔄 **Entornos dev/staging/prod**: 2º proyecto Supabase gratuito como staging; Vercel Preview → staging, Production → prod. (Pendiente: crear proyecto staging + scoping env vars en Vercel.)
-- 🔄 **Cobertura de tests**: añadir tests de server actions sin cubrir (compradores, entregas, postventa, matches, chat API).
-- 🔄 **E2E autenticado**: bypass de auth vía `storageState` (admin API Supabase) contra staging — cierra CAM-42.
-- 🔄 **SEO sitio público**: metadata raíz orientada a cliente, `robots.ts`, `sitemap.ts`, manifest, OG, JSON-LD (AutoDealer + Vehicle), canonicals.
+- ✅ **Flujo Git trunk-based**: ramas cortas → PR → squash-merge a `main`. **`main` protegida** (branch protection): exige el check de CI `quality` + PR (approvals=0). Conventional Commits enforced (commitlint + hook `commit-msg`). Hook `pre-push` (typecheck + test). `CONTRIBUTING.md` + plantilla de PR.
+- ✅ **CI/CD** (GitHub Actions): `ci.yml` → job `quality` (typecheck + lint + test) en push a main y PRs. `e2e.yml` → e2e autenticado contra staging (manual/nightly, no bloqueante; requiere secrets). `package.json` con `packageManager` pin (pnpm@10.33.2) + `engines node>=20`.
+- ✅ **Documentación**: `README.md`, `ARCHITECTURE.md`, `CHANGELOG.md` (Keep a Changelog) y 5 ADRs en `docs/adr/`.
+- ✅ **Cobertura de tests**: +41 tests de server actions (compradores, entregas, postventa, matches) → **292 verdes**. Patrón `vi.hoisted` mockDb. (Chat API streaming: trabajo futuro.)
+- ✅ **SEO sitio público**: metadata raíz orientada a cliente (`lib/seo.ts`), `app/robots.ts`, `app/sitemap.ts`, `app/manifest.ts`, `app/opengraph-image.tsx` (edge), JSON-LD AutoDealer (landing+contacto, corrige teléfono obsoleto) + Vehicle (`/comprar/[id]`), canonicals. Rutas SEO añadidas a `PUBLIC_PATHS` del middleware. Verificado en prod (`/robots.txt`, `/sitemap.xml` con 15 URLs).
+- ⬜ **Entornos dev/staging/prod** (PENDIENTE — requiere acciones del dueño): 2º proyecto Supabase gratuito como staging; Vercel Preview → staging, Production → prod.
+- ⬜ **E2E autenticado** (PENDIENTE — depende de staging): bypass de auth vía `storageState` (admin API Supabase) contra staging — cierra CAM-42.
+
+> **Handoff Fases 4+7** (retomar cuando se quiera montar staging):
+> 1. Crear 2º proyecto Supabase "campersnova-crm-staging" (free, Frankfurt) — elegir organización.
+> 2. Aplicar las 10 migraciones + `pnpm seed` contra staging; activar extensión `vector` + buckets `vehicle-photos`/`vehicle-documents`.
+> 3. Vercel → env vars con scope: Production→Supabase prod, Preview→Supabase staging. Añadir redirect URLs de preview/staging en Supabase Auth.
+> 4. GitHub secrets para `e2e.yml`: `E2E_BASE_URL`, `STAGING_NEXT_PUBLIC_SUPABASE_URL`, `STAGING_SUPABASE_SERVICE_ROLE_KEY`, `E2E_USER_EMAIL`.
+> 5. Escribir `e2e/global-setup.ts` (generateLink→verifyOtp→storageState) + `e2e/backoffice/*.spec.ts` (incl. pestaña Conversación CAM-55) + usuario e2e en `prisma/seed.ts`.
+> Plan detallado: ver el plan aprobado de esta sesión.
 
 > Decisiones estructurales en `docs/adr/`. Flujo de trabajo y comandos en `CONTRIBUTING.md`. Diseño del sistema en `ARCHITECTURE.md`.
 
