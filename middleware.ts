@@ -23,10 +23,19 @@ const PUBLIC_PATHS = [
 ]
 
 export async function middleware(request: NextRequest) {
-  const { supabaseResponse, user } = await updateSession(request)
   const { pathname } = request.nextUrl
 
   const isPublic = PUBLIC_PATHS.some((p) => pathname === p || pathname.startsWith(`${p}/`))
+
+  // Las rutas públicas (landing, /comprar, /vender, robots, sitemap…) no necesitan
+  // consultar Supabase Auth. Saltar esa llamada de red evita el cold-start del
+  // middleware (MIDDLEWARE_INVOCATION_TIMEOUT / 504) en todo el sitio público.
+  // Excepción: /login sí comprueba sesión para redirigir a un usuario ya logueado.
+  if (isPublic && pathname !== '/login') {
+    return NextResponse.next({ request })
+  }
+
+  const { supabaseResponse, user } = await updateSession(request)
 
   if (!user && !isPublic) {
     const url = request.nextUrl.clone()
