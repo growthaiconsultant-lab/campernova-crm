@@ -1,5 +1,6 @@
 import { type NextRequest, NextResponse } from 'next/server'
 import { updateSession } from '@/lib/supabase/middleware'
+import { resolveLegacyRedirect } from '@/lib/legacy-redirects'
 
 const PUBLIC_PATHS = [
   '/',
@@ -24,6 +25,16 @@ const PUBLIC_PATHS = [
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl
+
+  // Redirecciones 301 del WordPress antiguo — lo primero, antes del guard de auth
+  // (el middleware corre antes que redirects() de next.config, por eso van aquí).
+  const legacyDest = resolveLegacyRedirect(pathname)
+  if (legacyDest) {
+    const url = request.nextUrl.clone()
+    url.pathname = legacyDest
+    url.search = ''
+    return NextResponse.redirect(url, 308)
+  }
 
   const isPublic = PUBLIC_PATHS.some((p) => pathname === p || pathname.startsWith(`${p}/`))
 
