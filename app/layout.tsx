@@ -3,6 +3,7 @@ import { Inter, Fraunces, JetBrains_Mono, Cormorant_Garamond } from 'next/font/g
 import './globals.css'
 import { CookieBanner } from '@/components/cookie-banner'
 import { PostHogProvider } from '@/components/posthog-provider'
+import { SITE_URL, SITE_NAME, SITE_DESCRIPTION, SITE_KEYWORDS } from '@/lib/seo'
 
 const inter = Inter({
   subsets: ['latin'],
@@ -31,8 +32,34 @@ const cormorant = Cormorant_Garamond({
 })
 
 export const metadata: Metadata = {
-  title: 'CampersNova CRM',
-  description: 'CRM interno para gestión de compraventa de autocaravanas y campers',
+  metadataBase: new URL(SITE_URL),
+  title: {
+    default: `${SITE_NAME} — Autocaravanas y campers seminuevas con garantía`,
+    template: `%s · ${SITE_NAME}`,
+  },
+  description: SITE_DESCRIPTION,
+  keywords: SITE_KEYWORDS,
+  applicationName: SITE_NAME,
+  authors: [{ name: SITE_NAME }],
+  openGraph: {
+    type: 'website',
+    locale: 'es_ES',
+    url: SITE_URL,
+    siteName: SITE_NAME,
+    title: `${SITE_NAME} — Autocaravanas y campers seminuevas con garantía`,
+    description: SITE_DESCRIPTION,
+    // La imagen OG la provee app/opengraph-image.tsx (convención de Next).
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: `${SITE_NAME} — Autocaravanas y campers seminuevas`,
+    description: SITE_DESCRIPTION,
+  },
+  robots: {
+    index: true,
+    follow: true,
+    googleBot: { index: true, follow: true, 'max-image-preview': 'large' },
+  },
 }
 
 export default function RootLayout({
