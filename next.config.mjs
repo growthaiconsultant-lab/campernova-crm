@@ -11,6 +11,30 @@ const nextConfig = {
       },
     ],
   },
+
+  // ── Redirecciones 301 desde el WordPress antiguo (migración SEO) ──────────────
+  // Preservan el posicionamiento al conectar el dominio campersnova.com a esta app.
+  // Ver docs/migration/README.md para el detalle. Las rutas idénticas
+  // (/, /contacto, /aviso-legal) no necesitan redirect; Next maneja el trailing slash.
+  async redirects() {
+    const toComprar = (source) => ({ source, destination: '/comprar', permanent: true })
+    return [
+      // Páginas que cambian de slug
+      { source: '/tasacion', destination: '/vender', permanent: true },
+      { source: '/gestion-de-venta', destination: '/vender', permanent: true },
+      { source: '/politica-de-cookies', destination: '/cookies', permanent: true },
+      { source: '/privacy-policy', destination: '/privacidad', permanent: true },
+      // Catálogo / carrito WooCommerce → flujo de compra
+      { source: '/cars', destination: '/comprar', permanent: true },
+      { source: '/carrito', destination: '/comprar', permanent: true },
+      // Fichas de vehículo del WP (42) → catálogo (sin equivalente 1:1 todavía)
+      toComprar('/listings'),
+      { source: '/listings/:slug*', destination: '/comprar', permanent: true },
+      // Productos demo WooCommerce → catálogo
+      { source: '/producto/:slug*', destination: '/comprar', permanent: true },
+      { source: '/categoria-producto/:slug*', destination: '/comprar', permanent: true },
+    ]
+  },
 }
 
 export default withSentryConfig(nextConfig, {
