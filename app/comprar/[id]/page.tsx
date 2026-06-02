@@ -5,6 +5,8 @@ import { Shield, Eye, Handshake, Sparkles, Check, MapPin, Phone } from 'lucide-r
 import { PublicNav } from '@/components/public-nav'
 import { PublicFooter } from '@/components/public-footer'
 import { DUMMY_VEHICLES } from '@/lib/dummy/vehicles'
+import { JsonLd } from '@/components/json-ld'
+import { SITE_URL } from '@/lib/seo'
 
 function eur(n: number) {
   return new Intl.NumberFormat('es-ES', {
@@ -51,9 +53,41 @@ export function generateStaticParams() {
 export function generateMetadata({ params }: Props): Metadata {
   const v = DUMMY_VEHICLES.find((v) => v.id === params.id)
   if (!v) return {}
+  const canonical = `/comprar/${v.id}`
   return {
-    title: `${v.title} · CampersNova`,
+    // El template del layout añade " · CampersNova" automáticamente.
+    title: `${v.title} · ${v.year} · ${v.location}`,
     description: v.highlight,
+    alternates: { canonical },
+    openGraph: {
+      type: 'website',
+      url: `${SITE_URL}${canonical}`,
+      title: v.title,
+      description: v.highlight,
+    },
+  }
+}
+
+function vehicleJsonLd(v: (typeof DUMMY_VEHICLES)[number]) {
+  return {
+    '@context': 'https://schema.org',
+    '@type': 'Vehicle',
+    name: v.title,
+    description: v.highlight,
+    vehicleModelDate: String(v.year),
+    fuelType: v.fuel,
+    vehicleSeatingCapacity: v.seats,
+    bodyType: v.type,
+    mileageFromOdometer: { '@type': 'QuantitativeValue', value: v.km, unitCode: 'KMT' },
+    offers: {
+      '@type': 'Offer',
+      price: v.price,
+      priceCurrency: 'EUR',
+      availability: 'https://schema.org/InStock',
+      itemCondition: 'https://schema.org/UsedCondition',
+      url: `${SITE_URL}/comprar/${v.id}`,
+      seller: { '@type': 'AutoDealer', name: 'CampersNova' },
+    },
   }
 }
 
@@ -74,6 +108,7 @@ export default function VehicleDetailPage({ params }: Props) {
 
   return (
     <>
+      <JsonLd data={vehicleJsonLd(v)} />
       <PublicNav />
 
       <main className="min-h-screen pt-20" style={{ background: 'var(--cn-cream-100)' }}>

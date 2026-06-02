@@ -3,6 +3,8 @@ import Link from 'next/link'
 import { Mail, Phone, MapPin, Clock, MessageCircle, ArrowRight } from 'lucide-react'
 import { PublicNav } from '@/components/public-nav'
 import { PublicFooter } from '@/components/public-footer'
+import { JsonLd } from '@/components/json-ld'
+import { autoDealerJsonLd } from '@/lib/seo'
 
 export const metadata: Metadata = {
   title: 'Contacto · CampersNova',
@@ -47,6 +49,7 @@ const CHANNELS = [
 export default function ContactoPage() {
   return (
     <>
+      <JsonLd data={autoDealerJsonLd()} />
       <PublicNav />
 
       <main className="min-h-screen pt-20" style={{ background: 'var(--cn-cream-100)' }}>

@@ -15,6 +15,8 @@ import { PodcastSection } from '@/components/landing/podcast'
 import { TestimonialsSection } from '@/components/landing/testimonials'
 import { FinalCta } from '@/components/landing/final-cta'
 import { LandingAnalytics } from '@/components/landing/analytics'
+import { JsonLd } from '@/components/json-ld'
+import { autoDealerJsonLd } from '@/lib/seo'
 
 export const metadata: Metadata = {
   title: 'CampersNova · Compraventa de campers y autocaravanas',
@@ -50,29 +52,8 @@ export const metadata: Metadata = {
 export default function LandingPage() {
   return (
     <>
-      {/* JSON-LD Organization */}
-      <script
-        type="application/ld+json"
-        dangerouslySetInnerHTML={{
-          __html: JSON.stringify({
-            '@context': 'https://schema.org',
-            '@type': 'Organization',
-            name: 'CampersNova',
-            url: 'https://campersnova.com',
-            logo: 'https://campersnova.com/images/brand/Logo%20Campers%20Nova.png',
-            contactPoint: {
-              '@type': 'ContactPoint',
-              telephone: '+34-629-925-821',
-              email: 'info@campersnova.com',
-              contactType: 'customer service',
-              areaServed: 'ES',
-              availableLanguage: 'Spanish',
-            },
-            description:
-              'Intermediación profesional para la compraventa de campers y autocaravanas semi-nuevas en España.',
-          }),
-        }}
-      />
+      {/* JSON-LD — negocio local (AutoDealer) con NAP correcto */}
+      <JsonLd data={autoDealerJsonLd()} />
 
       <PublicNav />
 
