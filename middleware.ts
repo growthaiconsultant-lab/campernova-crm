@@ -15,6 +15,11 @@ const PUBLIC_PATHS = [
   '/api/chat',
   '/como-funciona',
   '/sobre',
+  // SEO / metadata routes — deben ser accesibles sin auth para buscadores y redes
+  '/robots.txt',
+  '/sitemap.xml',
+  '/manifest.webmanifest',
+  '/opengraph-image',
 ]
 
 export async function middleware(request: NextRequest) {
