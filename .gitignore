@@ -59,5 +59,15 @@ playwright/.cache/
 
 # Claude Code (local user settings — project settings.json se commitea si aplica)
 .claude/settings.local.json
+.claude/worktrees/
 
-.vercel
+# Codex (config local con tokens MCP — NUNCA commitear)
+.codex/
+
+# Documentos legales / de negocio (confidenciales — se mantienen fuera de git)
+docs/Term-Sheet-AIMS-CampersNova.*
+docs/Technology-Participation-Agreement.*
+
+# Playwright auth state generado (sesión de test — no commitear)
+e2e/.auth/
+storageState.json

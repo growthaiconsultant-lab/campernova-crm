@@ -2,6 +2,10 @@
   "name": "campernova-crm",
   "version": "0.1.0",
   "private": true,
+  "packageManager": "pnpm@10.33.2",
+  "engines": {
+    "node": ">=20"
+  },
   "scripts": {
     "dev": "next dev",
     "build": "prisma generate && next build",
@@ -59,6 +63,8 @@
     "zod": "^4.4.2"
   },
   "devDependencies": {
+    "@commitlint/cli": "^21.0.2",
+    "@commitlint/config-conventional": "^21.0.2",
     "@playwright/test": "^1.59.1",
     "@types/jszip": "^3.4.1",
     "@types/node": "^20",
