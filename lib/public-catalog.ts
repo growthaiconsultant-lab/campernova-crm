@@ -125,13 +125,21 @@ export async function getPublishedVehicles(): Promise<PublicVehicle[]> {
   return vehicles.map(mapToPublicVehicle)
 }
 
-/** Un vehículo publicado por su slug (o null si no existe / no está publicado). */
+/**
+ * Un vehículo publicado por su slug (o null si no existe / no está publicado).
+ * Resiliente: si la DB falla, devuelve null (la página hará 404) en vez de un 500.
+ */
 export async function getPublishedVehicleBySlug(slug: string): Promise<PublicVehicle | null> {
   const id = idFromSlug(slug)
   if (!id) return null
-  const v = await db.vehicle.findFirst({
-    where: { id, status: 'PUBLICADO' },
-    include: { photos: true },
-  })
-  return v ? mapToPublicVehicle(v) : null
+  try {
+    const v = await db.vehicle.findFirst({
+      where: { id, status: 'PUBLICADO' },
+      include: { photos: true },
+    })
+    return v ? mapToPublicVehicle(v) : null
+  } catch (err) {
+    console.error('[public-catalog] error al cargar vehículo por slug:', err)
+    return null
+  }
 }
