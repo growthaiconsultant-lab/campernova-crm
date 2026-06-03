@@ -320,10 +320,9 @@ export default function VenderEmpezarPage() {
 
   const handleSubmit = contactForm.handleSubmit(async (contact) => {
     setSubmitError(null)
-    if (!captchaToken) {
-      setSubmitError('Completa el captcha antes de enviar.')
-      return
-    }
+    // hCaptcha best-effort: si no se resolvió (reto/ error/ config de dominio), enviamos
+    // con 'unavailable' — el servidor ya no bloquea. No dejamos al vendedor sin enviar.
+    const captchaValue = captchaToken ?? 'unavailable'
     setSubmitting(true)
     const vehicle = vehicleForm.getValues()
     const fd = new FormData()
@@ -353,7 +352,7 @@ export default function VenderEmpezarPage() {
     }
 
     fd.set('gdpr-consent', 'true')
-    fd.set('h-captcha-response', captchaToken)
+    fd.set('h-captcha-response', captchaValue)
 
     try {
       const result = await submitPublicLead(fd)

@@ -45,14 +45,22 @@ export async function submitPublicLead(formData: FormData) {
     reqHeaders.get('x-forwarded-for')?.split(',')[0]?.trim() ?? reqHeaders.get('x-real-ip') ?? null
   const consentAt = new Date()
 
-  // Verify captcha first
+  // hCaptcha BEST-EFFORT (no bloqueante): si el captcha falla, no llega o el cliente
+  // no pudo resolverlo ('unavailable'), NO bloqueamos el envío del formulario de venta.
+  // Es el embudo de captación de vehículos y no debe romperse por un problema del captcha.
   const captchaToken = formData.get('h-captcha-response')
-  if (typeof captchaToken !== 'string' || !captchaToken) {
-    return { error: 'Completa el captcha antes de enviar.' }
-  }
-  const captchaOk = process.env.NODE_ENV !== 'production' || (await verifyHCaptcha(captchaToken))
-  if (!captchaOk) {
-    return { error: 'Verificación captcha fallida. Inténtalo de nuevo.' }
+  if (
+    typeof captchaToken === 'string' &&
+    captchaToken &&
+    captchaToken !== 'unavailable' &&
+    process.env.NODE_ENV === 'production'
+  ) {
+    try {
+      const ok = await verifyHCaptcha(captchaToken)
+      if (!ok) console.warn('[vender/submit] hCaptcha no verificado; continúo (best-effort)')
+    } catch (err) {
+      console.error('[vender/submit] error verificando hCaptcha; continúo', err)
+    }
   }
 
   // Parse scalar fields
