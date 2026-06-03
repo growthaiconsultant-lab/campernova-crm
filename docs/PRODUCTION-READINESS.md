@@ -11,6 +11,12 @@ Camino realista desde "MVP bien construido" hasta "producto de producción con g
 > ve afectada porque accede vía Prisma con el rol `postgres` (BYPASSRLS). Linter de Supabase:
 > 0 errores de seguridad tras el cambio.
 
+> **🚀 LANZAMIENTO (2026-06-03)**: el **cutover de DNS está hecho** — `campersnova.com` ya
+> sirve la web nueva en Vercel (SSL OK, rutas 200). Emails reales (Resend) y secretos
+> (`CRON_SECRET`, `SENTRY_AUTH_TOKEN`) configurados. **Lo que queda tras el cutover** (sitemap
+> `NEXT_PUBLIC_APP_URL`, login del equipo en Supabase Auth, `www`, stock real) está detallado,
+> con pasos exactos y el procedimiento de **rollback**, en **`docs/LAUNCH.md`**.
+
 **Leyenda de propietario**: 🧑 Tú (cloud/dashboard/negocio) · 🤖 Yo (código) · 🤝 Ambos.
 
 ---
@@ -19,13 +25,13 @@ Camino realista desde "MVP bien construido" hasta "producto de producción con g
 
 Sin esto, el negocio no funciona correctamente en producción.
 
-| #   | Ítem                                                                                                   | Por qué                                                                                                                            | Propietario                           |
-| --- | ------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------- |
-| 1   | **Verificar dominio en Resend** + cambiar `EMAIL_FROM` a `info@campersnova.com`                        | Hoy los emails están en **sandbox**: no se entregan a clientes/agentes reales                                                      | 🧑 DNS en Resend · 🤖 swap de env var |
-| 2   | **Conectar dominio real** `campersnova.com` en Vercel (DNS + HTTPS) + actualizar `NEXT_PUBLIC_APP_URL` | URLs canónicas, sitemap y emails usan hoy la URL `*.vercel.app`                                                                    | 🧑                                    |
-| 3   | ✅ **Conectar `/comprar/[id]` al inventario real** (Prisma) — _hecho (Fase B)_                         | Las fichas leen de `lib/public-catalog.ts` (vehículos `PUBLICADO`). Falta **publicar stock real** y el catálogo navegable (Fase C) | 🧑 publicar stock                     |
-| 4   | **Rotar los tokens de `.codex/`** (Linear + Supabase)                                                  | Aparecieron en salida de herramientas durante la auditoría                                                                         | 🧑                                    |
-| 5   | **`CRON_SECRET` en Vercel**                                                                            | El cron de postventa no exige auth en prod sin él                                                                                  | 🧑 generar · 🤖 código ya listo       |
+| #   | Ítem                                                                           | Por qué                                                                                                                               | Propietario                |
+| --- | ------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------- | -------------------------- |
+| 1   | ✅ **Dominio en Resend + `EMAIL_FROM`** — _hecho 2026-06-03_                   | Dominio `campersnova.com` verificado (DKIM/SPF/MX en `send`); `EMAIL_FROM = info@campersnova.com`. Emails reales ya salen             | ✅                         |
+| 2   | ✅ **Cutover DNS `campersnova.com` → Vercel** — _hecho 2026-06-03_             | La web ya sirve desde Vercel con SSL. **Pendiente tras cutover**: `NEXT_PUBLIC_APP_URL` (sitemap), Supabase Auth, `www` → `LAUNCH.md` | 🧑 retoques en `LAUNCH.md` |
+| 3   | ✅ **Conectar `/comprar/[id]` al inventario real** (Prisma) — _hecho (Fase B)_ | Las fichas leen de `lib/public-catalog.ts` (vehículos `PUBLICADO`). Falta **publicar stock real** y el catálogo navegable (Fase C)    | 🧑 publicar stock          |
+| 4   | **Rotar los tokens de `.codex/`** (Linear + Supabase)                          | Aparecieron en salida de herramientas durante la auditoría                                                                            | 🧑                         |
+| 5   | ✅ **`CRON_SECRET` en Vercel** — _hecho 2026-06-03_                            | El cron de postventa ya exige auth en prod                                                                                            | ✅                         |
 
 ---
 
@@ -33,13 +39,13 @@ Sin esto, el negocio no funciona correctamente en producción.
 
 Lo que convierte "funciona" en "tengo garantías de que sigue funcionando".
 
-| #   | Ítem                                                                              | Por qué                                                                                   | Propietario                            |
-| --- | --------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------- | -------------------------------------- |
-| 6   | **Entorno de staging** (2º proyecto Supabase + Vercel Preview→staging) — _Fase 4_ | Hoy las migraciones van directas a **prod**. Staging las prueba antes                     | 🤝 tú org/Vercel · 🤖 migraciones/seed |
-| 7   | **E2E autenticado** de flujos backoffice — _Fase 7, cierra CAM-42_                | Ningún test recorre lead→tasación→publicación→entrega de punta a punta                    | 🤖 código · 🧑 secrets                 |
-| 8   | **`SENTRY_AUTH_TOKEN`** + alerta de error-rate                                    | Sin él, los errores de prod no tienen línea de código exacta; sin alerta, nadie se entera | 🧑 token · 🤝 alerta                   |
-| 9   | **Tests del chat API** (streaming + tool-use)                                     | Único módulo crítico sin cobertura                                                        | 🤖                                     |
-| 10  | **Backups de DB verificados** + política de retención/restore documentada         | Garantía de recuperación ante desastre                                                    | 🧑 config Supabase · 🤖 doc/runbook    |
+| #   | Ítem                                                                                       | Por qué                                                                                                | Propietario                            |
+| --- | ------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------ | -------------------------------------- |
+| 6   | **Entorno de staging** (2º proyecto Supabase + Vercel Preview→staging) — _Fase 4_          | Hoy las migraciones van directas a **prod**. Staging las prueba antes                                  | 🤝 tú org/Vercel · 🤖 migraciones/seed |
+| 7   | **E2E autenticado** de flujos backoffice — _Fase 7, cierra CAM-42_                         | Ningún test recorre lead→tasación→publicación→entrega de punta a punta                                 | 🤖 código · 🧑 secrets                 |
+| 8   | 🟡 **`SENTRY_AUTH_TOKEN`** _(token hecho 2026-06-03)_ + alerta de error-rate _(pendiente)_ | Token ya configurado en Vercel → source maps en prod. Falta crear la alerta de error-rate en Sentry UI | 🧑 alerta                              |
+| 9   | ✅ **Tests del chat API** (streaming + tool-use) — _hecho (PR #23, +27 tests)_             | Era el único módulo crítico sin cobertura                                                              | ✅                                     |
+| 10  | **Backups de DB verificados** + política de retención/restore documentada                  | Garantía de recuperación ante desastre                                                                 | 🧑 config Supabase · 🤖 doc/runbook    |
 
 ---
 
