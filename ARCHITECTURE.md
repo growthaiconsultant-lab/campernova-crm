@@ -135,7 +135,7 @@ Compresión de imágenes en cliente con canvas nativo (≤1.5 MB), sin librería
 
 - **Vercel**: Production (`main`) → Supabase prod · Preview (PRs) → Supabase **staging** · Development (local).
 - **CI** (`.github/workflows/ci.yml`): `quality` (typecheck + lint + test) — gate de merge en `main`.
-- **E2E** (`.github/workflows/e2e.yml`): autenticado contra staging, manual/nightly, no bloqueante.
+- **E2E** (`.github/workflows/e2e.yml`): autenticado contra staging, manual/nightly, no bloqueante. Si no hay secretos de staging (`E2E_BASE_URL`), un paso guarda salta el resto y el run queda en verde (no falla hasta montar staging).
 - **Migraciones**: se prueban en staging (vía el Preview del PR) antes de llegar a prod. Workflow detallado en `CLAUDE.md`.
 
 Matriz de variables de entorno: ver `README.md` § Entornos y `.env.example`.
