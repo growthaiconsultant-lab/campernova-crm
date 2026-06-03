@@ -23,11 +23,30 @@ const EXACT: Record<string, string> = {
 const PREFIX_TO_COMPRAR = ['/listings']
 
 /**
+ * Contenido del WP eliminado para siempre y sin valor SEO (carrito, productos demo
+ * de WooCommerce, categorías de producto). Devolver 410 Gone es la señal correcta
+ * para Google ("ya no existe"), mejor que un redirect a una página genérica.
+ */
+const GONE_EXACT = ['/carrito']
+const GONE_PREFIX = ['/producto', '/categoria-producto']
+
+function stripTrailingSlash(pathname: string): string {
+  return pathname !== '/' && pathname.endsWith('/') ? pathname.slice(0, -1) : pathname
+}
+
+/** True si el path antiguo debe devolver 410 Gone. */
+export function isLegacyGone(pathname: string): boolean {
+  const path = stripTrailingSlash(pathname)
+  if (GONE_EXACT.includes(path)) return true
+  return GONE_PREFIX.some((prefix) => path === prefix || path.startsWith(`${prefix}/`))
+}
+
+/**
  * Devuelve la ruta destino para un path antiguo, o null si no aplica.
  * Normaliza el trailing slash del WordPress.
  */
 export function resolveLegacyRedirect(pathname: string): string | null {
-  const path = pathname !== '/' && pathname.endsWith('/') ? pathname.slice(0, -1) : pathname
+  const path = stripTrailingSlash(pathname)
 
   if (EXACT[path]) return EXACT[path]
 

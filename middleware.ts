@@ -1,6 +1,6 @@
 import { type NextRequest, NextResponse } from 'next/server'
 import { updateSession } from '@/lib/supabase/middleware'
-import { resolveLegacyRedirect } from '@/lib/legacy-redirects'
+import { resolveLegacyRedirect, isLegacyGone } from '@/lib/legacy-redirects'
 
 const PUBLIC_PATHS = [
   '/',
@@ -34,6 +34,12 @@ export async function middleware(request: NextRequest) {
     url.pathname = legacyDest
     url.search = ''
     return NextResponse.redirect(url, 308)
+  }
+
+  // Contenido del WP eliminado para siempre y sin valor SEO → 410 Gone
+  // (señal correcta a Google: "ya no existe", en vez de redirigir a /login).
+  if (isLegacyGone(pathname)) {
+    return new NextResponse('Gone', { status: 410 })
   }
 
   const isPublic = PUBLIC_PATHS.some((p) => pathname === p || pathname.startsWith(`${p}/`))
