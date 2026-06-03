@@ -11,11 +11,13 @@ Camino realista desde "MVP bien construido" hasta "producto de producción con g
 > ve afectada porque accede vía Prisma con el rol `postgres` (BYPASSRLS). Linter de Supabase:
 > 0 errores de seguridad tras el cambio.
 
-> **🚀 LANZAMIENTO (2026-06-03)**: el **cutover de DNS está hecho** — `campersnova.com` ya
-> sirve la web nueva en Vercel (SSL OK, rutas 200). Emails reales (Resend) y secretos
-> (`CRON_SECRET`, `SENTRY_AUTH_TOKEN`) configurados. **Lo que queda tras el cutover** (sitemap
-> `NEXT_PUBLIC_APP_URL`, login del equipo en Supabase Auth, `www`, stock real) está detallado,
-> con pasos exactos y el procedimiento de **rollback**, en **`docs/LAUNCH.md`**.
+> **🚀 LANZAMIENTO (2026-06-03 → retoques cerrados 2026-06-04)**: el **cutover de DNS está
+> hecho** — `campersnova.com` ya sirve la web nueva en Vercel (SSL OK, rutas 200). Emails
+> reales (Resend) y secretos (`CRON_SECRET`, `SENTRY_AUTH_TOKEN`) configurados. **Los tres
+> retoques post-cutover ya están cerrados**: sitemap en dominio real (PR #27, vía código),
+> login del equipo en `campersnova.com` (Supabase Auth) y `www` → apex (301). Lo único que
+> queda es de negocio/medio plazo (**publicar stock real**, Supabase Pro, staging). Detalle,
+> estado y **rollback** en **`docs/LAUNCH.md`**.
 
 **Leyenda de propietario**: 🧑 Tú (cloud/dashboard/negocio) · 🤖 Yo (código) · 🤝 Ambos.
 
