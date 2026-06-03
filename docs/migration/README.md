@@ -24,7 +24,8 @@ Descargado de `https://campersnova.com/wp-sitemap.xml` — **183 URLs únicas**.
 
 **Principio**: se redirige por **valor y relevancia**, no por completitud. Redirigir en masa
 URLs sin valor a una página genérica puede leerse como _soft 404_ y no transfiere autoridad.
-Lo que no tiene valor SEO se deja **caer en 404** (le indica a Google "ya no existe").
+Lo que no tiene valor SEO y está eliminado para siempre devuelve **410 Gone** (la señal
+correcta para Google: "ya no existe", mejor que un redirect a una página genérica o a login).
 
 De las 183 URLs, solo tienen valor SEO **~6 reglas**:
 
@@ -49,7 +50,8 @@ apuntar el dominio a esta app.
 | `/politica-de-cookies/` | `/cookies` | |
 | `/privacy-policy/` | `/privacidad` | |
 | `/listings/{slug}/` | `/comprar` | 42 fichas → catálogo (ver pendiente) |
-| `/carrito/` · `/producto/*` · `/categoria-producto/*` · taxonomías | **sin redirect (404)** | sin valor SEO |
+| `/carrito/` · `/producto/*` · `/categoria-producto/*` | **410 Gone** | demo/carrito sin valor SEO (`isLegacyGone`) |
+| taxonomías `/?taxonomy=…` | — | se auto-resuelven (cargan `/`), sin acción |
 
 ## Pendiente / mejora futura
 
