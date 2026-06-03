@@ -21,14 +21,21 @@ export async function POST(req: NextRequest) {
   try {
     const body = (await req.json()) as { captchaToken?: string }
 
-    if (!body.captchaToken) {
-      return NextResponse.json({ error: 'captcha_required' }, { status: 400 })
-    }
-
-    const captchaOk =
-      process.env.NODE_ENV !== 'production' || (await verifyHCaptcha(body.captchaToken))
-    if (!captchaOk) {
-      return NextResponse.json({ error: 'captcha_failed' }, { status: 400 })
+    // hCaptcha como BEST-EFFORT (no bloqueante): si el captcha falla, no llega o el
+    // cliente no pudo resolverlo ('unavailable'), NO dejamos al usuario sin chat —
+    // el rate-limit por IP (abajo) es la protección real contra el abuso. El chat de
+    // captación es el embudo clave y no debe romperse por un problema del captcha.
+    if (
+      body.captchaToken &&
+      body.captchaToken !== 'unavailable' &&
+      process.env.NODE_ENV === 'production'
+    ) {
+      try {
+        const ok = await verifyHCaptcha(body.captchaToken)
+        if (!ok) console.warn('[chat/buyer/start] hCaptcha no verificado; continúo (best-effort)')
+      } catch (err) {
+        console.error('[chat/buyer/start] error verificando hCaptcha; continúo', err)
+      }
     }
 
     const ip =
