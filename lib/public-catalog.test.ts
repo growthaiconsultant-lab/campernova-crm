@@ -5,6 +5,9 @@ import {
   idFromSlug,
   slugify,
   equipmentLabels,
+  brandSlug,
+  categoryForType,
+  CATEGORIES,
 } from './public-catalog'
 
 // Vehicle "completo" del CRM con datos INTERNOS que NO deben salir nunca.
@@ -82,7 +85,12 @@ describe('mapToPublicVehicle — seguridad de datos', () => {
     expect(pub.title).toBe('Volkswagen California Ocean')
     expect(pub.typeLabel).toBe('Camper')
     expect(pub.description).toBe('Impecable, un solo dueño, libro de revisiones completo.')
-    expect(equipmentLabels(pub.equipment)).toEqual(['Placas solares', 'Cocina', 'Ducha', 'Calefacción'])
+    expect(equipmentLabels(pub.equipment)).toEqual([
+      'Placas solares',
+      'Cocina',
+      'Ducha',
+      'Calefacción',
+    ])
   })
 
   it('ordena las fotos por order y aplica alt por defecto', () => {
@@ -101,5 +109,25 @@ describe('slug', () => {
   })
   it('slugify quita acentos y normaliza', () => {
     expect(slugify('Citroën Jumper Camión 2.0')).toBe('citroen-jumper-camion-2-0')
+  })
+})
+
+describe('catálogo navegable — categorías y marcas', () => {
+  it('brandSlug normaliza la marca a un slug SEO', () => {
+    expect(brandSlug('Fiat')).toBe('fiat')
+    expect(brandSlug('Mercedes-Benz')).toBe('mercedes-benz')
+    expect(brandSlug('Adriá')).toBe('adria')
+  })
+
+  it('categoryForType devuelve la categoría navegable correcta', () => {
+    expect(categoryForType('AUTOCARAVANA')?.slug).toBe('autocaravanas')
+    expect(categoryForType('CAMPER')?.slug).toBe('campers')
+  })
+
+  it('CATEGORIES cubre exactamente los dos tipos con slugs únicos', () => {
+    expect(CATEGORIES).toHaveLength(2)
+    const slugs = CATEGORIES.map((c) => c.slug)
+    expect(new Set(slugs).size).toBe(slugs.length)
+    expect(CATEGORIES.map((c) => c.type).sort()).toEqual(['AUTOCARAVANA', 'CAMPER'])
   })
 })

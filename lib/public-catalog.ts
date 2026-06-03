@@ -115,14 +115,94 @@ export function mapToPublicVehicle(v: VehicleWithPhotos): PublicVehicle {
   }
 }
 
-/** Todos los vehículos publicados, listos para el catálogo y el sitemap. */
-export async function getPublishedVehicles(): Promise<PublicVehicle[]> {
+/** Categorías navegables del catálogo (una por tipo de vehículo). */
+export const CATEGORIES: {
+  type: VehicleType
+  slug: string
+  label: string
+  labelPlural: string
+}[] = [
+  {
+    type: 'AUTOCARAVANA',
+    slug: 'autocaravanas',
+    label: 'Autocaravana',
+    labelPlural: 'Autocaravanas',
+  },
+  { type: 'CAMPER', slug: 'campers', label: 'Camper', labelPlural: 'Campers' },
+]
+
+/** Devuelve la categoría navegable correspondiente a un tipo de vehículo. */
+export function categoryForType(type: VehicleType) {
+  return CATEGORIES.find((c) => c.type === type) ?? null
+}
+
+/** Slug SEO de una marca (p.ej. "Fiat Ducato" → "fiat-ducato"). */
+export function brandSlug(brand: string): string {
+  return slugify(brand)
+}
+
+/** Todos los vehículos publicados, opcionalmente filtrados por tipo. */
+export async function getPublishedVehicles(filter?: {
+  type?: VehicleType
+}): Promise<PublicVehicle[]> {
   const vehicles = await db.vehicle.findMany({
-    where: { status: 'PUBLICADO' },
+    where: { status: 'PUBLICADO', ...(filter?.type ? { type: filter.type } : {}) },
     include: { photos: true },
     orderBy: { publishedAt: 'desc' },
   })
   return vehicles.map(mapToPublicVehicle)
+}
+
+/**
+ * Variante resiliente de `getPublishedVehicles`: si la DB falla, devuelve `[]`
+ * en lugar de lanzar (las páginas de catálogo muestran estado vacío, no un 500).
+ */
+export async function getPublishedVehiclesSafe(filter?: {
+  type?: VehicleType
+}): Promise<PublicVehicle[]> {
+  try {
+    return await getPublishedVehicles(filter)
+  } catch (err) {
+    console.error('[public-catalog] error al cargar vehículos publicados:', err)
+    return []
+  }
+}
+
+export type CatalogBrand = {
+  brand: string
+  slug: string
+  count: number
+  types: VehicleType[]
+}
+
+/** Marcas con stock publicado, con su conteo y los tipos disponibles. */
+export async function getCatalogBrands(): Promise<CatalogBrand[]> {
+  const vehicles = await getPublishedVehiclesSafe()
+  const map = new Map<string, CatalogBrand>()
+  for (const v of vehicles) {
+    const slug = brandSlug(v.brand)
+    const existing = map.get(slug)
+    if (existing) {
+      existing.count++
+      if (!existing.types.includes(v.type)) existing.types.push(v.type)
+    } else {
+      map.set(slug, { brand: v.brand, slug, count: 1, types: [v.type] })
+    }
+  }
+  return Array.from(map.values()).sort((a, b) => a.brand.localeCompare(b.brand, 'es'))
+}
+
+/**
+ * Vehículos publicados de una marca por su slug. Devuelve `null` si no hay
+ * ninguno (la página de marca hará 404 en vez de mostrar una página vacía/fina).
+ */
+export async function getPublishedVehiclesByBrandSlug(
+  slug: string
+): Promise<{ brand: string; vehicles: PublicVehicle[] } | null> {
+  const vehicles = await getPublishedVehiclesSafe()
+  const matching = vehicles.filter((v) => brandSlug(v.brand) === slug)
+  if (matching.length === 0) return null
+  return { brand: matching[0]!.brand, vehicles: matching }
 }
 
 /**

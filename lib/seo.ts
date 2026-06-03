@@ -104,15 +104,19 @@ export function pageMetadata({
   title,
   description,
   path,
+  noindex = false,
 }: {
   title: string
   description: string
   path: string
+  /** Si `true`, añade `robots: noindex, follow` (p.ej. páginas de catálogo sin stock). */
+  noindex?: boolean
 }): Metadata {
   return {
     title,
     description,
     alternates: { canonical: path },
     openGraph: { type: 'website', url: path, title, description },
+    ...(noindex ? { robots: { index: false, follow: true } } : {}),
   }
 }

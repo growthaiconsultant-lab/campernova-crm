@@ -9,6 +9,13 @@ const NAV_LINKS = [
   { href: '/contacto', label: 'Contacto' },
 ]
 
+const CATALOG_LINKS = [
+  { href: '/comprar/vehiculos', label: 'Catálogo completo' },
+  { href: '/comprar/autocaravanas', label: 'Autocaravanas en venta' },
+  { href: '/comprar/campers', label: 'Campers en venta' },
+  { href: '/comprar/marcas', label: 'Por marca' },
+]
+
 const LEGAL_LINKS = [
   { href: '/aviso-legal', label: 'Aviso legal' },
   { href: '/privacidad', label: 'Privacidad' },
@@ -61,6 +68,22 @@ export function PublicFooter() {
             </h5>
             <ul className="flex flex-col gap-2.5">
               {NAV_LINKS.map(({ href, label }) => (
+                <li key={href}>
+                  <Link
+                    href={href}
+                    className="text-sm text-cn-ink-700 transition-colors hover:text-cn-teal-900"
+                  >
+                    {label}
+                  </Link>
+                </li>
+              ))}
+            </ul>
+
+            <h5 className="mb-[18px] mt-8 text-[11px] font-semibold uppercase tracking-[0.12em] text-cn-teal-900">
+              Catálogo
+            </h5>
+            <ul className="flex flex-col gap-2.5">
+              {CATALOG_LINKS.map(({ href, label }) => (
                 <li key={href}>
                   <Link
                     href={href}
