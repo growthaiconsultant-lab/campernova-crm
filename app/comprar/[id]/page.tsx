@@ -10,6 +10,7 @@ import { SITE_URL } from '@/lib/seo'
 import {
   getPublishedVehicleBySlug,
   equipmentLabels,
+  categoryForType,
   type PublicVehicle,
 } from '@/lib/public-catalog'
 
@@ -108,17 +109,29 @@ export default async function VehicleDetailPage({ params }: Props) {
         <div className="mx-auto max-w-[1280px] px-8 pb-24 pt-8 max-[640px]:px-5">
           {/* Breadcrumb */}
           <nav
-            className="mb-6 flex items-center gap-2 font-mono text-[13px] tracking-[0.06em]"
+            className="mb-6 flex flex-wrap items-center gap-2 font-mono text-[13px] tracking-[0.06em]"
             style={{ color: 'var(--cn-ink-500)' }}
+            aria-label="Migas de pan"
           >
             <Link href="/" className="hover:underline">
               Inicio
             </Link>
-            <span>/</span>
-            <Link href="/comprar" className="hover:underline">
-              Comprar
+            <span aria-hidden>/</span>
+            <Link href="/comprar/vehiculos" className="hover:underline">
+              Catálogo
             </Link>
-            <span>/</span>
+            {(() => {
+              const cat = categoryForType(v.type)
+              return cat ? (
+                <>
+                  <span aria-hidden>/</span>
+                  <Link href={`/comprar/${cat.slug}`} className="hover:underline">
+                    {cat.labelPlural}
+                  </Link>
+                </>
+              ) : null
+            })()}
+            <span aria-hidden>/</span>
             <span style={{ color: 'var(--cn-teal-900)' }}>
               {v.title} {v.year}
             </span>
@@ -140,7 +153,10 @@ export default async function VehicleDetailPage({ params }: Props) {
                   priority
                 />
               ) : (
-                <div className="flex h-full items-center justify-center font-mono text-xs tracking-widest" style={{ color: 'var(--cn-ink-500)' }}>
+                <div
+                  className="flex h-full items-center justify-center font-mono text-xs tracking-widest"
+                  style={{ color: 'var(--cn-ink-500)' }}
+                >
                   Fotos próximamente
                 </div>
               )}
@@ -178,7 +194,12 @@ export default async function VehicleDetailPage({ params }: Props) {
 
           {/* Detail layout */}
           <div
-            style={{ display: 'grid', gridTemplateColumns: '1fr 380px', gap: 56, alignItems: 'flex-start' }}
+            style={{
+              display: 'grid',
+              gridTemplateColumns: '1fr 380px',
+              gap: 56,
+              alignItems: 'flex-start',
+            }}
             className="max-[1000px]:block"
           >
             {/* LEFT */}
@@ -316,7 +337,12 @@ export default async function VehicleDetailPage({ params }: Props) {
             {/* RIGHT — sticky sidebar */}
             <aside
               className="rounded-cn-lg p-7 max-[1000px]:mt-12"
-              style={{ background: '#fff', border: '1px solid var(--cn-line)', position: 'sticky', top: '96px' }}
+              style={{
+                background: '#fff',
+                border: '1px solid var(--cn-line)',
+                position: 'sticky',
+                top: '96px',
+              }}
             >
               <p
                 className="text-[38px] leading-none"
