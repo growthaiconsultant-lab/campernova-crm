@@ -4,18 +4,23 @@
  * prioridad sobre el guard de auth. Ver docs/migration/README.md.
  */
 
-/** Mapeo exacto de rutas que cambian de slug. */
+// Solo se redirigen las URLs con VALOR SEO real (páginas con autoridad/enlaces y
+// las fichas de vehículo). El resto del WordPress antiguo (taxonomías ?taxonomy=…,
+// productos demo de WooCommerce, carrito, plantillas internas) NO se redirige:
+// no tiene valor SEO y dejarlo caer en 404 le indica a Google "ya no existe".
+// Ver docs/migration/README.md § "¿Qué redirigir y qué no".
+
+/** Mapeo exacto de páginas que cambian de slug. */
 const EXACT: Record<string, string> = {
   '/tasacion': '/vender',
   '/gestion-de-venta': '/vender',
   '/cars': '/comprar',
-  '/carrito': '/comprar',
   '/politica-de-cookies': '/cookies',
   '/privacy-policy': '/privacidad',
 }
 
-/** Prefijos cuyo subárbol entero va al catálogo (sin equivalente 1:1 todavía). */
-const PREFIX_TO_COMPRAR = ['/listings', '/producto', '/categoria-producto']
+/** Fichas de vehículo del WP → catálogo (sin equivalente 1:1 todavía). */
+const PREFIX_TO_COMPRAR = ['/listings']
 
 /**
  * Devuelve la ruta destino para un path antiguo, o null si no aplica.
