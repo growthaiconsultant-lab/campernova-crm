@@ -3,12 +3,14 @@ import Link from 'next/link'
 import { ArrowRight } from 'lucide-react'
 import { PublicNav } from '@/components/public-nav'
 import { PublicFooter } from '@/components/public-footer'
+import { pageMetadata } from '@/lib/seo'
 
-export const metadata: Metadata = {
+export const metadata: Metadata = pageMetadata({
   title: 'Cómo funciona · CampersNova',
   description:
     'Descubre cómo trabajamos en CampersNova: proceso claro para comprar o vender tu camper o autocaravana sin sorpresas.',
-}
+  path: '/como-funciona',
+})
 
 const COMPRA_STEPS = [
   {

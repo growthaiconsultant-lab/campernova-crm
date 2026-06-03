@@ -1,10 +1,12 @@
 import type { Metadata } from 'next'
 import { LegalLayout } from '@/components/legal-layout'
+import { pageMetadata } from '@/lib/seo'
 
-export const metadata: Metadata = {
+export const metadata: Metadata = pageMetadata({
   title: 'Política de Privacidad — CampersNova',
   description: 'Información sobre el tratamiento de tus datos personales en CampersNova.',
-}
+  path: '/privacidad',
+})
 
 // ⚠️  PENDIENTE ANTES DEL DEPLOY: sustituir todos los valores [PENDIENTE_*]
 

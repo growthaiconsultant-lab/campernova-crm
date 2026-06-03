@@ -4,12 +4,15 @@ import Link from 'next/link'
 import { Check, ArrowRight } from 'lucide-react'
 import { PublicNav } from '@/components/public-nav'
 import { PublicFooter } from '@/components/public-footer'
+import { JsonLd } from '@/components/json-ld'
+import { pageMetadata, autoDealerJsonLd } from '@/lib/seo'
 
-export const metadata: Metadata = {
+export const metadata: Metadata = pageMetadata({
   title: 'Sobre nosotros · CampersNova',
   description:
     'Conoce CampersNova: nacimos en 2019 especializándonos en compraventa de campers y autocaravanas desde Barcelona. +240 operaciones cerradas.',
-}
+  path: '/sobre',
+})
 
 const MAPS_URL =
   'https://www.google.com/maps/dir//CAMPERS+NOVA,+SL,+Carrer+Torre+de+Cellers,+08150,+Barcelona/@41.4089216,2.1528576,10z/data=!4m8!4m7!1m0!1m5!1m1!1s0x12a4ebf0fa3704c3:0x5219e56327ff3bb7!2m2!1d2.2429082!2d41.5648851'
@@ -25,6 +28,7 @@ const BENEFITS = [
 export default function SobrePage() {
   return (
     <>
+      <JsonLd data={autoDealerJsonLd()} />
       <PublicNav />
 
       <main className="min-h-screen pt-20" style={{ background: 'var(--cn-cream-100)' }}>
@@ -39,12 +43,12 @@ export default function SobrePage() {
                 >
                   · Instalaciones y equipo
                 </p>
-                <h2
+                <h1
                   className="text-[2.2rem] font-bold leading-[1.1] tracking-[-0.025em] lg:text-[2.8rem]"
                   style={{ color: 'var(--cn-teal-900)', fontFamily: 'var(--font-fraunces)' }}
                 >
                   No somos un portal. Somos una empresa con instalaciones propias.
-                </h2>
+                </h1>
               </div>
               <p
                 className="max-w-[52ch] text-[16px] leading-relaxed lg:pb-1"

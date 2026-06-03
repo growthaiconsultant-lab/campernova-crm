@@ -1,11 +1,13 @@
 import type { Metadata } from 'next'
 import { LegalLayout } from '@/components/legal-layout'
 import Link from 'next/link'
+import { pageMetadata } from '@/lib/seo'
 
-export const metadata: Metadata = {
+export const metadata: Metadata = pageMetadata({
   title: 'Política de Cookies — CampersNova',
   description: 'Información sobre el uso de cookies en campersnova.com.',
-}
+  path: '/cookies',
+})
 
 export default function CookiesPage() {
   return (

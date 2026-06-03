@@ -4,13 +4,14 @@ import { Mail, Phone, MapPin, Clock, MessageCircle, ArrowRight } from 'lucide-re
 import { PublicNav } from '@/components/public-nav'
 import { PublicFooter } from '@/components/public-footer'
 import { JsonLd } from '@/components/json-ld'
-import { autoDealerJsonLd } from '@/lib/seo'
+import { autoDealerJsonLd, pageMetadata } from '@/lib/seo'
 
-export const metadata: Metadata = {
+export const metadata: Metadata = pageMetadata({
   title: 'Contacto · CampersNova',
   description:
     'Contacta con el equipo de CampersNova. Teléfono, email, WhatsApp e instalaciones en Barcelona. Lun–Vie 10:00–19:00.',
-}
+  path: '/contacto',
+})
 
 const MAPS_URL =
   'https://www.google.com/maps/dir//CAMPERS+NOVA,+SL,+Carrer+Torre+de+Cellers,+08150,+Barcelona/@41.4089216,2.1528576,10z/data=!4m8!4m7!1m0!1m5!1m1!1s0x12a4ebf0fa3704c3:0x5219e56327ff3bb7!2m2!1d2.2429082!2d41.5648851'

@@ -3,6 +3,8 @@
  * `SITE_URL` se usa para metadataBase, canonicals, sitemap y robots.
  */
 
+import type { Metadata } from 'next'
+
 export const SITE_URL = (
   process.env.NEXT_PUBLIC_APP_URL?.replace(/\/$/, '') || 'https://campersnova.com'
 ).trim()
@@ -90,5 +92,27 @@ export function autoDealerJsonLd() {
     areaServed: 'ES',
     sameAs: [BUSINESS.whatsapp],
     priceRange: '€€',
+  }
+}
+
+/**
+ * Construye la metadata de una página pública con canonical y Open Graph propios.
+ * `path` es relativo (p.ej. `/vender`); Next lo resuelve contra `metadataBase`.
+ * La imagen OG por defecto la aporta `app/opengraph-image.tsx`.
+ */
+export function pageMetadata({
+  title,
+  description,
+  path,
+}: {
+  title: string
+  description: string
+  path: string
+}): Metadata {
+  return {
+    title,
+    description,
+    alternates: { canonical: path },
+    openGraph: { type: 'website', url: path, title, description },
   }
 }
