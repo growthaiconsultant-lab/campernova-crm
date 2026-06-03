@@ -36,43 +36,40 @@ WordPress antiguo.
 
 ---
 
-## 🔴 PENDIENTE INMEDIATO (tras el cutover)
+## ✅ PENDIENTE INMEDIATO — TODO CERRADO (2026-06-04)
 
-No bloquean: la web funciona. Pero conviene cerrarlos pronto.
+Los tres retoques posteriores al cutover ya están hechos y verificados.
 
-### 1. `NEXT_PUBLIC_APP_URL` → dominio real (lo más útil — arregla el sitemap)
+### 1. ✅ Sitemap con el dominio real — resuelto por código (PR #27)
 
-Ahora mismo el **sitemap lista URLs de `campernova-crm.vercel.app`** en vez de
-`campersnova.com` (los canonicals de las páginas sí usan ya `campersnova.com`).
-Causa: `NEXT_PUBLIC_APP_URL` apunta a la URL de Vercel.
+El sitemap listaba URLs de `campernova-crm.vercel.app` porque `SITE_URL` dependía de
+`NEXT_PUBLIC_APP_URL` (que en Vercel vale la URL del deploy). **Se arregló en el código**:
+`lib/seo.ts` ahora fija el dominio canónico (`SITE_URL = https://campersnova.com`, con
+override opcional vía `NEXT_PUBLIC_SITE_URL`), independiente de `NEXT_PUBLIC_APP_URL`.
+**Verificado en vivo**: el sitemap ya lista URLs de `campersnova.com`.
 
-**Pasos** (Vercel → Settings → Environment Variables):
+> Opcional (no bloquea, no afecta al SEO): actualizar `NEXT_PUBLIC_APP_URL` en Vercel a
+> `https://campersnova.com` para que los **enlaces de los emails del backoffice** (ej.
+> "Ver ficha →") apunten al dominio en vez de a `*.vercel.app`. Solo cosmético interno.
 
-1. Busca `NEXT_PUBLIC_APP_URL` → menú `…` → **Edit**.
-2. Valor: `https://campersnova.com`
-3. **Save** → en el toast, **Redeploy**.
+### 2. ✅ Login del equipo en el dominio (Supabase Auth) — hecho
 
-→ Tras el redeploy, sitemap, Open Graph y enlaces de email usan `campersnova.com`.
+Supabase → Authentication → URL Configuration:
 
-### 2. Login del equipo en el dominio (Supabase Auth)
+- **Site URL** = `https://campersnova.com` ✅ ("Successfully updated site URL")
+- **Redirect URLs**: añadido `https://campersnova.com/auth/callback` ✅ (Total URLs: 4 —
+  se conservan `localhost:3000`, `campernova-crm.vercel.app` y el wildcard de previews)
 
-Para que el equipo entre al CRM en `campersnova.com/login` (de momento funciona en la
-URL `*.vercel.app`).
+El equipo ya puede entrar al CRM en `campersnova.com/login`.
 
-**Pasos** (Supabase → proyecto → Authentication → URL Configuration):
+### 3. ✅ `www.campersnova.com` → apex — hecho
 
-- **Site URL**: `https://campersnova.com`
-- **Redirect URLs**: añadir `https://campersnova.com/auth/callback`
+Redirección **301** `https://www.campersnova.com` → `https://campersnova.com/` configurada en
+dinahosting (panel **Redirecciones** del dominio). **Verificado**: `www` responde 301 al apex.
+(Se optó por la redirección HTTP de dinahosting en vez de añadir el subdominio en Vercel —
+mismo resultado para usuario y SEO, sin tocar la zona DNS.)
 
-### 3. `www.campersnova.com` (opcional pero recomendable)
-
-`www` **sigue apuntando al WordPress** (`82.98.132.86`). Para que también lleve a la web nueva:
-
-1. Vercel → Domains → **Add** `www.campersnova.com` → **Redirect to** `campersnova.com` (308).
-2. dinahosting → Zona DNS → cambiar el registro `www` para que apunte a Vercel
-   (CNAME `cname.vercel-dns.com`, o A `216.198.79.1`).
-
-### 4. Limpieza (opcional)
+### 4. Limpieza (opcional, pendiente)
 
 - Quitar el registro `TXT _vercel` de la zona DNS — Vercel indica que se puede borrar tras
   verificar la propiedad. (Inofensivo dejarlo.)
@@ -112,7 +109,7 @@ se tocó; solo se añadió el subdominio `send` para Resend).
 | Tipo | Host                 | Valor                                   | Para qué                         |
 | ---- | -------------------- | --------------------------------------- | -------------------------------- |
 | A    | `@`                  | `216.198.79.1`                          | **Web → Vercel** (cambiado)      |
-| A    | `www`                | `82.98.132.86`                          | Aún WordPress — _pendiente_ (#3) |
+| —    | `www`                | Redirección 301 → apex (dinahosting)    | `www` → `campersnova.com` ✅     |
 | TXT  | `_vercel`            | `vc-domain-verify=...`                  | Verificación de propiedad Vercel |
 | MX   | `@` (SOA)            | `mail.campersnova.com`                  | Correo — **intacto**             |
 | MX   | `send`               | `feedback-smtp.eu-west-1.amazonses.com` | Resend (envío)                   |
