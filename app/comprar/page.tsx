@@ -26,6 +26,8 @@ export default function ComprarPage() {
   const captchaRef = useRef<HCaptcha>(null)
   const scrollerRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
+  // Evita arrancar la sesión dos veces (hCaptcha puede disparar onVerify + el fallback).
+  const startedRef = useRef(false)
 
   const [sessionToken, setSessionToken] = useState<string | null>(null)
   const [sessionStatus, setSessionStatus] = useState<
@@ -58,6 +60,8 @@ export default function ComprarPage() {
   }, [input])
 
   const handleCaptchaVerify = useCallback(async (token: string) => {
+    if (startedRef.current) return // ya arrancada — evita sesiones duplicadas
+    startedRef.current = true
     setStartError(null)
     try {
       const res = await fetch('/api/chat/buyer/start', {
@@ -74,15 +78,24 @@ export default function ComprarPage() {
       setSessionToken(data.sessionToken)
       // greeting ya visible desde el mount — no sobreescribir
     } catch {
+      startedRef.current = false // permite reintento
       setStartError('No hemos podido iniciar la sesión. Recarga la página e inténtalo de nuevo.')
     }
   }, [])
 
-  // Dev: invisible hCaptcha doesn't fire onVerify on localhost — bypass automatically
   useEffect(() => {
+    // Dev: el hCaptcha invisible no dispara onVerify en localhost — bypass automático.
     if (process.env.NODE_ENV !== 'production') {
       void handleCaptchaVerify('dev-bypass')
+      return
     }
+    // Prod: si hCaptcha no resuelve en 6s (reto ignorado, error o config de dominio),
+    // arrancamos igual con un token de fallback — el rate-limit por IP sigue protegiendo.
+    // Así el chat nunca queda bloqueado por un problema del captcha.
+    const fallback = setTimeout(() => {
+      if (!startedRef.current) void handleCaptchaVerify('unavailable')
+    }, 6000)
+    return () => clearTimeout(fallback)
   }, [handleCaptchaVerify])
 
   const sendMessage = useCallback(
@@ -599,6 +612,12 @@ export default function ComprarPage() {
           size="invisible"
           onVerify={handleCaptchaVerify}
           onLoad={() => captchaRef.current?.execute()}
+          onError={() => {
+            if (!startedRef.current) void handleCaptchaVerify('unavailable')
+          }}
+          onChalExpired={() => {
+            if (!startedRef.current) void handleCaptchaVerify('unavailable')
+          }}
         />
       )}
     </>
