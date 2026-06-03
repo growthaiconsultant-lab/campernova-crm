@@ -1,10 +1,12 @@
 import type { Metadata } from 'next'
 import { LegalLayout } from '@/components/legal-layout'
+import { pageMetadata } from '@/lib/seo'
 
-export const metadata: Metadata = {
+export const metadata: Metadata = pageMetadata({
   title: 'Aviso Legal — CampersNova',
   description: 'Aviso legal e información sobre el titular del sitio web campersnova.com.',
-}
+  path: '/aviso-legal',
+})
 
 // ⚠️  PENDIENTE ANTES DEL DEPLOY: sustituir todos los valores [PENDIENTE_*]
 // con los datos reales del operador (autónomo / S.L.)

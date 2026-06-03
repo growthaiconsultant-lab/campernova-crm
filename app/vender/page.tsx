@@ -4,12 +4,15 @@ import Link from 'next/link'
 import { PublicNav } from '@/components/public-nav'
 import { PublicFooter } from '@/components/public-footer'
 import { WhatsAppFab } from '@/components/whatsapp-fab'
+import { JsonLd } from '@/components/json-ld'
+import { pageMetadata, autoDealerJsonLd } from '@/lib/seo'
 
-export const metadata: Metadata = {
+export const metadata: Metadata = pageMetadata({
   title: 'Vender tu camper o autocaravana · CampersNova',
   description:
     'Vende tu camper o autocaravana con valoración profesional, sin curiosos y con pagos protegidos. Tiempo medio de venta: 42 días.',
-}
+  path: '/vender',
+})
 
 // ─── SVG helpers ─────────────────────────────────────────────────────────────
 
@@ -180,6 +183,7 @@ const COMPARE_ROWS: [string, CellValue, CellValue, CellValue][] = [
 export default function VenderPage() {
   return (
     <>
+      <JsonLd data={autoDealerJsonLd()} />
       <PublicNav />
 
       <main id="main-content">
