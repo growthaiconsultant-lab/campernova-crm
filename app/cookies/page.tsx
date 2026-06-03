@@ -4,7 +4,7 @@ import Link from 'next/link'
 import { pageMetadata } from '@/lib/seo'
 
 export const metadata: Metadata = pageMetadata({
-  title: 'Política de Cookies — CampersNova',
+  title: 'Política de Cookies',
   description: 'Información sobre el uso de cookies en campersnova.com.',
   path: '/cookies',
 })
