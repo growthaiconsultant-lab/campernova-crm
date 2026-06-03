@@ -76,6 +76,31 @@ mismo resultado para usuario y SEO, sin tocar la zona DNS.)
 
 ---
 
+## 🔎 Google Search Console (SEO) — CONFIGURADO (2026-06-04)
+
+Propiedad creada y lista para monitorizar el SEO tras el cutover.
+
+- **Propiedad de tipo Dominio** `campersnova.com` (cubre `www`/apex y http/https) en la cuenta
+  de Google de la agencia (`growth.ai.consultant@gmail.com`, la misma que gestiona otros
+  clientes). **Propiedad verificada** vía registro `TXT @ = google-site-verification=…` en
+  dinahosting (propagó al instante).
+- **Sitemap enviado**: `https://campersnova.com/sitemap.xml` (HTTP 200, `application/xml`,
+  lista las 9 rutas públicas en el dominio real). El estado inicial puede mostrar
+  **"Couldn't fetch"** durante unas horas — es normal recién enviado; Google lo re-rastrea
+  solo. El sitemap es válido y accesible (verificado por fuera).
+- **Home indexada**: la inspección de URL confirma **"URL is on Google" / "Page is indexed" /
+  HTTPS OK**. Se pidió **Request indexing** de la home para forzar un re-rastreo tras el
+  cambio de dominio.
+
+**Pendiente / opcional de SEO** (no bloquea):
+
+- Volver a Search Console en unas horas para confirmar que el sitemap pasa a **"Success"** y
+  empieza a descubrir páginas.
+- A medida que se publique **stock real**, las fichas `/comprar/[id]` entran al sitemap solas
+  (ISR) y Google las irá indexando; se puede pedir indexación manual de las más importantes.
+- **Bing Webmaster Tools**: opcional, requiere cuenta Microsoft (no configurado).
+- Vincular con **Google Analytics**/GA4 si se quiere cruzar datos (opcional).
+
 ## 🟠 PENDIENTE A MEDIO PLAZO
 
 - **Publicar stock real**: los comerciales subirán vehículos durante ~2 semanas. Al ponerlos
@@ -106,17 +131,18 @@ se tocó; solo se añadió el subdominio `send` para Resend).
 
 ## Estado de la zona DNS de `campersnova.com` tras el cutover (dinahosting)
 
-| Tipo | Host                 | Valor                                   | Para qué                         |
-| ---- | -------------------- | --------------------------------------- | -------------------------------- |
-| A    | `@`                  | `216.198.79.1`                          | **Web → Vercel** (cambiado)      |
-| —    | `www`                | Redirección 301 → apex (dinahosting)    | `www` → `campersnova.com` ✅     |
-| TXT  | `_vercel`            | `vc-domain-verify=...`                  | Verificación de propiedad Vercel |
-| MX   | `@` (SOA)            | `mail.campersnova.com`                  | Correo — **intacto**             |
-| MX   | `send`               | `feedback-smtp.eu-west-1.amazonses.com` | Resend (envío)                   |
-| TXT  | `send`               | `v=spf1 include:amazonses.com ~all`     | Resend (SPF)                     |
-| TXT  | `resend._domainkey`  | `p=MIG...`                              | Resend (DKIM)                    |
-| TXT  | `_dmarc`             | `v=DMARC1; ...`                         | Correo — intacto                 |
-| TXT  | `default._domainkey` | `v=DKIM1; ...`                          | Correo — intacto                 |
+| Tipo | Host                 | Valor                                   | Para qué                           |
+| ---- | -------------------- | --------------------------------------- | ---------------------------------- |
+| A    | `@`                  | `216.198.79.1`                          | **Web → Vercel** (cambiado)        |
+| —    | `www`                | Redirección 301 → apex (dinahosting)    | `www` → `campersnova.com` ✅       |
+| TXT  | `_vercel`            | `vc-domain-verify=...`                  | Verificación de propiedad Vercel   |
+| TXT  | `@`                  | `google-site-verification=zWVJ_Jkw…`    | Verificación Google Search Console |
+| MX   | `@` (SOA)            | `mail.campersnova.com`                  | Correo — **intacto**               |
+| MX   | `send`               | `feedback-smtp.eu-west-1.amazonses.com` | Resend (envío)                     |
+| TXT  | `send`               | `v=spf1 include:amazonses.com ~all`     | Resend (SPF)                       |
+| TXT  | `resend._domainkey`  | `p=MIG...`                              | Resend (DKIM)                      |
+| TXT  | `_dmarc`             | `v=DMARC1; ...`                         | Correo — intacto                   |
+| TXT  | `default._domainkey` | `v=DKIM1; ...`                          | Correo — intacto                   |
 
 > Diseño SEO/redirecciones del cutover: `lib/legacy-redirects.ts` (308 de las URLs del WP
 > con valor SEO). Diagnóstico y plan SEO: ver `PRODUCTION-READINESS.md` y los ADRs.
