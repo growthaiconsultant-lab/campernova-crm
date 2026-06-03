@@ -3,7 +3,12 @@ name: E2E
 # E2E autenticado contra STAGING. No bloquea el merge (necesita secretos + DB viva).
 # Se lanza a mano (workflow_dispatch) o cada noche (schedule).
 #
-# Requiere estos secrets del repo (entorno de staging — ver Phase 4 / README § Entornos):
+# Comportamiento sin staging: si el secreto `E2E_BASE_URL` no está configurado, el
+# job NO falla — un paso guarda detecta que no hay entorno de staging y se salta el
+# resto (el run queda en verde). Así no llegan emails de fallo hasta que se monte
+# staging (ver Fase 4 / README § Entornos / handoff en CLAUDE.md).
+#
+# Requiere estos secrets del repo para ejecutarse de verdad (entorno de staging):
 #   E2E_BASE_URL                     URL de la app de staging (p.ej. preview de Vercel)
 #   STAGING_NEXT_PUBLIC_SUPABASE_URL
 #   STAGING_SUPABASE_SERVICE_ROLE_KEY
@@ -25,23 +30,40 @@ jobs:
       SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.STAGING_SUPABASE_SERVICE_ROLE_KEY }}
       E2E_USER_EMAIL: ${{ secrets.E2E_USER_EMAIL }}
     steps:
+      # Si no hay staging configurado, saltamos el resto SIN fallar (run en verde).
+      - name: Comprobar configuración de staging
+        id: guard
+        run: |
+          if [ -z "$E2E_BASE_URL" ]; then
+            echo "::notice::Staging no configurado (secret E2E_BASE_URL vacío). Se omite el E2E."
+            echo "run=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "run=true" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Checkout
+        if: steps.guard.outputs.run == 'true'
         uses: actions/checkout@v4
 
       - name: Setup pnpm
+        if: steps.guard.outputs.run == 'true'
         uses: pnpm/action-setup@v4
 
       - name: Setup Node
+        if: steps.guard.outputs.run == 'true'
         uses: actions/setup-node@v4
         with:
           node-version: 20
           cache: pnpm
 
       - name: Install dependencies
+        if: steps.guard.outputs.run == 'true'
         run: pnpm install --frozen-lockfile
 
       - name: Install Playwright browsers
+        if: steps.guard.outputs.run == 'true'
         run: pnpm exec playwright install --with-deps chromium
 
       - name: Run E2E (vs staging)
+        if: steps.guard.outputs.run == 'true'
         run: pnpm test:e2e
