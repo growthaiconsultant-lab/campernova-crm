@@ -2,11 +2,10 @@ import { describe, it, expect } from 'vitest'
 import { resolveLegacyRedirect } from './legacy-redirects'
 
 describe('resolveLegacyRedirect', () => {
-  it('mapea rutas exactas que cambian de slug', () => {
+  it('mapea las páginas con valor SEO que cambian de slug', () => {
     expect(resolveLegacyRedirect('/tasacion')).toBe('/vender')
     expect(resolveLegacyRedirect('/gestion-de-venta')).toBe('/vender')
     expect(resolveLegacyRedirect('/cars')).toBe('/comprar')
-    expect(resolveLegacyRedirect('/carrito')).toBe('/comprar')
     expect(resolveLegacyRedirect('/politica-de-cookies')).toBe('/cookies')
     expect(resolveLegacyRedirect('/privacy-policy')).toBe('/privacidad')
   })
@@ -16,12 +15,16 @@ describe('resolveLegacyRedirect', () => {
     expect(resolveLegacyRedirect('/cars/')).toBe('/comprar')
   })
 
-  it('manda los subárboles de listings/producto al catálogo', () => {
+  it('manda las fichas de vehículo (/listings/*) al catálogo', () => {
     expect(resolveLegacyRedirect('/listings/volkswagen-california-beach-2023')).toBe('/comprar')
     expect(resolveLegacyRedirect('/listings/')).toBe('/comprar')
     expect(resolveLegacyRedirect('/listings')).toBe('/comprar')
-    expect(resolveLegacyRedirect('/producto/business')).toBe('/comprar')
-    expect(resolveLegacyRedirect('/categoria-producto/uncategorized')).toBe('/comprar')
+  })
+
+  it('NO redirige lo que no tiene valor SEO (404 intencionado)', () => {
+    expect(resolveLegacyRedirect('/carrito')).toBeNull() // carrito WooCommerce
+    expect(resolveLegacyRedirect('/producto/business')).toBeNull() // producto demo
+    expect(resolveLegacyRedirect('/categoria-producto/uncategorized')).toBeNull()
   })
 
   it('devuelve null para rutas que no son legacy', () => {

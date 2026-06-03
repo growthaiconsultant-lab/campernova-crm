@@ -104,6 +104,9 @@ Endurecimiento del proyecto a estándar senior. Documentación de entrada (`READ
 - ✅ **Documentación**: `README.md`, `ARCHITECTURE.md`, `CHANGELOG.md` (Keep a Changelog) y 5 ADRs en `docs/adr/`.
 - ✅ **Cobertura de tests**: +41 tests de server actions (compradores, entregas, postventa, matches) → **292 verdes**. Patrón `vi.hoisted` mockDb. (Chat API streaming: trabajo futuro.)
 - ✅ **SEO sitio público**: metadata raíz orientada a cliente (`lib/seo.ts`), `app/robots.ts`, `app/sitemap.ts`, `app/manifest.ts`, `app/opengraph-image.tsx` (edge), JSON-LD AutoDealer (landing+contacto, corrige teléfono obsoleto) + Vehicle (`/comprar/[id]`), canonicals. Rutas SEO añadidas a `PUBLIC_PATHS` del middleware. Verificado en prod (`/robots.txt`, `/sitemap.xml` con 15 URLs).
+- ✅ **Fix middleware cold-start**: las rutas públicas ya no llaman a Supabase Auth (evita `504 MIDDLEWARE_INVOCATION_TIMEOUT` en la web pública). Solo backoffice y `/login` comprueban sesión.
+- ✅ **Migración SEO 301 (WordPress → web nueva)**: sitemap del WP antiguo descargado (183 URLs en `docs/migration/`). Redirecciones 308 en `lib/legacy-redirects.ts` (resueltas en el middleware, antes del guard de auth). Solo se redirige lo que tiene **valor SEO** (~6 reglas: páginas con slug cambiado + `/listings/*`→`/comprar`); taxonomías/productos demo/carrito se dejan en 404 a propósito. Se activan al hacer cutover del dominio. Ver `docs/migration/README.md`.
+- 📌 **Cuentas e identidades**: el dueño tiene varios proyectos con cuentas distintas (Campernova=`growthaiconsultant` vs TuteBot=`joeylito`). Ver **`docs/ACCOUNTS.md`** — evita fallos de push, MCP en cuenta equivocada, etc.
 - ⬜ **Entornos dev/staging/prod** (PENDIENTE — requiere acciones del dueño): 2º proyecto Supabase gratuito como staging; Vercel Preview → staging, Production → prod.
 - ⬜ **E2E autenticado** (PENDIENTE — depende de staging): bypass de auth vía `storageState` (admin API Supabase) contra staging — cierra CAM-42.
 
