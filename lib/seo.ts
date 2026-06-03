@@ -5,9 +5,13 @@
 
 import type { Metadata } from 'next'
 
-export const SITE_URL = (
-  process.env.NEXT_PUBLIC_APP_URL?.replace(/\/$/, '') || 'https://campersnova.com'
-).trim()
+// Dominio canónico de producción para SEO: sitemap, canonicals, Open Graph y JSON-LD.
+// Es un dato de NEGOCIO fijo y NO debe depender de `NEXT_PUBLIC_APP_URL` (que en Vercel
+// puede valer la URL `*.vercel.app` del deploy y contaminaría el sitemap/canonicals).
+// Permite override solo si se define explícitamente `NEXT_PUBLIC_SITE_URL`.
+export const SITE_URL = (process.env.NEXT_PUBLIC_SITE_URL || 'https://campersnova.com')
+  .replace(/\/$/, '')
+  .trim()
 
 export const SITE_NAME = 'CampersNova'
 export const SITE_LEGAL_NAME = 'Campers Nova S.L'
