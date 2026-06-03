@@ -6,7 +6,7 @@ import { PublicFooter } from '@/components/public-footer'
 import { pageMetadata } from '@/lib/seo'
 
 export const metadata: Metadata = pageMetadata({
-  title: 'Cómo funciona · CampersNova',
+  title: 'Cómo funciona',
   description:
     'Descubre cómo trabajamos en CampersNova: proceso claro para comprar o vender tu camper o autocaravana sin sorpresas.',
   path: '/como-funciona',

@@ -6,7 +6,7 @@ import { pageMetadata } from '@/lib/seo'
 // Este layout (Server Component) le da su propia meta + canonical. Las fichas
 // `/comprar/[id]` sobreescriben con su `generateMetadata`.
 export const metadata: Metadata = pageMetadata({
-  title: 'Comprar camper o autocaravana seminueva · CampersNova',
+  title: 'Comprar camper o autocaravana seminueva',
   description:
     'Encuentra tu camper o autocaravana seminueva con garantía. Te ayudamos a elegir según tu uso, presupuesto y plazas. Stock real e instalaciones en Barcelona.',
   path: '/comprar',

@@ -8,7 +8,7 @@ import { JsonLd } from '@/components/json-ld'
 import { pageMetadata, autoDealerJsonLd } from '@/lib/seo'
 
 export const metadata: Metadata = pageMetadata({
-  title: 'Sobre nosotros · CampersNova',
+  title: 'Sobre nosotros',
   description:
     'Conoce CampersNova: nacimos en 2019 especializándonos en compraventa de campers y autocaravanas desde Barcelona. +240 operaciones cerradas.',
   path: '/sobre',

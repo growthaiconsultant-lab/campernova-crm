@@ -19,7 +19,8 @@ import { JsonLd } from '@/components/json-ld'
 import { autoDealerJsonLd } from '@/lib/seo'
 
 export const metadata: Metadata = {
-  title: 'CampersNova · Compraventa de campers y autocaravanas',
+  // `absolute` evita que la plantilla del layout añada "· CampersNova" (ya está en el título).
+  title: { absolute: 'CampersNova · Compraventa de campers y autocaravanas seminuevas' },
   description:
     'Compra o vende tu camper o autocaravana con confianza. Tasación gratuita, gestión profesional. Solo cobramos si vendemos. Instalaciones en Barcelona.',
   openGraph: {

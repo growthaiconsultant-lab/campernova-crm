@@ -3,7 +3,7 @@ import { LegalLayout } from '@/components/legal-layout'
 import { pageMetadata } from '@/lib/seo'
 
 export const metadata: Metadata = pageMetadata({
-  title: 'Aviso Legal — CampersNova',
+  title: 'Aviso Legal',
   description: 'Aviso legal e información sobre el titular del sitio web campersnova.com.',
   path: '/aviso-legal',
 })

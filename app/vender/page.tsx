@@ -8,7 +8,7 @@ import { JsonLd } from '@/components/json-ld'
 import { pageMetadata, autoDealerJsonLd } from '@/lib/seo'
 
 export const metadata: Metadata = pageMetadata({
-  title: 'Vender tu camper o autocaravana · CampersNova',
+  title: 'Vender tu camper o autocaravana',
   description:
     'Vende tu camper o autocaravana con valoración profesional, sin curiosos y con pagos protegidos. Tiempo medio de venta: 42 días.',
   path: '/vender',

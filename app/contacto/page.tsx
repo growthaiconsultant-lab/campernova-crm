@@ -7,7 +7,7 @@ import { JsonLd } from '@/components/json-ld'
 import { autoDealerJsonLd, pageMetadata } from '@/lib/seo'
 
 export const metadata: Metadata = pageMetadata({
-  title: 'Contacto · CampersNova',
+  title: 'Contacto',
   description:
     'Contacta con el equipo de CampersNova. Teléfono, email, WhatsApp e instalaciones en Barcelona. Lun–Vie 10:00–19:00.',
   path: '/contacto',
