@@ -31,6 +31,7 @@ import {
   getAverageWorkshopHoursPerVehicle,
   getStockHistorySnapshot,
 } from '@/lib/dashboard/metrics'
+import { withDashboardCache, withDashboardCacheGlobal } from '@/lib/dashboard/cache'
 import { DashboardFilters } from './dashboard-filters'
 import { ForbiddenToast } from '@/components/forbidden-toast'
 import { AlertTriangle, FileWarning, ShieldAlert } from 'lucide-react'
@@ -79,6 +80,33 @@ const STATUS_DOTS: Record<string, string> = {
 
 const TIME_DOTS = ['#2563eb', '#7c3aed', '#0891b2', '#d97706', '#1f8a5b', '#b3aca0']
 
+// ── Métricas cacheadas (data cache, keyed por filtro de agente) ────────────────
+// Las funciones puras siguen recibiendo `db` (testeable); aquí las envolvemos con caché
+// para que la navegación repetida del dashboard no re-ejecute todas las queries.
+const sellerCounts$ = withDashboardCache('seller-lead-counts', getSellerLeadCounts)
+const buyerCounts$ = withDashboardCache('buyer-lead-counts', getBuyerLeadCounts)
+const vehicleCounts$ = withDashboardCache('vehicle-counts', getVehicleCounts)
+const salesMoM$ = withDashboardCache('sales-mom', getSalesMonthOverMonth)
+const proFunnel$ = withDashboardCache('pro-funnel', getProFunnel)
+const stockValue$ = withDashboardCache('stock-value', getStockValue)
+const avgDaysInStock$ = withDashboardCache('avg-days-in-stock', getAverageDaysInStock)
+const monthlyMargin$ = withDashboardCache('monthly-margin', getMonthlyNetMargin)
+const pubToSoldRate$ = withDashboardCache('pub-to-sold-rate', getPublishedToSoldRate)
+const leadAcceptance$ = withDashboardCache('lead-acceptance', getLeadAcceptanceRate)
+const stagnant$ = withDashboardCache('stagnant-vehicles', getStagnantVehicles)
+const avgWorkshopHours$ = withDashboardCache(
+  'avg-workshop-hours',
+  getAverageWorkshopHoursPerVehicle
+)
+const avgPostventaCost$ = withDashboardCache(
+  'avg-postventa-cost',
+  getAveragePostventaCostPerVehicle
+)
+const vehiclesPerCommercial$ = withDashboardCacheGlobal(
+  'vehicles-per-commercial',
+  getVehiclesPerCommercial
+)
+
 // ── Page ──────────────────────────────────────────────────────────────────────
 
 export default async function DashboardPage({
@@ -103,11 +131,11 @@ export default async function DashboardPage({
   // ── Base queries ─────────────────────────────────────────────────────────
   const [sellerCounts, buyerCounts, vehicleCounts, salesMoM, proFunnel, agents] = await Promise.all(
     [
-      getSellerLeadCounts(db, filter),
-      getBuyerLeadCounts(db, filter),
-      getVehicleCounts(db, filter),
-      getSalesMonthOverMonth(db, filter),
-      getProFunnel(db, filter),
+      sellerCounts$(filter),
+      buyerCounts$(filter),
+      vehicleCounts$(filter),
+      salesMoM$(filter),
+      proFunnel$(filter),
       isAdmin
         ? db.user.findMany({
             where: { active: true },
@@ -252,24 +280,24 @@ export default async function DashboardPage({
   const showFinancials = isAdmin || isMarketing
   const [stockValue, avgDaysInStock, monthlyMargin, pubToSoldRate, funnelComparison, stockHistory] =
     await Promise.all([
-      showFinancials ? getStockValue(db, filter) : Promise.resolve(null),
-      showFinancials || isEntregas ? getAverageDaysInStock(db, filter) : Promise.resolve(null),
-      isAdmin ? getMonthlyNetMargin(db, filter) : Promise.resolve(null),
-      isAdmin ? getPublishedToSoldRate(db, filter) : Promise.resolve(null),
-      isAdmin ? getLeadAcceptanceRate(db, filter) : Promise.resolve(null),
+      showFinancials ? stockValue$(filter) : Promise.resolve(null),
+      showFinancials || isEntregas ? avgDaysInStock$(filter) : Promise.resolve(null),
+      isAdmin ? monthlyMargin$(filter) : Promise.resolve(null),
+      isAdmin ? pubToSoldRate$(filter) : Promise.resolve(null),
+      isAdmin ? leadAcceptance$(filter) : Promise.resolve(null),
       showFinancials ? getStockHistorySnapshot() : Promise.resolve([]),
     ])
 
   // ── Operational metrics ───────────────────────────────────────────────────
   const showOperational = isAdmin || isAgente || isMarketing
   const [stagnantVehicles] = await Promise.all([
-    showOperational || isEntregas ? getStagnantVehicles(db, filter) : Promise.resolve([]),
+    showOperational || isEntregas ? stagnant$(filter) : Promise.resolve([]),
   ])
 
   // ── Workshop metrics ──────────────────────────────────────────────────────
   const showWorkshop = isAdmin || isTaller
   const [avgWorkshopHours, workshopCostsLast30, vehiclesPerCommercial] = await Promise.all([
-    showWorkshop ? getAverageWorkshopHoursPerVehicle(db, filter) : Promise.resolve(null),
+    showWorkshop ? avgWorkshopHours$(filter) : Promise.resolve(null),
     isAdmin
       ? db.vehicleCost.aggregate({
           where: {
@@ -280,10 +308,10 @@ export default async function DashboardPage({
           _sum: { amount: true },
         })
       : Promise.resolve({ _sum: { amount: null } }),
-    isAdmin ? getVehiclesPerCommercial(db) : Promise.resolve([]),
+    isAdmin ? vehiclesPerCommercial$() : Promise.resolve([]),
   ])
 
-  const avgPostventaCost = isAdmin ? await getAveragePostventaCostPerVehicle(db, filter) : null
+  const avgPostventaCost = isAdmin ? await avgPostventaCost$(filter) : null
 
   // ── Margin table ──────────────────────────────────────────────────────────
   const vehiclesWithMargin = isAdmin

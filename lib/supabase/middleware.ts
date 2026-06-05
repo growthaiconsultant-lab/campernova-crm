@@ -23,10 +23,28 @@ export async function updateSession(request: NextRequest) {
     }
   )
 
-  // Refresh session — do not add logic between this and getUser()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
+  // Verificación de sesión en el middleware (corre en CADA request del backoffice).
+  // `getClaims()` valida el JWT de forma local — sin roundtrip al servidor de Auth cuando el
+  // proyecto usa claves de firma asimétricas — y refresca la sesión si hace falta. Es más
+  // rápido que `getUser()` (que siempre va a la red) en cada navegación.
+  // Fallback defensivo: si `getClaims()` no devuelve claims o falla, caemos a `getUser()` para
+  // no romper el acceso del equipo bajo ninguna circunstancia.
+  let userId: string | null = null
+  try {
+    const { data, error } = await supabase.auth.getClaims()
+    if (!error && data?.claims?.sub) {
+      userId = data.claims.sub
+    }
+  } catch {
+    userId = null
+  }
 
-  return { supabase, supabaseResponse, user }
+  if (!userId) {
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
+    userId = user?.id ?? null
+  }
+
+  return { supabase, supabaseResponse, user: userId ? { id: userId } : null }
 }
