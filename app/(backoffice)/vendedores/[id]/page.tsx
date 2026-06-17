@@ -1015,6 +1015,19 @@ export default async function FichaVendedorPage({
                   />
                 </div>
                 {isAgente && <MissingForPublishCard vehicle={legalInput} docs={docSummary} />}
+                <div className="rounded-xl border border-cn-line p-4">
+                  <p className="text-sm font-medium text-cn-ink-700">Taller</p>
+                  <p className="text-cn-ink-400 mt-0.5 text-xs">
+                    Crea una orden de trabajo para preparar este vehículo. Luego podrás planificarla
+                    y bloquearla en la agenda del taller.
+                  </p>
+                  <a
+                    href={`/taller/nueva?vehicleId=${v.id}`}
+                    className="mt-3 inline-flex h-9 items-center rounded-lg bg-cn-teal-900 px-4 text-sm font-medium text-white hover:opacity-90"
+                  >
+                    Crear orden de taller
+                  </a>
+                </div>
               </CardContent>
             </Card>
           )}

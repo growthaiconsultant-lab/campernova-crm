@@ -15,6 +15,8 @@ import { WorkOrderActionsBar } from './work-order-actions-bar'
 import { ChecklistItemRow } from './checklist-item-row'
 import { TimeEntrySection } from './time-entry-form'
 import { PartsSection } from './parts-section'
+import { ScheduleCard } from './schedule-card'
+import { computeHoursDeviation } from '@/lib/taller/scheduling'
 
 const STATUS_LABELS: Record<WorkOrderStatus, string> = {
   PENDIENTE: 'Pendiente',
@@ -50,32 +52,39 @@ const CATEGORY_LABELS: Record<ChecklistItemCategory, string> = {
 export default async function WorkOrderPage({ params }: { params: { id: string } }) {
   const currentUser = await requireCanViewTaller()
 
-  const wo = await db.workOrder.findUnique({
-    where: { id: params.id },
-    include: {
-      vehicle: {
-        select: {
-          id: true,
-          brand: true,
-          model: true,
-          year: true,
-          sellerLead: { select: { id: true, name: true } },
+  const [wo, users] = await Promise.all([
+    db.workOrder.findUnique({
+      where: { id: params.id },
+      include: {
+        vehicle: {
+          select: {
+            id: true,
+            brand: true,
+            model: true,
+            year: true,
+            sellerLead: { select: { id: true, name: true } },
+          },
+        },
+        assignedTo: { select: { id: true, name: true } },
+        approvedBy: { select: { id: true, name: true } },
+        checklist: { orderBy: [{ category: 'asc' }, { item: 'asc' }] },
+        timeEntries: {
+          include: { worker: { select: { id: true, name: true } } },
+          orderBy: { workDate: 'desc' },
+        },
+        parts: { orderBy: { createdAt: 'asc' } },
+        costs: {
+          include: { createdBy: { select: { name: true } } },
+          orderBy: { createdAt: 'asc' },
         },
       },
-      assignedTo: { select: { id: true, name: true } },
-      approvedBy: { select: { id: true, name: true } },
-      checklist: { orderBy: [{ category: 'asc' }, { item: 'asc' }] },
-      timeEntries: {
-        include: { worker: { select: { id: true, name: true } } },
-        orderBy: { workDate: 'desc' },
-      },
-      parts: { orderBy: { createdAt: 'asc' } },
-      costs: {
-        include: { createdBy: { select: { name: true } } },
-        orderBy: { createdAt: 'asc' },
-      },
-    },
-  })
+    }),
+    db.user.findMany({
+      where: { active: true },
+      select: { id: true, name: true },
+      orderBy: { name: 'asc' },
+    }),
+  ])
 
   if (!wo) notFound()
 
@@ -115,6 +124,10 @@ export default async function WorkOrderPage({ params }: { params: { id: string }
   const totalPartsCost = parts.reduce((s, p) => s + p.quantity * p.unitCost, 0)
   const totalRealCost = totalHoursCost + totalPartsCost
 
+  const totalRealHours = timeEntries.reduce((s, e) => s + e.hours, 0)
+  const plannedHours = wo.estimatedHours ? Number(wo.estimatedHours) : null
+  const hoursDeviation = computeHoursDeviation(plannedHours, totalRealHours)
+
   return (
     <div className="space-y-6">
       {/* Cabecera */}
@@ -150,6 +163,18 @@ export default async function WorkOrderPage({ params }: { params: { id: string }
         status={wo.status}
         approvalLevel={wo.approvalLevel}
         isAdmin={isAdmin}
+      />
+
+      {/* Planificación / agenda */}
+      <ScheduleCard
+        woId={wo.id}
+        users={users}
+        assignedToId={wo.assignedToId}
+        assignedToName={wo.assignedTo?.name ?? null}
+        estimatedHours={plannedHours}
+        scheduledStart={wo.scheduledStart ? wo.scheduledStart.toISOString() : null}
+        scheduledEnd={wo.scheduledEnd ? wo.scheduledEnd.toISOString() : null}
+        isClosed={isClosed}
       />
 
       {/* Tabs */}
@@ -226,6 +251,39 @@ export default async function WorkOrderPage({ params }: { params: { id: string }
                     </div>
                   )}
                 </div>
+
+                {plannedHours != null && (
+                  <div className="rounded-lg border border-cn-line p-3">
+                    <div className="flex flex-wrap items-center gap-x-6 gap-y-1 text-sm">
+                      <span className="text-cn-ink-500">
+                        Horas previstas:{' '}
+                        <span className="font-medium text-cn-ink-700">{plannedHours} h</span>
+                      </span>
+                      <span className="text-cn-ink-500">
+                        Reales:{' '}
+                        <span className="font-medium text-cn-ink-700">{totalRealHours} h</span>
+                      </span>
+                      {totalRealHours > 0 && hoursDeviation.deviation != null && (
+                        <span
+                          className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${
+                            hoursDeviation.status === 'desviado_arriba'
+                              ? 'bg-red-100 text-red-700'
+                              : hoursDeviation.status === 'por_debajo'
+                                ? 'bg-blue-100 text-blue-700'
+                                : 'bg-green-100 text-green-700'
+                          }`}
+                        >
+                          {hoursDeviation.deviation > 0 ? '+' : ''}
+                          {hoursDeviation.deviation} h
+                          {hoursDeviation.deviationPct != null
+                            ? ` (${hoursDeviation.deviationPct > 0 ? '+' : ''}${Math.round(hoursDeviation.deviationPct)}%)`
+                            : ''}
+                          {hoursDeviation.status === 'desviado_arriba' ? ' · revisar' : ''}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                )}
 
                 {wo.description && (
                   <div>

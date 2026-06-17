@@ -5,7 +5,11 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Button } from '@/components/ui/button'
 import { WorkOrderForm } from './work-order-form'
 
-export default async function NuevaOrdenPage() {
+export default async function NuevaOrdenPage({
+  searchParams,
+}: {
+  searchParams: { vehicleId?: string }
+}) {
   await requireCanViewTaller()
 
   const [vehicles, users] = await Promise.all([
@@ -48,7 +52,11 @@ export default async function NuevaOrdenPage() {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <WorkOrderForm vehicles={vehicleOptions} users={users} />
+          <WorkOrderForm
+            vehicles={vehicleOptions}
+            users={users}
+            initialVehicleId={searchParams.vehicleId ?? ''}
+          />
         </CardContent>
       </Card>
     </div>

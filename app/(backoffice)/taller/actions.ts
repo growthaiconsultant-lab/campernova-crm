@@ -77,6 +77,7 @@ const scheduleWorkOrderSchema = z.object({
   assignedToId: z.string().min(1, 'Asigna un responsable para planificar'),
   scheduledStart: z.string().min(1, 'Fecha de inicio requerida'),
   scheduledEnd: z.string().min(1, 'Fecha de fin requerida'),
+  estimatedHours: z.coerce.number().positive().optional().nullable(),
 })
 
 const timeEntrySchema = z.object({
@@ -507,7 +508,7 @@ export async function scheduleWorkOrder(woId: string, formData: unknown): Promis
     return { ok: false, error: 'Datos inválidos', fieldErrors: parsed.error.flatten().fieldErrors }
   }
 
-  const { assignedToId, scheduledStart, scheduledEnd } = parsed.data
+  const { assignedToId, scheduledStart, scheduledEnd, estimatedHours } = parsed.data
 
   const wo = await db.workOrder.findUnique({
     where: { id: woId },
@@ -529,7 +530,12 @@ export async function scheduleWorkOrder(woId: string, formData: unknown): Promis
 
   await db.workOrder.update({
     where: { id: woId },
-    data: { assignedToId, scheduledStart: start, scheduledEnd: end },
+    data: {
+      assignedToId,
+      scheduledStart: start,
+      scheduledEnd: end,
+      ...(estimatedHours != null ? { estimatedHours } : {}),
+    },
   })
 
   revalidateTaller(woId)
