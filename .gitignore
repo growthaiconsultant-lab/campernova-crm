@@ -16,6 +16,7 @@ next-env.d.ts
 
 # Environment variables — NUNCA commitear secretos
 .env
+.env.staging
 .env*.local
 .env.local
 .env.development.local
