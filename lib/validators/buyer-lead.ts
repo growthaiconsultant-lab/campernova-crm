@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { VEHICLE_CATEGORY_VALUES, BED_LAYOUT_VALUES, LICENSE_TYPE_VALUES } from '@/lib/rv-taxonomy'
 
 export const criticalEquipmentSchema = z.object({
   solar: z.boolean().default(false),
@@ -70,6 +71,17 @@ export const updateBuyerLeadSchema = z.object({
   }),
   useZone: z.string().optional(),
   purchaseTimeline: z.string().optional().nullable(),
+  // ── Preferencias RV (Fase #3 v1) ──
+  preferredCategory: z.enum(VEHICLE_CATEGORY_VALUES).optional().nullable(),
+  preferredBedLayout: z.enum(BED_LAYOUT_VALUES).optional().nullable(),
+  sleepingPlacesRequired: z.number().int().min(0).max(12).optional().nullable(),
+  bathroomRequired: z.boolean().optional().nullable(),
+  licenseType: z.enum(LICENSE_TYPE_VALUES).optional().nullable(),
+  needsWinter: z.boolean().optional().nullable(),
+  needsGarage: z.boolean().optional().nullable(),
+  maxLengthM: z.number().positive().max(15).optional().nullable(),
+  maxHeightM: z.number().positive().max(5).optional().nullable(),
+  hasKids: z.boolean().optional().nullable(),
 })
 
 export type UpdateBuyerLeadValues = z.input<typeof updateBuyerLeadSchema>

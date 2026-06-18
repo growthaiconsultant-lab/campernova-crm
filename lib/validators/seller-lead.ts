@@ -1,4 +1,10 @@
 import { z } from 'zod'
+import {
+  VEHICLE_CATEGORY_VALUES,
+  BED_LAYOUT_VALUES,
+  BATHROOM_TYPE_VALUES,
+  HEATING_TYPE_VALUES,
+} from '@/lib/rv-taxonomy'
 
 export const equipmentSchema = z.object({
   solar: z.boolean().default(false),
@@ -41,6 +47,11 @@ export const createSellerLeadSchema = z.object({
     shower: false,
     heating: false,
   }),
+  // ── Ficha técnica RV (opcional en el alta web; el agente la afina luego) ──
+  sleepingPlaces: z.number().int().min(0).max(12).optional().nullable(),
+  category: z.enum(VEHICLE_CATEGORY_VALUES).optional().nullable(),
+  bedLayout: z.enum(BED_LAYOUT_VALUES).optional().nullable(),
+  bathroomType: z.enum(BATHROOM_TYPE_VALUES).optional().nullable(),
 })
 
 // OUTPUT: tipo validado que devuelve Zod (con defaults aplicados)
@@ -86,6 +97,17 @@ export const updateVehicleSchema = z.object({
     heating: false,
   }),
   status: z.enum(['NUEVO', 'TASADO', 'PUBLICADO', 'RESERVADO', 'VENDIDO', 'DESCARTADO']),
+  // ── Ficha técnica RV (Fase #3 v1) ──
+  category: z.enum(VEHICLE_CATEGORY_VALUES).optional().nullable(),
+  bedLayout: z.enum(BED_LAYOUT_VALUES).optional().nullable(),
+  sleepingPlaces: z.number().int().min(0).max(12).optional().nullable(),
+  bathroomType: z.enum(BATHROOM_TYPE_VALUES).optional().nullable(),
+  heatingType: z.enum(HEATING_TYPE_VALUES).optional().nullable(),
+  winterized: z.boolean().optional().nullable(),
+  hasGarage: z.boolean().optional().nullable(),
+  maxMassKg: z.number().int().min(0).max(20000).optional().nullable(),
+  heightM: z.number().positive().max(5).optional().nullable(),
+  offGrid: z.boolean().optional().nullable(),
 })
 
 export type UpdateVehicleValues = z.input<typeof updateVehicleSchema>

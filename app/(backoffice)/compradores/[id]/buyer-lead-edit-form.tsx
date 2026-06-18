@@ -17,6 +17,13 @@ import {
   PURCHASE_TIMELINE_OPTIONS,
   type UpdateBuyerLeadValues,
 } from '@/lib/validators/buyer-lead'
+import {
+  EQUIPMENT_OPTIONS,
+  RV_CATEGORY_OPTIONS,
+  RV_BED_OPTIONS,
+  RV_LICENSE_OPTIONS,
+  RV_NONE,
+} from '@/lib/rv-taxonomy'
 import { updateBuyerLead } from './actions'
 import {
   BUYER_LEAD_TRANSITIONS,
@@ -28,16 +35,22 @@ import { Lock } from 'lucide-react'
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
-const EQUIPMENT_ITEMS = [
-  { id: 'solar', label: 'Placas solares' },
-  { id: 'kitchen', label: 'Cocina' },
-  { id: 'bathroom', label: 'Baño' },
-  { id: 'shower', label: 'Ducha' },
-  { id: 'heating', label: 'Calefacción' },
-] as const
-
+// Opciones desde la fuente única (lib/rv-taxonomy). Baño = bathroomRequired (no flag de equipo).
+const EQUIPMENT_ITEMS = EQUIPMENT_OPTIONS
 type EquipmentKey = (typeof EQUIPMENT_ITEMS)[number]['id']
 type Agent = { id: string; name: string }
+
+const PREF_CATEGORY_OPTIONS = RV_CATEGORY_OPTIONS
+const PREF_BED_OPTIONS = RV_BED_OPTIONS
+const LICENSE_OPTIONS = RV_LICENSE_OPTIONS
+const NONE = RV_NONE
+const PREF_BOOLEANS = [
+  { id: 'bathroomRequired', label: 'Baño imprescindible' },
+  { id: 'hasKids', label: 'Viaja con niños' },
+  { id: 'needsWinter', label: 'Uso en invierno' },
+  { id: 'needsGarage', label: 'Necesita garaje' },
+] as const
+type PrefBoolKey = (typeof PREF_BOOLEANS)[number]['id']
 
 type Props = {
   leadId: string
@@ -442,6 +455,234 @@ export function BuyerLeadEditForm({ leadId, defaultValues, agents, isAdmin }: Pr
                               onChange={field.onChange}
                             />
                             <span className="text-[12.5px] font-medium">{item.label}</span>
+                          </label>
+                        </FormControl>
+                      </FormItem>
+                    )}
+                  />
+                ))}
+              </div>
+            </div>
+
+            {/* Ficha técnica buscada (RV) */}
+            <div className="mt-5 border-t border-[#f1f5f9] pt-5">
+              <p className="mb-3 font-mono text-[10px] uppercase tracking-[0.12em] text-[#94a3b8]">
+                Ficha técnica buscada (RV)
+              </p>
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                {/* Distribución preferida */}
+                <FormField
+                  control={form.control}
+                  name="preferredCategory"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FieldLabel>Distribución preferida</FieldLabel>
+                      <Select
+                        value={field.value ?? NONE}
+                        onValueChange={(v) => field.onChange(v === NONE ? null : v)}
+                      >
+                        <FormControl>
+                          <SelectTrigger className="h-9 border-[#e2e8f0] bg-[#f8fafc] text-[13.5px]">
+                            <SelectValue placeholder="Sin preferencia" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          <SelectItem value={NONE}>Sin preferencia</SelectItem>
+                          {PREF_CATEGORY_OPTIONS.map((o) => (
+                            <SelectItem key={o.value} value={o.value}>
+                              {o.label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage className="text-[11px]" />
+                    </FormItem>
+                  )}
+                />
+
+                {/* Cama preferida */}
+                <FormField
+                  control={form.control}
+                  name="preferredBedLayout"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FieldLabel>Cama preferida</FieldLabel>
+                      <Select
+                        value={field.value ?? NONE}
+                        onValueChange={(v) => field.onChange(v === NONE ? null : v)}
+                      >
+                        <FormControl>
+                          <SelectTrigger className="h-9 border-[#e2e8f0] bg-[#f8fafc] text-[13.5px]">
+                            <SelectValue placeholder="Sin preferencia" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          <SelectItem value={NONE}>Sin preferencia</SelectItem>
+                          {PREF_BED_OPTIONS.map((o) => (
+                            <SelectItem key={o.value} value={o.value}>
+                              {o.label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage className="text-[11px]" />
+                    </FormItem>
+                  )}
+                />
+
+                {/* Carnet */}
+                <FormField
+                  control={form.control}
+                  name="licenseType"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FieldLabel>Carnet del comprador</FieldLabel>
+                      <Select
+                        value={field.value ?? NONE}
+                        onValueChange={(v) => field.onChange(v === NONE ? null : v)}
+                      >
+                        <FormControl>
+                          <SelectTrigger className="h-9 border-[#e2e8f0] bg-[#f8fafc] text-[13.5px]">
+                            <SelectValue placeholder="Sin especificar" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          <SelectItem value={NONE}>Sin especificar</SelectItem>
+                          {LICENSE_OPTIONS.map((o) => (
+                            <SelectItem key={o.value} value={o.value}>
+                              {o.label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage className="text-[11px]" />
+                    </FormItem>
+                  )}
+                />
+
+                {/* Plazas para dormir requeridas */}
+                <FormField
+                  control={form.control}
+                  name="sleepingPlacesRequired"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FieldLabel>Plazas para dormir (mín.)</FieldLabel>
+                      <FormControl>
+                        <input
+                          type="number"
+                          min={0}
+                          max={12}
+                          value={field.value ?? ''}
+                          onChange={(e) =>
+                            field.onChange(e.target.value === '' ? null : Number(e.target.value))
+                          }
+                          placeholder="Sin mínimo"
+                          className={inputCls}
+                        />
+                      </FormControl>
+                      <FormMessage className="text-[11px]" />
+                    </FormItem>
+                  )}
+                />
+
+                {/* Largo máximo (parking) */}
+                <FormField
+                  control={form.control}
+                  name="maxLengthM"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FieldLabel>Largo máximo (m)</FieldLabel>
+                      <FormControl>
+                        <input
+                          type="number"
+                          step="0.1"
+                          min="0"
+                          value={field.value ?? ''}
+                          onChange={(e) =>
+                            field.onChange(e.target.value === '' ? null : Number(e.target.value))
+                          }
+                          placeholder="Sin límite"
+                          className={inputCls}
+                        />
+                      </FormControl>
+                      <FormMessage className="text-[11px]" />
+                    </FormItem>
+                  )}
+                />
+
+                {/* Alto máximo (parking) */}
+                <FormField
+                  control={form.control}
+                  name="maxHeightM"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FieldLabel>Alto máximo (m)</FieldLabel>
+                      <FormControl>
+                        <input
+                          type="number"
+                          step="0.05"
+                          min="0"
+                          value={field.value ?? ''}
+                          onChange={(e) =>
+                            field.onChange(e.target.value === '' ? null : Number(e.target.value))
+                          }
+                          placeholder="Sin límite"
+                          className={inputCls}
+                        />
+                      </FormControl>
+                      <FormMessage className="text-[11px]" />
+                    </FormItem>
+                  )}
+                />
+              </div>
+
+              {/* Flags de preferencia */}
+              <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
+                {PREF_BOOLEANS.map((item) => (
+                  <FormField
+                    key={item.id}
+                    control={form.control}
+                    name={item.id as PrefBoolKey}
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormControl>
+                          <label
+                            className={`flex cursor-pointer select-none items-center gap-2 rounded-lg border px-3 py-2 transition-all ${
+                              field.value
+                                ? 'border-[#294e4c] bg-[#f0f7f6] text-[#294e4c]'
+                                : 'border-[#e2e8f0] bg-[#f8fafc] text-[#64748b] hover:bg-white'
+                            }`}
+                          >
+                            <div
+                              className={`flex h-4 w-4 shrink-0 items-center justify-center rounded border transition-all ${
+                                field.value
+                                  ? 'border-[#294e4c] bg-[#294e4c]'
+                                  : 'border-[#cbd5e1] bg-white'
+                              }`}
+                            >
+                              {field.value && (
+                                <svg
+                                  className="h-2.5 w-2.5 text-white"
+                                  viewBox="0 0 12 12"
+                                  fill="none"
+                                >
+                                  <polyline
+                                    points="1.5,6 5,9.5 10.5,2.5"
+                                    stroke="currentColor"
+                                    strokeWidth="1.8"
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                  />
+                                </svg>
+                              )}
+                            </div>
+                            <input
+                              type="checkbox"
+                              className="sr-only"
+                              checked={field.value === true}
+                              onChange={field.onChange}
+                            />
+                            <span className="text-[12px] font-medium">{item.label}</span>
                           </label>
                         </FormControl>
                       </FormItem>

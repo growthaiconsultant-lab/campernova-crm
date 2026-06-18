@@ -1,5 +1,12 @@
 import { passesHardFilters } from './filters'
-import { scoreAgeKm, scoreEquipment, scorePrice, scoreZone } from './scoring'
+import {
+  scoreAgeKm,
+  scoreBedLayout,
+  scoreCategory,
+  scoreEquipment,
+  scorePrice,
+  scoreZone,
+} from './scoring'
 import type {
   MatchingBuyerInput,
   MatchingDeps,
@@ -11,7 +18,9 @@ import { TOP_N, WEIGHTS } from './types'
 
 function weightedTotal(breakdown: ScoreBreakdown): number {
   const total =
-    (breakdown.equipment * WEIGHTS.equipment +
+    (breakdown.category * WEIGHTS.category +
+      breakdown.bedLayout * WEIGHTS.bedLayout +
+      breakdown.equipment * WEIGHTS.equipment +
       breakdown.price * WEIGHTS.price +
       breakdown.ageKm * WEIGHTS.ageKm +
       breakdown.zone * WEIGHTS.zone) /
@@ -26,6 +35,8 @@ export function scorePair(
   nowYear: number = new Date().getFullYear()
 ): ScoredMatch {
   const breakdown: ScoreBreakdown = {
+    category: scoreCategory(vehicle.category, buyer.preferredCategory),
+    bedLayout: scoreBedLayout(vehicle.bedLayout, buyer.preferredBedLayout),
     equipment: scoreEquipment(vehicle.equipment, buyer.criticalEquipment),
     price: scorePrice(vehicle.price, buyer.maxBudget),
     ageKm: scoreAgeKm(vehicle.year, vehicle.km, nowYear),

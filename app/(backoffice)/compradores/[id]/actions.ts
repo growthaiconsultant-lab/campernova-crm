@@ -32,6 +32,16 @@ export async function updateBuyerLead(leadId: string, data: unknown) {
     criticalEquipment,
     useZone,
     purchaseTimeline,
+    preferredCategory,
+    preferredBedLayout,
+    sleepingPlacesRequired,
+    bathroomRequired,
+    licenseType,
+    needsWinter,
+    needsGarage,
+    maxLengthM,
+    maxHeightM,
+    hasKids,
   } = parsed.data
 
   const currentLead = await db.buyerLead.findUnique({
@@ -106,6 +116,16 @@ export async function updateBuyerLead(leadId: string, data: unknown) {
         criticalEquipment,
         useZone: useZone ?? null,
         purchaseTimeline: purchaseTimeline ?? null,
+        preferredCategory: preferredCategory ?? null,
+        preferredBedLayout: preferredBedLayout ?? null,
+        sleepingPlacesRequired: sleepingPlacesRequired ?? null,
+        bathroomRequired: bathroomRequired ?? null,
+        licenseType: licenseType ?? null,
+        needsWinter: needsWinter ?? null,
+        needsGarage: needsGarage ?? null,
+        maxLengthM: maxLengthM ?? null,
+        maxHeightM: maxHeightM ?? null,
+        hasKids: hasKids ?? null,
       },
     })
     if (agentChanging && agentActivityContent) {

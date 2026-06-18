@@ -1,5 +1,38 @@
 import { describe, expect, it } from 'vitest'
-import { scoreAgeKm, scoreEquipment, scorePrice, scoreZone } from './scoring'
+import {
+  scoreAgeKm,
+  scoreBedLayout,
+  scoreCategory,
+  scoreEquipment,
+  scorePrice,
+  scoreZone,
+} from './scoring'
+
+describe('scoreCategory', () => {
+  it('sin preferencia del comprador → 100', () => {
+    expect(scoreCategory('PERFILADA', null)).toBe(100)
+  })
+  it('stock sin etiquetar (null) → 60 neutral', () => {
+    expect(scoreCategory(null, 'PERFILADA')).toBe(60)
+  })
+  it('coincide → 100, no coincide → 30', () => {
+    expect(scoreCategory('PERFILADA', 'PERFILADA')).toBe(100)
+    expect(scoreCategory('CAPUCHINA', 'PERFILADA')).toBe(30)
+  })
+})
+
+describe('scoreBedLayout', () => {
+  it('sin preferencia del comprador → 100', () => {
+    expect(scoreBedLayout('ISLA', null)).toBe(100)
+  })
+  it('stock sin etiquetar (null) → 60 neutral', () => {
+    expect(scoreBedLayout(null, 'ISLA')).toBe(60)
+  })
+  it('coincide → 100, no coincide → 40', () => {
+    expect(scoreBedLayout('ISLA', 'ISLA')).toBe(100)
+    expect(scoreBedLayout('LITERAS', 'ISLA')).toBe(40)
+  })
+})
 
 describe('scoreEquipment', () => {
   it('sin requisitos del comprador → 100', () => {

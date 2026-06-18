@@ -126,7 +126,23 @@ export async function updateVehicle(vehicleId: string, data: unknown) {
     desiredPrice,
     equipment,
     status,
+    category,
+    bedLayout,
+    sleepingPlaces,
+    bathroomType,
+    heatingType,
+    winterized,
+    hasGarage,
+    maxMassKg,
+    heightM,
+    offGrid,
   } = parsed.data
+
+  // Baño = fuente única (bathroomType): derivamos el flag de equipo para coherencia.
+  const equipmentResolved = {
+    ...equipment,
+    bathroom: bathroomType != null ? bathroomType !== 'NINGUNO' : equipment.bathroom,
+  }
 
   const vehicle = await db.vehicle.findUnique({
     where: { id: vehicleId },
@@ -223,8 +239,18 @@ export async function updateVehicle(vehicleId: string, data: unknown) {
         conservationState,
         location: location ?? null,
         desiredPrice: desiredPrice ?? null,
-        equipment,
+        equipment: equipmentResolved,
         status,
+        category: category ?? null,
+        bedLayout: bedLayout ?? null,
+        sleepingPlaces: sleepingPlaces ?? null,
+        bathroomType: bathroomType ?? null,
+        heatingType: heatingType ?? null,
+        winterized: winterized ?? null,
+        hasGarage: hasGarage ?? null,
+        maxMassKg: maxMassKg ?? null,
+        heightM: heightM ?? null,
+        offGrid: offGrid ?? null,
       },
     })
     if (statusChanging) {
@@ -247,7 +273,7 @@ export async function updateVehicle(vehicleId: string, data: unknown) {
     year,
     km,
     conservationState,
-    equipment,
+    equipment: equipmentResolved,
   })
   await recalculateMatchesForVehicle(vehicleId, db)
 
