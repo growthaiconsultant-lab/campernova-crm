@@ -30,12 +30,19 @@ interface NavSection {
 
 const NAV_SECTIONS: NavSection[] = [
   {
+    title: 'Pipeline',
     items: [
       {
         href: '/dashboard',
         label: 'Dashboard',
         icon: LayoutDashboard,
         roles: ['ADMIN', 'AGENTE', 'TALLER', 'ENTREGAS', 'MARKETING'],
+      },
+      {
+        href: '/vehiculos',
+        label: 'Vehículos',
+        icon: Truck,
+        roles: ['ADMIN', 'AGENTE', 'TALLER', 'MARKETING'],
       },
       {
         href: '/vendedores',
@@ -48,12 +55,6 @@ const NAV_SECTIONS: NavSection[] = [
         label: 'Compradores',
         icon: ShoppingCart,
         roles: ['ADMIN', 'AGENTE'],
-      },
-      {
-        href: '/vehiculos',
-        label: 'Vehículos',
-        icon: Truck,
-        roles: ['ADMIN', 'AGENTE', 'TALLER', 'MARKETING'],
       },
     ],
   },
@@ -96,7 +97,7 @@ export function Sidebar({ userRole }: SidebarProps) {
       'flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors',
       isActive(href)
         ? 'bg-sidebar-primary text-sidebar-primary-foreground font-medium'
-        : 'text-sidebar-foreground/60 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'
+        : 'text-sidebar-foreground/75 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'
     )
 
   return (
