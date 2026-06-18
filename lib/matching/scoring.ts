@@ -1,3 +1,4 @@
+import type { VehicleCategory, BedLayout } from '@prisma/client'
 import type { EquipmentFlags } from '../valuation/types'
 
 const PRICE_SWEET_SPOT = 0.9
@@ -62,4 +63,24 @@ export function scoreZone(vehicleLocation: string | null, buyerZone: string | nu
   if (buyerZone === null || normalize(buyerZone) === '') return 100
   if (vehicleLocation === null || normalize(vehicleLocation) === '') return 0
   return normalize(vehicleLocation) === normalize(buyerZone) ? 100 : 0
+}
+
+/// Distribución/carrocería: preferencia (no excluyente).
+/// Sin preferencia → 100. Stock sin etiquetar → 60 (neutral, no se castiga lo desconocido).
+/// Coincide → 100. No coincide → 30.
+export function scoreCategory(
+  vehicleCategory: VehicleCategory | null,
+  preferred: VehicleCategory | null
+): number {
+  if (preferred === null) return 100
+  if (vehicleCategory === null) return 60
+  return vehicleCategory === preferred ? 100 : 30
+}
+
+/// Tipo de cama: preferencia (no excluyente).
+/// Sin preferencia → 100. Stock sin etiquetar → 60. Coincide → 100. No coincide → 40.
+export function scoreBedLayout(vehicleBed: BedLayout | null, preferred: BedLayout | null): number {
+  if (preferred === null) return 100
+  if (vehicleBed === null) return 60
+  return vehicleBed === preferred ? 100 : 40
 }

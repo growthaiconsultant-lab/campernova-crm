@@ -15,6 +15,13 @@ const VEHICLE_SELECT = {
   location: true,
   desiredPrice: true,
   valuationRecommended: true,
+  category: true,
+  bedLayout: true,
+  sleepingPlaces: true,
+  bathroomType: true,
+  maxMassKg: true,
+  length: true,
+  heightM: true,
 } as const
 
 const BUYER_SELECT = {
@@ -24,6 +31,13 @@ const BUYER_SELECT = {
   maxBudget: true,
   criticalEquipment: true,
   useZone: true,
+  preferredCategory: true,
+  preferredBedLayout: true,
+  sleepingPlacesRequired: true,
+  bathroomRequired: true,
+  licenseType: true,
+  maxLengthM: true,
+  maxHeightM: true,
 } as const
 
 type VehicleRow = {
@@ -36,6 +50,13 @@ type VehicleRow = {
   location: string | null
   desiredPrice: { toString(): string } | null
   valuationRecommended: { toString(): string } | null
+  category: MatchingVehicleInput['category']
+  bedLayout: MatchingVehicleInput['bedLayout']
+  sleepingPlaces: number | null
+  bathroomType: MatchingVehicleInput['bathroomType']
+  maxMassKg: number | null
+  length: number | null
+  heightM: number | null
 }
 
 type BuyerRow = {
@@ -45,6 +66,13 @@ type BuyerRow = {
   maxBudget: { toString(): string } | null
   criticalEquipment: unknown
   useZone: string | null
+  preferredCategory: MatchingBuyerInput['preferredCategory']
+  preferredBedLayout: MatchingBuyerInput['preferredBedLayout']
+  sleepingPlacesRequired: number | null
+  bathroomRequired: boolean | null
+  licenseType: MatchingBuyerInput['licenseType']
+  maxLengthM: number | null
+  maxHeightM: number | null
 }
 
 function toEquipment(value: unknown): EquipmentFlags {
@@ -68,6 +96,13 @@ function vehicleRowToInput(row: VehicleRow): MatchingVehicleInput {
     equipment: toEquipment(row.equipment),
     location: row.location,
     price: desired ?? valuation,
+    category: row.category,
+    bedLayout: row.bedLayout,
+    sleepingPlaces: row.sleepingPlaces,
+    bathroomType: row.bathroomType,
+    maxMassKg: row.maxMassKg,
+    length: row.length,
+    heightM: row.heightM,
   }
 }
 
@@ -79,6 +114,13 @@ function buyerRowToInput(row: BuyerRow): MatchingBuyerInput {
     maxBudget: toNumber(row.maxBudget),
     criticalEquipment: toEquipment(row.criticalEquipment),
     useZone: row.useZone,
+    preferredCategory: row.preferredCategory,
+    preferredBedLayout: row.preferredBedLayout,
+    sleepingPlacesRequired: row.sleepingPlacesRequired,
+    bathroomRequired: row.bathroomRequired,
+    licenseType: row.licenseType,
+    maxLengthM: row.maxLengthM,
+    maxHeightM: row.maxHeightM,
   }
 }
 

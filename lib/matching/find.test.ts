@@ -15,6 +15,13 @@ function makeVehicle(overrides: Partial<MatchingVehicleInput> = {}): MatchingVeh
     equipment: { solar: true, bathroom: true, heating: true, kitchen: true },
     location: 'Madrid',
     price: 30_000,
+    category: null,
+    bedLayout: null,
+    sleepingPlaces: null,
+    bathroomType: null,
+    maxMassKg: null,
+    length: null,
+    heightM: null,
     ...overrides,
   }
 }
@@ -27,6 +34,13 @@ function makeBuyer(overrides: Partial<MatchingBuyerInput> = {}): MatchingBuyerIn
     maxBudget: 35_000,
     criticalEquipment: { solar: true, bathroom: true },
     useZone: 'Madrid',
+    preferredCategory: null,
+    preferredBedLayout: null,
+    sleepingPlacesRequired: null,
+    bathroomRequired: null,
+    licenseType: null,
+    maxLengthM: null,
+    maxHeightM: null,
     ...overrides,
   }
 }
@@ -81,6 +95,53 @@ describe('passesHardFilters', () => {
       false
     )
   })
+
+  it('baño obligatorio descarta vehículo sin baño', () => {
+    expect(
+      passesHardFilters(
+        makeVehicle({ bathroomType: 'NINGUNO' }),
+        makeBuyer({ bathroomRequired: true })
+      )
+    ).toBe(false)
+  })
+
+  it('carnet B descarta MMA > 3.500 kg, pero pasa si ≤ 3.500', () => {
+    expect(
+      passesHardFilters(makeVehicle({ maxMassKg: 4200 }), makeBuyer({ licenseType: 'B' }))
+    ).toBe(false)
+    expect(
+      passesHardFilters(makeVehicle({ maxMassKg: 3400 }), makeBuyer({ licenseType: 'B' }))
+    ).toBe(true)
+  })
+
+  it('plazas para dormir insuficientes descarta', () => {
+    expect(
+      passesHardFilters(
+        makeVehicle({ sleepingPlaces: 2 }),
+        makeBuyer({ sleepingPlacesRequired: 4 })
+      )
+    ).toBe(false)
+  })
+
+  it('parking: vehículo más largo que el máximo descarta', () => {
+    expect(passesHardFilters(makeVehicle({ length: 7.4 }), makeBuyer({ maxLengthM: 6 }))).toBe(
+      false
+    )
+  })
+
+  it('fail-open: stock sin etiquetar no se descarta aunque el comprador exija criterios RV', () => {
+    expect(
+      passesHardFilters(
+        makeVehicle(), // category/bathroom/maxMass/length/sleepingPlaces todos null
+        makeBuyer({
+          bathroomRequired: true,
+          licenseType: 'B',
+          sleepingPlacesRequired: 6,
+          maxLengthM: 5,
+        })
+      )
+    ).toBe(true)
+  })
 })
 
 describe('scorePair', () => {
@@ -119,14 +180,32 @@ describe('scorePair', () => {
     expect(result.breakdown.equipment).toBe(0)
   })
 
-  it('score final pondera correctamente: equipment=100, price=100, ageKm=0, zone=0 → 65', () => {
+  it('score final pondera correctamente (cat/cama sin pref=100, equip=100, price=100, ageKm=0, zone=0 → 75)', () => {
     const result = scorePair(
       makeVehicle({ year: 2011, km: 200_000, location: 'Barcelona' }),
       makeBuyer(),
       NOW_YEAR
     )
-    // 40*100/100 + 25*100/100 + 20*0/100 + 15*0/100 = 40 + 25 = 65
-    expect(result.score).toBe(65)
+    // category22 + bedLayout18 + equipment15 + price20 + ageKm15*0 + zone10*0 = 75
+    expect(result.score).toBe(75)
+  })
+
+  it('coincidir distribución y cama preferidas sube el score; no coincidir lo baja', () => {
+    const match = scorePair(
+      makeVehicle({ category: 'PERFILADA', bedLayout: 'ISLA' }),
+      makeBuyer({ preferredCategory: 'PERFILADA', preferredBedLayout: 'ISLA' }),
+      NOW_YEAR
+    )
+    const mismatch = scorePair(
+      makeVehicle({ category: 'CAPUCHINA', bedLayout: 'LITERAS' }),
+      makeBuyer({ preferredCategory: 'PERFILADA', preferredBedLayout: 'ISLA' }),
+      NOW_YEAR
+    )
+    expect(match.breakdown.category).toBe(100)
+    expect(match.breakdown.bedLayout).toBe(100)
+    expect(mismatch.breakdown.category).toBe(30)
+    expect(mismatch.breakdown.bedLayout).toBe(40)
+    expect(match.score).toBeGreaterThan(mismatch.score)
   })
 })
 
