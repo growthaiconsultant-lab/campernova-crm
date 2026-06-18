@@ -2,7 +2,7 @@ import Link from 'next/link'
 import { db } from '@/lib/db'
 import { requireCanViewTaller } from '@/lib/auth'
 import { Button } from '@/components/ui/button'
-import { Plus } from 'lucide-react'
+import { Plus, CalendarDays } from 'lucide-react'
 import type { WorkOrderStatus, WorkOrderApprovalLevel } from '@prisma/client'
 
 const STATUS_LABELS: Record<WorkOrderStatus, string> = {
@@ -84,12 +84,20 @@ export default async function TallerPage({
             {workOrders.length} órdenes de trabajo
           </p>
         </div>
-        <Button asChild>
-          <Link href="/taller/nueva">
-            <Plus className="mr-1.5 h-4 w-4" />
-            Nueva orden
-          </Link>
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button asChild variant="outline">
+            <Link href="/taller/agenda">
+              <CalendarDays className="mr-1.5 h-4 w-4" />
+              Agenda
+            </Link>
+          </Button>
+          <Button asChild>
+            <Link href="/taller/nueva">
+              <Plus className="mr-1.5 h-4 w-4" />
+              Nueva orden
+            </Link>
+          </Button>
+        </div>
       </div>
 
       {/* Filtros */}

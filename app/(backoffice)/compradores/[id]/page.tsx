@@ -18,11 +18,9 @@ import { WhatsAppButton } from '@/components/whatsapp-button'
 import { buyerWhatsAppMessage } from '@/lib/whatsapp'
 import { LeadTabNav } from '@/app/(backoffice)/vendedores/[id]/lead-tab-nav'
 import type { LeadTab } from '@/app/(backoffice)/vendedores/[id]/lead-tab-nav'
-import {
-  BUYER_LEAD_STATUS_LABELS,
-  BUYER_LEAD_STATUS_CLASSES,
-  BUYER_LEAD_TRANSITIONS,
-} from '@/lib/state-machine'
+import { StatusPill } from '@/components/status-pill'
+import { InfoTooltip } from '@/components/info-tooltip'
+import { BUYER_LEAD_STATUS_LABELS, BUYER_LEAD_TRANSITIONS } from '@/lib/state-machine'
 import type { BuyerLeadStatus } from '@prisma/client'
 import { ChevronLeft, Phone, Mail, Shield, MessagesSquare } from 'lucide-react'
 
@@ -140,6 +138,7 @@ export default async function FichaCompradorPage({
                 model: true,
                 year: true,
                 salePrice: true,
+                sellerLead: { select: { id: true } },
               },
             },
           },
@@ -179,7 +178,21 @@ export default async function FichaCompradorPage({
   const isAdmin = currentUser.role === 'ADMIN'
   const isTerminal = !BUYER_LEAD_TRANSITIONS[lead.status as BuyerLeadStatus]
   const statusLabel = BUYER_LEAD_STATUS_LABELS[lead.status as BuyerLeadStatus] ?? lead.status
-  const statusClass = BUYER_LEAD_STATUS_CLASSES[lead.status as BuyerLeadStatus] ?? ''
+
+  // Resumen de la necesidad — la unidad de trabajo del comprador
+  const tipoLabel =
+    lead.vehicleType === 'CAMPER'
+      ? 'camper'
+      : lead.vehicleType === 'AUTOCARAVANA'
+        ? 'autocaravana'
+        : 'vehículo'
+  const needSummary = [
+    `Busca ${tipoLabel}`,
+    lead.maxBudget ? `hasta ${EUR(Number(lead.maxBudget))}` : null,
+    lead.minSeats ? `${lead.minSeats}+ plazas` : null,
+  ]
+    .filter(Boolean)
+    .join(' · ')
 
   const bestMatch = lead.matches[0]
   const bestMatchScore = bestMatch ? bestMatch.score : 0
@@ -291,17 +304,19 @@ export default async function FichaCompradorPage({
   return (
     <div className="-mx-6 -mt-6 flex min-h-full flex-col">
       {/* ── Topbar ── */}
-      <header className="sticky top-0 z-20 flex h-[73px] items-center gap-3 border-b border-[#e2e8f0] bg-white px-8">
+      <header className="sticky top-0 z-20 flex h-[73px] items-center gap-3 border-b border-border bg-card px-8">
         <Link
           href="/compradores"
-          className="flex items-center gap-1 font-mono text-[11px] uppercase tracking-[0.12em] text-[#64748b] transition-colors hover:text-[#0a0a0a]"
+          className="flex items-center gap-1 font-mono text-[11px] uppercase tracking-[0.12em] text-muted-foreground transition-colors hover:text-foreground"
         >
           <ChevronLeft className="h-3.5 w-3.5" />
           Compradores
         </Link>
-        <span className="font-mono text-[11px] uppercase tracking-[0.12em] text-[#c8d4e0]">/</span>
-        <span className="max-w-[220px] truncate font-mono text-[11px] uppercase tracking-[0.12em] text-[#0a0a0a]">
-          {lead.name}
+        <span className="font-mono text-[11px] uppercase tracking-[0.12em] text-muted-foreground/40">
+          /
+        </span>
+        <span className="max-w-[280px] truncate font-mono text-[11px] uppercase tracking-[0.12em] text-foreground">
+          {needSummary}
         </span>
         <div className="flex-1" />
         <div className="flex items-center gap-2">
@@ -318,33 +333,26 @@ export default async function FichaCompradorPage({
       </header>
 
       {/* ── Hero section ── */}
-      <section className="border-b border-[#e2e8f0] bg-white px-8 pb-0 pt-6">
-        {/* Identity row */}
-        <div className="flex items-start gap-5">
-          <div
-            className="relative flex h-[76px] w-[76px] shrink-0 items-center justify-center rounded-full text-[28px] font-semibold text-white"
-            style={{
-              background: 'linear-gradient(135deg, #294e4c 0%, #3d7573 100%)',
-              boxShadow: '0 0 0 4px #fff, 0 0 0 6px #e2e8f0',
-            }}
-          >
+      <section className="border-b border-border bg-background px-8 pb-0 pt-6">
+        {/* Identity row — centrada en la necesidad */}
+        <div className="flex items-start gap-4">
+          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-muted text-lg font-semibold text-foreground">
             {lead.name.charAt(0).toUpperCase()}
           </div>
 
           <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-center gap-2">
-              <h1 className="text-[28px] font-semibold leading-tight text-[#0a0a0a]">
-                {lead.name}
+              <h1 className="text-[22px] font-bold leading-tight tracking-[-0.02em] text-foreground">
+                {needSummary}
               </h1>
-              <span
-                className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-[11px] font-medium ${statusClass}`}
-              >
-                {statusLabel}
-              </span>
-              {isTerminal && <span className="text-[11px] text-[#94a3b8]">🔒 Estado final</span>}
+              <StatusPill status={lead.status} entity="buyer" />
+              {isTerminal && (
+                <span className="text-[11px] text-muted-foreground">Estado final</span>
+              )}
             </div>
 
-            <div className="mt-1 flex flex-wrap items-center gap-x-4 gap-y-1 text-[12px] text-[#64748b]">
+            <div className="mt-1 flex flex-wrap items-center gap-x-4 gap-y-1 text-[12px] text-muted-foreground">
+              <span className="font-medium text-foreground">{lead.name}</span>
               <span>#{lead.id.slice(-8)}</span>
               <span>
                 Alta:{' '}
@@ -356,14 +364,14 @@ export default async function FichaCompradorPage({
               </span>
               {lead.agent && (
                 <span className="flex items-center gap-1.5">
-                  <span className="inline-flex h-4 w-4 items-center justify-center rounded-full bg-[#294e4c] text-[8px] font-bold text-white">
+                  <span className="inline-flex h-4 w-4 items-center justify-center rounded-full bg-sidebar-primary text-[8px] font-bold text-sidebar-primary-foreground">
                     {lead.agent.name.charAt(0).toUpperCase()}
                   </span>
                   {lead.agent.name}
                 </span>
               )}
               {lead.source && (
-                <span className="rounded bg-[#f1f5f9] px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-[0.08em] text-[#64748b]">
+                <span className="rounded bg-muted px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-[0.08em] text-muted-foreground">
                   {lead.source}
                 </span>
               )}
@@ -373,31 +381,31 @@ export default async function FichaCompradorPage({
               {lead.email && (
                 <a
                   href={`mailto:${lead.email}`}
-                  className="flex items-center gap-1.5 rounded-full border border-[#e2e8f0] bg-[#f8fafc] px-3 py-1 text-[12px] text-[#374151] transition-colors hover:bg-white"
+                  className="flex items-center gap-1.5 rounded-full border border-border bg-muted px-3 py-1 text-[12px] text-foreground transition-colors hover:bg-card"
                 >
-                  <Mail className="h-3 w-3 text-[#94a3b8]" />
+                  <Mail className="h-3 w-3 text-muted-foreground" />
                   {lead.email}
                 </a>
               )}
               {lead.phone && (
                 <a
                   href={`tel:${lead.phone}`}
-                  className="flex items-center gap-1.5 rounded-full border border-[#e2e8f0] bg-[#f8fafc] px-3 py-1 text-[12px] text-[#374151] transition-colors hover:bg-white"
+                  className="flex items-center gap-1.5 rounded-full border border-border bg-muted px-3 py-1 text-[12px] text-foreground transition-colors hover:bg-card"
                 >
-                  <Phone className="h-3 w-3 text-[#94a3b8]" />
+                  <Phone className="h-3 w-3 text-muted-foreground" />
                   {lead.phone}
                 </a>
               )}
               {activeEquipment.slice(0, 3).map((e) => (
                 <span
                   key={e}
-                  className="rounded-full border border-[#e2e8f0] bg-[#f8fafc] px-3 py-1 text-[11px] text-[#64748b]"
+                  className="rounded-full border border-border bg-muted px-3 py-1 text-[11px] text-muted-foreground"
                 >
                   {e}
                 </span>
               ))}
               {activeEquipment.length > 3 && (
-                <span className="text-[11px] text-[#94a3b8]">
+                <span className="text-[11px] text-muted-foreground">
                   +{activeEquipment.length - 3} más
                 </span>
               )}
@@ -405,59 +413,83 @@ export default async function FichaCompradorPage({
           </div>
         </div>
 
-        {/* KPI strip */}
-        <div className="mt-6 grid grid-cols-[repeat(4,1fr)_auto] border-t border-[#f1f5f9]">
-          {[
-            {
-              label: 'Presupuesto',
-              value: lead.maxBudget ? EUR(Number(lead.maxBudget)) : '—',
-              color: 'text-[#0a0a0a]',
-            },
-            {
-              label: 'Compra final',
-              value: delivery?.vehicle?.salePrice ? EUR(Number(delivery.vehicle.salePrice)) : '—',
-              color: delivery?.vehicle?.salePrice ? 'text-[#1f8a5b]' : 'text-[#0a0a0a]',
-            },
-            {
-              label: 'Plazo',
-              value: lead.purchaseTimeline
-                ? (PURCHASE_TIMELINE_LABELS[lead.purchaseTimeline] ?? lead.purchaseTimeline)
-                : '—',
-              color: 'text-[#0a0a0a]',
-            },
-            {
-              label: 'Lead score',
-              value: `${leadScore}/100`,
-              color:
-                leadScore >= 75
-                  ? 'text-[#1f8a5b]'
-                  : leadScore >= 50
-                    ? 'text-[#d97706]'
-                    : 'text-[#94a3b8]',
-            },
-          ].map((kpi, i) => (
-            <div key={i} className={`px-6 py-4 ${i > 0 ? 'border-l border-[#f1f5f9]' : ''}`}>
-              <p className="font-mono text-[10px] uppercase tracking-[0.12em] text-[#94a3b8]">
-                {kpi.label}
+        {/* KPI tiles — mismo lenguaje que la ficha de vendedor */}
+        <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-5">
+          {/* Mejor match (ancla) */}
+          <div className="rounded-xl border border-border bg-card px-4 py-3">
+            <div className="mb-1 flex items-center gap-1">
+              <p className="font-mono text-[10px] uppercase tracking-[0.12em] text-muted-foreground">
+                Mejor match
               </p>
-              <p className={`mt-1 text-[22px] font-semibold leading-tight ${kpi.color}`}>
-                {kpi.value}
-              </p>
+              <InfoTooltip
+                text="Puntuación del vehículo en stock que mejor encaja con sus preferencias. Verde ≥80."
+                side="bottom"
+              />
             </div>
-          ))}
-          <div className="border-l border-[#f1f5f9] px-6 py-4">
-            <p className="font-mono text-[10px] uppercase tracking-[0.12em] text-[#94a3b8]">
-              Garantía
-            </p>
-            <p className="mt-1 text-[22px] font-semibold leading-tight text-[#0a0a0a]">
-              {warrantyMonthsLeft !== null ? `${warrantyMonthsLeft} m` : '—'}
+            <p
+              className={`text-xl font-bold tracking-[-0.02em] ${bestMatchScore >= 80 ? 'text-green-600' : bestMatchScore >= 60 ? 'text-sidebar-primary' : 'text-foreground'}`}
+            >
+              {bestMatch ? `${bestMatchScore}%` : '—'}
             </p>
           </div>
+
+          {/* Presupuesto */}
+          <div className="rounded-xl border border-border bg-card px-4 py-3">
+            <p className="mb-1 font-mono text-[10px] uppercase tracking-[0.12em] text-muted-foreground">
+              Presupuesto
+            </p>
+            <p className="text-xl font-bold tracking-[-0.02em] text-foreground">
+              {lead.maxBudget ? EUR(Number(lead.maxBudget)) : '—'}
+            </p>
+          </div>
+
+          {/* Plazo de compra */}
+          <div className="rounded-xl border border-border bg-card px-4 py-3">
+            <p className="mb-1 font-mono text-[10px] uppercase tracking-[0.12em] text-muted-foreground">
+              Plazo de compra
+            </p>
+            <p className="text-xl font-bold tracking-[-0.02em] text-foreground">
+              {lead.purchaseTimeline
+                ? (PURCHASE_TIMELINE_LABELS[lead.purchaseTimeline] ?? lead.purchaseTimeline)
+                : '—'}
+            </p>
+          </div>
+
+          {/* Calidad del lead */}
+          <div className="rounded-xl border border-border bg-card px-4 py-3">
+            <div className="mb-1 flex items-center gap-1">
+              <p className="font-mono text-[10px] uppercase tracking-[0.12em] text-muted-foreground">
+                Calidad lead
+              </p>
+              <InfoTooltip
+                text="Puntuación 0-100: contacto, preferencias completas, matches activos y engagement por estado."
+                side="bottom"
+              />
+            </div>
+            <p
+              className={`text-xl font-bold tracking-[-0.02em] ${leadScore >= 75 ? 'text-green-600' : leadScore >= 50 ? 'text-amber-600' : 'text-muted-foreground'}`}
+            >
+              {leadScore}
+              <span className="text-sm font-normal text-muted-foreground">/100</span>
+            </p>
+          </div>
+
+          {/* Garantía (si aplica) */}
+          {warrantyMonthsLeft !== null && (
+            <div className="rounded-xl border border-border bg-card px-4 py-3">
+              <p className="mb-1 font-mono text-[10px] uppercase tracking-[0.12em] text-muted-foreground">
+                Garantía
+              </p>
+              <p className="text-xl font-bold tracking-[-0.02em] text-foreground">
+                {warrantyMonthsLeft} m
+              </p>
+            </div>
+          )}
         </div>
 
         {/* Tabs — via LeadTabNav (client, URL-driven) */}
-        <div className="-mx-8">
-          <Suspense fallback={<div className="h-12 border-t border-[#e2e8f0]" />}>
+        <div className="-mx-8 mt-6">
+          <Suspense fallback={<div className="h-12 border-t border-border" />}>
             <LeadTabNav tabs={tabs} defaultTab="ficha" />
           </Suspense>
         </div>
@@ -479,11 +511,11 @@ export default async function FichaCompradorPage({
 
           {/* ── TAB: ACTIVIDAD ── */}
           {activeTab === 'actividad' && (
-            <div className="overflow-hidden rounded-xl border border-[#e2e8f0] bg-white">
-              <div className="border-b border-[#e2e8f0] px-6 py-4">
-                <h2 className="text-[14px] font-semibold text-[#0a0a0a]">
+            <div className="overflow-hidden rounded-xl border border-border bg-card">
+              <div className="border-b border-border px-6 py-4">
+                <h2 className="text-[14px] font-semibold text-foreground">
                   Actividad
-                  <span className="ml-2 font-mono text-[11px] font-normal text-[#94a3b8]">
+                  <span className="ml-2 font-mono text-[11px] font-normal text-muted-foreground">
                     {activities.length} entradas
                   </span>
                 </h2>
@@ -491,7 +523,7 @@ export default async function FichaCompradorPage({
               <div className="space-y-4 p-6">
                 <NoteForm addNote={addBuyerLeadNote.bind(null, lead.id)} />
                 {activities.length > 0 && (
-                  <div className="border-t border-[#f1f5f9] pt-4">
+                  <div className="border-t border-border pt-4">
                     <ActivityTimeline
                       activities={activities as ActivityItem[]}
                       currentUserId={currentUser.id}
@@ -499,7 +531,7 @@ export default async function FichaCompradorPage({
                   </div>
                 )}
                 {activities.length === 0 && (
-                  <p className="text-center text-[13px] text-[#94a3b8]">
+                  <p className="text-center text-[13px] text-muted-foreground">
                     Sin actividad registrada todavía
                   </p>
                 )}
@@ -511,11 +543,11 @@ export default async function FichaCompradorPage({
           {activeTab === 'matches' && (
             <>
               {buyerMatches.length > 0 ? (
-                <MatchesSection side="buyer" matches={buyerMatches} />
+                <MatchesSection side="buyer" matches={buyerMatches} defaultOpen />
               ) : (
-                <div className="flex flex-col items-center justify-center rounded-xl border border-[#e2e8f0] bg-white py-16">
-                  <p className="text-[15px] font-medium text-[#0a0a0a]">Sin vehículos sugeridos</p>
-                  <p className="mt-1 text-[13px] text-[#94a3b8]">
+                <div className="flex flex-col items-center justify-center rounded-xl border border-border bg-card py-16">
+                  <p className="text-[15px] font-medium text-foreground">Sin vehículos sugeridos</p>
+                  <p className="mt-1 text-[13px] text-muted-foreground">
                     Los matches se calculan automáticamente cuando hay vehículos compatibles
                   </p>
                 </div>
@@ -536,10 +568,10 @@ export default async function FichaCompradorPage({
                 llmModel={chatSession!.llmModel}
               />
             ) : (
-              <div className="flex flex-col items-center justify-center rounded-xl border border-[#e2e8f0] bg-white py-16">
-                <MessagesSquare className="mb-3 h-8 w-8 text-[#e2e8f0]" />
-                <p className="text-[15px] font-medium text-[#0a0a0a]">Sin conversación</p>
-                <p className="mt-1 text-[13px] text-[#94a3b8]">
+              <div className="flex flex-col items-center justify-center rounded-xl border border-border bg-card py-16">
+                <MessagesSquare className="mb-3 h-8 w-8 text-muted-foreground/30" />
+                <p className="text-[15px] font-medium text-foreground">Sin conversación</p>
+                <p className="mt-1 text-[13px] text-muted-foreground">
                   Este lead no se originó desde el chat del portal
                 </p>
               </div>
@@ -551,14 +583,14 @@ export default async function FichaCompradorPage({
               {warranty ? (
                 <div className="space-y-5">
                   {/* Warranty card */}
-                  <div className="overflow-hidden rounded-xl border border-[#e2e8f0] bg-white">
-                    <div className="border-b border-[#e2e8f0] px-6 py-4">
+                  <div className="overflow-hidden rounded-xl border border-border bg-card">
+                    <div className="border-b border-border px-6 py-4">
                       <div className="flex items-center justify-between">
-                        <h2 className="flex items-center gap-2 text-[14px] font-semibold text-[#0a0a0a]">
-                          <Shield className="h-4 w-4 text-[#294e4c]" />
+                        <h2 className="flex items-center gap-2 text-[14px] font-semibold text-foreground">
+                          <Shield className="h-4 w-4 text-sidebar-primary" />
                           Garantía activa
                         </h2>
-                        <span className="rounded-full bg-[#f0f7f6] px-2.5 py-1 text-[11px] font-medium text-[#294e4c]">
+                        <span className="rounded-full bg-sidebar-primary/10 px-2.5 py-1 text-[11px] font-medium text-sidebar-primary">
                           {warrantyMonthsLeft} meses restantes
                         </span>
                       </div>
@@ -584,18 +616,18 @@ export default async function FichaCompradorPage({
                           },
                         ].map((row) => (
                           <div key={row.label}>
-                            <p className="font-mono text-[10px] uppercase tracking-[0.1em] text-[#94a3b8]">
+                            <p className="font-mono text-[10px] uppercase tracking-[0.1em] text-muted-foreground">
                               {row.label}
                             </p>
-                            <p className="mt-1 text-[14px] font-medium text-[#0a0a0a]">
+                            <p className="mt-1 text-[14px] font-medium text-foreground">
                               {row.value}
                             </p>
                           </div>
                         ))}
                       </div>
-                      <div className="h-2 overflow-hidden rounded-full bg-[#f1f5f9]">
+                      <div className="h-2 overflow-hidden rounded-full bg-muted">
                         <div
-                          className="h-full rounded-full bg-[#294e4c] transition-all"
+                          className="h-full rounded-full bg-sidebar-primary transition-all"
                           style={{ width: `${Math.max(2, 100 - warrantyElapsedPct)}%` }}
                         />
                       </div>
@@ -604,16 +636,16 @@ export default async function FichaCompradorPage({
 
                   {/* Tickets */}
                   {openTickets.length > 0 && (
-                    <div className="overflow-hidden rounded-xl border border-amber-200 bg-white">
+                    <div className="overflow-hidden rounded-xl border border-amber-200 bg-card">
                       <div className="border-b border-amber-200 bg-amber-50 px-6 py-4">
                         <h2 className="text-[14px] font-semibold text-amber-800">
                           Incidencias abiertas ({openTickets.length})
                         </h2>
                       </div>
-                      <div className="divide-y divide-[#f1f5f9]">
+                      <div className="divide-y divide-border">
                         {openTickets.map((t) => (
                           <div key={t.id} className="flex items-center justify-between px-6 py-4">
-                            <p className="text-[13px] font-medium text-[#0a0a0a]">{t.title}</p>
+                            <p className="text-[13px] font-medium text-foreground">{t.title}</p>
                             <div className="flex items-center gap-2">
                               <span
                                 className={`rounded-full px-2 py-0.5 text-[10px] font-medium ${
@@ -621,22 +653,22 @@ export default async function FichaCompradorPage({
                                     ? 'bg-red-100 text-red-700'
                                     : t.priority === 'ALTA'
                                       ? 'bg-amber-100 text-amber-700'
-                                      : 'bg-[#f1f5f9] text-[#64748b]'
+                                      : 'bg-muted text-muted-foreground'
                                 }`}
                               >
                                 {t.priority}
                               </span>
-                              <span className="rounded-full bg-[#f1f5f9] px-2 py-0.5 text-[10px] text-[#64748b]">
+                              <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] text-muted-foreground">
                                 {t.status}
                               </span>
                             </div>
                           </div>
                         ))}
                       </div>
-                      <div className="border-t border-[#f1f5f9] px-6 py-3">
+                      <div className="border-t border-border px-6 py-3">
                         <Link
                           href={`/postventa/${warranty.id}`}
-                          className="text-[12px] font-medium text-[#294e4c] hover:underline"
+                          className="text-[12px] font-medium text-sidebar-primary hover:underline"
                         >
                           Ver en módulo postventa →
                         </Link>
@@ -645,17 +677,17 @@ export default async function FichaCompradorPage({
                   )}
 
                   {openTickets.length === 0 && (
-                    <div className="flex items-center gap-3 rounded-xl border border-[#e2e8f0] bg-white px-6 py-4">
-                      <span className="flex h-8 w-8 items-center justify-center rounded-full bg-[#f0f7f6] text-[#294e4c]">
+                    <div className="flex items-center gap-3 rounded-xl border border-border bg-card px-6 py-4">
+                      <span className="flex h-8 w-8 items-center justify-center rounded-full bg-sidebar-primary/10 text-sidebar-primary">
                         ✓
                       </span>
                       <div>
-                        <p className="text-[13px] font-medium text-[#0a0a0a]">
+                        <p className="text-[13px] font-medium text-foreground">
                           Sin incidencias abiertas
                         </p>
                         <Link
                           href={`/postventa/${warranty.id}`}
-                          className="text-[12px] text-[#294e4c] hover:underline"
+                          className="text-[12px] text-sidebar-primary hover:underline"
                         >
                           Ver historial completo →
                         </Link>
@@ -664,10 +696,10 @@ export default async function FichaCompradorPage({
                   )}
                 </div>
               ) : (
-                <div className="flex flex-col items-center justify-center rounded-xl border border-[#e2e8f0] bg-white py-16">
-                  <Shield className="mb-3 h-8 w-8 text-[#e2e8f0]" />
-                  <p className="text-[15px] font-medium text-[#0a0a0a]">Sin garantía activa</p>
-                  <p className="mt-1 text-[13px] text-[#94a3b8]">
+                <div className="flex flex-col items-center justify-center rounded-xl border border-border bg-card py-16">
+                  <Shield className="mb-3 h-8 w-8 text-muted-foreground/30" />
+                  <p className="text-[15px] font-medium text-foreground">Sin garantía activa</p>
+                  <p className="mt-1 text-[13px] text-muted-foreground">
                     La garantía se genera automáticamente al completar la entrega del vehículo
                   </p>
                 </div>
@@ -677,9 +709,9 @@ export default async function FichaCompradorPage({
 
           {/* ── TAB: DOCUMENTOS ── */}
           {activeTab === 'documentos' && (
-            <div className="flex flex-col items-center justify-center rounded-xl border border-[#e2e8f0] bg-white py-16">
-              <p className="text-[15px] font-medium text-[#0a0a0a]">Próximamente</p>
-              <p className="mt-1 text-[13px] text-[#94a3b8]">
+            <div className="flex flex-col items-center justify-center rounded-xl border border-border bg-card py-16">
+              <p className="text-[15px] font-medium text-foreground">Próximamente</p>
+              <p className="mt-1 text-[13px] text-muted-foreground">
                 La gestión documental del comprador estará disponible en una próxima versión
               </p>
             </div>
@@ -687,7 +719,7 @@ export default async function FichaCompradorPage({
         </div>
 
         {/* ── Right sidebar ── */}
-        <aside className="border-l border-[#e2e8f0]">
+        <aside className="border-l border-border">
           <div className="sticky top-[130px] space-y-4 p-5">
             {/* Próxima acción — dark gradient card (client, logs WhatsApp) */}
             <ProximaAccionCard
@@ -725,34 +757,34 @@ export default async function FichaCompradorPage({
 
             {/* Operación */}
             {delivery && delivery.vehicle && (
-              <div className="rounded-xl border border-[#e2e8f0] bg-white p-5">
-                <p className="mb-3 font-mono text-[10px] uppercase tracking-[0.12em] text-[#94a3b8]">
+              <div className="rounded-xl border border-border bg-card p-5">
+                <p className="mb-3 font-mono text-[10px] uppercase tracking-[0.12em] text-muted-foreground">
                   Operación
                 </p>
                 <div className="space-y-2.5">
                   <div className="flex items-start justify-between gap-2">
-                    <span className="text-[11px] text-[#64748b]">Vehículo</span>
-                    <span className="text-right text-[12px] font-medium text-[#0a0a0a]">
+                    <span className="text-[11px] text-muted-foreground">Vehículo</span>
+                    <span className="text-right text-[12px] font-medium text-foreground">
                       {delivery.vehicle.brand} {delivery.vehicle.model}
                       {delivery.vehicle.year ? ` (${delivery.vehicle.year})` : ''}
                     </span>
                   </div>
                   {delivery.vehicle.salePrice && (
                     <div className="flex items-center justify-between">
-                      <span className="text-[11px] text-[#64748b]">Precio final</span>
-                      <span className="text-[13px] font-semibold text-[#1f8a5b]">
+                      <span className="text-[11px] text-muted-foreground">Precio final</span>
+                      <span className="text-[13px] font-semibold text-green-600">
                         {EUR(Number(delivery.vehicle.salePrice))}
                       </span>
                     </div>
                   )}
                   {delivery.vehicle.salePrice && lead.maxBudget && (
                     <div className="flex items-center justify-between">
-                      <span className="text-[11px] text-[#64748b]">vs presupuesto</span>
+                      <span className="text-[11px] text-muted-foreground">vs presupuesto</span>
                       <span
                         className={`text-[12px] font-medium ${
                           Number(delivery.vehicle.salePrice) <= Number(lead.maxBudget)
-                            ? 'text-[#1f8a5b]'
-                            : 'text-[#d97706]'
+                            ? 'text-green-600'
+                            : 'text-amber-600'
                         }`}
                       >
                         {Math.round(
@@ -763,33 +795,41 @@ export default async function FichaCompradorPage({
                     </div>
                   )}
                   <div className="flex items-center justify-between">
-                    <span className="text-[11px] text-[#64748b]">Días en pipeline</span>
-                    <span className="text-[12px] text-[#0a0a0a]">{daysInPipeline} días</span>
+                    <span className="text-[11px] text-muted-foreground">Días en pipeline</span>
+                    <span className="text-[12px] text-foreground">{daysInPipeline} días</span>
                   </div>
+                  {delivery.vehicle.sellerLead?.id && (
+                    <Link
+                      href={`/vendedores/${delivery.vehicle.sellerLead.id}`}
+                      className="mt-1 block text-[12px] font-medium text-sidebar-primary hover:underline"
+                    >
+                      Ver ficha del vehículo / vendedor →
+                    </Link>
+                  )}
                 </div>
               </div>
             )}
 
             {/* Garantía */}
             {warranty && (
-              <div className="rounded-xl border border-[#e2e8f0] bg-white p-5">
+              <div className="rounded-xl border border-border bg-card p-5">
                 <div className="mb-3 flex items-center justify-between">
-                  <p className="font-mono text-[10px] uppercase tracking-[0.12em] text-[#94a3b8]">
+                  <p className="font-mono text-[10px] uppercase tracking-[0.12em] text-muted-foreground">
                     Garantía
                   </p>
-                  <Shield className="h-3.5 w-3.5 text-[#294e4c]" />
+                  <Shield className="h-3.5 w-3.5 text-sidebar-primary" />
                 </div>
-                <p className="text-[22px] font-semibold leading-tight text-[#0a0a0a]">
+                <p className="text-[22px] font-semibold leading-tight text-foreground">
                   {warrantyMonthsLeft} meses
                 </p>
-                <p className="text-[11px] text-[#64748b]">restantes</p>
-                <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-[#f1f5f9]">
+                <p className="text-[11px] text-muted-foreground">restantes</p>
+                <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-muted">
                   <div
-                    className="h-full rounded-full bg-[#294e4c] transition-all"
+                    className="h-full rounded-full bg-sidebar-primary transition-all"
                     style={{ width: `${Math.max(2, 100 - warrantyElapsedPct)}%` }}
                   />
                 </div>
-                <div className="mt-2 flex justify-between text-[10px] text-[#94a3b8]">
+                <div className="mt-2 flex justify-between text-[10px] text-muted-foreground">
                   <span>
                     {new Date(warranty.startDate).toLocaleDateString('es-ES', {
                       day: 'numeric',
@@ -809,8 +849,8 @@ export default async function FichaCompradorPage({
             )}
 
             {/* Calidad del lead */}
-            <div className="rounded-xl border border-[#e2e8f0] bg-white p-5">
-              <p className="mb-4 font-mono text-[10px] uppercase tracking-[0.12em] text-[#94a3b8]">
+            <div className="rounded-xl border border-border bg-card p-5">
+              <p className="mb-4 font-mono text-[10px] uppercase tracking-[0.12em] text-muted-foreground">
                 Calidad del lead
               </p>
               <div className="flex items-center gap-4">
@@ -822,7 +862,7 @@ export default async function FichaCompradorPage({
                     } ${leadScore * 3.6}deg, #f1f5f9 0)`,
                   }}
                 >
-                  <div className="flex h-11 w-11 items-center justify-center rounded-full bg-white">
+                  <div className="flex h-11 w-11 items-center justify-center rounded-full bg-card">
                     <span
                       className="text-[14px] font-bold"
                       style={{
@@ -835,10 +875,10 @@ export default async function FichaCompradorPage({
                   </div>
                 </div>
                 <div className="flex-1">
-                  <p className="text-[13px] font-semibold text-[#0a0a0a]">
+                  <p className="text-[13px] font-semibold text-foreground">
                     {leadScore >= 75 ? 'Alto potencial' : leadScore >= 50 ? 'Moderado' : 'Bajo'}
                   </p>
-                  <p className="mt-0.5 text-[11px] text-[#64748b]">
+                  <p className="mt-0.5 text-[11px] text-muted-foreground">
                     {leadScore >= 75
                       ? 'Perfil muy completo'
                       : leadScore >= 50
@@ -856,7 +896,7 @@ export default async function FichaCompradorPage({
                 ].map((row) => (
                   <div key={row.label}>
                     <div className="mb-1 flex items-center justify-between">
-                      <span className="text-[11px] text-[#64748b]">{row.label}</span>
+                      <span className="text-[11px] text-muted-foreground">{row.label}</span>
                       <span
                         className="text-[11px] font-medium"
                         style={{ color: scoreColor(row.value) }}
@@ -864,7 +904,7 @@ export default async function FichaCompradorPage({
                         {row.value}%
                       </span>
                     </div>
-                    <div className="h-1 overflow-hidden rounded-full bg-[#f1f5f9]">
+                    <div className="h-1 overflow-hidden rounded-full bg-muted">
                       <div
                         className="h-full rounded-full transition-all"
                         style={{ width: `${row.value}%`, background: scoreColor(row.value) }}
@@ -876,8 +916,8 @@ export default async function FichaCompradorPage({
             </div>
 
             {/* Resumen rápido */}
-            <div className="rounded-xl border border-[#e2e8f0] bg-white p-5">
-              <p className="mb-3 font-mono text-[10px] uppercase tracking-[0.12em] text-[#94a3b8]">
+            <div className="rounded-xl border border-border bg-card p-5">
+              <p className="mb-3 font-mono text-[10px] uppercase tracking-[0.12em] text-muted-foreground">
                 Resumen
               </p>
               <div className="space-y-2">
@@ -902,10 +942,10 @@ export default async function FichaCompradorPage({
                   .filter(Boolean)
                   .map((row) => (
                     <div key={row!.label} className="flex items-center justify-between">
-                      <span className="text-[11px] text-[#64748b]">{row!.label}</span>
+                      <span className="text-[11px] text-muted-foreground">{row!.label}</span>
                       <span
                         className={`text-[12px] font-medium ${
-                          row!.warn ? 'text-amber-600' : 'text-[#0a0a0a]'
+                          row!.warn ? 'text-amber-600' : 'text-foreground'
                         }`}
                       >
                         {row!.value}

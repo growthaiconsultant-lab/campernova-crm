@@ -21,13 +21,14 @@ interface User {
 interface Props {
   vehicles: Vehicle[]
   users: User[]
+  initialVehicleId?: string
 }
 
-export function WorkOrderForm({ vehicles, users }: Props) {
+export function WorkOrderForm({ vehicles, users, initialVehicleId = '' }: Props) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
 
-  const [vehicleId, setVehicleId] = useState('')
+  const [vehicleId, setVehicleId] = useState(initialVehicleId)
   const [description, setDescription] = useState('')
   const [assignedToId, setAssignedToId] = useState('')
   const [estimatedHours, setEstimatedHours] = useState('')

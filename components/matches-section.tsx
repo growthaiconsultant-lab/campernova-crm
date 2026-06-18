@@ -269,11 +269,11 @@ function VehicleMatchCard({ match }: { match: BuyerMatchData }) {
 // ─── Sección principal (colapsable) ──────────────────────────────────────────
 
 type MatchesSectionProps =
-  | { side: 'vehicle'; matches: VehicleMatchData[] }
-  | { side: 'buyer'; matches: BuyerMatchData[] }
+  | { side: 'vehicle'; matches: VehicleMatchData[]; defaultOpen?: boolean }
+  | { side: 'buyer'; matches: BuyerMatchData[]; defaultOpen?: boolean }
 
 export function MatchesSection(props: MatchesSectionProps) {
-  const [open, setOpen] = useState(false)
+  const [open, setOpen] = useState(props.defaultOpen ?? false)
   const count = props.matches.length
   const title = props.side === 'vehicle' ? 'Compradores interesados' : 'Vehículos sugeridos'
 

@@ -595,6 +595,10 @@ model WorkOrder {
   approvedAt     DateTime?              @map("approved_at")
   startedAt      DateTime?              @map("started_at")
   completedAt    DateTime?              @map("completed_at")
+  // Planificación/agenda del taller (capacidad): ventana de trabajo reservada en el calendario.
+  // `estimatedHours` actúa como horas PREVISTAS; `timeEntries` son las horas REALES.
+  scheduledStart DateTime?              @map("scheduled_start")
+  scheduledEnd   DateTime?              @map("scheduled_end")
   notes          String?
   createdAt      DateTime               @default(now()) @map("created_at")
   updatedAt      DateTime               @updatedAt @map("updated_at")
@@ -610,6 +614,7 @@ model WorkOrder {
   @@index([vehicleId])
   @@index([assignedToId, status])
   @@index([status])
+  @@index([assignedToId, scheduledStart])
   @@map("work_orders")
 }
 

@@ -5,6 +5,8 @@ import { z } from 'zod'
 import { db } from '@/lib/db'
 import { requireAdmin, requireCanEditTaller, requireCanViewTaller } from '@/lib/auth'
 import type { WorkOrderStatus } from '@prisma/client'
+import { suggestSchedule, DEFAULT_HOURS_PER_DAY } from '@/lib/taller/scheduling'
+import { getMechanicBacklogHours } from '@/lib/taller/prisma-deps'
 
 type ActionResult<T = undefined> =
   | { ok: true; data?: T }
@@ -66,6 +68,16 @@ const createWorkOrderSchema = z.object({
   estimatedCost: z.coerce.number().positive().optional().nullable(),
   approvalLimit: z.coerce.number().positive().default(500),
   notes: z.string().trim().optional().nullable(),
+  // Planificación opcional al crear (ventana reservada en la agenda).
+  scheduledStart: z.string().optional().nullable(),
+  scheduledEnd: z.string().optional().nullable(),
+})
+
+const scheduleWorkOrderSchema = z.object({
+  assignedToId: z.string().min(1, 'Asigna un responsable para planificar'),
+  scheduledStart: z.string().min(1, 'Fecha de inicio requerida'),
+  scheduledEnd: z.string().min(1, 'Fecha de fin requerida'),
+  estimatedHours: z.coerce.number().positive().optional().nullable(),
 })
 
 const timeEntrySchema = z.object({
@@ -101,6 +113,8 @@ export async function createWorkOrder(formData: unknown): Promise<ActionResult<{
     estimatedCost,
     approvalLimit,
     notes,
+    scheduledStart,
+    scheduledEnd,
   } = parsed.data
 
   // Determinar approvalLevel inicial
@@ -124,6 +138,8 @@ export async function createWorkOrder(formData: unknown): Promise<ActionResult<{
       approvalLimit,
       approvalLevel,
       notes: notes ?? null,
+      scheduledStart: scheduledStart ? new Date(scheduledStart) : null,
+      scheduledEnd: scheduledEnd ? new Date(scheduledEnd) : null,
       checklist: {
         create: INITIAL_CHECKLIST.map((item) => ({
           category: item.category,
@@ -439,5 +455,91 @@ export async function updateEstimatedCost(
   })
 
   revalidateTaller(woId)
+  return { ok: true }
+}
+
+// ─── Planificación / agenda ────────────────────────────────────────────────────
+
+/**
+ * Sugiere la ventana de trabajo (fecha de inicio y de entrega estimada) para una orden,
+ * teniendo en cuenta la carga en cola del responsable. Lo usa el formulario antes de confirmar.
+ */
+export async function suggestScheduleForOrder(input: {
+  assignedToId?: string | null
+  estimatedHours: number
+  excludeWorkOrderId?: string
+}): Promise<ActionResult<{ start: string; end: string; workingDaysNeeded: number }>> {
+  await requireCanViewTaller()
+
+  const hours = Number(input.estimatedHours)
+  if (!hours || hours <= 0) {
+    return { ok: false, error: 'Indica las horas previstas para poder sugerir una fecha.' }
+  }
+
+  const backlogHours = input.assignedToId
+    ? await getMechanicBacklogHours(db, input.assignedToId, input.excludeWorkOrderId)
+    : 0
+
+  const result = suggestSchedule({
+    plannedHours: hours,
+    backlogHours,
+    from: new Date(),
+    hoursPerDay: DEFAULT_HOURS_PER_DAY,
+  })
+
+  return {
+    ok: true,
+    data: {
+      start: result.start.toISOString(),
+      end: result.end.toISOString(),
+      workingDaysNeeded: result.workingDaysNeeded,
+    },
+  }
+}
+
+/**
+ * Reserva (planifica) una orden en la agenda: responsable + ventana de trabajo.
+ */
+export async function scheduleWorkOrder(woId: string, formData: unknown): Promise<ActionResult> {
+  await requireCanEditTaller()
+
+  const parsed = scheduleWorkOrderSchema.safeParse(formData)
+  if (!parsed.success) {
+    return { ok: false, error: 'Datos inválidos', fieldErrors: parsed.error.flatten().fieldErrors }
+  }
+
+  const { assignedToId, scheduledStart, scheduledEnd, estimatedHours } = parsed.data
+
+  const wo = await db.workOrder.findUnique({
+    where: { id: woId },
+    select: { status: true, vehicle: { select: { sellerLeadId: true } } },
+  })
+  if (!wo) return { ok: false, error: 'Orden no encontrada' }
+  if (wo.status === 'COMPLETADA' || wo.status === 'RECHAZADA') {
+    return { ok: false, error: 'No se puede planificar una orden cerrada.' }
+  }
+
+  const start = new Date(scheduledStart)
+  const end = new Date(scheduledEnd)
+  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) {
+    return { ok: false, error: 'Fechas inválidas.' }
+  }
+  if (end < start) {
+    return { ok: false, error: 'La fecha de fin no puede ser anterior al inicio.' }
+  }
+
+  await db.workOrder.update({
+    where: { id: woId },
+    data: {
+      assignedToId,
+      scheduledStart: start,
+      scheduledEnd: end,
+      ...(estimatedHours != null ? { estimatedHours } : {}),
+    },
+  })
+
+  revalidateTaller(woId)
+  revalidatePath('/taller/agenda')
+  if (wo.vehicle.sellerLeadId) revalidatePath(`/vendedores/${wo.vehicle.sellerLeadId}`)
   return { ok: true }
 }
