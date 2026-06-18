@@ -13,21 +13,65 @@ datasource db {
 // ─────────────────────────────────────────────────────────────
 
 enum UserRole {
-  ADMIN      // Joel, Esteban — acceso total
-  AGENTE     // Desirée, comerciales — comercial + lectura general
-  TALLER     // Manolo — solo módulo taller + ver vehículos
-  ENTREGAS   // Javi — entregas + postventa
-  MARKETING  // Ari — anuncios + fotos + lectura vehículos
+  ADMIN // Joel, Esteban — acceso total
+  AGENTE // Desirée, comerciales — comercial + lectura general
+  TALLER // Manolo — solo módulo taller + ver vehículos
+  ENTREGAS // Javi — entregas + postventa
+  MARKETING // Ari — anuncios + fotos + lectura vehículos
 }
 
 enum LeadCanal {
   PRO // Captación online vía /vender
-  CN  // Captación en oficina por agente
+  CN // Captación en oficina por agente
 }
 
 enum VehicleType {
   CAMPER
   AUTOCARAVANA
+}
+
+/// Taxonomía RV (Fase #3 v1) — carrocería / categoría del vehículo.
+enum VehicleCategory {
+  MINI_CAMPER
+  CAMPER // camper compacta (tipo California)
+  GRAN_VOLUMEN // furgón grande camperizado (Ducato L2H2/L3H2…)
+  PERFILADA
+  CAPUCHINA
+  INTEGRAL
+}
+
+/// Distribución de la zona de descanso.
+enum BedLayout {
+  TRANSVERSAL
+  LONGITUDINAL
+  GEMELAS
+  ISLA
+  FRANCESA
+  BASCULANTE // cama elevable que baja del techo
+  LITERAS
+  TECHO_ELEVABLE // cama en el pop-top
+  DINETTE // salón convertible en cama
+}
+
+/// Configuración de baño.
+enum BathroomType {
+  NINGUNO
+  HUMEDO // ducha + WC en el mismo espacio (wet bath)
+  SEPARADO // ducha independiente / baño partido
+}
+
+/// Carnet necesario para conducir el vehículo (según MMA).
+enum LicenseType {
+  B // hasta 3.500 kg
+  C1 // > 3.500 kg
+}
+
+/// Tipo de calefacción de la célula.
+enum HeatingType {
+  NINGUNA
+  GAS
+  DIESEL
+  ELECTRICA
 }
 
 enum ConservationState {
@@ -276,21 +320,21 @@ model User {
   createdAt        DateTime  @default(now()) @map("created_at")
   updatedAt        DateTime  @updatedAt @map("updated_at")
 
-  sellerLeads             SellerLead[]            @relation("AgentSellerLeads")
-  buyerLeads              BuyerLead[]             @relation("AgentBuyerLeads")
-  activities              Activity[]
-  valuations              Valuation[]
-  vehicleAds              VehicleAd[]
-  assignedWorkOrders      WorkOrder[]             @relation("AssignedWorkOrders")
-  approvedWorkOrders      WorkOrder[]             @relation("ApprovedWorkOrders")
-  workOrderTimeEntries    WorkOrderTimeEntry[]
-  vehicleCostsCreated     VehicleCost[]
-  deliveriesResponsable   Delivery[]              @relation("ResponsableDeliveries")
-  warrantiesExtended      Warranty[]
-  deliveryDocsUploaded    DeliveryDocument[]
-  postventaTicketsResp    PostventaTicket[]       @relation("ResponsibleTickets")
-  postventaPhotosUploaded PostventaTicketPhoto[]
-  chargeChecksPerformed   Vehicle[]               @relation("ChargeChecks")
+  sellerLeads              SellerLead[]           @relation("AgentSellerLeads")
+  buyerLeads               BuyerLead[]            @relation("AgentBuyerLeads")
+  activities               Activity[]
+  valuations               Valuation[]
+  vehicleAds               VehicleAd[]
+  assignedWorkOrders       WorkOrder[]            @relation("AssignedWorkOrders")
+  approvedWorkOrders       WorkOrder[]            @relation("ApprovedWorkOrders")
+  workOrderTimeEntries     WorkOrderTimeEntry[]
+  vehicleCostsCreated      VehicleCost[]
+  deliveriesResponsable    Delivery[]             @relation("ResponsableDeliveries")
+  warrantiesExtended       Warranty[]
+  deliveryDocsUploaded     DeliveryDocument[]
+  postventaTicketsResp     PostventaTicket[]      @relation("ResponsibleTickets")
+  postventaPhotosUploaded  PostventaTicketPhoto[]
+  chargeChecksPerformed    Vehicle[]              @relation("ChargeChecks")
   vehicleDocumentsUploaded VehicleDocument[]
 
   @@map("users")
@@ -298,18 +342,18 @@ model User {
 
 /// Lead de vendedor — persona que quiere vender su vehículo.
 model SellerLead {
-  id        String           @id @default(cuid())
-  name      String
-  email     String
-  phone     String
-  canal           LeadCanal        @default(PRO)
-  status          SellerLeadStatus @default(NUEVO)
-  source          String?
-  agentId         String?          @map("agent_id")
-  gdprConsentAt   DateTime?        @map("gdpr_consent_at")
-  gdprConsentIp   String?          @map("gdpr_consent_ip")
-  createdAt       DateTime         @default(now()) @map("created_at")
-  updatedAt       DateTime         @updatedAt @map("updated_at")
+  id            String           @id @default(cuid())
+  name          String
+  email         String
+  phone         String
+  canal         LeadCanal        @default(PRO)
+  status        SellerLeadStatus @default(NUEVO)
+  source        String?
+  agentId       String?          @map("agent_id")
+  gdprConsentAt DateTime?        @map("gdpr_consent_at")
+  gdprConsentIp String?          @map("gdpr_consent_ip")
+  createdAt     DateTime         @default(now()) @map("created_at")
+  updatedAt     DateTime         @updatedAt @map("updated_at")
 
   agent      User?      @relation("AgentSellerLeads", fields: [agentId], references: [id])
   vehicle    Vehicle?
@@ -330,9 +374,20 @@ model Vehicle {
   model                String
   year                 Int
   km                   Int
-  seats                Int
-  length               Float?            // metros
+  seats                Int // plazas homologadas (de viaje)
+  length               Float? // largo en metros
   type                 VehicleType
+  // ── Taxonomía RV (Fase #3 v1) — nullable / additivo ──
+  category             VehicleCategory?  @map("category")
+  bedLayout            BedLayout?        @map("bed_layout")
+  sleepingPlaces       Int?              @map("sleeping_places") // plazas para dormir
+  bathroomType         BathroomType?     @map("bathroom_type")
+  heatingType          HeatingType?      @map("heating_type")
+  winterized           Boolean?          @map("winterized") // preparado para invierno
+  hasGarage            Boolean?          @map("has_garage") // garaje para bici/moto
+  maxMassKg            Int?              @map("max_mass_kg") // MMA → determina carnet B/C1
+  heightM              Float?            @map("height_m") // altura en metros
+  offGrid              Boolean?          @map("off_grid") // autonomía real (litio + solar)
   equipment            Json              @default("{}")
   conservationState    ConservationState @default(NORMAL) @map("conservation_state")
   location             String?
@@ -358,8 +413,8 @@ model Vehicle {
   createdAt            DateTime          @default(now()) @map("created_at")
   updatedAt            DateTime          @updatedAt @map("updated_at")
 
-  sellerLead      SellerLead       @relation(fields: [sellerLeadId], references: [id], onDelete: Cascade)
-  chargeCheckedBy User?            @relation("ChargeChecks", fields: [chargeCheckedById], references: [id])
+  sellerLead      SellerLead        @relation(fields: [sellerLeadId], references: [id], onDelete: Cascade)
+  chargeCheckedBy User?             @relation("ChargeChecks", fields: [chargeCheckedById], references: [id])
   photos          VehiclePhoto[]
   valuations      Valuation[]
   matches         Match[]
@@ -416,23 +471,34 @@ model Valuation {
 /// Lead de comprador — persona que busca comprar un vehículo.
 /// criticalEquipment es JSONB con flags: solar, kitchen, bathroom, shower, heating.
 model BuyerLead {
-  id                String          @id @default(cuid())
-  name              String
-  email             String
-  phone             String
-  agentId           String?         @map("agent_id")
-  vehicleType       VehicleType?    @map("vehicle_type")
-  minSeats          Int?            @map("min_seats")
-  maxBudget         Decimal?        @map("max_budget") @db.Decimal(10, 2)
-  criticalEquipment Json            @default("{}") @map("critical_equipment")
-  useZone           String?         @map("use_zone")
-  purchaseTimeline  String?         @map("purchase_timeline")
-  status            BuyerLeadStatus @default(NUEVO)
-  source            String?
-  createdAt         DateTime        @default(now()) @map("created_at")
-  updatedAt         DateTime        @updatedAt @map("updated_at")
+  id                     String           @id @default(cuid())
+  name                   String
+  email                  String
+  phone                  String
+  agentId                String?          @map("agent_id")
+  vehicleType            VehicleType?     @map("vehicle_type")
+  minSeats               Int?             @map("min_seats") // plazas de viaje requeridas (homologadas)
+  maxBudget              Decimal?         @map("max_budget") @db.Decimal(10, 2)
+  criticalEquipment      Json             @default("{}") @map("critical_equipment")
+  useZone                String?          @map("use_zone")
+  purchaseTimeline       String?          @map("purchase_timeline")
+  // ── Preferencias RV (Fase #3 v1) — nullable / additivo ──
+  preferredCategory      VehicleCategory? @map("preferred_category") // preferencia (puntúa)
+  preferredBedLayout     BedLayout?       @map("preferred_bed_layout") // preferencia (puntúa)
+  sleepingPlacesRequired Int?             @map("sleeping_places_required") // excluyente
+  bathroomRequired       Boolean?         @map("bathroom_required") // excluyente si true
+  licenseType            LicenseType?     @map("license_type") // B → excluye vehículos > 3.500 kg
+  needsWinter            Boolean?         @map("needs_winter") // penaliza si no está preparado
+  needsGarage            Boolean?         @map("needs_garage") // preferencia
+  maxLengthM             Float?           @map("max_length_m") // restricción parking (excluyente si def.)
+  maxHeightM             Float?           @map("max_height_m") // restricción parking (excluyente si def.)
+  hasKids                Boolean?         @map("has_kids") // → literas / Isofix (preferencia)
+  status                 BuyerLeadStatus  @default(NUEVO)
+  source                 String?
+  createdAt              DateTime         @default(now()) @map("created_at")
+  updatedAt              DateTime         @updatedAt @map("updated_at")
 
-  agent       User?              @relation("AgentBuyerLeads", fields: [agentId], references: [id])
+  agent       User?             @relation("AgentBuyerLeads", fields: [agentId], references: [id])
   matches     Match[]
   activities  Activity[]
   documents   Document[]
@@ -453,16 +519,16 @@ model BuyerChatSession {
 
   messages Json @default("[]")
 
-  capturedNombre        String?  @map("captured_nombre")
-  capturedEmail         String?  @map("captured_email")
-  capturedTelefono      String?  @map("captured_telefono")
-  capturedNecesidad     String?  @map("captured_necesidad")
-  capturedPlazas        Int?     @map("captured_plazas")
+  capturedNombre         String? @map("captured_nombre")
+  capturedEmail          String? @map("captured_email")
+  capturedTelefono       String? @map("captured_telefono")
+  capturedNecesidad      String? @map("captured_necesidad")
+  capturedPlazas         Int?    @map("captured_plazas")
   capturedPresupuestoMin Int?    @map("captured_presupuesto_min")
   capturedPresupuestoMax Int?    @map("captured_presupuesto_max")
-  capturedPlazos        String?  @map("captured_plazos")
-  capturedEquipamiento  Json?    @map("captured_equipamiento")
-  capturedZona          String?  @map("captured_zona")
+  capturedPlazos         String? @map("captured_plazos")
+  capturedEquipamiento   Json?   @map("captured_equipamiento")
+  capturedZona           String? @map("captured_zona")
 
   gdprConsentAt DateTime? @map("gdpr_consent_at")
   gdprConsentIp String?   @map("gdpr_consent_ip")
@@ -470,11 +536,11 @@ model BuyerChatSession {
   buyerLeadId String?    @unique @map("buyer_lead_id")
   buyerLead   BuyerLead? @relation(fields: [buyerLeadId], references: [id])
 
-  ipAddress      String?  @map("ip_address")
-  userAgent      String?  @map("user_agent")
-  llmModel       String   @default("claude-haiku-4-5-20251001") @map("llm_model")
-  totalTokens    Int      @default(0) @map("total_tokens")
-  totalCostCents Int      @default(0) @map("total_cost_cents")
+  ipAddress      String? @map("ip_address")
+  userAgent      String? @map("user_agent")
+  llmModel       String  @default("claude-haiku-4-5-20251001") @map("llm_model")
+  totalTokens    Int     @default(0) @map("total_tokens")
+  totalCostCents Int     @default(0) @map("total_cost_cents")
 
   startedAt     DateTime  @default(now()) @map("started_at")
   lastMessageAt DateTime  @default(now()) @map("last_message_at")
@@ -706,14 +772,14 @@ model Delivery {
 
 /// Ítem del checklist de pre-entrega y explicación al comprador.
 model DeliveryChecklistItem {
-  id         String                  @id @default(cuid())
-  deliveryId String                  @map("delivery_id")
+  id         String                    @id @default(cuid())
+  deliveryId String                    @map("delivery_id")
   category   DeliveryChecklistCategory
   item       String
-  result     DeliveryChecklistResult @default(PENDIENTE)
+  result     DeliveryChecklistResult   @default(PENDIENTE)
   notes      String?
-  createdAt  DateTime                @default(now()) @map("created_at")
-  updatedAt  DateTime                @updatedAt @map("updated_at")
+  createdAt  DateTime                  @default(now()) @map("created_at")
+  updatedAt  DateTime                  @updatedAt @map("updated_at")
 
   delivery Delivery @relation(fields: [deliveryId], references: [id], onDelete: Cascade)
 
@@ -786,8 +852,8 @@ model PostventaTicket {
   createdAt     DateTime       @default(now()) @map("created_at")
   updatedAt     DateTime       @updatedAt @map("updated_at")
 
-  warranty    Warranty                @relation(fields: [warrantyId], references: [id], onDelete: Cascade)
-  responsible User?                   @relation("ResponsibleTickets", fields: [responsibleId], references: [id])
+  warranty    Warranty               @relation(fields: [warrantyId], references: [id], onDelete: Cascade)
+  responsible User?                  @relation("ResponsibleTickets", fields: [responsibleId], references: [id])
   photos      PostventaTicketPhoto[]
 
   @@index([warrantyId, status])
