@@ -92,7 +92,46 @@ claude mcp add-json linear '{\"command\":\"npx\",\"args\":[\"-y\",\"mcp-linear@l
 
 `.claude/settings.json` y `.claude/settings.local.json` se mantienen como referencia de la estructura, pero la fuente de verdad funcional es el registro de la CLI.
 
-## Estado actual (Block 9 — Calidad, Flujo y Entornos profesionales — 6/8 COMPLETADO ✅)
+## Estado actual (Block 10 — Staging, Calendario de Taller y Rediseño UX — DESPLEGADO A PROD ✅)
+
+Desplegado a producción el **2026-06-18** vía **PR #31** (squash-merge a `main`, commit `43cc899`). La migración additiva se aplicó a prod **antes** del merge (orden seguro: migración → merge → deploy). Tres frentes del plan de la nota de voz del dueño (`docs`/plan aprobado):
+
+### Entorno de STAGING (Fase 0 del plan)
+
+- 2º proyecto Supabase **`campernova-crm-staging`** (ref `iatuhydsfwoeprpbklod`, Frankfurt) inicializado **desde el código** (no se copian datos de clientes de prod): `prisma db push` del schema completo + RLS deny-all + extensión `vector` + buckets + `pnpm seed`.
+- Secretos de staging en **`.env.staging`** (gitignored). Para trabajar contra staging en local: `set -a; . ./.env.staging; set +a; pnpm dev`. **Verificar siempre** que el host es `iatuhydsfwoeprpbklod` (staging), no `bbmglaatlyilxutzomxd` (prod). `.env` (sin sufijo) apunta a **prod** y es el que usa Prisma CLI por defecto.
+- Disciplina de migraciones: validar en staging → a prod solo migraciones **additivas** (nunca destructivas).
+- ⚠️ **Corrección importante: Supabase de prod está en plan _Pro_ (compute _Micro_)** — verificado en el panel el 2026-06-18. **La nota previa de "plan free / se pausó por inactividad" quedó OBSOLETA.** Si el equipo nota lentitud bajo carga, la palanca no es el plan sino **subir el compute Micro → Small** en Project Settings → Compute and Disk (ojo con el spend cap). Vercel sigue en Hobby (cold starts). Local en modo dev no es representativo del rendimiento de prod.
+
+### Módulo Taller — calendario de capacidad (#1)
+
+- Schema **additivo**: `WorkOrder.scheduledStart`/`scheduledEnd` (nullable) + `@@index([assignedToId, scheduledStart])`. Migración `20260617000000_add_workorder_scheduling` (solo `ADD COLUMN` + `CREATE INDEX`, sin destructivos). **Aplicada a prod.**
+- `lib/taller/scheduling.ts` (lógica pura, deps inyectables, 18 tests): `suggestSchedule` (modelo de cola: primer hueco libre + fecha de entrega estimada según el backlog del mecánico y horas/día), `computeHoursDeviation` (previstas vs reales), `addWorkingDays`/`workingDaysForHours`. `lib/taller/prisma-deps.ts`: `getMechanicBacklogHours`.
+- Server actions (`taller/actions.ts`): `suggestScheduleForOrder`, `scheduleWorkOrder` (persiste responsable + ventana + horas; sin Activity para no chocar con el parser `CAMBIO_ESTADO` del dashboard), `createWorkOrder` ampliado con planificación.
+- UI: **agenda semanal** `app/(backoffice)/taller/agenda/page.tsx` (CSS grid, filas = mecánicos, columnas = días, bloques por `scheduledStart/End`, "libre desde", nav `?week`); `ScheduleCard` en el detalle de orden (`taller/[id]/schedule-card.tsx`); botón **"Crear orden de taller"** en la ficha del vehículo (pestaña Preparación) con `?vehicleId=`; **previstas vs reales** en el tab Resumen de la orden.
+
+### Rediseño UX de fichas (vehículo-céntrico) + navegación
+
+- **Sistema de ficha unificado**: vendedor y comprador comparten plantilla — topbar sticky + hero centrado en el **vehículo/necesidad** + tira de métricas en tarjetas + **rail derecho persistente de 320px** (próxima acción + contacto + agente + resumen) visible en TODAS las pestañas (antes la próxima acción se perdía al cambiar de tab en vendedor).
+- **`components/status-pill.tsx`** — `<StatusPill status entity="seller|vehicle|buyer" />`: **fuente única** de labels + colores de estado desde `lib/state-machine` (con variantes dark). Las fichas dejan de redefinir mapas de estado a mano (se eliminó el `VEHICLE_PHASE` inline del vendedor).
+- **Ficha comprador tokenizada a la marca**: se reemplazaron TODOS los hex slate/azul hardcodeados (`#e2e8f0`, `#64748b`, `#0a0a0a`, `#294e4c`…) por tokens `--cn-*`/shadcn → vendedor y comprador ya parecen la misma app. Hero centrado en la necesidad ("Busca {tipo} · hasta {€} · {plazas}p", persona como subtítulo, avatar neutro) + **mejor-match como KPI ancla** + `InfoTooltip`.
+- `LeadTabNav` **accesible**: `role=tablist/tab`, `aria-selected`, roving `tabIndex`, navegación con flechas/Home/End, foco visible. Componente compartido por ambas fichas.
+- `MatchesSection` acepta `defaultOpen` → abierta por defecto en su pestaña dedicada (Compradores / Vehículos sugeridos).
+- **Navegación**: `components/layout/sidebar.tsx` reagrupado — grupo **"Pipeline"** etiquetado con **Vehículos elevado** tras Dashboard; contraste del item inactivo subido (`/60`→`/75`) a nivel AA.
+- En el topbar del vendedor, el avance de estado (`QuickAdvanceButton`) se degradó a `variant="outline"` (secundario) — la próxima acción real del rail es el CTA primario.
+
+### CRM centrado en el vehículo — segmentación + cruce (#2)
+
+- `/vendedores` (`buildViewConditions`): vistas **"Stock"** (vehículos en `TASADO`/`PUBLICADO`/`RESERVADO` = inventario real, `STOCK_STATUSES`) y **"Leads web"** (canal `PRO` sin cualificar = formulario público a triar) con contador en vivo.
+- Cruce **vehículo↔comprador**: tarjeta "Comprador" en el rail de la ficha del vendedor cuando hay **match cerrado** (`closedMatch`) con enlace a la ficha del comprador; y enlace "Ver ficha del vehículo / vendedor" en la tarjeta de operación del comprador (se añadió `sellerLead` al select de `deliveries.vehicle`).
+
+### Pendiente del plan (#3)
+
+- **Chat + matching con taxonomía RV** (distribución capuchina/perfilada/integral/camper, tipos de cama, plazas homologadas, etc.) — **NO empezado, bloqueado** a la espera de que el dueño dé la **taxonomía exacta** y qué criterios son **excluyentes vs preferencia**.
+
+> Tests: **354 verdes** (incluye 18 de `lib/taller/scheduling`). Verificado typecheck + lint + suite + CI `quality` en verde antes del deploy.
+
+## Estado previo (Block 9 — Calidad, Flujo y Entornos profesionales — 6/8 COMPLETADO ✅)
 
 ### Block 9 — Calidad, Flujo y Entornos profesionales
 
