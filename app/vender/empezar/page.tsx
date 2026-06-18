@@ -10,6 +10,15 @@ import { z } from 'zod'
 import { usePostHog } from 'posthog-js/react'
 import { cn } from '@/lib/utils'
 import { compressImage } from '@/lib/image/compress'
+import {
+  EQUIPMENT_OPTIONS,
+  RV_CATEGORY_OPTIONS,
+  RV_BED_OPTIONS,
+  RV_BATHROOM_OPTIONS,
+  VEHICLE_CATEGORY_VALUES,
+  BED_LAYOUT_VALUES,
+  BATHROOM_TYPE_VALUES,
+} from '@/lib/rv-taxonomy'
 import { submitPublicLead } from './actions'
 
 // ─── Schemas por paso ────────────────────────────────────────────────────────
@@ -37,6 +46,11 @@ const vehicleStepSchema = z.object({
     shower: z.boolean().default(false),
     heating: z.boolean().default(false),
   }),
+  // Ficha técnica RV (opcional) — homogénea con el backoffice y el matching
+  sleepingPlaces: z.number().int().min(0).max(12).optional().nullable(),
+  category: z.enum(VEHICLE_CATEGORY_VALUES).optional().nullable(),
+  bedLayout: z.enum(BED_LAYOUT_VALUES).optional().nullable(),
+  bathroomType: z.enum(BATHROOM_TYPE_VALUES).optional().nullable(),
 })
 
 const contactStepSchema = z.object({
@@ -51,13 +65,8 @@ const contactStepSchema = z.object({
 type VehicleStepValues = z.input<typeof vehicleStepSchema>
 type ContactStepValues = z.input<typeof contactStepSchema>
 
-const EQUIPMENT_ITEMS = [
-  { id: 'solar' as const, label: 'Placas solares' },
-  { id: 'kitchen' as const, label: 'Cocina' },
-  { id: 'bathroom' as const, label: 'Baño' },
-  { id: 'shower' as const, label: 'Ducha' },
-  { id: 'heating' as const, label: 'Calefacción' },
-]
+// Equipamiento (flags). El baño va aparte como dimensión (bathroomType), no como flag.
+const EQUIPMENT_ITEMS = EQUIPMENT_OPTIONS
 
 const MIN_PHOTOS = 6
 const MAX_PHOTOS = 30
@@ -300,6 +309,10 @@ export default function VenderEmpezarPage() {
       desiredPrice: null,
       location: '',
       plate: '',
+      sleepingPlaces: null,
+      category: null,
+      bedLayout: null,
+      bathroomType: null,
     },
   })
 
@@ -341,6 +354,10 @@ export default function VenderEmpezarPage() {
     if (vehicle.desiredPrice != null) fd.set('desiredPrice', String(vehicle.desiredPrice))
     if (vehicle.location) fd.set('location', vehicle.location)
     if (vehicle.plate) fd.set('plate', vehicle.plate.toUpperCase())
+    if (vehicle.sleepingPlaces != null) fd.set('sleepingPlaces', String(vehicle.sleepingPlaces))
+    if (vehicle.category) fd.set('category', vehicle.category)
+    if (vehicle.bedLayout) fd.set('bedLayout', vehicle.bedLayout)
+    if (vehicle.bathroomType) fd.set('bathroomType', vehicle.bathroomType)
     fd.set('equipment.solar', String(vehicle.equipment?.solar ?? false))
     fd.set('equipment.kitchen', String(vehicle.equipment?.kitchen ?? false))
     fd.set('equipment.bathroom', String(vehicle.equipment?.bathroom ?? false))
@@ -492,7 +509,7 @@ export default function VenderEmpezarPage() {
                 </div>
 
                 <div>
-                  <label className="mb-1.5 block text-sm font-medium">Plazas *</label>
+                  <label className="mb-1.5 block text-sm font-medium">Plazas homologadas *</label>
                   <input
                     type="number"
                     min={1}
@@ -501,11 +518,30 @@ export default function VenderEmpezarPage() {
                     placeholder="Ej: 4"
                     {...vehicleForm.register('seats', { valueAsNumber: true })}
                   />
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    Las que pueden viajar con cinturón.
+                  </p>
                   {vehicleForm.formState.errors.seats && (
                     <p className="mt-1 text-xs text-destructive">
                       {vehicleForm.formState.errors.seats.message}
                     </p>
                   )}
+                </div>
+
+                <div>
+                  <label className="mb-1.5 block text-sm font-medium">
+                    Plazas para dormir <span className="text-muted-foreground">(opcional)</span>
+                  </label>
+                  <input
+                    type="number"
+                    min={0}
+                    max={12}
+                    className="w-full rounded-md border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                    placeholder="Ej: 4"
+                    {...vehicleForm.register('sleepingPlaces', {
+                      setValueAs: (v) => (v === '' ? null : Number(v)),
+                    })}
+                  />
                 </div>
 
                 <div>
@@ -606,6 +642,69 @@ export default function VenderEmpezarPage() {
                       {item.label}
                     </label>
                   ))}
+                </div>
+              </div>
+
+              {/* Ficha técnica RV (opcional) — homogénea con el backoffice y el matching */}
+              <div className="rounded-lg border border-dashed bg-muted/20 p-4">
+                <p className="text-sm font-medium">
+                  Ficha técnica{' '}
+                  <span className="font-normal text-muted-foreground">
+                    (opcional — nos ayuda a encontrarte comprador antes)
+                  </span>
+                </p>
+                <div className="mt-3 grid grid-cols-1 gap-4 sm:grid-cols-3">
+                  <div>
+                    <label className="mb-1.5 block text-sm font-medium">Distribución</label>
+                    <select
+                      defaultValue=""
+                      className="w-full rounded-md border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                      {...vehicleForm.register('category', {
+                        setValueAs: (v) => (v === '' ? null : v),
+                      })}
+                    >
+                      <option value="">Sin especificar</option>
+                      {RV_CATEGORY_OPTIONS.map((o) => (
+                        <option key={o.value} value={o.value}>
+                          {o.label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="mb-1.5 block text-sm font-medium">Tipo de cama</label>
+                    <select
+                      defaultValue=""
+                      className="w-full rounded-md border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                      {...vehicleForm.register('bedLayout', {
+                        setValueAs: (v) => (v === '' ? null : v),
+                      })}
+                    >
+                      <option value="">Sin especificar</option>
+                      {RV_BED_OPTIONS.map((o) => (
+                        <option key={o.value} value={o.value}>
+                          {o.label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="mb-1.5 block text-sm font-medium">Baño</label>
+                    <select
+                      defaultValue=""
+                      className="w-full rounded-md border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                      {...vehicleForm.register('bathroomType', {
+                        setValueAs: (v) => (v === '' ? null : v),
+                      })}
+                    >
+                      <option value="">Sin especificar</option>
+                      {RV_BATHROOM_OPTIONS.map((o) => (
+                        <option key={o.value} value={o.value}>
+                          {o.label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
                 </div>
               </div>
 

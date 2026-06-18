@@ -22,6 +22,14 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { updateVehicleSchema, type UpdateVehicleValues } from '@/lib/validators/seller-lead'
+import {
+  EQUIPMENT_OPTIONS,
+  RV_CATEGORY_OPTIONS,
+  RV_BED_OPTIONS,
+  RV_BATHROOM_OPTIONS,
+  RV_HEATING_OPTIONS,
+  RV_NONE,
+} from '@/lib/rv-taxonomy'
 import { updateVehicle } from './actions'
 import {
   VEHICLE_TRANSITIONS,
@@ -30,47 +38,14 @@ import {
 } from '@/lib/state-machine'
 import type { VehicleStatus } from '@prisma/client'
 
-const EQUIPMENT_ITEMS = [
-  { id: 'solar', label: 'Placas solares' },
-  { id: 'kitchen', label: 'Cocina' },
-  { id: 'bathroom', label: 'Baño' },
-  { id: 'shower', label: 'Ducha' },
-  { id: 'heating', label: 'Calefacción' },
-] as const
-
+// Opciones desde la fuente única (lib/rv-taxonomy). Baño = bathroomType (no flag de equipo).
+const EQUIPMENT_ITEMS = EQUIPMENT_OPTIONS
 type EquipmentKey = (typeof EQUIPMENT_ITEMS)[number]['id']
-
-// ── Opciones taxonomía RV (Fase #3) ──
-const CATEGORY_OPTIONS = [
-  { value: 'MINI_CAMPER', label: 'Mini camper' },
-  { value: 'CAMPER', label: 'Camper compacta' },
-  { value: 'GRAN_VOLUMEN', label: 'Gran volumen (furgón)' },
-  { value: 'PERFILADA', label: 'Perfilada' },
-  { value: 'CAPUCHINA', label: 'Capuchina' },
-  { value: 'INTEGRAL', label: 'Integral' },
-] as const
-const BED_OPTIONS = [
-  { value: 'TRANSVERSAL', label: 'Transversal' },
-  { value: 'LONGITUDINAL', label: 'Longitudinal' },
-  { value: 'GEMELAS', label: 'Camas gemelas' },
-  { value: 'ISLA', label: 'Cama isla' },
-  { value: 'FRANCESA', label: 'Cama francesa' },
-  { value: 'BASCULANTE', label: 'Basculante (techo)' },
-  { value: 'LITERAS', label: 'Literas' },
-  { value: 'TECHO_ELEVABLE', label: 'Cama en techo elevable' },
-  { value: 'DINETTE', label: 'Dinette convertible' },
-] as const
-const BATHROOM_OPTIONS = [
-  { value: 'NINGUNO', label: 'Sin baño' },
-  { value: 'HUMEDO', label: 'Baño húmedo (ducha + WC)' },
-  { value: 'SEPARADO', label: 'Ducha / WC separados' },
-] as const
-const HEATING_OPTIONS = [
-  { value: 'NINGUNA', label: 'Sin calefacción' },
-  { value: 'GAS', label: 'Gas' },
-  { value: 'DIESEL', label: 'Diésel' },
-  { value: 'ELECTRICA', label: 'Eléctrica' },
-] as const
+const CATEGORY_OPTIONS = RV_CATEGORY_OPTIONS
+const BED_OPTIONS = RV_BED_OPTIONS
+const BATHROOM_OPTIONS = RV_BATHROOM_OPTIONS
+const HEATING_OPTIONS = RV_HEATING_OPTIONS
+const NONE = RV_NONE
 
 const RV_BOOLEANS = [
   { id: 'winterized', label: 'Preparada invierno' },
@@ -79,8 +54,6 @@ const RV_BOOLEANS = [
 ] as const
 
 type RvBoolKey = (typeof RV_BOOLEANS)[number]['id']
-
-const NONE = '__none__'
 
 type Props = {
   vehicleId: string

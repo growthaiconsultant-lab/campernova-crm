@@ -17,6 +17,13 @@ import {
   PURCHASE_TIMELINE_OPTIONS,
   type UpdateBuyerLeadValues,
 } from '@/lib/validators/buyer-lead'
+import {
+  EQUIPMENT_OPTIONS,
+  RV_CATEGORY_OPTIONS,
+  RV_BED_OPTIONS,
+  RV_LICENSE_OPTIONS,
+  RV_NONE,
+} from '@/lib/rv-taxonomy'
 import { updateBuyerLead } from './actions'
 import {
   BUYER_LEAD_TRANSITIONS,
@@ -28,41 +35,15 @@ import { Lock } from 'lucide-react'
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
-const EQUIPMENT_ITEMS = [
-  { id: 'solar', label: 'Placas solares' },
-  { id: 'kitchen', label: 'Cocina' },
-  { id: 'bathroom', label: 'Baño' },
-  { id: 'shower', label: 'Ducha' },
-  { id: 'heating', label: 'Calefacción' },
-] as const
-
+// Opciones desde la fuente única (lib/rv-taxonomy). Baño = bathroomRequired (no flag de equipo).
+const EQUIPMENT_ITEMS = EQUIPMENT_OPTIONS
 type EquipmentKey = (typeof EQUIPMENT_ITEMS)[number]['id']
 type Agent = { id: string; name: string }
 
-// ── Preferencias taxonomía RV (Fase #3) ──
-const PREF_CATEGORY_OPTIONS = [
-  { value: 'MINI_CAMPER', label: 'Mini camper' },
-  { value: 'CAMPER', label: 'Camper compacta' },
-  { value: 'GRAN_VOLUMEN', label: 'Gran volumen (furgón)' },
-  { value: 'PERFILADA', label: 'Perfilada' },
-  { value: 'CAPUCHINA', label: 'Capuchina' },
-  { value: 'INTEGRAL', label: 'Integral' },
-] as const
-const PREF_BED_OPTIONS = [
-  { value: 'TRANSVERSAL', label: 'Transversal' },
-  { value: 'LONGITUDINAL', label: 'Longitudinal' },
-  { value: 'GEMELAS', label: 'Camas gemelas' },
-  { value: 'ISLA', label: 'Cama isla' },
-  { value: 'FRANCESA', label: 'Cama francesa' },
-  { value: 'BASCULANTE', label: 'Basculante (techo)' },
-  { value: 'LITERAS', label: 'Literas' },
-  { value: 'TECHO_ELEVABLE', label: 'Cama en techo elevable' },
-  { value: 'DINETTE', label: 'Dinette convertible' },
-] as const
-const LICENSE_OPTIONS = [
-  { value: 'B', label: 'Carnet B (hasta 3.500 kg)' },
-  { value: 'C1', label: 'Carnet C1 (más de 3.500 kg)' },
-] as const
+const PREF_CATEGORY_OPTIONS = RV_CATEGORY_OPTIONS
+const PREF_BED_OPTIONS = RV_BED_OPTIONS
+const LICENSE_OPTIONS = RV_LICENSE_OPTIONS
+const NONE = RV_NONE
 const PREF_BOOLEANS = [
   { id: 'bathroomRequired', label: 'Baño imprescindible' },
   { id: 'hasKids', label: 'Viaja con niños' },
@@ -70,7 +51,6 @@ const PREF_BOOLEANS = [
   { id: 'needsGarage', label: 'Necesita garaje' },
 ] as const
 type PrefBoolKey = (typeof PREF_BOOLEANS)[number]['id']
-const NONE = '__none__'
 
 type Props = {
   leadId: string

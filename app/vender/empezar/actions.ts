@@ -86,6 +86,11 @@ export async function submitPublicLead(formData: FormData) {
       shower: formData.get('equipment.shower') === 'true',
       heating: formData.get('equipment.heating') === 'true',
     },
+    // Ficha técnica RV (opcional)
+    sleepingPlaces: formData.get('sleepingPlaces') ? Number(formData.get('sleepingPlaces')) : null,
+    category: (formData.get('category') as string | null) || null,
+    bedLayout: (formData.get('bedLayout') as string | null) || null,
+    bathroomType: (formData.get('bathroomType') as string | null) || null,
   }
 
   const parsed = createSellerLeadSchema.safeParse(raw)
@@ -119,7 +124,17 @@ export async function submitPublicLead(formData: FormData) {
     plate,
     desiredPrice,
     equipment,
+    sleepingPlaces,
+    category,
+    bedLayout,
+    bathroomType,
   } = parsed.data
+
+  // Baño = fuente única (bathroomType). Si el vendedor lo indica, derivamos el flag de equipo.
+  const equipmentResolved = {
+    ...equipment,
+    bathroom: bathroomType != null ? bathroomType !== 'NINGUNO' : equipment.bathroom,
+  }
 
   // Create lead + vehicle in a single transaction
   const lead = await db.sellerLead.create({
@@ -145,8 +160,12 @@ export async function submitPublicLead(formData: FormData) {
           location: location ?? null,
           plate: plate ?? null,
           desiredPrice: desiredPrice ?? null,
-          equipment,
+          equipment: equipmentResolved,
           status: 'NUEVO',
+          sleepingPlaces: sleepingPlaces ?? null,
+          category: category ?? null,
+          bedLayout: bedLayout ?? null,
+          bathroomType: bathroomType ?? null,
         },
       },
     },

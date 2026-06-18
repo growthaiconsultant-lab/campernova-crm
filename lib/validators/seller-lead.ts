@@ -1,4 +1,10 @@
 import { z } from 'zod'
+import {
+  VEHICLE_CATEGORY_VALUES,
+  BED_LAYOUT_VALUES,
+  BATHROOM_TYPE_VALUES,
+  HEATING_TYPE_VALUES,
+} from '@/lib/rv-taxonomy'
 
 export const equipmentSchema = z.object({
   solar: z.boolean().default(false),
@@ -41,6 +47,11 @@ export const createSellerLeadSchema = z.object({
     shower: false,
     heating: false,
   }),
+  // ── Ficha técnica RV (opcional en el alta web; el agente la afina luego) ──
+  sleepingPlaces: z.number().int().min(0).max(12).optional().nullable(),
+  category: z.enum(VEHICLE_CATEGORY_VALUES).optional().nullable(),
+  bedLayout: z.enum(BED_LAYOUT_VALUES).optional().nullable(),
+  bathroomType: z.enum(BATHROOM_TYPE_VALUES).optional().nullable(),
 })
 
 // OUTPUT: tipo validado que devuelve Zod (con defaults aplicados)
@@ -58,29 +69,6 @@ export const updateSellerLeadSchema = z.object({
 })
 
 export type UpdateSellerLeadValues = z.input<typeof updateSellerLeadSchema>
-
-// Valores de la taxonomía RV (Fase #3) — fuente para selects + validación
-export const VEHICLE_CATEGORY_VALUES = [
-  'MINI_CAMPER',
-  'CAMPER',
-  'GRAN_VOLUMEN',
-  'PERFILADA',
-  'CAPUCHINA',
-  'INTEGRAL',
-] as const
-export const BED_LAYOUT_VALUES = [
-  'TRANSVERSAL',
-  'LONGITUDINAL',
-  'GEMELAS',
-  'ISLA',
-  'FRANCESA',
-  'BASCULANTE',
-  'LITERAS',
-  'TECHO_ELEVABLE',
-  'DINETTE',
-] as const
-export const BATHROOM_TYPE_VALUES = ['NINGUNO', 'HUMEDO', 'SEPARADO'] as const
-export const HEATING_TYPE_VALUES = ['NINGUNA', 'GAS', 'DIESEL', 'ELECTRICA'] as const
 
 export const updateVehicleSchema = z.object({
   type: z.enum(['CAMPER', 'AUTOCARAVANA'], { error: 'Selecciona un tipo' }),
