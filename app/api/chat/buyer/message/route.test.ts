@@ -10,7 +10,7 @@ const { mockDb } = vi.hoisted(() => ({
   },
 }))
 vi.mock('@/lib/db', () => ({ db: mockDb }))
-vi.mock('@ai-sdk/anthropic', () => ({ anthropic: vi.fn(() => 'mock-model') }))
+vi.mock('@/lib/ai/anthropic', () => ({ anthropic: vi.fn(() => 'mock-model') }))
 
 // Mock del Vercel AI SDK: streamText no llama a la red; devolvemos un objeto con
 // toTextStreamResponse y dejamos accesible la config (tools/system) para inspección.

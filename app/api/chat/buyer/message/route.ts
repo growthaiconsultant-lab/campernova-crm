@@ -1,6 +1,6 @@
 import { NextRequest } from 'next/server'
-import { anthropic } from '@ai-sdk/anthropic'
 import { streamText, tool, stepCountIs } from 'ai'
+import { anthropic } from '@/lib/ai/anthropic'
 import { db } from '@/lib/db'
 import { BUYER_SYSTEM_PROMPT } from '@/lib/chat/system-prompt'
 import { registerBuyerLeadSchema } from '@/lib/chat/tools'
