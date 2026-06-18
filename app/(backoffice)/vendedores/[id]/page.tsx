@@ -307,6 +307,16 @@ export default async function FichaVendedorPage({
           heating: boolean
         },
         status: v.status,
+        category: v.category ?? null,
+        bedLayout: v.bedLayout ?? null,
+        sleepingPlaces: v.sleepingPlaces ?? null,
+        bathroomType: v.bathroomType ?? null,
+        heatingType: v.heatingType ?? null,
+        winterized: v.winterized ?? null,
+        hasGarage: v.hasGarage ?? null,
+        maxMassKg: v.maxMassKg ?? null,
+        heightM: v.heightM ?? null,
+        offGrid: v.offGrid ?? null,
       }
     : null
 

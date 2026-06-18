@@ -59,6 +59,29 @@ export const updateSellerLeadSchema = z.object({
 
 export type UpdateSellerLeadValues = z.input<typeof updateSellerLeadSchema>
 
+// Valores de la taxonomía RV (Fase #3) — fuente para selects + validación
+export const VEHICLE_CATEGORY_VALUES = [
+  'MINI_CAMPER',
+  'CAMPER',
+  'GRAN_VOLUMEN',
+  'PERFILADA',
+  'CAPUCHINA',
+  'INTEGRAL',
+] as const
+export const BED_LAYOUT_VALUES = [
+  'TRANSVERSAL',
+  'LONGITUDINAL',
+  'GEMELAS',
+  'ISLA',
+  'FRANCESA',
+  'BASCULANTE',
+  'LITERAS',
+  'TECHO_ELEVABLE',
+  'DINETTE',
+] as const
+export const BATHROOM_TYPE_VALUES = ['NINGUNO', 'HUMEDO', 'SEPARADO'] as const
+export const HEATING_TYPE_VALUES = ['NINGUNA', 'GAS', 'DIESEL', 'ELECTRICA'] as const
+
 export const updateVehicleSchema = z.object({
   type: z.enum(['CAMPER', 'AUTOCARAVANA'], { error: 'Selecciona un tipo' }),
   brand: z.string().min(1, 'La marca es obligatoria'),
@@ -86,6 +109,17 @@ export const updateVehicleSchema = z.object({
     heating: false,
   }),
   status: z.enum(['NUEVO', 'TASADO', 'PUBLICADO', 'RESERVADO', 'VENDIDO', 'DESCARTADO']),
+  // ── Ficha técnica RV (Fase #3 v1) ──
+  category: z.enum(VEHICLE_CATEGORY_VALUES).optional().nullable(),
+  bedLayout: z.enum(BED_LAYOUT_VALUES).optional().nullable(),
+  sleepingPlaces: z.number().int().min(0).max(12).optional().nullable(),
+  bathroomType: z.enum(BATHROOM_TYPE_VALUES).optional().nullable(),
+  heatingType: z.enum(HEATING_TYPE_VALUES).optional().nullable(),
+  winterized: z.boolean().optional().nullable(),
+  hasGarage: z.boolean().optional().nullable(),
+  maxMassKg: z.number().int().min(0).max(20000).optional().nullable(),
+  heightM: z.number().positive().max(5).optional().nullable(),
+  offGrid: z.boolean().optional().nullable(),
 })
 
 export type UpdateVehicleValues = z.input<typeof updateVehicleSchema>

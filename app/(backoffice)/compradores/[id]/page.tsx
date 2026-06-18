@@ -239,6 +239,16 @@ export default async function FichaCompradorPage({
     },
     useZone: lead.useZone ?? '',
     purchaseTimeline: lead.purchaseTimeline ?? null,
+    preferredCategory: lead.preferredCategory ?? null,
+    preferredBedLayout: lead.preferredBedLayout ?? null,
+    sleepingPlacesRequired: lead.sleepingPlacesRequired ?? null,
+    bathroomRequired: lead.bathroomRequired ?? null,
+    licenseType: lead.licenseType ?? null,
+    needsWinter: lead.needsWinter ?? null,
+    needsGarage: lead.needsGarage ?? null,
+    maxLengthM: lead.maxLengthM ?? null,
+    maxHeightM: lead.maxHeightM ?? null,
+    hasKids: lead.hasKids ?? null,
   }
 
   const buyerMatches: BuyerMatchData[] = lead.matches.map((m) => {

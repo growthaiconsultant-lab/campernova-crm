@@ -126,6 +126,16 @@ export async function updateVehicle(vehicleId: string, data: unknown) {
     desiredPrice,
     equipment,
     status,
+    category,
+    bedLayout,
+    sleepingPlaces,
+    bathroomType,
+    heatingType,
+    winterized,
+    hasGarage,
+    maxMassKg,
+    heightM,
+    offGrid,
   } = parsed.data
 
   const vehicle = await db.vehicle.findUnique({
@@ -225,6 +235,16 @@ export async function updateVehicle(vehicleId: string, data: unknown) {
         desiredPrice: desiredPrice ?? null,
         equipment,
         status,
+        category: category ?? null,
+        bedLayout: bedLayout ?? null,
+        sleepingPlaces: sleepingPlaces ?? null,
+        bathroomType: bathroomType ?? null,
+        heatingType: heatingType ?? null,
+        winterized: winterized ?? null,
+        hasGarage: hasGarage ?? null,
+        maxMassKg: maxMassKg ?? null,
+        heightM: heightM ?? null,
+        offGrid: offGrid ?? null,
       },
     })
     if (statusChanging) {

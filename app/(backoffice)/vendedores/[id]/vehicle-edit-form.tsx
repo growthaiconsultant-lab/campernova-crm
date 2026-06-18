@@ -40,6 +40,48 @@ const EQUIPMENT_ITEMS = [
 
 type EquipmentKey = (typeof EQUIPMENT_ITEMS)[number]['id']
 
+// ── Opciones taxonomía RV (Fase #3) ──
+const CATEGORY_OPTIONS = [
+  { value: 'MINI_CAMPER', label: 'Mini camper' },
+  { value: 'CAMPER', label: 'Camper compacta' },
+  { value: 'GRAN_VOLUMEN', label: 'Gran volumen (furgón)' },
+  { value: 'PERFILADA', label: 'Perfilada' },
+  { value: 'CAPUCHINA', label: 'Capuchina' },
+  { value: 'INTEGRAL', label: 'Integral' },
+] as const
+const BED_OPTIONS = [
+  { value: 'TRANSVERSAL', label: 'Transversal' },
+  { value: 'LONGITUDINAL', label: 'Longitudinal' },
+  { value: 'GEMELAS', label: 'Camas gemelas' },
+  { value: 'ISLA', label: 'Cama isla' },
+  { value: 'FRANCESA', label: 'Cama francesa' },
+  { value: 'BASCULANTE', label: 'Basculante (techo)' },
+  { value: 'LITERAS', label: 'Literas' },
+  { value: 'TECHO_ELEVABLE', label: 'Cama en techo elevable' },
+  { value: 'DINETTE', label: 'Dinette convertible' },
+] as const
+const BATHROOM_OPTIONS = [
+  { value: 'NINGUNO', label: 'Sin baño' },
+  { value: 'HUMEDO', label: 'Baño húmedo (ducha + WC)' },
+  { value: 'SEPARADO', label: 'Ducha / WC separados' },
+] as const
+const HEATING_OPTIONS = [
+  { value: 'NINGUNA', label: 'Sin calefacción' },
+  { value: 'GAS', label: 'Gas' },
+  { value: 'DIESEL', label: 'Diésel' },
+  { value: 'ELECTRICA', label: 'Eléctrica' },
+] as const
+
+const RV_BOOLEANS = [
+  { id: 'winterized', label: 'Preparada invierno' },
+  { id: 'hasGarage', label: 'Garaje (bici/moto)' },
+  { id: 'offGrid', label: 'Autonomía off-grid' },
+] as const
+
+type RvBoolKey = (typeof RV_BOOLEANS)[number]['id']
+
+const NONE = '__none__'
+
 type Props = {
   vehicleId: string
   defaultValues: UpdateVehicleValues
@@ -334,6 +376,229 @@ export function VehicleEditForm({ vehicleId, defaultValues }: Props) {
                   <FormItem className="flex items-center space-x-2 space-y-0">
                     <FormControl>
                       <Checkbox checked={field.value as boolean} onCheckedChange={field.onChange} />
+                    </FormControl>
+                    <FormLabel className="cursor-pointer font-normal">{item.label}</FormLabel>
+                  </FormItem>
+                )}
+              />
+            ))}
+          </div>
+        </div>
+
+        {/* Ficha técnica (RV) — alimenta el matching */}
+        <div className="border-t pt-4">
+          <p className="text-sm font-medium leading-none">Ficha técnica (RV)</p>
+          <p className="mb-3 mt-1 text-xs text-muted-foreground">
+            Cuanto más completes, mejor cuadra el matching con los compradores. Déjalo en blanco si
+            no lo sabes.
+          </p>
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            {/* Categoría / carrocería */}
+            <FormField
+              control={form.control}
+              name="category"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Distribución</FormLabel>
+                  <Select
+                    value={field.value ?? NONE}
+                    onValueChange={(v) => field.onChange(v === NONE ? null : v)}
+                  >
+                    <FormControl>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Sin especificar" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      <SelectItem value={NONE}>Sin especificar</SelectItem>
+                      {CATEGORY_OPTIONS.map((o) => (
+                        <SelectItem key={o.value} value={o.value}>
+                          {o.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            {/* Tipo de cama */}
+            <FormField
+              control={form.control}
+              name="bedLayout"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Tipo de cama</FormLabel>
+                  <Select
+                    value={field.value ?? NONE}
+                    onValueChange={(v) => field.onChange(v === NONE ? null : v)}
+                  >
+                    <FormControl>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Sin especificar" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      <SelectItem value={NONE}>Sin especificar</SelectItem>
+                      {BED_OPTIONS.map((o) => (
+                        <SelectItem key={o.value} value={o.value}>
+                          {o.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            {/* Baño */}
+            <FormField
+              control={form.control}
+              name="bathroomType"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Baño</FormLabel>
+                  <Select
+                    value={field.value ?? NONE}
+                    onValueChange={(v) => field.onChange(v === NONE ? null : v)}
+                  >
+                    <FormControl>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Sin especificar" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      <SelectItem value={NONE}>Sin especificar</SelectItem>
+                      {BATHROOM_OPTIONS.map((o) => (
+                        <SelectItem key={o.value} value={o.value}>
+                          {o.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            {/* Calefacción */}
+            <FormField
+              control={form.control}
+              name="heatingType"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Calefacción</FormLabel>
+                  <Select
+                    value={field.value ?? NONE}
+                    onValueChange={(v) => field.onChange(v === NONE ? null : v)}
+                  >
+                    <FormControl>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Sin especificar" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      <SelectItem value={NONE}>Sin especificar</SelectItem>
+                      {HEATING_OPTIONS.map((o) => (
+                        <SelectItem key={o.value} value={o.value}>
+                          {o.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            {/* Plazas para dormir */}
+            <FormField
+              control={form.control}
+              name="sleepingPlaces"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Plazas para dormir</FormLabel>
+                  <FormControl>
+                    <Input
+                      type="number"
+                      min={0}
+                      max={12}
+                      value={field.value ?? ''}
+                      onChange={(e) =>
+                        field.onChange(e.target.value === '' ? null : Number(e.target.value))
+                      }
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            {/* MMA / peso máximo */}
+            <FormField
+              control={form.control}
+              name="maxMassKg"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>MMA — peso máximo (kg)</FormLabel>
+                  <FormControl>
+                    <Input
+                      type="number"
+                      min={0}
+                      step="50"
+                      placeholder="p. ej. 3500"
+                      value={field.value ?? ''}
+                      onChange={(e) =>
+                        field.onChange(e.target.value === '' ? null : Number(e.target.value))
+                      }
+                    />
+                  </FormControl>
+                  <p className="text-xs text-muted-foreground">
+                    {'>'} 3.500 kg exige carnet C1 al comprador.
+                  </p>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            {/* Altura */}
+            <FormField
+              control={form.control}
+              name="heightM"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Altura (m)</FormLabel>
+                  <FormControl>
+                    <Input
+                      type="number"
+                      step="0.05"
+                      min="0"
+                      placeholder="p. ej. 2.85"
+                      value={field.value ?? ''}
+                      onChange={(e) =>
+                        field.onChange(e.target.value === '' ? null : Number(e.target.value))
+                      }
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+          </div>
+
+          {/* Flags RV */}
+          <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-3">
+            {RV_BOOLEANS.map((item) => (
+              <FormField
+                key={item.id}
+                control={form.control}
+                name={item.id as RvBoolKey}
+                render={({ field }) => (
+                  <FormItem className="flex items-center space-x-2 space-y-0">
+                    <FormControl>
+                      <Checkbox checked={field.value === true} onCheckedChange={field.onChange} />
                     </FormControl>
                     <FormLabel className="cursor-pointer font-normal">{item.label}</FormLabel>
                   </FormItem>
