@@ -11,6 +11,10 @@ por lo que este changelog puede regenerarse/ampliarse desde el historial.
 
 ### Added
 
+- **Calendario de capacidad del taller**: planificación de órdenes con fecha de entrega sugerida según el backlog del mecánico, agenda semanal, horas previstas vs reales y "Crear orden de taller" desde la ficha del vehículo. Migración additiva `WorkOrder.scheduledStart/scheduledEnd` + índice (`20260617000000_add_workorder_scheduling`).
+- **Rediseño UX de fichas (vehículo-céntrico)**: fichas de vendedor y comprador unificadas — hero centrado en el vehículo/necesidad, rail derecho persistente con la próxima acción, `StatusPill` compartido (fuente única de estados), `LeadTabNav` accesible (ARIA + teclado). Ficha de comprador tokenizada a la marca.
+- **Vistas "Stock" y "Leads web"** en el listado de vendedores (separar inventario real de leads web sin cualificar) + cruce vehículo↔comprador en ambas fichas.
+- **Entorno de staging** (2º proyecto Supabase `campernova-crm-staging`) para validar features y migraciones antes de producción.
 - Flujo de trabajo profesional: CI (`quality`: typecheck + lint + test) en GitHub Actions, protección de rama `main`, Conventional Commits (commitlint + hook `commit-msg`), hook `pre-push`, `CONTRIBUTING.md` y plantilla de PR.
 - Documentación de entrada: `README.md`, `ARCHITECTURE.md`, `CHANGELOG.md` y Architecture Decision Records (`docs/adr/`).
 - Pestaña "Conversación" en la ficha de comprador + filtro de origen en el listado (CAM-55).
