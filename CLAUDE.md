@@ -92,7 +92,30 @@ claude mcp add-json linear '{\"command\":\"npx\",\"args\":[\"-y\",\"mcp-linear@l
 
 `.claude/settings.json` y `.claude/settings.local.json` se mantienen como referencia de la estructura, pero la fuente de verdad funcional es el registro de la CLI.
 
-## Estado actual (Block 10 — Staging, Calendario de Taller y Rediseño UX — DESPLEGADO A PROD ✅)
+## Estado actual (Block 11 — Taxonomía RV en el matching + etiquetado IA — DESPLEGADO A PROD ✅)
+
+Desplegado a producción el **2026-06-18** vía **PR #34** (squash-merge a `main`). La migración additiva `20260618000000_add_rv_taxonomy` se aplicó a prod **antes** del merge (orden seguro: migración → merge → deploy), con `prisma migrate deploy` (conexión directa `.env` → prod). **No** se usó el MCP de Supabase: el token cargado apunta a la cuenta **TuteBot/joeylito**, no a Campernova (gotcha de cuentas, ver `docs/ACCOUNTS.md`). Migración solo `CREATE TYPE` + `ADD COLUMN` nullable → no toca datos.
+
+### Taxonomía RV (Fase #3 del plan de la nota de voz) — antes bloqueada, ahora v1
+
+- **Schema additivo** en `Vehicle` (category, bedLayout, sleepingPlaces, bathroomType, heatingType, winterized, hasGarage, maxMassKg, heightM, offGrid) y `BuyerLead` (preferencias espejo + excluyentes). `seats` = plazas homologadas; `sleepingPlaces` = para dormir.
+- **Matching** (`lib/matching`): nuevos ejes de scoring **categoría (22)** y **cama (18)** + filtros duros nuevos (plazas dormir, baño obligatorio, carnet/MMA > 3.500 kg, largo/alto de parking). `WEIGHTS` = categoría 22 · cama 18 · precio 20 · equipo 15 · antig/km 15 · zona 10. **Fail-open**: el stock sin etiquetar NO se oculta (ejes sin dato → neutral 60). Diseño en `docs/adr/0006-rv-taxonomy-matching.md`.
+- **Fuente única de opciones** `lib/rv-taxonomy.ts` (mismas etiquetas/valores en `/vender`, ficha de vehículo y de comprador). Baño = dimensión propia (`bathroomType`); `equipment.bathroom` se deriva de ahí.
+- **Etiquetado asistido por IA** (`lib/rv-suggest/`): botón "Sugerir con IA" en la ficha del vehículo (pestaña Preparación) → Claude (visión) analiza fotos + marca/modelo y prerellena la ficha técnica RV; el agente revisa y guarda. Solo **añade** información; salida validada contra los enums (`normalizeRvSuggestion`). Reutiliza el pipeline de visión de anuncios (SDK oficial, URL + fallback base64).
+- **Glosario** del dueño en `docs/taxonomia-rv-glosario.md` (base de la taxonomía y futuro conocimiento del chat en la Fase B).
+- Tests: **378 verdes**. Validado end-to-end en staging (3 vehículos + 2 compradores opuestos → cada filtro y eje demostrado) y visión real probada (el modelo reconoció el vehículo desde la foto).
+
+**Operativa para el equipo**: para que el matching cuadre fino, etiquetar el stock en la ficha del vehículo (pestaña **Preparación** → "Ficha técnica (RV)"). Atajo: el botón **"Sugerir con IA"** rellena casi todo desde las fotos; solo hay que revisar y Guardar.
+
+### Fix del chat comprador en local (PR #33)
+
+`@ai-sdk/anthropic` construye la URL como `${baseURL}/messages`, así que `ANTHROPIC_BASE_URL` debe incluir `/v1`. Si el entorno la exporta sin `/v1` (válido para el SDK oficial, no para el AI SDK) el chat de `/comprar` daba 404 y se quedaba "pensando" — **solo en local** (en Vercel la variable no existe). Provider normalizado en `lib/ai/anthropic.ts`.
+
+### Pendiente (Fase B del plan)
+
+- **Chat con taxonomía RV**: que el asistente de `/comprar` use el glosario para mapear el lenguaje del cliente a la taxonomía y capture sus preferencias RV. Sobre `main` limpio, tras etiquetar stock real.
+
+## Estado previo (Block 10 — Staging, Calendario de Taller y Rediseño UX — DESPLEGADO A PROD ✅)
 
 Desplegado a producción el **2026-06-18** vía **PR #31** (squash-merge a `main`, commit `43cc899`). La migración additiva se aplicó a prod **antes** del merge (orden seguro: migración → merge → deploy). Tres frentes del plan de la nota de voz del dueño (`docs`/plan aprobado):
 
