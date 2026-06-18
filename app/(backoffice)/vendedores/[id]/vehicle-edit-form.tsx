@@ -30,7 +30,9 @@ import {
   RV_HEATING_OPTIONS,
   RV_NONE,
 } from '@/lib/rv-taxonomy'
+import { Sparkles, Loader2 } from 'lucide-react'
 import { updateVehicle } from './actions'
+import { suggestVehicleRvTaxonomy } from './rv-suggest-actions'
 import {
   VEHICLE_TRANSITIONS,
   VEHICLE_STATUS_LABELS,
@@ -75,6 +77,46 @@ export function VehicleEditForm({ vehicleId, defaultValues }: Props) {
     resolver: zodResolver(updateVehicleSchema),
     defaultValues,
   })
+
+  const [suggesting, setSuggesting] = useState(false)
+  const [suggestNote, setSuggestNote] = useState<string | null>(null)
+  const [suggestError, setSuggestError] = useState<string | null>(null)
+
+  async function handleSuggest() {
+    setSuggesting(true)
+    setSuggestNote(null)
+    setSuggestError(null)
+    const res = await suggestVehicleRvTaxonomy(vehicleId)
+    setSuggesting(false)
+    if ('error' in res) {
+      setSuggestError(res.error)
+      return
+    }
+    const s = res.suggestion
+    const dirty = { shouldDirty: true } as const
+    // La IA solo AÑADE información: rellena lo que propone con criterio y no borra
+    // lo que ya hubiera (los null se ignoran; el equipamiento solo se activa, no se apaga).
+    if (s.category !== null) form.setValue('category', s.category, dirty)
+    if (s.bedLayout !== null) form.setValue('bedLayout', s.bedLayout, dirty)
+    if (s.bathroomType !== null) form.setValue('bathroomType', s.bathroomType, dirty)
+    if (s.heatingType !== null) form.setValue('heatingType', s.heatingType, dirty)
+    if (s.sleepingPlaces !== null) form.setValue('sleepingPlaces', s.sleepingPlaces, dirty)
+    if (s.maxMassKg !== null) form.setValue('maxMassKg', s.maxMassKg, dirty)
+    if (s.heightM !== null) form.setValue('heightM', s.heightM, dirty)
+    if (s.length !== null) form.setValue('length', s.length, dirty)
+    if (s.winterized !== null) form.setValue('winterized', s.winterized, dirty)
+    if (s.hasGarage !== null) form.setValue('hasGarage', s.hasGarage, dirty)
+    if (s.offGrid !== null) form.setValue('offGrid', s.offGrid, dirty)
+    if (s.equipment.solar) form.setValue('equipment.solar', true, dirty)
+    if (s.equipment.kitchen) form.setValue('equipment.kitchen', true, dirty)
+    if (s.equipment.shower) form.setValue('equipment.shower', true, dirty)
+    if (s.equipment.heating) form.setValue('equipment.heating', true, dirty)
+    setSuggestNote(
+      s.notes
+        ? `Sugerido por IA — revisa y guarda. ${s.notes}`
+        : 'Sugerido por IA — revisa los campos y pulsa Guardar.'
+    )
+  }
 
   async function onSubmit(data: UpdateVehicleValues) {
     setSaved(false)
@@ -360,11 +402,36 @@ export function VehicleEditForm({ vehicleId, defaultValues }: Props) {
 
         {/* Ficha técnica (RV) — alimenta el matching */}
         <div className="border-t pt-4">
-          <p className="text-sm font-medium leading-none">Ficha técnica (RV)</p>
-          <p className="mb-3 mt-1 text-xs text-muted-foreground">
-            Cuanto más completes, mejor cuadra el matching con los compradores. Déjalo en blanco si
-            no lo sabes.
-          </p>
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <p className="text-sm font-medium leading-none">Ficha técnica (RV)</p>
+              <p className="mb-3 mt-1 text-xs text-muted-foreground">
+                Cuanto más completes, mejor cuadra el matching con los compradores. Déjalo en blanco
+                si no lo sabes.
+              </p>
+            </div>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={handleSuggest}
+              disabled={suggesting}
+              className="shrink-0"
+            >
+              {suggesting ? (
+                <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+              ) : (
+                <Sparkles className="mr-1.5 h-3.5 w-3.5" />
+              )}
+              {suggesting ? 'Analizando fotos…' : 'Sugerir con IA'}
+            </Button>
+          </div>
+          {suggestNote && (
+            <p className="mb-3 rounded-md bg-muted px-3 py-2 text-xs text-muted-foreground">
+              {suggestNote}
+            </p>
+          )}
+          {suggestError && <p className="mb-3 text-xs text-destructive">{suggestError}</p>}
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             {/* Categoría / carrocería */}
             <FormField

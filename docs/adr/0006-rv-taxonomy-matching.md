@@ -23,6 +23,6 @@ La taxonomía se basa en el glosario experto del dueño (ver `docs/taxonomia-rv-
 ## Consecuencias
 
 - El % de match refleja distribución + cama + restricciones legales → fiable.
-- Requiere que el **agente etiquete el stock** (inspección física en la nave). El alta web captura lo que el vendedor sepa (opcional).
+- Requiere que el **agente etiquete el stock** (inspección física en la nave). El alta web captura lo que el vendedor sepa (opcional). Para que ese etiquetado no sea un cuello de botella, se añade **etiquetado asistido por IA** (`lib/rv-suggest/`): Claude analiza las fotos + marca/modelo y prerellena la ficha; el agente revisa y confirma. La IA solo añade (no borra) y su salida se valida contra los enums de la taxonomía (`normalizeRvSuggestion`). Reutiliza el pipeline de visión de la generación de anuncios.
 - Lógica pura testeable en `lib/matching` (+12 tests). Migración additiva validada en staging antes de prod.
 - La **Fase B (chat)** usará el glosario como conocimiento para mapear el lenguaje del cliente a esta taxonomía.
