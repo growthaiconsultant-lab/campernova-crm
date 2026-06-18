@@ -4,7 +4,7 @@ import { db } from '@/lib/db'
 import { requireAuth } from '@/lib/auth'
 import { LeadsFilters } from './leads-filters'
 import { buildWhatsAppUrl } from '@/lib/whatsapp'
-import type { Prisma, SellerLeadStatus, LeadCanal } from '@prisma/client'
+import type { Prisma, SellerLeadStatus, LeadCanal, VehicleStatus } from '@prisma/client'
 
 const PAGE_SIZE = 50
 
@@ -20,6 +20,9 @@ const PIPELINE_STAGES = [
 ]
 
 const TERMINAL_STATUSES: SellerLeadStatus[] = ['CERRADO', 'DESCARTADO']
+
+// "Stock real" = vehículos que custodiamos y estamos vendiendo (no leads sin cualificar)
+const STOCK_STATUSES: VehicleStatus[] = ['TASADO', 'PUBLICADO', 'RESERVADO']
 
 // ── Status pills ──────────────────────────────────────────────────────────────
 
@@ -124,6 +127,13 @@ function buildViewConditions(
   twoDaysAgo: Date,
   startOfWeek: Date
 ): Prisma.SellerLeadWhereInput {
+  if (view === 'stock') return { vehicle: { status: { in: STOCK_STATUSES } } }
+  if (view === 'leads-web')
+    return {
+      canal: 'PRO',
+      status: { notIn: TERMINAL_STATUSES },
+      OR: [{ vehicle: null }, { vehicle: { valuationRecommended: null } }],
+    }
   if (view === 'mis-leads') return { agentId: currentUserId, status: { notIn: TERMINAL_STATUSES } }
   if (view === 'sin-asignar') return { agentId: null, status: { notIn: TERMINAL_STATUSES } }
   if (view === 'sin-tasar')
@@ -243,6 +253,8 @@ export default async function VendedoresPage({ searchParams }: { searchParams: S
     sinTasarCount,
     necesitanAccionCount,
     estaSemanaCout,
+    stockCount,
+    leadsWebCount,
     closed30,
     created30,
     total,
@@ -269,6 +281,14 @@ export default async function VendedoresPage({ searchParams }: { searchParams: S
       },
     }),
     db.sellerLead.count({ where: { createdAt: { gte: startOfWeek } } }),
+    db.sellerLead.count({ where: { vehicle: { status: { in: STOCK_STATUSES } } } }),
+    db.sellerLead.count({
+      where: {
+        canal: 'PRO',
+        status: { notIn: TERMINAL_STATUSES },
+        OR: [{ vehicle: null }, { vehicle: { valuationRecommended: null } }],
+      },
+    }),
     db.sellerLead.count({ where: { status: 'CERRADO', updatedAt: { gte: thirtyDaysAgo } } }),
     db.sellerLead.count({ where: { createdAt: { gte: thirtyDaysAgo } } }),
     db.sellerLead.count({ where }),
@@ -492,6 +512,8 @@ export default async function VendedoresPage({ searchParams }: { searchParams: S
           <div className="flex items-center">
             {[
               { key: 'todos', label: 'Todos', count: pipelineTotal },
+              { key: 'stock', label: 'Stock', count: stockCount },
+              { key: 'leads-web', label: 'Leads web', count: leadsWebCount },
               { key: 'mis-leads', label: 'Mis leads', count: misLeadsCount },
               { key: 'sin-asignar', label: 'Sin asignar', count: sinAsignarCount },
               { key: 'sin-tasar', label: 'Sin tasar', count: sinTasarCount },
