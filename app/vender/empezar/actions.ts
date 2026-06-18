@@ -182,7 +182,7 @@ export async function submitPublicLead(formData: FormData) {
     year,
     km,
     conservationState,
-    equipment,
+    equipment: equipmentResolved,
   })
 
   // Recalcula matches con el precio recién tasado
