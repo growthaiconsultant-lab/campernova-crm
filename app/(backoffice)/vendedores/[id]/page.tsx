@@ -18,11 +18,7 @@ import { NoteForm } from '@/components/note-form'
 import { addSellerLeadNote } from './actions'
 import { WhatsAppButton } from '@/components/whatsapp-button'
 import { sellerWhatsAppMessage } from '@/lib/whatsapp'
-import {
-  SELLER_LEAD_TRANSITIONS,
-  SELLER_LEAD_STATUS_LABELS,
-  SELLER_LEAD_STATUS_CLASSES,
-} from '@/lib/state-machine'
+import { SELLER_LEAD_TRANSITIONS, SELLER_LEAD_STATUS_LABELS } from '@/lib/state-machine'
 import type { SellerLeadStatus } from '@prisma/client'
 import { PublicNotesEditor } from '@/components/vehicle-ads/public-notes-editor'
 import { GenerateAdButton } from '@/components/vehicle-ads/generate-ad-button'
@@ -47,16 +43,8 @@ import { LeadTabNav } from './lead-tab-nav'
 import type { LeadTab } from './lead-tab-nav'
 import { SellerTopbarActions } from './seller-topbar-actions'
 import { ProximaAccionCard } from './proxima-accion-card'
-import {
-  AlertTriangle,
-  Info,
-  CheckCircle2,
-  Phone,
-  Mail,
-  MapPin,
-  ChevronRight,
-  ChevronLeft,
-} from 'lucide-react'
+import { StatusPill } from '@/components/status-pill'
+import { AlertTriangle, Info, CheckCircle2, Phone, Mail, ChevronLeft } from 'lucide-react'
 import { QuickAdvanceButton } from './quick-advance-button'
 import { InfoTooltip } from '@/components/info-tooltip'
 
@@ -166,6 +154,9 @@ export default async function FichaVendedorPage({
     },
   }))
 
+  // Comprador de la operación (match cerrado) — para el cruce vehículo↔comprador
+  const closedMatch = vehicleMatches.find((m) => m.status === 'CERRADO') ?? null
+
   // Legal / expediente
   const legalInput: VehicleLegalInput | null = v
     ? {
@@ -272,16 +263,19 @@ export default async function FichaVendedorPage({
   // ── Tabs definición ────────────────────────────────────────────────────────
   const tabs: LeadTab[] = [
     { key: 'resumen', label: 'Resumen' },
-    { key: 'vehiculo', label: 'Vehículo' },
-    ...(v ? [{ key: 'fotos', label: 'Fotos', badge: v.photos.length }] : []),
-    ...(v ? [{ key: 'compradores', label: 'Compradores', badge: vehicleMatches.length }] : []),
-    { key: 'actividad', label: 'Actividad', badge: activities.length },
-    ...(v && legalInput
-      ? [{ key: 'expediente', label: 'Expediente legal', badge: `${completionPct}%` }]
+    ...(v
+      ? [
+          {
+            key: 'preparacion',
+            label: 'Preparación',
+            ...(legalInput ? { badge: `${completionPct}%` } : {}),
+          },
+        ]
       : []),
     ...(v ? [{ key: 'publicacion', label: 'Publicación' }] : []),
-    ...(isAdmin && v ? [{ key: 'costes', label: 'Costes' }] : []),
-    ...(v ? [{ key: 'tasacion', label: 'Tasación' }] : []),
+    ...(v ? [{ key: 'compradores', label: 'Compradores', badge: vehicleMatches.length }] : []),
+    { key: 'actividad', label: 'Actividad', badge: activities.length },
+    ...(v ? [{ key: 'economia', label: isAdmin ? 'Economía' : 'Tasación' }] : []),
   ]
 
   // ── Form default values ────────────────────────────────────────────────────
@@ -341,7 +335,9 @@ export default async function FichaVendedorPage({
             Vendedores
           </Link>
           <span className="text-muted-foreground/40">/</span>
-          <span className="font-semibold text-foreground">{lead.name}</span>
+          <span className="font-semibold text-foreground">
+            {v ? `${v.brand} ${v.model}` : lead.name}
+          </span>
         </nav>
         <div className="flex items-center gap-2">
           <SellerTopbarActions leadId={lead.id} isTerminal={!nextLeadStatuses.length} />
@@ -361,6 +357,7 @@ export default async function FichaVendedorPage({
               leadId={lead.id}
               nextStatus={primaryNextStatus}
               label={`Mover a ${SELLER_LEAD_STATUS_LABELS[primaryNextStatus as SellerLeadStatus]}`}
+              variant="outline"
             />
           )}
         </div>
@@ -368,123 +365,104 @@ export default async function FichaVendedorPage({
 
       {/* ── Hero ── */}
       <section className="border-b border-border bg-background px-10 pb-0 pt-7">
-        {/* Identity row */}
-        <div className="mb-6 flex items-center gap-6">
-          {/* Avatar 84px with status ring */}
-          <div
-            className={`flex h-[84px] w-[84px] shrink-0 items-center justify-center rounded-full border-4 text-2xl font-bold text-background ${
-              lead.status === 'CERRADO'
-                ? 'border-green-500 bg-green-600'
-                : lead.status === 'DESCARTADO'
-                  ? 'border-red-400 bg-slate-500'
-                  : lead.status === 'EN_NEGOCIACION'
-                    ? 'border-amber-400 bg-foreground'
-                    : 'border-sidebar-primary/30 bg-foreground'
-            }`}
-          >
-            {lead.name
-              .split(' ')
-              .slice(0, 2)
-              .map((w: string) => w[0])
-              .join('')
-              .toUpperCase()}
+        {/* Identity row — centrado en el vehículo */}
+        <div className="mb-6 flex flex-col gap-5 sm:flex-row sm:items-center">
+          {/* Miniatura del vehículo */}
+          <div className="h-[76px] w-[110px] shrink-0 overflow-hidden rounded-xl border border-border bg-muted">
+            {v?.photos[0] ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={v.photos[0].url}
+                alt={v ? `${v.brand} ${v.model}` : ''}
+                className="h-full w-full object-cover"
+              />
+            ) : (
+              <div className="flex h-full w-full items-center justify-center text-lg font-bold text-muted-foreground/40">
+                {v ? v.brand.charAt(0).toUpperCase() : '—'}
+              </div>
+            )}
           </div>
 
-          {/* Name + sub-info */}
+          {/* Vehículo + vendedor */}
           <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-center gap-3">
-              <h1 className="text-[28px] font-bold leading-tight tracking-[-0.02em]">
-                {lead.name}
+              <h1 className="text-[26px] font-bold leading-tight tracking-[-0.02em]">
+                {v ? `${v.brand} ${v.model}` : lead.name}
               </h1>
-              <span
-                className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-medium ${SELLER_LEAD_STATUS_CLASSES[lead.status as SellerLeadStatus] ?? ''}`}
-              >
-                {SELLER_LEAD_STATUS_LABELS[lead.status as SellerLeadStatus] ?? lead.status}
-              </span>
-            </div>
-            <div className="mt-1.5 flex flex-wrap items-center gap-4 text-sm text-muted-foreground">
-              {lead.email && (
-                <a
-                  href={`mailto:${lead.email}`}
-                  className="flex items-center gap-1.5 transition-colors hover:text-foreground"
-                >
-                  <Mail className="h-3.5 w-3.5" />
-                  {lead.email}
-                </a>
+              {v ? (
+                <StatusPill status={v.status} entity="vehicle" />
+              ) : (
+                <StatusPill status={lead.status} entity="seller" />
               )}
+              {v && (
+                <span
+                  className={`rounded-md px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${
+                    lead.canal === 'PRO'
+                      ? 'bg-amber-100 text-amber-700'
+                      : 'bg-slate-100 text-slate-600'
+                  }`}
+                >
+                  {lead.canal === 'PRO' ? 'Formulario web' : 'Backoffice'}
+                </span>
+              )}
+            </div>
+            {v && (
+              <p className="mt-1 text-sm text-muted-foreground">
+                {[
+                  v.year,
+                  v.km != null ? `${v.km.toLocaleString('es-ES')} km` : null,
+                  v.length ? `${v.length} m` : null,
+                  v.plate,
+                  v.location,
+                ]
+                  .filter(Boolean)
+                  .join(' · ')}
+              </p>
+            )}
+            {/* Vendedor + contacto */}
+            <div className="mt-2.5 flex flex-wrap items-center gap-2 text-sm">
+              <span className="text-muted-foreground">
+                Vendedor · <span className="font-medium text-foreground">{lead.name}</span>
+              </span>
               {lead.phone && (
                 <a
                   href={`tel:${lead.phone}`}
-                  className="flex items-center gap-1.5 transition-colors hover:text-foreground"
+                  className="inline-flex items-center gap-1 rounded-md border border-border px-2 py-1 text-xs text-muted-foreground transition-colors hover:border-green-500 hover:text-green-600"
                 >
-                  <Phone className="h-3.5 w-3.5" />
+                  <Phone className="h-3 w-3" />
                   {lead.phone}
                 </a>
               )}
-              {v?.location && (
-                <span className="flex items-center gap-1.5">
-                  <MapPin className="h-3.5 w-3.5" />
-                  {v.location}
-                </span>
+              {lead.email && (
+                <a
+                  href={`mailto:${lead.email}`}
+                  className="inline-flex items-center gap-1 rounded-md border border-border px-2 py-1 text-xs text-muted-foreground transition-colors hover:border-foreground hover:text-foreground"
+                >
+                  <Mail className="h-3 w-3" />
+                  {lead.email}
+                </a>
               )}
-              <span
-                className={`rounded-md px-2 py-0.5 text-xs font-semibold uppercase tracking-wide ${
-                  lead.canal === 'PRO' ? 'bg-teal-100 text-teal-700' : 'bg-slate-100 text-slate-600'
-                }`}
-              >
-                Canal {lead.canal}
-              </span>
             </div>
           </div>
 
-          {/* Circle contact buttons */}
-          <div className="flex shrink-0 items-center gap-2">
-            {lead.phone && (
-              <a
-                href={`tel:${lead.phone}`}
-                title="Llamar"
-                className="flex h-10 w-10 items-center justify-center rounded-full border border-border bg-background text-muted-foreground transition-colors hover:border-green-500 hover:bg-green-500 hover:text-white"
-              >
-                <Phone className="h-4 w-4" />
-              </a>
-            )}
-            {lead.email && (
-              <a
-                href={`mailto:${lead.email}`}
-                title="Email"
-                className="flex h-10 w-10 items-center justify-center rounded-full border border-border bg-background text-muted-foreground transition-colors hover:border-foreground hover:bg-foreground hover:text-background"
-              >
-                <Mail className="h-4 w-4" />
-              </a>
-            )}
+          {/* Días en pipeline */}
+          <div className="shrink-0 sm:text-right">
+            <p
+              className={`text-[26px] font-bold leading-none ${daysPipeline > 60 ? 'text-red-500' : daysPipeline > 30 ? 'text-amber-500' : 'text-foreground'}`}
+            >
+              {daysPipeline}
+            </p>
+            <p className="mt-1 font-mono text-[10px] uppercase tracking-[0.12em] text-muted-foreground">
+              días en pipeline
+            </p>
           </div>
         </div>
 
-        {/* KPI metrics bar */}
+        {/* Tira de métricas clave */}
         {v && (
-          <div className="grid grid-cols-[repeat(5,1fr)_auto] divide-x divide-border border-t">
-            {/* Vehículo */}
-            <div className="flex flex-col justify-center px-5 py-4">
-              <div className="mb-1 flex items-center gap-1">
-                <p className="font-mono text-[10px] uppercase tracking-[0.12em] text-muted-foreground">
-                  Vehículo
-                </p>
-                <InfoTooltip
-                  text="Marca, modelo, año y kilometraje del vehículo en consignación."
-                  side="bottom"
-                />
-              </div>
-              <p className="text-[22px] font-bold leading-snug tracking-[-0.02em]">
-                {v.brand} {v.model}
-              </p>
-              <p className="mt-0.5 text-xs text-muted-foreground">
-                {v.year} · {v.km?.toLocaleString('es-ES')} km
-                {v.length ? ` · ${v.length}m` : ''}
-              </p>
-            </div>
-
+          <div className="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-5">
             {/* Precio salida */}
-            <div className="flex flex-col justify-center px-5 py-4">
+            <div className="rounded-xl border border-border bg-card px-4 py-3">
               <div className="mb-1 flex items-center gap-1">
                 <p className="font-mono text-[10px] uppercase tracking-[0.12em] text-muted-foreground">
                   Precio salida
@@ -494,118 +472,70 @@ export default async function FichaVendedorPage({
                   side="bottom"
                 />
               </div>
-              <p className="text-[22px] font-bold leading-snug tracking-[-0.02em] text-sidebar-primary">
+              <p className="text-xl font-bold tracking-[-0.02em] text-sidebar-primary">
                 {(v.salePrice ?? v.desiredPrice) ? EUR(Number(v.salePrice ?? v.desiredPrice)) : '—'}
               </p>
-              {v.valuationRecommended && (
-                <p className="mt-0.5 text-[11px] text-muted-foreground">
-                  Tasación: {Math.round(Number(v.valuationMin ?? v.valuationRecommended) / 1000)}k–
-                  {Math.round(Number(v.valuationMax ?? v.valuationRecommended) / 1000)}k €
-                </p>
-              )}
             </div>
 
-            {/* Margen (admin) or placeholder */}
-            {isAdmin && margin ? (
-              <div className="flex flex-col justify-center px-5 py-4">
+            {/* Tasación */}
+            <div className="rounded-xl border border-border bg-card px-4 py-3">
+              <p className="mb-1 font-mono text-[10px] uppercase tracking-[0.12em] text-muted-foreground">
+                Tasación
+              </p>
+              <p className="text-xl font-bold tracking-[-0.02em]">
+                {v.valuationRecommended
+                  ? `${Math.round(Number(v.valuationMin ?? v.valuationRecommended) / 1000)}–${Math.round(Number(v.valuationMax ?? v.valuationRecommended) / 1000)}k €`
+                  : '—'}
+              </p>
+            </div>
+
+            {/* Margen (solo admin) */}
+            {isAdmin && (
+              <div className="rounded-xl border border-border bg-card px-4 py-3">
                 <div className="mb-1 flex items-center gap-1">
                   <p className="font-mono text-[10px] uppercase tracking-[0.12em] text-muted-foreground">
-                    Margen objetivo
+                    Margen
                   </p>
                   <InfoTooltip
-                    text="Beneficio neto estimado: precio venta − compra − todos los costes imputados. Solo visible para administradores."
+                    text="Beneficio neto estimado: precio venta − compra − todos los costes imputados. Solo administradores."
                     side="bottom"
                   />
                 </div>
                 <p
-                  className={`text-[22px] font-bold leading-snug tracking-[-0.02em] ${(margin.netMargin ?? 0) >= 0 ? 'text-green-600' : 'text-red-500'}`}
+                  className={`text-xl font-bold tracking-[-0.02em] ${margin && (margin.netMargin ?? 0) >= 0 ? 'text-green-600' : 'text-red-500'}`}
                 >
-                  {margin.netMargin !== null ? EUR(margin.netMargin) : '—'}
+                  {margin && margin.netMargin !== null ? EUR(margin.netMargin) : '—'}
                 </p>
-                <p className="mt-0.5 text-[11px] text-muted-foreground">
-                  {margin.marginPercentReal !== null
-                    ? `${margin.marginPercentReal.toFixed(1)}% sobre PVP`
-                    : `${margin.marginPercentTarget}% objetivo`}
-                </p>
-              </div>
-            ) : (
-              <div className="flex flex-col justify-center px-5 py-4">
-                <p className="font-mono text-[10px] uppercase tracking-[0.12em] text-muted-foreground">
-                  Margen
-                </p>
-                <p className="mt-1 text-[22px] font-bold text-muted-foreground/30">—</p>
               </div>
             )}
 
-            {/* Días pipeline */}
-            <div className="flex flex-col justify-center px-5 py-4">
+            {/* Calidad del lead */}
+            <div className="rounded-xl border border-border bg-card px-4 py-3">
               <div className="mb-1 flex items-center gap-1">
                 <p className="font-mono text-[10px] uppercase tracking-[0.12em] text-muted-foreground">
-                  Días pipeline
+                  Calidad lead
                 </p>
                 <InfoTooltip
-                  text="Días desde que entró el lead hasta hoy. Más de 60 días sin cierre reduce la probabilidad de conversión."
+                  text="Puntuación 0-100: completud del vehículo, fotos, matches activos, actividad reciente y canal."
                   side="bottom"
                 />
               </div>
-              <p
-                className={`text-[22px] font-bold leading-snug tracking-[-0.02em] ${daysPipeline > 60 ? 'text-red-500' : daysPipeline > 30 ? 'text-amber-500' : 'text-foreground'}`}
-              >
-                {daysPipeline}d
-              </p>
-              <p
-                className={`mt-0.5 text-[11px] ${daysSinceActivity > 7 ? 'text-red-500' : 'text-muted-foreground'}`}
-              >
-                {lastActivity ? `Contacto hace ${daysSinceActivity}d` : 'Sin contacto'}
+              <p className={`text-xl font-bold tracking-[-0.02em] ${leadScoreColor(leadScore)}`}>
+                {leadScore}
+                <span className="text-sm font-normal text-muted-foreground">/100</span>
               </p>
             </div>
 
-            {/* Lead score */}
-            <div className="flex flex-col justify-center px-5 py-4">
-              <div className="mb-1 flex items-center gap-1">
-                <p className="font-mono text-[10px] uppercase tracking-[0.12em] text-muted-foreground">
-                  Lead score
-                </p>
-                <InfoTooltip
-                  text="Puntuación de calidad 0-100: completud del vehículo, fotos, matches activos, actividad reciente y canal de entrada."
-                  side="bottom"
-                />
-              </div>
-              <div className="flex items-baseline gap-1">
-                <span
-                  className={`text-[22px] font-bold leading-snug tracking-[-0.02em] ${leadScoreColor(leadScore)}`}
-                >
-                  {leadScore}
-                </span>
-                <span className="text-sm text-muted-foreground">/100</span>
-              </div>
-              <div className="mt-1.5 flex h-1.5 w-20 gap-0.5">
-                {[20, 40, 60, 80, 100].map((t) => (
-                  <div
-                    key={t}
-                    className={`flex-1 rounded-sm transition-colors ${
-                      leadScore >= t
-                        ? leadScore >= 75
-                          ? 'bg-green-500'
-                          : leadScore >= 50
-                            ? 'bg-sidebar-primary'
-                            : 'bg-amber-400'
-                        : 'bg-muted'
-                    }`}
-                  />
-                ))}
-              </div>
-            </div>
-
-            {/* Estado link */}
-            <div className="flex shrink-0 items-center px-5 py-4">
-              <Link
-                href={`/vendedores/${lead.id}?tab=vehiculo`}
-                className="flex items-center gap-0.5 text-sm text-muted-foreground transition-colors hover:text-foreground"
+            {/* Listo para publicar */}
+            <div className="rounded-xl border border-border bg-card px-4 py-3">
+              <p className="mb-1 font-mono text-[10px] uppercase tracking-[0.12em] text-muted-foreground">
+                Listo p/ publicar
+              </p>
+              <p
+                className={`text-xl font-bold tracking-[-0.02em] ${completionPct >= 90 ? 'text-green-600' : completionPct >= 60 ? 'text-amber-500' : 'text-muted-foreground'}`}
               >
-                <ChevronRight className="h-4 w-4" />
-                <span>Estado</span>
-              </Link>
+                {completionPct}%
+              </p>
             </div>
           </div>
         )}
@@ -619,7 +549,7 @@ export default async function FichaVendedorPage({
       </section>
 
       {/* ── Contenido principal ── */}
-      <div className="grid flex-1 grid-cols-[1fr_360px]">
+      <div className="grid flex-1 grid-cols-1 lg:grid-cols-[1fr_320px]">
         {/* Main content */}
         <div className="min-w-0 p-8 pb-16">
           {/* ─────────────── RESUMEN ─────────────── */}
@@ -667,7 +597,7 @@ export default async function FichaVendedorPage({
                       Vehículo
                     </p>
                     <Link
-                      href={`/vendedores/${lead.id}?tab=vehiculo`}
+                      href={`/vendedores/${lead.id}?tab=preparacion`}
                       className="text-xs text-sidebar-primary hover:underline"
                     >
                       Editar datos
@@ -736,7 +666,7 @@ export default async function FichaVendedorPage({
                       Fotos · {v.photos.length} de 12 recomendadas
                     </p>
                     <Link
-                      href={`/vendedores/${lead.id}?tab=fotos`}
+                      href={`/vendedores/${lead.id}?tab=preparacion`}
                       className="text-xs text-sidebar-primary hover:underline"
                     >
                       Gestionar →
@@ -816,7 +746,7 @@ export default async function FichaVendedorPage({
                       Expediente legal · Documentación de venta
                     </p>
                     <Link
-                      href={`/vendedores/${lead.id}?tab=expediente`}
+                      href={`/vendedores/${lead.id}?tab=preparacion`}
                       className="text-xs text-sidebar-primary hover:underline"
                     >
                       Plantilla completa →
@@ -907,8 +837,8 @@ export default async function FichaVendedorPage({
             </div>
           )}
 
-          {/* ─────────────── VEHÍCULO ─────────────── */}
-          {activeTab === 'vehiculo' && (
+          {/* ─────────────── PREPARACIÓN · datos ─────────────── */}
+          {activeTab === 'preparacion' && (
             <div className="grid gap-6 lg:grid-cols-2">
               <Card>
                 <CardHeader>
@@ -936,8 +866,8 @@ export default async function FichaVendedorPage({
             </div>
           )}
 
-          {/* ─────────────── FOTOS ─────────────── */}
-          {activeTab === 'fotos' && v && (
+          {/* ─────────────── PREPARACIÓN · fotos ─────────────── */}
+          {activeTab === 'preparacion' && v && (
             <Card>
               <CardHeader>
                 <CardTitle className="text-base">Fotos del vehículo</CardTitle>
@@ -950,7 +880,7 @@ export default async function FichaVendedorPage({
 
           {/* ─────────────── COMPRADORES ─────────────── */}
           {activeTab === 'compradores' && v && (
-            <MatchesSection side="vehicle" matches={vehicleMatches} />
+            <MatchesSection side="vehicle" matches={vehicleMatches} defaultOpen />
           )}
 
           {/* ─────────────── ACTIVIDAD ─────────────── */}
@@ -973,8 +903,8 @@ export default async function FichaVendedorPage({
             </Card>
           )}
 
-          {/* ─────────────── EXPEDIENTE ─────────────── */}
-          {activeTab === 'expediente' && v && legalInput && isAgente && (
+          {/* ─────────────── PREPARACIÓN · expediente ─────────────── */}
+          {activeTab === 'preparacion' && v && legalInput && isAgente && (
             <Card>
               <CardHeader>
                 <div className="flex items-center justify-between">
@@ -1086,8 +1016,8 @@ export default async function FichaVendedorPage({
             </Card>
           )}
 
-          {/* ─────────────── COSTES ─────────────── */}
-          {activeTab === 'costes' && v && isAdmin && (
+          {/* ─────────────── ECONOMÍA · costes ─────────────── */}
+          {activeTab === 'economia' && v && isAdmin && (
             <Card>
               <CardHeader>
                 <CardTitle className="text-base">Costes y margen</CardTitle>
@@ -1141,8 +1071,8 @@ export default async function FichaVendedorPage({
             </Card>
           )}
 
-          {/* ─────────────── TASACIÓN ─────────────── */}
-          {activeTab === 'tasacion' && v && (
+          {/* ─────────────── ECONOMÍA · tasación ─────────────── */}
+          {activeTab === 'economia' && v && (
             <Card>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
                 <CardTitle className="text-base">Tasación</CardTitle>
@@ -1184,10 +1114,10 @@ export default async function FichaVendedorPage({
           )}
         </div>
 
-        {/* ── Sidebar derecha 360px ── */}
-        <aside className="border-l border-border">
-          <div className="sticky top-[130px] divide-y divide-border">
-            {/* ── Próxima acción — dark card (client, logs WhatsApp) ── */}
+        {/* ── Rail derecho persistente (320px) — orientación a la tarea ── */}
+        <aside className="border-t border-border lg:border-l lg:border-t-0">
+          <div className="divide-y divide-border lg:sticky lg:top-[130px]">
+            {/* Próxima acción — persistente en todas las pestañas */}
             <div className="p-5">
               <ProximaAccionCard
                 phone={lead.phone}
@@ -1198,19 +1128,42 @@ export default async function FichaVendedorPage({
               />
             </div>
 
-            {/* ── Asignación ── */}
+            {/* Comprador / operación (match cerrado) — cruce vehículo↔comprador */}
+            {closedMatch && (
+              <div className="p-5">
+                <p className="mb-3 font-mono text-[10px] uppercase tracking-[0.12em] text-muted-foreground">
+                  Comprador
+                </p>
+                <Link
+                  href={`/compradores/${closedMatch.buyerLead.id}`}
+                  className="flex items-center gap-3 rounded-lg border border-border p-3 transition-colors hover:bg-muted"
+                >
+                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-green-100 text-sm font-bold text-green-700">
+                    {closedMatch.buyerLead.name.charAt(0).toUpperCase()}
+                  </div>
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-semibold text-foreground">
+                      {closedMatch.buyerLead.name}
+                    </p>
+                    <p className="text-xs text-muted-foreground">Operación cerrada · ver ficha →</p>
+                  </div>
+                </Link>
+              </div>
+            )}
+
+            {/* Agente asignado */}
             <div className="p-5">
               <p className="mb-3 font-mono text-[10px] uppercase tracking-[0.12em] text-muted-foreground">
-                Asignación
+                Agente asignado
               </p>
               {lead.agent ? (
                 <div className="flex items-center gap-3">
                   <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-sidebar-primary text-sm font-bold text-sidebar-primary-foreground">
                     {lead.agent.name.charAt(0)}
                   </div>
-                  <div>
-                    <p className="text-sm font-semibold">{lead.agent.name}</p>
-                    <p className="text-xs text-muted-foreground">Agente asignado</p>
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-semibold">{lead.agent.name}</p>
+                    <p className="text-xs text-muted-foreground">Responsable del lead</p>
                   </div>
                 </div>
               ) : (
@@ -1222,162 +1175,43 @@ export default async function FichaVendedorPage({
                 </div>
               )}
               {isAdmin && (
-                <div className="mt-3 flex gap-2">
-                  <Button asChild variant="outline" size="sm" className="flex-1 text-xs">
-                    <Link href={`/vendedores/${lead.id}?tab=vehiculo`}>
-                      {lead.agent ? 'Reasignar' : 'Asignarme'}
-                    </Link>
-                  </Button>
-                  {lead.agent && (
-                    <Button asChild variant="outline" size="sm" className="flex-1 text-xs">
-                      <Link href={`/vendedores/${lead.id}?tab=vehiculo`}>Asignar a otro</Link>
-                    </Button>
-                  )}
-                </div>
+                <Button asChild variant="outline" size="sm" className="mt-3 w-full text-xs">
+                  <Link href={`/vendedores/${lead.id}?tab=preparacion`}>
+                    {lead.agent ? 'Reasignar agente' : 'Asignar agente'}
+                  </Link>
+                </Button>
               )}
             </div>
 
-            {/* ── Tasación — 3 columnas ── */}
-            {v && v.valuationRecommended && (
-              <div className="p-5">
-                <p className="mb-3 font-mono text-[10px] uppercase tracking-[0.12em] text-muted-foreground">
-                  Tasación interna
-                </p>
-                <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2">
-                  <div>
-                    <p className="font-mono text-[9px] uppercase tracking-[0.08em] text-muted-foreground">
-                      Cliente pide
-                    </p>
-                    <p className="mt-1 text-base font-bold">
-                      {v.desiredPrice ? EUR(Number(v.desiredPrice)) : '—'}
-                    </p>
-                  </div>
-                  <span className="text-muted-foreground/60">→</span>
-                  <div>
-                    <p className="font-mono text-[9px] uppercase tracking-[0.08em] text-muted-foreground">
-                      Nuestra tasación
-                    </p>
-                    <p className="mt-1 text-base font-bold text-sidebar-primary">
-                      {Math.round(Number(v.valuationMin) / 1000)}k–
-                      {Math.round(Number(v.valuationMax) / 1000)}k €
-                    </p>
-                  </div>
-                </div>
-                <div className="mt-3 grid grid-cols-3 gap-2 border-t border-border pt-3">
-                  <div className="text-center">
-                    <p className="font-mono text-[9px] uppercase tracking-wide text-muted-foreground">
-                      Mediana
-                    </p>
-                    <p className="mt-0.5 text-sm font-semibold">
-                      {EUR(Number(v.valuationRecommended))}
-                    </p>
-                  </div>
-                  <div className="text-center">
-                    <p className="font-mono text-[9px] uppercase tracking-wide text-muted-foreground">
-                      Tasaciones
-                    </p>
-                    <p className="mt-0.5 text-sm font-semibold">{v.valuations.length}</p>
-                  </div>
-                  <div className="text-center">
-                    <p className="font-mono text-[9px] uppercase tracking-wide text-muted-foreground">
-                      Confianza
-                    </p>
-                    <p className="mt-0.5 text-sm font-semibold">
-                      {v.valuations[0]?.confidence ?? '—'}
-                    </p>
-                  </div>
-                </div>
-                {v.desiredPrice && v.valuationRecommended && (
-                  <p
-                    className={`mt-2 text-xs ${Number(v.desiredPrice) > Number(v.valuationRecommended) * 1.05 ? 'text-amber-600' : 'text-green-600'}`}
-                  >
-                    {Number(v.desiredPrice) > Number(v.valuationRecommended) * 1.05
-                      ? `${Math.round(((Number(v.desiredPrice) - Number(v.valuationRecommended)) / Number(v.valuationRecommended)) * 100)}% por encima de la mediana`
-                      : 'Dentro del rango de mercado'}
-                  </p>
-                )}
-              </div>
-            )}
-
-            {/* ── Costes y margen (admin) ── */}
-            {isAdmin && margin && (
-              <div className="p-5">
-                <div className="mb-3 flex items-center justify-between">
-                  <p className="font-mono text-[10px] uppercase tracking-[0.12em] text-muted-foreground">
-                    Costes y margen
-                  </p>
-                  <Link
-                    href={`/vendedores/${lead.id}?tab=costes`}
-                    className="text-[10px] text-sidebar-primary hover:underline"
-                  >
-                    Editar →
-                  </Link>
-                </div>
-                <div className="space-y-1.5 text-xs">
-                  {margin.purchasePrice && (
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Precio compra</span>
-                      <span className="font-medium">{EUR(margin.purchasePrice)}</span>
-                    </div>
-                  )}
-                  {margin.totalCosts > 0 && (
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Gastos imputados</span>
-                      <span className="font-medium">{EUR(margin.totalCosts)}</span>
-                    </div>
-                  )}
-                  <div className="flex justify-between border-t border-border pt-1.5">
-                    <span className="font-semibold">Coste total</span>
-                    <span className="font-bold">
-                      {EUR((margin.purchasePrice ?? 0) + margin.totalCosts)}
-                    </span>
-                  </div>
-                  {margin.netMargin !== null && (
-                    <div
-                      className={`mt-2 flex justify-between rounded-lg p-2 ${margin.netMargin >= 0 ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'}`}
-                    >
-                      <span className="font-semibold">Margen neto</span>
-                      <span className="font-bold">
-                        {EUR(margin.netMargin)}
-                        {margin.marginPercentReal !== null
-                          ? ` · ${margin.marginPercentReal.toFixed(1)}%`
-                          : ''}
-                      </span>
-                    </div>
-                  )}
-                </div>
-              </div>
-            )}
-
-            {/* ── Resumen ── */}
+            {/* Resumen */}
             <div className="p-5">
               <p className="mb-3 font-mono text-[10px] uppercase tracking-[0.12em] text-muted-foreground">
                 Resumen
               </p>
               <div className="space-y-2 text-xs">
-                <div className="flex justify-between">
+                <div className="flex justify-between gap-2">
                   <span className="text-muted-foreground">Origen</span>
                   <span className="font-medium">
-                    {lead.canal === 'PRO' ? 'Web · Pro' : 'Backoffice · CN'}
+                    {lead.canal === 'PRO' ? 'Web · Formulario' : 'Backoffice'}
                   </span>
                 </div>
-                <div className="flex justify-between">
+                <div className="flex justify-between gap-2">
                   <span className="text-muted-foreground">Días en pipeline</span>
                   <span className="font-medium">{daysPipeline} días</span>
                 </div>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Etapa actual</span>
+                <div className="flex justify-between gap-2">
+                  <span className="text-muted-foreground">Estado del contacto</span>
                   <span className="font-medium">
                     {SELLER_LEAD_STATUS_LABELS[lead.status as SellerLeadStatus] ?? lead.status}
                   </span>
                 </div>
-                <div className="flex justify-between">
+                <div className="flex justify-between gap-2">
                   <span className="text-muted-foreground">Última actividad</span>
                   <span className="font-medium">
                     {lastActivity ? `hace ${daysSinceActivity}d` : 'Sin actividad'}
                   </span>
                 </div>
-                <div className="flex justify-between">
+                <div className="flex justify-between gap-2">
                   <span className="text-muted-foreground">Probabilidad cierre</span>
                   <span
                     className={`font-bold ${closureProb >= 60 ? 'text-green-600' : closureProb >= 30 ? 'text-amber-600' : 'text-red-500'}`}

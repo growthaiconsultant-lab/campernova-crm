@@ -9,15 +9,17 @@ type Props = {
   leadId: string
   nextStatus: string
   label: string
+  variant?: 'default' | 'outline' | 'secondary'
 }
 
-export function QuickAdvanceButton({ leadId, nextStatus, label }: Props) {
+export function QuickAdvanceButton({ leadId, nextStatus, label, variant = 'default' }: Props) {
   const [isPending, startTransition] = useTransition()
   const router = useRouter()
 
   return (
     <Button
       size="sm"
+      variant={variant}
       disabled={isPending}
       onClick={() =>
         startTransition(async () => {
