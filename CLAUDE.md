@@ -111,9 +111,20 @@ Desplegado a producción el **2026-06-18** vía **PR #34** (squash-merge a `main
 
 `@ai-sdk/anthropic` construye la URL como `${baseURL}/messages`, así que `ANTHROPIC_BASE_URL` debe incluir `/v1`. Si el entorno la exporta sin `/v1` (válido para el SDK oficial, no para el AI SDK) el chat de `/comprar` daba 404 y se quedaba "pensando" — **solo en local** (en Vercel la variable no existe). Provider normalizado en `lib/ai/anthropic.ts`.
 
-### Pendiente (Fase B del plan)
+### Fase B — Chat con taxonomía RV (DESPLEGADO A PROD ✅)
 
-- **Chat con taxonomía RV**: que el asistente de `/comprar` use el glosario para mapear el lenguaje del cliente a la taxonomía y capture sus preferencias RV. Sobre `main` limpio, tras etiquetar stock real.
+Desplegado el **2026-06-19** vía **PR #37** (squash-merge a `main`). **Sin migración** (reutiliza los campos RV del `BuyerLead` de la Fase A) → deploy directo de código.
+
+- El asistente de `/comprar` traduce el lenguaje del cliente (coloquial o técnico) a la taxonomía: distribución, tipo de cama, plazas para dormir, baño obligatorio, carnet/peso, alto/largo de parking, uso invernal, garaje deporte, niños → se guarda en el `BuyerLead` para alimentar el matching.
+- **Tool** ampliado (`lib/chat/tools.ts`) + **system prompt** (`lib/chat/system-prompt.ts`) con una chuleta _lenguaje cliente → taxonomía_ y reglas **excluyente vs preferencia** (solo fija carnet/medidas/baño si el cliente es firme → no auto-excluye stock). Mapeo args→`BuyerLead` en `app/api/chat/buyer/message/route.ts`.
+- Estilo conversacional (1-2 preguntas máximo, no interrogatorio); avisa proactivamente del carnet/peso si el cliente pide algo grande.
+- Validado: **380 tests** + eval de comprensión (NLU) con el modelo real sobre 12 frases (11/12; el restante es una clasificación alternativa válida) + prueba en vivo en staging (lead creado con sus preferencias RV). Baño = `bathroomRequired` (se quitó `bathroom` de los flags de equipamiento del chat, coherente con la Fase A).
+
+> **Nota dev**: la ficha pesada de comprador puede tirar el worker de render del dev server en Windows (`Jest worker encountered child process exceptions`) — es un flake local de Next 14 dev, no afecta a producción. Mitiga: `rm -rf .next` + `NODE_OPTIONS=--max-old-space-size=4096 pnpm dev`.
+
+### Pendiente del plan de la nota de voz
+
+Plan original (taller, CRM vehículo-céntrico, chat+matching RV) **completado**. Próximo valor: que el equipo **etiquete el stock real** (botón "Sugerir con IA") para que el matching y el chat crucen contra inventario etiquetado.
 
 ## Estado previo (Block 10 — Staging, Calendario de Taller y Rediseño UX — DESPLEGADO A PROD ✅)
 
