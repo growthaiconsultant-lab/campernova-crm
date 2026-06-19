@@ -129,6 +129,27 @@ se tocó; solo se añadió el subdominio `send` para Resend).
 
 ---
 
+## 🗑️ Jubilar el WordPress (cuando se decida, sin prisa)
+
+El WordPress viejo (hosting en dinahosting, IP `82.98.132.86`) solo sigue vivo como **red de
+seguridad de rollback**. Cuando haya confianza en el sitio nuevo (semanas/meses), se puede dar de
+baja ese **producto de hosting** para dejar de pagarlo. Antes de hacerlo, conviene saber:
+
+1. **No rompe `www`**: el redirect `www → apex` es una **redirección de dominio de dinahosting**
+   (panel _Redirecciones_), independiente del hosting WordPress. Dar de baja el hosting NO afecta a
+   `www` mientras el **dominio siga en dinahosting** (que es donde vive la DNS).
+2. **Lo único que se pierde es el rollback rápido por DNS** (volver el `A @` a `82.98.132.86`).
+   Confirmar primero que el sitio nuevo lleva tiempo estable antes de renunciar a esa red.
+3. **El correo no se toca**: el MX raíz es independiente del hosting WordPress.
+4. **No dar de baja el dominio** — solo el producto de hosting. El dominio + su DNS deben seguir en
+   dinahosting (o trasladarse con cuidado) porque ahí viven el `A @ → Vercel`, la redirección `www`
+   y los TXT de verificación.
+5. (Opcional, para no depender de la redirección de dinahosting) pasar `www` a **Vercel**: añadir
+   `www.campersnova.com` como dominio del proyecto (redirect a apex) y apuntar `www` por CNAME a
+   Vercel. No urgente — la redirección actual funciona.
+
+---
+
 ## Estado de la zona DNS de `campersnova.com` tras el cutover (dinahosting)
 
 | Tipo | Host                 | Valor                                   | Para qué                           |
