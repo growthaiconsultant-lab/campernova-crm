@@ -13,18 +13,44 @@ describe('registerBuyerLeadSchema — contrato de creación de lead', () => {
     expect(registerBuyerLeadSchema.safeParse(base).success).toBe(true)
   })
 
-  it('acepta un objeto completo con opcionales', () => {
+  it('acepta un objeto completo con opcionales (incl. taxonomía RV)', () => {
     const full = {
       ...base,
-      tipo: 'CAMPER',
+      tipo: 'AUTOCARAVANA',
       plazas: 4,
       presupuestoMin: 20000,
       presupuestoMax: 45000,
       zona: 'Cataluña',
       plazos: '1_3_meses',
-      equipamiento: { bathroom: true, solar: true },
+      equipamiento: { shower: true, solar: true },
+      categoria: 'PERFILADA',
+      tipoCama: 'ISLA',
+      plazasDormir: 2,
+      banoObligatorio: true,
+      carnet: 'B',
+      usoInvierno: true,
+      garajeDeporte: false,
+      viajaConNinos: false,
+      largoMaxM: 6.5,
+      altoMaxM: 2.9,
     }
-    expect(registerBuyerLeadSchema.safeParse(full).success).toBe(true)
+    const parsed = registerBuyerLeadSchema.safeParse(full)
+    expect(parsed.success).toBe(true)
+    if (parsed.success) {
+      expect(parsed.data.categoria).toBe('PERFILADA')
+      expect(parsed.data.carnet).toBe('B')
+      expect(parsed.data.altoMaxM).toBe(2.9)
+    }
+  })
+
+  it('rechaza una categoría RV fuera del enum', () => {
+    expect(registerBuyerLeadSchema.safeParse({ ...base, categoria: 'FURGO_RARA' }).success).toBe(
+      false
+    )
+  })
+
+  it('rechaza un carnet fuera del enum (B/C1)', () => {
+    expect(registerBuyerLeadSchema.safeParse({ ...base, carnet: 'A2' }).success).toBe(false)
   })
 
   it('rechaza email inválido', () => {

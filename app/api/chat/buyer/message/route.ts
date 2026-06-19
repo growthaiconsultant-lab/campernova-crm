@@ -90,6 +90,17 @@ export async function POST(req: NextRequest) {
                   useZone: d.zona ?? undefined,
                   purchaseTimeline: d.plazos ?? undefined,
                   criticalEquipment: d.equipamiento ?? {},
+                  // Taxonomía RV (Fase B) — preferencias capturadas por el asistente
+                  preferredCategory: d.categoria ?? undefined,
+                  preferredBedLayout: d.tipoCama ?? undefined,
+                  sleepingPlacesRequired: d.plazasDormir ?? undefined,
+                  bathroomRequired: d.banoObligatorio ?? undefined,
+                  licenseType: d.carnet ?? undefined,
+                  needsWinter: d.usoInvierno ?? undefined,
+                  needsGarage: d.garajeDeporte ?? undefined,
+                  maxLengthM: d.largoMaxM ?? undefined,
+                  maxHeightM: d.altoMaxM ?? undefined,
+                  hasKids: d.viajaConNinos ?? undefined,
                 },
               })
 

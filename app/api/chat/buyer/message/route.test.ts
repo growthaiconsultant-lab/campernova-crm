@@ -118,8 +118,14 @@ describe('POST /api/chat/buyer/message — flujo correcto', () => {
       nombre: 'Ana López',
       email: 'ana@example.com',
       telefono: '600111222',
-      necesidad: 'camper para 2',
-      tipo: 'CAMPER',
+      necesidad: 'autocaravana para 2',
+      tipo: 'AUTOCARAVANA',
+      categoria: 'PERFILADA',
+      tipoCama: 'ISLA',
+      carnet: 'B',
+      banoObligatorio: true,
+      altoMaxM: 2.9,
+      viajaConNinos: true,
     })
 
     expect(out).toEqual({ ok: true })
@@ -127,6 +133,13 @@ describe('POST /api/chat/buyer/message — flujo correcto', () => {
     const createArg = txCreate.mock.calls[0]![0].data
     expect(createArg.source).toBe('CHAT')
     expect(createArg.name).toBe('Ana López')
-    expect(createArg.vehicleType).toBe('CAMPER')
+    expect(createArg.vehicleType).toBe('AUTOCARAVANA')
+    // Taxonomía RV (Fase B) mapeada a los campos del BuyerLead
+    expect(createArg.preferredCategory).toBe('PERFILADA')
+    expect(createArg.preferredBedLayout).toBe('ISLA')
+    expect(createArg.licenseType).toBe('B')
+    expect(createArg.bathroomRequired).toBe(true)
+    expect(createArg.maxHeightM).toBe(2.9)
+    expect(createArg.hasKids).toBe(true)
   })
 })
