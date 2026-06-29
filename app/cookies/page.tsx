@@ -64,6 +64,27 @@ export default function CookiesPage() {
                 </td>
                 <td className="px-4 py-3 text-muted-foreground">1 año</td>
               </tr>
+              <tr className="bg-muted/20">
+                <td className="px-4 py-3 font-mono text-xs text-muted-foreground">
+                  _ga (Google Analytics)
+                </td>
+                <td className="px-4 py-3 text-muted-foreground">Analítica</td>
+                <td className="px-4 py-3 text-muted-foreground">
+                  Distingue usuarios para el análisis de tráfico (Google Analytics 4, vía Google Tag
+                  Manager)
+                </td>
+                <td className="px-4 py-3 text-muted-foreground">2 años</td>
+              </tr>
+              <tr>
+                <td className="px-4 py-3 font-mono text-xs text-muted-foreground">
+                  _ga_* (Google Analytics)
+                </td>
+                <td className="px-4 py-3 text-muted-foreground">Analítica</td>
+                <td className="px-4 py-3 text-muted-foreground">
+                  Mantiene el estado de la sesión para el análisis de tráfico (Google Analytics 4)
+                </td>
+                <td className="px-4 py-3 text-muted-foreground">2 años</td>
+              </tr>
             </tbody>
           </table>
         </div>

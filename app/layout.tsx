@@ -3,6 +3,7 @@ import { Inter, Fraunces, JetBrains_Mono, Cormorant_Garamond } from 'next/font/g
 import './globals.css'
 import { CookieBanner } from '@/components/cookie-banner'
 import { PostHogProvider } from '@/components/posthog-provider'
+import { GoogleTagManager } from '@/components/google-tag-manager'
 import { SITE_URL, SITE_NAME, SITE_DESCRIPTION, SITE_KEYWORDS } from '@/lib/seo'
 
 const inter = Inter({
@@ -73,6 +74,7 @@ export default function RootLayout({
         className={`${inter.variable} ${fraunces.variable} ${jetbrainsMono.variable} ${cormorant.variable} min-h-screen font-sans antialiased`}
       >
         <PostHogProvider>{children}</PostHogProvider>
+        <GoogleTagManager />
         <CookieBanner />
       </body>
     </html>
