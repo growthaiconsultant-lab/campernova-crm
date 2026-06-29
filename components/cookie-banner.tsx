@@ -44,7 +44,8 @@ export function CookieBanner() {
             <p>
               Usamos cookies propias <strong className="text-white">técnicas</strong> (necesarias
               para el funcionamiento del sitio) y <strong className="text-white">analíticas</strong>{' '}
-              (PostHog, para mejorar el servicio). Puedes aceptar todas o solo las esenciales.{' '}
+              (PostHog y Google Analytics, para mejorar el servicio). Puedes aceptar todas o solo
+              las esenciales.{' '}
               <Link
                 href="/cookies"
                 className="text-[#b59e7d] underline underline-offset-2 hover:text-[#b59e7d]/80"

@@ -62,11 +62,14 @@ export default function PrivacidadPage() {
             </p>
           </div>
           <div>
-            <p className="mb-1 font-medium text-foreground">Análisis web (PostHog)</p>
+            <p className="mb-1 font-medium text-foreground">
+              Análisis web (PostHog y Google Analytics)
+            </p>
             <p>
-              Usamos PostHog para recopilar datos de uso agregados y anónimos del sitio web (páginas
-              visitadas, tiempo en página, dispositivo). No se recogen datos personales
-              identificativos sin consentimiento previo.
+              Usamos PostHog y Google Analytics 4 (gestionado mediante Google Tag Manager) para
+              recopilar datos de uso agregados del sitio web (páginas visitadas, tiempo en página,
+              dispositivo, fuente de tráfico). Estas cookies solo se activan si aceptas su uso en el
+              banner de cookies; sin tu consentimiento no se cargan ni recogen datos.
             </p>
             <p className="mt-1">
               <span className="font-medium text-foreground">Base jurídica:</span> consentimiento
@@ -104,6 +107,10 @@ export default function PrivacidadPage() {
           <li>
             <span className="font-medium text-foreground">PostHog Inc.</span> — analítica web
             (instancia EU)
+          </li>
+          <li>
+            <span className="font-medium text-foreground">Google Ireland Ltd.</span> — analítica web
+            (Google Analytics 4 y Google Tag Manager)
           </li>
           <li>
             <span className="font-medium text-foreground">Vercel Inc.</span> — alojamiento del sitio
