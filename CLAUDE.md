@@ -92,7 +92,36 @@ claude mcp add-json linear '{\"command\":\"npx\",\"args\":[\"-y\",\"mcp-linear@l
 
 `.claude/settings.json` y `.claude/settings.local.json` se mantienen como referencia de la estructura, pero la fuente de verdad funcional es el registro de la CLI.
 
-## Estado actual (Block 11 — Taxonomía RV en el matching + etiquetado IA — DESPLEGADO A PROD ✅)
+## Estado actual (Block 12 — Analytics, Favicon, Logo y limpieza web — DESPLEGADO A PROD ✅)
+
+Desplegado a producción el **2026-07-01** vía **PRs #39–#42** (squash-merge a `main`). Sin migraciones de base de datos — solo cambios de frontend y analytics.
+
+### Google Tag Manager + GA4 (PR #39)
+
+- **GTM**: contenedor `GTM-NK5ZBX8P` cargado en `components/google-tag-manager.tsx` con **consentimiento estricto** — idéntico al modelo de PostHog. El script solo se inyecta cuando el usuario hace clic en "Aceptar todas" en el banner de cookies. Escucha `CustomEvent('cn:consent')` (mismo tab) y `StorageEvent` (cross-tab).
+- **GA4**: propiedad `CampersNova` · stream `campersnova.com - Web` · Measurement ID `G-WTR0WB8R6R`. Configurado **dentro del contenedor GTM** como etiqueta "Google tag" con trigger All Pages — no hay código GA4 en el repo.
+- **Env var en Vercel**: `NEXT_PUBLIC_GTM_ID=GTM-NK5ZBX8P` (Production + Preview).
+- Actualizado: banner de cookies (menciona GA), `/cookies` (filas `_ga` y `_ga_*`), `/privacidad` (sección analítica + Google Ireland Ltd. como encargado).
+
+### Favicon con logo real (PR #40)
+
+- `app/favicon.ico` — 32×32 generado desde el logo circular (PowerShell System.Drawing)
+- `app/icon.png` — 512×512 (favicon moderno / PWA)
+- `app/apple-icon.png` — 180×180 (iOS Add to Home Screen)
+- Fuente: `public/favicon Campers Nova.png` (logo circular cream)
+
+### Logo PNG en el header (PR #42)
+
+- `components/public-nav.tsx` reemplaza `LogoCampersNova` (componente tipográfico) por `<Image>` con el logo PNG real.
+- Fuente: `public/logo cn.png` (1536×1024, fondo transparente). El PNG original tenía el texto en solo el 33% del área → recortado automáticamente a `public/logo-cn-cropped.png` (756×334) usando PowerShell con detección de píxeles alfa > 0.
+- Tamaño en header: `h-9` mobile · `h-11` desktop, ancho automático.
+- El componente `LogoCampersNova` sigue existiendo (`components/logo-campers-nova.tsx`) — lo usa el sidebar del backoffice y el footer.
+
+### Sección Nova Assistant ocultada (PR #41)
+
+- `app/page.tsx`: `<NovaAssistant />` comentado e import eliminado. La funcionalidad no está lista. El componente sigue en `components/landing/nova-assistant.tsx` para reactivar cuando esté disponible.
+
+## Estado previo (Block 11 — Taxonomía RV en el matching + etiquetado IA — DESPLEGADO A PROD ✅)
 
 Desplegado a producción el **2026-06-18** vía **PR #34** (squash-merge a `main`). La migración additiva `20260618000000_add_rv_taxonomy` se aplicó a prod **antes** del merge (orden seguro: migración → merge → deploy), con `prisma migrate deploy` (conexión directa `.env` → prod). **No** se usó el MCP de Supabase: el token cargado apunta a la cuenta **TuteBot/joeylito**, no a Campernova (gotcha de cuentas, ver `docs/ACCOUNTS.md`). Migración solo `CREATE TYPE` + `ADD COLUMN` nullable → no toca datos.
 
