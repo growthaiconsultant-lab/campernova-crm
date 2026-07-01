@@ -35,12 +35,11 @@ export function PublicNav() {
         {/* Logo */}
         <Link href="/" className="flex shrink-0 items-center">
           <Image
-            src="/logo cn.png"
+            src="/logo-cn-cropped.png"
             alt="CampersNova"
-            width={140}
-            height={60}
-            className="h-8 w-auto lg:h-10"
-            style={{ mixBlendMode: 'multiply' }}
+            width={756}
+            height={334}
+            className="h-9 w-auto lg:h-11"
             priority
           />
         </Link>
