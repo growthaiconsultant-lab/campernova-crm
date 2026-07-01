@@ -6,7 +6,6 @@ import { HeroSection } from '@/components/landing/hero'
 import { TrustStrip } from '@/components/landing/trust-strip'
 import { TwoRoutes } from '@/components/landing/two-routes'
 import { SearchMethod } from '@/components/landing/search-method'
-import { NovaAssistant } from '@/components/landing/nova-assistant'
 import { HowItWorksSection } from '@/components/landing/how-it-works'
 import { WhyUsPillars } from '@/components/landing/why-us-pillars'
 import { SellBlock } from '@/components/landing/sell-block'
@@ -63,7 +62,7 @@ export default function LandingPage() {
         <TrustStrip />
         <TwoRoutes />
         <SearchMethod />
-        <NovaAssistant />
+        {/* <NovaAssistant /> */}
         <HowItWorksSection />
         <WhyUsPillars />
         <SellBlock />
