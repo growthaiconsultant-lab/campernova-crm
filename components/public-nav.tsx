@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { LogoCampersNova } from '@/components/logo-campers-nova'
+import Image from 'next/image'
 import { usePathname } from 'next/navigation'
 
 const NAV_LINKS: { href: string; label: string; activePath?: string }[] = [
@@ -32,11 +32,15 @@ export function PublicNav() {
       }}
     >
       <div className="mx-auto flex h-[72px] max-w-[1280px] items-center justify-between gap-4 px-8 max-[640px]:px-5">
-        {/* Logo — responsive: 22px mobile → 30px desktop */}
+        {/* Logo */}
         <Link href="/" className="flex shrink-0 items-center">
-          <LogoCampersNova
-            variant="dark"
-            className="[--logo-campers:8px] [--logo-nova:22px] lg:[--logo-campers:11px] lg:[--logo-nova:30px]"
+          <Image
+            src="/logo-cn-cropped.png"
+            alt="CampersNova"
+            width={756}
+            height={334}
+            className="h-9 w-auto lg:h-11"
+            priority
           />
         </Link>
 
