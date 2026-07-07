@@ -12,6 +12,7 @@ import { VehicleEditForm } from './vehicle-edit-form'
 import { ValuationOverrideForm } from './valuation-override-form'
 import { MatchesSection } from '@/components/matches-section'
 import type { VehicleMatchData } from '@/components/matches-section'
+import { prismaMatchingDeps, buildMatchExplanation } from '@/lib/matching'
 import { ActivityTimeline } from '@/components/activity-timeline'
 import type { ActivityItem } from '@/components/activity-timeline'
 import { NoteForm } from '@/components/note-form'
@@ -140,10 +141,25 @@ export default async function FichaVendedorPage({
   const lastActivity = activities[0]?.createdAt ?? null
   const daysSinceActivity = lastActivity ? daysSince(lastActivity) : daysPipeline
 
+  // CAM-64: explicación determinista por match (motivos + riesgos)
+  const matchDeps = prismaMatchingDeps(db)
+  const vehicleMatchInput =
+    v && (v.matches?.length ?? 0) > 0 ? await matchDeps.getVehicle(v.id) : null
+  const matchExplanations = new Map<string, { reasons: string[]; risks: string[] }>()
+  if (vehicleMatchInput) {
+    await Promise.all(
+      (v?.matches ?? []).map(async (m) => {
+        const b = await matchDeps.getBuyer(m.buyerLead.id)
+        if (b) matchExplanations.set(m.id, buildMatchExplanation(vehicleMatchInput, b))
+      })
+    )
+  }
+
   const vehicleMatches: VehicleMatchData[] = (v?.matches ?? []).map((m) => ({
     id: m.id,
     score: m.score,
     status: m.status,
+    explanation: matchExplanations.get(m.id) ?? null,
     buyerLead: {
       id: m.buyerLead.id,
       name: m.buyerLead.name,

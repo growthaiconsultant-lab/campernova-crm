@@ -10,10 +10,13 @@ import type { MatchStatus } from '@prisma/client'
 
 // ─── Types (plain JS — sin Decimal de Prisma) ────────────────────────────────
 
+export type MatchExplanationData = { reasons: string[]; risks: string[] } | null
+
 export type VehicleMatchData = {
   id: string
   score: number
   status: string
+  explanation?: MatchExplanationData
   buyerLead: {
     id: string
     name: string
@@ -28,6 +31,7 @@ export type BuyerMatchData = {
   id: string
   score: number
   status: string
+  explanation?: MatchExplanationData
   vehicle: {
     id: string
     brand: string
@@ -103,6 +107,39 @@ function formatEur(value: number): string {
     currency: 'EUR',
     maximumFractionDigits: 0,
   })
+}
+
+// ─── Explicación del match (CAM-64) ───────────────────────────────────────────
+
+function MatchExplanation({ explanation }: { explanation?: MatchExplanationData }) {
+  if (!explanation) return null
+  const { reasons, risks } = explanation
+  if (reasons.length === 0 && risks.length === 0) return null
+
+  return (
+    <div className="space-y-1.5 rounded-lg bg-muted/50 p-2.5 text-xs">
+      {reasons.length > 0 && (
+        <ul className="space-y-0.5">
+          {reasons.map((r, i) => (
+            <li key={`r${i}`} className="flex gap-1.5 text-foreground">
+              <span className="mt-px shrink-0 text-green-600">✓</span>
+              <span>{r}</span>
+            </li>
+          ))}
+        </ul>
+      )}
+      {risks.length > 0 && (
+        <ul className="space-y-0.5 border-t border-border/60 pt-1.5">
+          {risks.map((r, i) => (
+            <li key={`k${i}`} className="flex gap-1.5 text-muted-foreground">
+              <span className="mt-px shrink-0 text-amber-500">⚠</span>
+              <span>{r}</span>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  )
 }
 
 // ─── Status transition buttons ────────────────────────────────────────────────
@@ -195,6 +232,8 @@ function BuyerMatchCard({ match }: { match: VehicleMatchData }) {
         )}
       </div>
 
+      <MatchExplanation explanation={match.explanation} />
+
       {/* Acciones */}
       <div className="flex items-center justify-between gap-2 pt-0.5">
         <StatusButtons matchId={match.id} currentStatus={match.status} />
@@ -254,6 +293,8 @@ function VehicleMatchCard({ match }: { match: BuyerMatchData }) {
           </div>
         </div>
       </div>
+
+      <MatchExplanation explanation={match.explanation} />
 
       {/* Acciones */}
       <div className="flex items-center justify-between gap-2">

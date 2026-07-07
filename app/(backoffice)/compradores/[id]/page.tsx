@@ -8,6 +8,7 @@ import { TradeInCard } from './trade-in-card'
 import { BuyerTopbarActions } from './buyer-topbar-actions'
 import { ProximaAccionCard } from './proxima-accion-card'
 import { MatchesSection } from '@/components/matches-section'
+import { prismaMatchingDeps, buildMatchExplanation } from '@/lib/matching'
 import type { BuyerMatchData } from '@/components/matches-section'
 import { ActivityTimeline } from '@/components/activity-timeline'
 import type { ActivityItem } from '@/components/activity-timeline'
@@ -253,12 +254,26 @@ export default async function FichaCompradorPage({
     hasKids: lead.hasKids ?? null,
   }
 
+  // CAM-64: explicación determinista por match (motivos + riesgos)
+  const matchDeps = prismaMatchingDeps(db)
+  const buyerMatchInput = lead.matches.length > 0 ? await matchDeps.getBuyer(lead.id) : null
+  const matchExplanations = new Map<string, { reasons: string[]; risks: string[] }>()
+  if (buyerMatchInput) {
+    await Promise.all(
+      lead.matches.map(async (m) => {
+        const v = await matchDeps.getVehicle(m.vehicle.id)
+        if (v) matchExplanations.set(m.id, buildMatchExplanation(v, buyerMatchInput))
+      })
+    )
+  }
+
   const buyerMatches: BuyerMatchData[] = lead.matches.map((m) => {
     const rawPrice = m.vehicle.desiredPrice ?? m.vehicle.valuationRecommended
     return {
       id: m.id,
       score: m.score,
       status: m.status,
+      explanation: matchExplanations.get(m.id) ?? null,
       vehicle: {
         id: m.vehicle.id,
         brand: m.vehicle.brand,
