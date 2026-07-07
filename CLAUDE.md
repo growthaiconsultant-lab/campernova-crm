@@ -92,7 +92,13 @@ claude mcp add-json linear '{\"command\":\"npx\",\"args\":[\"-y\",\"mcp-linear@l
 
 `.claude/settings.json` y `.claude/settings.local.json` se mantienen como referencia de la estructura, pero la fuente de verdad funcional es el registro de la CLI.
 
-## Estado actual (Block 15 — Calendario operativo F1→F4 — DESPLEGADO A PROD ✅)
+## Estado actual (Block 15 — Calendario operativo F1→F5 — DESPLEGADO A PROD ✅)
+
+### F5 — Vista mensual (PR #55, squash `7a3e3e2`, 2026-07-07) — sin migración
+
+- Tercera vista del calendario (spec §23.1): `/calendario?view=month`. Rejilla de semanas (lun–dom), celda con día + hasta 3 eventos + "+N más"; días fuera del mes atenuados, hoy resaltado; clic en día → vista día; nav por meses (`?month=`). Toggle: Semana · Día · Mes.
+- **Fix zona horaria**: helper `ymd()` (fecha local YYYY-MM-DD) en vez de `toISOString().slice(0,10)`, que en UTC+ devolvía el día anterior.
+- Suite: **460 tests verdes**.
 
 ### F4 — Mejora ≠ Reparación en Taller (PR #54, squash `d04f793`, 2026-07-07)
 
