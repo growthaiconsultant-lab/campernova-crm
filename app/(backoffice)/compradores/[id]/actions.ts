@@ -10,6 +10,7 @@ import {
   BUYER_LEAD_STATUS_LABELS,
   isValidTransition,
 } from '@/lib/state-machine'
+import { isValidLostReason, LOST_REASON_LABELS } from '@/lib/lost-reason'
 import type { BuyerLeadStatus } from '@prisma/client'
 
 export async function updateBuyerLead(leadId: string, data: unknown) {
@@ -157,8 +158,18 @@ export async function updateBuyerLead(leadId: string, data: unknown) {
   return { ok: true }
 }
 
-export async function archiveBuyerLead(leadId: string) {
+export async function archiveBuyerLead(
+  leadId: string,
+  lostReason?: string,
+  lostReasonNotes?: string
+) {
   const actor = await requireAgente()
+
+  // CAM-61: motivo estructurado obligatorio al marcar como perdido
+  if (!lostReason || !isValidLostReason(lostReason)) {
+    return { error: 'Selecciona el motivo de la pérdida' }
+  }
+  const notes = lostReasonNotes?.trim().slice(0, 500) || null
 
   const lead = await db.buyerLead.findUnique({
     where: { id: leadId },
@@ -173,12 +184,12 @@ export async function archiveBuyerLead(leadId: string) {
   await db.$transaction(async (tx) => {
     await tx.buyerLead.update({
       where: { id: leadId },
-      data: { status: 'PERDIDO' },
+      data: { status: 'PERDIDO', lostReason, lostReasonNotes: notes },
     })
     await tx.activity.create({
       data: {
         type: 'CAMBIO_ESTADO',
-        content: `Estado cambiado: ${BUYER_LEAD_STATUS_LABELS[lead.status as BuyerLeadStatus]} → ${BUYER_LEAD_STATUS_LABELS['PERDIDO']}`,
+        content: `Estado cambiado: ${BUYER_LEAD_STATUS_LABELS[lead.status as BuyerLeadStatus]} → ${BUYER_LEAD_STATUS_LABELS['PERDIDO']} · Motivo: ${LOST_REASON_LABELS[lostReason]}${notes ? ` — ${notes}` : ''}`,
         agentId: actor.id,
         buyerLeadId: leadId,
       },

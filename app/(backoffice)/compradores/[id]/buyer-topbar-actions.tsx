@@ -20,6 +20,7 @@ import {
 import { Button } from '@/components/ui/button'
 import { Archive, MoreHorizontal, Copy, ExternalLink } from 'lucide-react'
 import { archiveBuyerLead } from './actions'
+import { LOST_REASON_OPTIONS } from '@/lib/lost-reason'
 
 type Props = {
   leadId: string
@@ -28,13 +29,23 @@ type Props = {
 
 export function BuyerTopbarActions({ leadId, isTerminal }: Props) {
   const [archiveOpen, setArchiveOpen] = useState(false)
+  const [reason, setReason] = useState('')
+  const [notes, setNotes] = useState('')
+  const [error, setError] = useState<string | null>(null)
   const [isPending, startTransition] = useTransition()
   const router = useRouter()
 
   function handleArchive() {
+    if (!reason) {
+      setError('Selecciona el motivo de la pérdida')
+      return
+    }
+    setError(null)
     startTransition(async () => {
-      const result = await archiveBuyerLead(leadId)
-      if (!result.error) {
+      const result = await archiveBuyerLead(leadId, reason, notes)
+      if (result.error) {
+        setError(result.error)
+      } else {
         setArchiveOpen(false)
         router.refresh()
       }
@@ -96,6 +107,40 @@ export function BuyerTopbarActions({ leadId, isTerminal }: Props) {
               opinión.
             </DialogDescription>
           </DialogHeader>
+          {/* CAM-61: motivo estructurado */}
+          <div className="space-y-3">
+            <div>
+              <label className="mb-1.5 block text-[13px] font-medium text-foreground">
+                Motivo de la pérdida <span className="text-red-500">*</span>
+              </label>
+              <select
+                value={reason}
+                onChange={(e) => setReason(e.target.value)}
+                className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-ring"
+              >
+                <option value="">Selecciona un motivo…</option>
+                {LOST_REASON_OPTIONS.map((o) => (
+                  <option key={o.value} value={o.value}>
+                    {o.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="mb-1.5 block text-[13px] font-medium text-foreground">
+                Detalle (opcional)
+              </label>
+              <textarea
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
+                maxLength={500}
+                rows={2}
+                placeholder="Ej.: encontró una perfilada más barata en un concesionario de Girona"
+                className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-ring"
+              />
+            </div>
+            {error && <p className="text-[13px] text-red-600">{error}</p>}
+          </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setArchiveOpen(false)} disabled={isPending}>
               Cancelar

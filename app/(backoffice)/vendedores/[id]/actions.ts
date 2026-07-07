@@ -15,6 +15,7 @@ import {
   isValidTransition,
 } from '@/lib/state-machine'
 import type { SellerLeadStatus } from '@prisma/client'
+import { isValidLostReason, LOST_REASON_LABELS } from '@/lib/lost-reason'
 import {
   getVehicleLegalInput,
   getVehicleDocumentSummary,
@@ -281,8 +282,18 @@ export async function updateVehicle(vehicleId: string, data: unknown) {
   return { ok: true }
 }
 
-export async function archiveSellerLead(leadId: string) {
+export async function archiveSellerLead(
+  leadId: string,
+  lostReason?: string,
+  lostReasonNotes?: string
+) {
   const actor = await requireAgente()
+
+  // CAM-61: motivo estructurado obligatorio al descartar
+  if (!lostReason || !isValidLostReason(lostReason)) {
+    return { error: 'Selecciona el motivo del descarte' }
+  }
+  const notes = lostReasonNotes?.trim().slice(0, 500) || null
 
   const lead = await db.sellerLead.findUnique({
     where: { id: leadId },
@@ -297,12 +308,12 @@ export async function archiveSellerLead(leadId: string) {
   await db.$transaction(async (tx) => {
     await tx.sellerLead.update({
       where: { id: leadId },
-      data: { status: 'DESCARTADO' },
+      data: { status: 'DESCARTADO', lostReason, lostReasonNotes: notes },
     })
     await tx.activity.create({
       data: {
         type: 'CAMBIO_ESTADO',
-        content: `Estado cambiado: ${SELLER_LEAD_STATUS_LABELS[lead.status as SellerLeadStatus]} → ${SELLER_LEAD_STATUS_LABELS['DESCARTADO']}`,
+        content: `Estado cambiado: ${SELLER_LEAD_STATUS_LABELS[lead.status as SellerLeadStatus]} → ${SELLER_LEAD_STATUS_LABELS['DESCARTADO']} · Motivo: ${LOST_REASON_LABELS[lostReason]}${notes ? ` — ${notes}` : ''}`,
         agentId: actor.id,
         sellerLeadId: leadId,
       },
