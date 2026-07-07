@@ -4,6 +4,7 @@ import { agentLeadNotificationHtml } from './templates/agent-lead-notification'
 import { matchNotificationHtml } from './templates/match-notification'
 import { deliveryConfirmationHtml } from './templates/delivery-confirmation'
 import { ticketOpenedHtml } from './templates/ticket-opened'
+import { calendarDigestHtml, calendarEventAssignedHtml } from './templates/calendar-digest'
 import type { RegisterBuyerLeadArgs } from '@/lib/chat/tools'
 
 interface SendSellerLeadConfirmationParams {
@@ -247,5 +248,72 @@ export async function sendMatchNotification(params: SendMatchNotificationParams)
   } catch (err) {
     // Non-blocking: log but don't throw — match is already created
     console.error('[email] sendMatchNotification failed:', err)
+  }
+}
+
+// ── Calendario (F6) ───────────────────────────────────────────────────────────
+
+interface CalendarDigestItem {
+  kindLabel: string
+  title: string
+  timeLabel: string
+  contextLabel: string | null
+  href: string
+}
+
+export async function sendCalendarDigest(params: {
+  to: string
+  userName: string
+  dateLabel: string
+  items: CalendarDigestItem[]
+}): Promise<void> {
+  if (params.items.length === 0) return
+  const from = process.env.EMAIL_FROM ?? 'onboarding@resend.dev'
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000'
+  try {
+    await getResend().emails.send({
+      from,
+      to: params.to,
+      subject: `Tu agenda de ${params.dateLabel} · ${params.items.length} evento${params.items.length === 1 ? '' : 's'}`,
+      html: calendarDigestHtml({
+        userName: params.userName,
+        dateLabel: params.dateLabel,
+        items: params.items,
+        appUrl,
+      }),
+    })
+  } catch (err) {
+    console.error('[email] sendCalendarDigest failed:', err)
+  }
+}
+
+export async function sendCalendarEventAssigned(params: {
+  to: string
+  assigneeName: string
+  eventTitle: string
+  kindLabel: string
+  whenLabel: string
+  contextLabel: string | null
+  href: string
+}): Promise<void> {
+  const from = process.env.EMAIL_FROM ?? 'onboarding@resend.dev'
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000'
+  try {
+    await getResend().emails.send({
+      from,
+      to: params.to,
+      subject: `Te han asignado: ${params.eventTitle}`,
+      html: calendarEventAssignedHtml({
+        assigneeName: params.assigneeName,
+        eventTitle: params.eventTitle,
+        kindLabel: params.kindLabel,
+        whenLabel: params.whenLabel,
+        contextLabel: params.contextLabel,
+        href: params.href,
+        appUrl,
+      }),
+    })
+  } catch (err) {
+    console.error('[email] sendCalendarEventAssigned failed:', err)
   }
 }

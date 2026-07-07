@@ -4,7 +4,8 @@ import { revalidatePath } from 'next/cache'
 import { db } from '@/lib/db'
 import { requireAgente } from '@/lib/auth'
 import { createCalendarEventSchema } from '@/lib/validators/calendar-event'
-import { isValidEventTransition } from '@/lib/calendar/event-meta'
+import { isValidEventTransition, EVENT_TYPE_LABELS } from '@/lib/calendar/event-meta'
+import { sendCalendarEventAssigned } from '@/lib/email/send'
 import type { CalendarEventStatus, Prisma } from '@prisma/client'
 
 /** F2: crea un evento de calendario (cita, limpieza, seguimiento, otro). */
@@ -40,6 +41,31 @@ export async function createCalendarEvent(data: unknown): Promise<{ error?: stri
       specificData: (d.specificData ?? undefined) as Prisma.InputJsonValue | undefined,
     },
   })
+
+  // F6: aviso inmediato al responsable si se le asigna (y no es quien lo crea)
+  if (d.assignedToId && d.assignedToId !== actor.id) {
+    const assignee = await db.user.findUnique({
+      where: { id: d.assignedToId },
+      select: { name: true, email: true, active: true },
+    })
+    if (assignee?.active && assignee.email) {
+      await sendCalendarEventAssigned({
+        to: assignee.email,
+        assigneeName: assignee.name,
+        eventTitle: d.title,
+        kindLabel: EVENT_TYPE_LABELS[d.type],
+        whenLabel: start.toLocaleString('es-ES', {
+          weekday: 'long',
+          day: 'numeric',
+          month: 'long',
+          hour: '2-digit',
+          minute: '2-digit',
+        }),
+        contextLabel: null,
+        href: `/calendario/${event.id}`,
+      })
+    }
+  }
 
   revalidatePath('/calendario')
   if (d.buyerLeadId) revalidatePath(`/compradores/${d.buyerLeadId}`)

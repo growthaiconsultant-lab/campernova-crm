@@ -26,6 +26,7 @@ export type CalendarItem = {
   tone: CalendarTone
   /** ruta a la ficha/entidad de origen */
   href: string
+  assigneeId: string | null
   assigneeName: string | null
   /** contexto secundario: cliente o vehículo asociado */
   contextLabel: string | null

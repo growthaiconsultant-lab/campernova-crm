@@ -94,6 +94,7 @@ export function deliveryToItem(r: DeliveryRow): CalendarItem {
     status: DELIVERY_LABEL[r.status],
     tone: DELIVERY_TONE[r.status],
     href: `/entregas/${r.id}`,
+    assigneeId: r.responsable?.id ?? null,
     assigneeName: r.responsable?.name ?? null,
     contextLabel: r.buyerLead?.name ?? null,
   }
@@ -121,6 +122,7 @@ export function workOrderToItem(r: WorkOrderRow): CalendarItem {
     status: r.status,
     tone: WORKORDER_TONE[r.status] ?? 'default',
     href: `/taller/${r.id}`,
+    assigneeId: r.assignedTo?.id ?? null,
     assigneeName: r.assignedTo?.name ?? null,
     contextLabel: veh,
   }
@@ -146,6 +148,7 @@ export function followupToItem(r: FollowupRow): CalendarItem {
     status: r.status,
     tone: FOLLOWUP_TONE[r.status],
     href: `/postventa/${r.warrantyId}`,
+    assigneeId: null,
     assigneeName: null,
     contextLabel: null,
   }
@@ -165,6 +168,7 @@ export function nextActionToItem(r: NextActionRow, now: Date = new Date()): Cale
     status: overdue ? 'Vencida' : 'Pendiente',
     tone: overdue ? 'danger' : 'default',
     href: `${base}/${r.id}`,
+    assigneeId: r.agent?.id ?? null,
     assigneeName: r.agent?.name ?? null,
     contextLabel: r.leadKind === 'seller' ? 'Vendedor' : 'Comprador',
   }
@@ -195,6 +199,7 @@ export function eventToItem(r: EventRow): CalendarItem {
     status: EVENT_STATUS_LABELS[r.status],
     tone: EVENT_TONE[r.status],
     href: `/calendario/${r.id}`,
+    assigneeId: r.assignedTo?.id ?? null,
     assigneeName: r.assignedTo?.name ?? null,
     contextLabel: context,
   }
