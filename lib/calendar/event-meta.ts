@@ -4,10 +4,18 @@ import type { CalendarEventType, CalendarEventStatus, CalendarEventPriority } fr
 
 export const EVENT_TYPE_LABELS: Record<CalendarEventType, string> = {
   CITA: 'Cita',
+  LLAMADA: 'Llamada',
   LIMPIEZA: 'Limpieza',
   SEGUIMIENTO: 'Seguimiento',
   OTRO: 'Otro',
 }
+
+/**
+ * Tipos que se crean como evento del calendario (F3). Los otros de la hoja del
+ * dueño (Entrega, Entrada, Reparación, Mejora) se crean en su módulo y el
+ * calendario los agrega — el selector del calendario redirige allí.
+ */
+export const NATIVE_EVENT_TYPES: CalendarEventType[] = ['CITA', 'LLAMADA', 'LIMPIEZA', 'OTRO']
 
 export const EVENT_STATUS_LABELS: Record<CalendarEventStatus, string> = {
   PROGRAMADO: 'Programado',
@@ -25,9 +33,10 @@ export const EVENT_PRIORITY_LABELS: Record<CalendarEventPriority, string> = {
   URGENTE: 'Urgente',
 }
 
-export const EVENT_TYPE_OPTIONS = (
-  Object.entries(EVENT_TYPE_LABELS) as [CalendarEventType, string][]
-).map(([value, label]) => ({ value, label }))
+export const EVENT_TYPE_OPTIONS = NATIVE_EVENT_TYPES.map((value) => ({
+  value,
+  label: EVENT_TYPE_LABELS[value],
+}))
 
 export const EVENT_PRIORITY_OPTIONS = (
   Object.entries(EVENT_PRIORITY_LABELS) as [CalendarEventPriority, string][]

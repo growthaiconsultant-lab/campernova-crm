@@ -204,6 +204,7 @@ enum NextActionType {
 /// (entrega→Delivery, reparación/mejora→WorkOrder) NO viven aquí.
 enum CalendarEventType {
   CITA
+  LLAMADA
   LIMPIEZA
   SEGUIMIENTO
   OTRO

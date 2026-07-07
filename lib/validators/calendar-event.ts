@@ -2,7 +2,7 @@ import { z } from 'zod'
 
 /** Validación de creación de evento de calendario (F2). */
 export const createCalendarEventSchema = z.object({
-  type: z.enum(['CITA', 'LIMPIEZA', 'SEGUIMIENTO', 'OTRO']),
+  type: z.enum(['CITA', 'LLAMADA', 'LIMPIEZA', 'SEGUIMIENTO', 'OTRO']),
   title: z.string().trim().min(1, 'El título es obligatorio').max(200),
   description: z.string().trim().max(2000).optional().nullable(),
   startAt: z.string().refine((v) => !Number.isNaN(new Date(v).getTime()), 'Fecha no válida'),
