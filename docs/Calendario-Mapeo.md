@@ -41,4 +41,4 @@
 
 ---
 
-> Estado: **F1 (#51) + F2 (#52) + F3 (#53) desplegados a prod (2026-07-07)**. Los 8 tipos de la hoja del dueño se crean desde el calendario (nativos como CalendarEvent; Entrega/Entrada/Reparación/Mejora redirigen a su módulo). Pendiente: F4 (WorkOrder.kind para separar Mejora de Reparación), F5 mensual+reporting, F6 recordatorios, F7 IA.
+> Estado: **F1 (#51) + F2 (#52) + F3 (#53) + F4 (#54) desplegados a prod (2026-07-07)**. Los 8 tipos de la hoja del dueño se crean desde el calendario, sin duplicar (nativos como CalendarEvent; Entrega/Entrada/Reparación/Mejora redirigen a su módulo; Reparación vs Mejora ya distinguidas vía `WorkOrder.kind`). Pendiente: F5 mensual+reporting, F6 recordatorios, F7 IA.

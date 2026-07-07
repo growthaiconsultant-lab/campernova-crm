@@ -92,7 +92,15 @@ claude mcp add-json linear '{\"command\":\"npx\",\"args\":[\"-y\",\"mcp-linear@l
 
 `.claude/settings.json` y `.claude/settings.local.json` se mantienen como referencia de la estructura, pero la fuente de verdad funcional es el registro de la CLI.
 
-## Estado actual (Block 15 — Calendario operativo F1+F2+F3 — DESPLEGADO A PROD ✅)
+## Estado actual (Block 15 — Calendario operativo F1→F4 — DESPLEGADO A PROD ✅)
+
+### F4 — Mejora ≠ Reparación en Taller (PR #54, squash `d04f793`, 2026-07-07)
+
+Migración additiva `20260707600000_add_workorder_kind` (columna con default → filas existentes = REPARACION) aplicada a staging y prod.
+
+- **Schema**: enum `WorkOrderKind` (REPARACION, MEJORA) + `WorkOrder.kind` default REPARACION. (Limpieza NO va aquí — ya es evento de calendario; no se duplica.)
+- Formulario de orden: selector Reparación/Mejora; acepta `?kind=`. Selector del calendario: Reparación/Mejora → `/taller/nueva?kind=`. Agregación: tarjeta "Taller · Mejora/Reparación". Ficha de la orden: badge (Mejora violeta / Reparación gris).
+- Con F4 el calendario cubre **los 8 tipos de la hoja del dueño completos y sin duplicar**. Suite: **460 tests verdes**.
 
 ### F3 — Crear los 8 tipos de la hoja desde el calendario (PR #53, squash `04887c3`, 2026-07-07)
 
