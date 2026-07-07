@@ -99,7 +99,7 @@ export function BuyerListFilters({ agents }: Props) {
       {/* Search */}
       <form
         onSubmit={handleSearchSubmit}
-        className="flex min-w-[280px] flex-1 items-center gap-2 rounded-lg border border-transparent bg-[#f8fafc] px-3 focus-within:border-[#2563eb] focus-within:bg-white focus-within:shadow-[0_0_0_3px_rgba(37,99,235,0.12)]"
+        className="flex min-w-[200px] flex-1 items-center gap-2 rounded-lg border border-transparent bg-[#f8fafc] px-3 focus-within:border-[#2563eb] focus-within:bg-white focus-within:shadow-[0_0_0_3px_rgba(37,99,235,0.12)]"
       >
         <svg
           viewBox="0 0 24 24"
