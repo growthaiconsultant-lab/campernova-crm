@@ -92,7 +92,18 @@ claude mcp add-json linear '{\"command\":\"npx\",\"args\":[\"-y\",\"mcp-linear@l
 
 `.claude/settings.json` y `.claude/settings.local.json` se mantienen como referencia de la estructura, pero la fuente de verdad funcional es el registro de la CLI.
 
-## Estado actual (Block 15 — Calendario operativo F1+F2 — DESPLEGADO A PROD ✅)
+## Estado actual (Block 15 — Calendario operativo F1+F2+F3 — DESPLEGADO A PROD ✅)
+
+### F3 — Crear los 8 tipos de la hoja desde el calendario (PR #53, squash `04887c3`, 2026-07-07)
+
+Alinea el calendario con la **hoja manuscrita del dueño**: los 8 tipos (Entrega, Entrada/Recepción, Reparación, Mejora, Cita, **Llamada**, Otros, Limpieza) se crean "desde el calendario" sin duplicar datos. Migración additiva `20260707500000_add_llamada_event_type` (nuevo valor de enum) aplicada a staging y prod.
+
+- **Selector de tipo** en `/calendario/nuevo`: 8 tarjetas. Nativos (Cita/Llamada/Limpieza/Otros) → formulario `CalendarEvent`; con módulo propio (Entrega→`/entregas/nueva`, Entrada→`/vendedores/nuevo`, Reparación/Mejora→`/taller/nueva?vehicleId=`) → redirigen a su form existente. **Una sola fuente de verdad.**
+- **Nuevo tipo `LLAMADA`** (enum `CalendarEventType`) con campos teléfono + motivo; `NATIVE_EVENT_TYPES` separa los que se materializan como evento de los que redirigen.
+- ⚠️ **Reparación y Mejora comparten `/taller/nueva`** (misma creación). Distinguir Mejora dentro de Taller (`WorkOrder.kind`) queda como F4.
+- Nota: la hoja decía "Demanda" pero el dueño aclaró que es **"Llamada"**. Suite: **460 tests verdes**.
+
+## Estado previo (Block 15 — Calendario operativo F1+F2 — DESPLEGADO A PROD ✅)
 
 Módulo de **Calendario / Agenda operativa** (spec del dueño en `docs/`). Decisión de arquitectura acordada con el dueño: **agregación, NO mega-tabla** — el calendario reúne lo ya agendado (Entregas, Taller, Postventa, Próximas acciones) en una vista unificada + una tabla `CalendarEvent` **solo** para tipos sin hogar (Citas primero). Se evita duplicar Delivery/WorkOrder → una sola fuente de verdad por entidad. El plan/mapeo vive en `docs/Calendario-Mapeo.md`.
 
