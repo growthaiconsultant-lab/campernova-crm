@@ -9,6 +9,7 @@ import { BuyerTopbarActions } from './buyer-topbar-actions'
 import { ProximaAccionCard } from './proxima-accion-card'
 import { MatchesSection } from '@/components/matches-section'
 import { prismaMatchingDeps, buildMatchExplanation } from '@/lib/matching'
+import { classifyBuyerCriteria } from '@/lib/buyer-criteria'
 import type { BuyerMatchData } from '@/components/matches-section'
 import { ActivityTimeline } from '@/components/activity-timeline'
 import type { ActivityItem } from '@/components/activity-timeline'
@@ -285,6 +286,25 @@ export default async function FichaCompradorPage({
         sellerLeadId: m.vehicle.sellerLead.id,
       },
     }
+  })
+
+  // CAM-65: criterios excluyentes vs preferencias
+  const buyerCriteria = classifyBuyerCriteria({
+    vehicleType: lead.vehicleType,
+    minSeats: lead.minSeats,
+    maxBudget: lead.maxBudget ? Number(lead.maxBudget) : null,
+    sleepingPlacesRequired: lead.sleepingPlacesRequired,
+    bathroomRequired: lead.bathroomRequired,
+    licenseType: lead.licenseType,
+    maxLengthM: lead.maxLengthM,
+    maxHeightM: lead.maxHeightM,
+    preferredCategory: lead.preferredCategory,
+    preferredBedLayout: lead.preferredBedLayout,
+    criticalEquipment: (lead.criticalEquipment ?? {}) as Record<string, boolean>,
+    useZone: lead.useZone,
+    needsWinter: lead.needsWinter,
+    needsGarage: lead.needsGarage,
+    hasKids: lead.hasKids,
   })
 
   const scoreContacto = lead.phone ? 100 : 70
@@ -888,6 +908,39 @@ export default async function FichaCompradorPage({
                       year: 'numeric',
                     })}
                   </span>
+                </div>
+              </div>
+            )}
+
+            {/* Criterios de búsqueda (CAM-65) */}
+            {buyerCriteria.length > 0 && (
+              <div className="rounded-xl border border-border bg-card p-5">
+                <div className="mb-3 flex items-center justify-between">
+                  <p className="font-mono text-[10px] uppercase tracking-[0.12em] text-muted-foreground">
+                    Criterios de búsqueda
+                  </p>
+                  <InfoTooltip
+                    text="Los excluyentes (rojo) descartan vehículos que no cumplen. Las preferencias (gris) puntúan pero no descartan."
+                    side="left"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  {buyerCriteria.map((c, i) => (
+                    <div key={i} className="flex items-center justify-between gap-2">
+                      <span className="min-w-0 truncate text-[12px] text-muted-foreground">
+                        {c.label}: <span className="text-foreground">{c.value}</span>
+                      </span>
+                      <span
+                        className={`shrink-0 rounded-full px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide ${
+                          c.kind === 'excluyente'
+                            ? 'bg-red-50 text-red-600'
+                            : 'bg-slate-100 text-slate-500'
+                        }`}
+                      >
+                        {c.kind === 'excluyente' ? 'Excluyente' : 'Preferencia'}
+                      </span>
+                    </div>
+                  ))}
                 </div>
               </div>
             )}
