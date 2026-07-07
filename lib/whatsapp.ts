@@ -1,12 +1,7 @@
+import { normalizePhone } from './phone'
+
 export function formatPhoneForWhatsApp(phone: string): string {
-  const digits = phone.replace(/\D/g, '')
-  // 9 dígitos españoles (móvil 6xx/7xx) → añadir prefijo 34
-  if (digits.length === 9 && (digits.startsWith('6') || digits.startsWith('7'))) {
-    return `34${digits}`
-  }
-  // 0034xxx → quitar doble cero
-  if (digits.startsWith('00')) return digits.slice(2)
-  return digits
+  return normalizePhone(phone)
 }
 
 export function buildWhatsAppUrl(phone: string, message: string): string {

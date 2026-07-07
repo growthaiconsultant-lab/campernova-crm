@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
@@ -29,6 +30,7 @@ import {
   type BuyerLeadFormValues,
 } from '@/lib/validators/buyer-lead'
 import { createBuyerLead } from '../actions'
+import { BUYER_LEAD_STATUS_LABELS as BUYER_STATUS_LABELS } from '@/lib/state-machine'
 
 const EQUIPMENT_ITEMS = [
   { id: 'solar', label: 'Placas solares' },
@@ -40,9 +42,12 @@ const EQUIPMENT_ITEMS = [
 
 type EquipmentKey = (typeof EQUIPMENT_ITEMS)[number]['id']
 
+type DuplicateInfo = { id: string; name: string; status: string }
+
 export function BuyerLeadForm() {
   const router = useRouter()
   const [serverError, setServerError] = useState<string | null>(null)
+  const [duplicate, setDuplicate] = useState<DuplicateInfo | null>(null)
 
   const form = useForm<BuyerLeadFormValues>({
     resolver: zodResolver(createBuyerLeadSchema),
@@ -65,14 +70,25 @@ export function BuyerLeadForm() {
     },
   })
 
-  async function onSubmit(data: BuyerLeadFormValues) {
+  async function submit(data: BuyerLeadFormValues, allowDuplicate: boolean) {
     setServerError(null)
-    const result = await createBuyerLead(data)
+    const result = await createBuyerLead(data, allowDuplicate)
+    if ('duplicate' in result && result.duplicate) {
+      setDuplicate(result.duplicate)
+      return
+    }
     if ('error' in result) {
       setServerError('Error al guardar el lead. Revisa los datos e inténtalo de nuevo.')
       return
     }
-    router.push(`/compradores/${result.leadId}`)
+    if ('leadId' in result && result.leadId) {
+      router.push(`/compradores/${result.leadId}`)
+    }
+  }
+
+  async function onSubmit(data: BuyerLeadFormValues) {
+    setDuplicate(null)
+    await submit(data, false)
   }
 
   return (
@@ -280,6 +296,41 @@ export function BuyerLeadForm() {
             </div>
           </CardContent>
         </Card>
+
+        {duplicate && (
+          <div className="rounded-lg border border-amber-300 bg-amber-50 p-4">
+            <p className="text-sm font-medium text-amber-800">
+              Ya existe un comprador con este teléfono
+            </p>
+            <p className="mt-1 text-sm text-amber-700">
+              <Link
+                href={`/compradores/${duplicate.id}`}
+                className="font-semibold underline underline-offset-2"
+              >
+                {duplicate.name}
+              </Link>{' '}
+              (
+              {BUYER_STATUS_LABELS[duplicate.status as keyof typeof BUYER_STATUS_LABELS] ??
+                duplicate.status}
+              ). Revisa si es la misma persona antes de crear un duplicado.
+            </p>
+            <div className="mt-3 flex flex-wrap gap-2">
+              <Button asChild size="sm" variant="outline">
+                <Link href={`/compradores/${duplicate.id}`}>Abrir ficha existente</Link>
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                variant="ghost"
+                className="text-amber-700"
+                disabled={form.formState.isSubmitting}
+                onClick={() => submit(form.getValues(), true)}
+              >
+                Crear de todas formas
+              </Button>
+            </div>
+          </div>
+        )}
 
         {serverError && <p className="text-sm text-destructive">{serverError}</p>}
 
