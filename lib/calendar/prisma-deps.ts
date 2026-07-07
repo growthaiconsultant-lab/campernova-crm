@@ -43,6 +43,7 @@ export function prismaCalendarDeps(db: PrismaClient): CalendarDeps {
           scheduledStart: true,
           scheduledEnd: true,
           status: true,
+          kind: true,
           description: true,
           vehicle: { select: { brand: true, model: true } },
           assignedTo: { select: { id: true, name: true } },

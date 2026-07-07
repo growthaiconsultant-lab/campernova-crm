@@ -29,7 +29,8 @@ const workOrder: WorkOrderRow = {
   scheduledStart: new Date('2026-07-08T09:00:00'),
   scheduledEnd: new Date('2026-07-09T18:00:00'),
   status: 'EN_CURSO',
-  description: 'Revisar inversor',
+  kind: 'MEJORA',
+  description: 'Instalar placa solar',
   vehicle: { brand: 'VW', model: 'California' },
   assignedTo: { id: 'u2', name: 'Manolo' },
 }
@@ -84,12 +85,13 @@ describe('mappers', () => {
     expect(it_.title).toContain('Benimar Tessoro')
   })
 
-  it('workOrder → item con fin y responsable', () => {
+  it('workOrder → item con fin, responsable y tipo (mejora)', () => {
     const it_ = workOrderToItem(workOrder)
     expect(it_.id).toBe('workorder:w1')
     expect(it_.end).toEqual(workOrder.scheduledEnd)
     expect(it_.assigneeName).toBe('Manolo')
     expect(it_.href).toBe('/taller/w1')
+    expect(it_.kindLabel).toBe('Taller · Mejora')
   })
 
   it('followup → all-day, href a la garantía', () => {
