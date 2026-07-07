@@ -92,7 +92,32 @@ claude mcp add-json linear '{\"command\":\"npx\",\"args\":[\"-y\",\"mcp-linear@l
 
 `.claude/settings.json` y `.claude/settings.local.json` se mantienen como referencia de la estructura, pero la fuente de verdad funcional es el registro de la CLI.
 
-## Estado actual (Block 12 — Analytics, Favicon, Logo y limpieza web — DESPLEGADO A PROD ✅)
+## Estado actual (Block 13 — Backoffice 100% responsive — DESPLEGADO A PROD ✅)
+
+Desplegado a producción el **2026-07-07** vía **PR #43** (squash-merge a `main`, commit `92fee20`). Sin migraciones — solo frontend. El backoffice era desktop-only; ahora es usable en móvil y tablet. La web pública no se tocó (ya era mobile-first).
+
+### Navegación unificada (una sola barra)
+
+- **Desktop (≥1024px)**: se eliminó la barra global casi vacía (h-16). El menú de usuario (avatar + nombre + rol + logout) vive en el **pie del sidebar** (`components/layout/sidebar.tsx`). Cada página tiene una única barra sticky propia (título + acción principal).
+- **Móvil (<1024px)**: barra global fina h-14 (`components/layout/topbar.tsx`, ahora `lg:hidden`) con hamburguesa + avatar. El sidebar se oculta (`hidden lg:flex`) y se abre como **drawer** (`components/layout/mobile-sidebar.tsx`: overlay + panel w-64, cierra al navegar, bloquea scroll del body). Sin librerías nuevas.
+- `SidebarContent` es el componente compartido entre el aside desktop y el drawer móvil (props `userRole`, `userName`, `roleLabel`, `onNavigate`).
+- **Cabeceras de página** (listados y fichas): sticky **solo en desktop** (`lg:sticky lg:top-0 lg:h-[73px]`); en móvil scrollean con el contenido (altura auto con `min-h` + `py-2`). Esto corrige un glitch donde la cabecera sticky flotaba en mitad de la lista en móvil.
+
+### Listados y tablas
+
+- **`/vendedores` y `/compradores`**: pipeline strip y tabla envueltos en `overflow-x-auto` con `min-w-[820px]`/`min-w-[980px]` (scroll horizontal, no aplastar columnas). Tabs de vistas scrollables (`overflow-x-auto whitespace-nowrap`). Footer de paginación con `flex-wrap`. Paddings `px-4 md:px-10`. Botón "Exportar" oculto en `<sm`. "Guardar vista" oculto en `<md`. **Acciones de fila (WhatsApp/ver) siempre visibles en táctil**: `lg:opacity-0 lg:group-hover:opacity-100` (antes eran invisibles en móvil al depender del hover).
+- **Taller/Entregas/Postventa/Usuarios**: todas las tablas pasaron de `overflow-hidden` a `overflow-x-auto` + `min-w-[480-760px]` en el `<table>`. Cabeceras de página con `flex-wrap gap-3`.
+- Los buscadores de filtros bajaron de `min-w-[280px]` a `min-w-[200px]` (no desbordan en 320px).
+
+### Fichas
+
+- **Ficha comprador** adoptó el patrón de la de vendedor: `grid-cols-1 lg:grid-cols-[1fr_320px]` (antes `grid-cols-[1fr_320px]` fijo — rota en móvil). Rail derecho: `border-t lg:border-l lg:border-t-0`, sticky solo desktop (`lg:sticky lg:top-[130px]`).
+- **Ficha vendedor**: paddings responsive (`px-4 md:px-8/10`, `p-4 md:p-8`), `QuickAdvanceButton` del topbar oculto en `<sm` (la próxima acción del rail es el CTA primario).
+- Dashboard: cabecera con wrap; fila "Top vehículos por margen" oculta la barra de progreso en `<md` con grid responsive.
+
+> Nota validación: el preview de Vercel del PR dio `500 MIDDLEWARE_INVOCATION_FAILED` — al scope **Preview** de Vercel le faltan las env vars de Supabase (paso pendiente del handoff de staging, ver Block 9). No afecta a Production. Validado en local.
+
+## Estado previo (Block 12 — Analytics, Favicon, Logo y limpieza web — DESPLEGADO A PROD ✅)
 
 Desplegado a producción el **2026-07-01** vía **PRs #39–#42** (squash-merge a `main`). Sin migraciones de base de datos — solo cambios de frontend y analytics.
 
