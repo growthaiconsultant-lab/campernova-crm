@@ -11,6 +11,7 @@ import {
   UserCog,
   Wrench,
   CalendarCheck,
+  CalendarDays,
   ShieldCheck,
   LogOut,
 } from 'lucide-react'
@@ -63,6 +64,12 @@ const NAV_SECTIONS: NavSection[] = [
   {
     title: 'Operaciones',
     items: [
+      {
+        href: '/calendario',
+        label: 'Calendario',
+        icon: CalendarDays,
+        roles: ['ADMIN', 'AGENTE', 'TALLER', 'ENTREGAS'],
+      },
       {
         href: '/taller',
         label: 'Taller',
