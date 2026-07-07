@@ -47,6 +47,12 @@ function addDays(d: Date, n: number): Date {
 const fmtDay = (d: Date) => d.toLocaleDateString('es-ES', { day: 'numeric', month: 'short' })
 const fmtTime = (d: Date) => d.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })
 
+/** Fecha local como YYYY-MM-DD (evita el desfase de toISOString en UTC+). */
+function ymd(d: Date): string {
+  const p = (n: number) => String(n).padStart(2, '0')
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`
+}
+
 function ItemCard({ item }: { item: CalendarItem }) {
   return (
     <Link
@@ -76,11 +82,19 @@ function ItemCard({ item }: { item: CalendarItem }) {
 export default async function CalendarioPage({
   searchParams,
 }: {
-  searchParams: { week?: string; view?: string; date?: string; source?: string; assignee?: string }
+  searchParams: {
+    week?: string
+    month?: string
+    view?: string
+    date?: string
+    source?: string
+    assignee?: string
+  }
 }) {
   await requireAuth()
 
-  const view = searchParams.view === 'day' ? 'day' : 'week'
+  const view =
+    searchParams.view === 'day' ? 'day' : searchParams.view === 'month' ? 'month' : 'week'
   const now = new Date()
 
   // Filtros
@@ -94,11 +108,22 @@ export default async function CalendarioPage({
   let to: Date
   let dayList: Date[]
   let offset = 0
+  let monthOffset = 0
+  let monthBaseMonth = now.getMonth()
   if (view === 'day') {
     const base = searchParams.date ? startOfDay(new Date(searchParams.date)) : startOfDay(now)
     from = base
     to = addDays(base, 1)
     dayList = [base]
+  } else if (view === 'month') {
+    monthOffset = Number.parseInt(searchParams.month ?? '0', 10) || 0
+    const monthFirst = new Date(now.getFullYear(), now.getMonth() + monthOffset, 1)
+    monthBaseMonth = monthFirst.getMonth()
+    const monthLast = new Date(now.getFullYear(), now.getMonth() + monthOffset + 1, 0)
+    from = mondayOf(monthFirst)
+    to = addDays(mondayOf(monthLast), 7) // domingo de la última semana + 1
+    const total = Math.round((to.getTime() - from.getTime()) / 86_400_000)
+    dayList = Array.from({ length: total }, (_, i) => addDays(from, i))
   } else {
     offset = Number.parseInt(searchParams.week ?? '0', 10) || 0
     const monday = mondayOf(now, offset)
@@ -126,10 +151,19 @@ export default async function CalendarioPage({
   }
 
   const todayKey = startOfDay(now).getTime()
-  const weekLabel =
+  const monthDate = new Date(now.getFullYear(), now.getMonth() + monthOffset, 1)
+  const periodLabel =
     view === 'day'
       ? dayList[0].toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long' })
-      : `Semana del ${fmtDay(dayList[0])} al ${fmtDay(dayList[6])}`
+      : view === 'month'
+        ? monthDate.toLocaleDateString('es-ES', { month: 'long', year: 'numeric' })
+        : `Semana del ${fmtDay(dayList[0])} al ${fmtDay(dayList[6])}`
+
+  // Filas de semanas para la vista mensual (chunks de 7)
+  const monthWeeks: Date[][] = []
+  if (view === 'month') {
+    for (let i = 0; i < dayList.length; i += 7) monthWeeks.push(dayList.slice(i, i + 7))
+  }
 
   const navBase = (params: Record<string, string>) => {
     const sp = new URLSearchParams()
@@ -172,8 +206,14 @@ export default async function CalendarioPage({
             >
               Día
             </Link>
+            <Link
+              href={navBase({ view: 'month', month: String(monthOffset) })}
+              className={`px-3 py-1.5 text-[12.5px] font-medium ${view === 'month' ? 'bg-foreground text-background' : 'text-muted-foreground hover:bg-muted'}`}
+            >
+              Mes
+            </Link>
           </div>
-          {/* Navegación */}
+          {/* Navegación semana */}
           {view === 'week' && (
             <div className="flex items-center gap-1">
               <Link
@@ -198,16 +238,126 @@ export default async function CalendarioPage({
               </Link>
             </div>
           )}
+          {/* Navegación mes */}
+          {view === 'month' && (
+            <div className="flex items-center gap-1">
+              <Link
+                href={navBase({ view: 'month', month: String(monthOffset - 1) })}
+                className="inline-flex h-8 items-center rounded-lg border border-border px-2.5 text-sm text-muted-foreground hover:bg-muted"
+              >
+                ‹
+              </Link>
+              {monthOffset !== 0 && (
+                <Link
+                  href={navBase({ view: 'month' })}
+                  className="inline-flex h-8 items-center rounded-lg border border-border px-2.5 text-[12.5px] text-muted-foreground hover:bg-muted"
+                >
+                  Hoy
+                </Link>
+              )}
+              <Link
+                href={navBase({ view: 'month', month: String(monthOffset + 1) })}
+                className="inline-flex h-8 items-center rounded-lg border border-border px-2.5 text-sm text-muted-foreground hover:bg-muted"
+              >
+                ›
+              </Link>
+            </div>
+          )}
         </div>
       </header>
 
       <div className="px-4 pb-16 pt-4 md:px-8">
         <div className="mb-3 flex items-center justify-between gap-3">
-          <p className="text-[13px] capitalize text-muted-foreground">{weekLabel}</p>
+          <p className="text-[13px] capitalize text-muted-foreground">{periodLabel}</p>
           <CalendarFilters agents={agents} />
         </div>
 
-        {view === 'week' ? (
+        {view === 'month' ? (
+          <div className="overflow-x-auto rounded-xl border border-border bg-card">
+            <div className="min-w-[720px]">
+              {/* Cabecera de días */}
+              <div
+                className="grid border-b border-border"
+                style={{ gridTemplateColumns: 'repeat(7, 1fr)' }}
+              >
+                {DAY_LABELS.map((l) => (
+                  <div
+                    key={l}
+                    className="px-2 py-2 text-center text-[11px] font-medium capitalize text-muted-foreground"
+                  >
+                    {l}
+                  </div>
+                ))}
+              </div>
+              {/* Semanas */}
+              {monthWeeks.map((week, wi) => (
+                <div
+                  key={wi}
+                  className="grid border-b border-border last:border-b-0"
+                  style={{ gridTemplateColumns: 'repeat(7, 1fr)' }}
+                >
+                  {week.map((d, di) => {
+                    const key = startOfDay(d).getTime()
+                    const dayItems = byDay.get(key) ?? []
+                    const isToday = key === todayKey
+                    const inMonth = d.getMonth() === monthBaseMonth
+                    return (
+                      <div
+                        key={di}
+                        className={`min-h-[104px] border-r border-border p-1 last:border-r-0 ${inMonth ? '' : 'bg-muted/30'}`}
+                      >
+                        <Link
+                          href={navBase({ view: 'day', date: ymd(d) })}
+                          className={`mb-1 block text-right text-[11px] font-medium ${
+                            isToday
+                              ? 'text-foreground'
+                              : inMonth
+                                ? 'text-muted-foreground'
+                                : 'text-muted-foreground/40'
+                          }`}
+                        >
+                          <span
+                            className={
+                              isToday
+                                ? 'inline-flex h-5 w-5 items-center justify-center rounded-full bg-foreground text-background'
+                                : ''
+                            }
+                          >
+                            {d.getDate()}
+                          </span>
+                        </Link>
+                        <div className="space-y-0.5">
+                          {dayItems.slice(0, 3).map((it) => (
+                            <Link
+                              key={it.id}
+                              href={it.href}
+                              className={`block truncate rounded px-1 py-0.5 text-[10px] font-medium ${TONE_CLASSES[it.tone]}`}
+                              title={it.title}
+                            >
+                              {!it.allDay ? `${fmtTime(it.start)} ` : ''}
+                              {it.title}
+                            </Link>
+                          ))}
+                          {dayItems.length > 3 && (
+                            <Link
+                              href={navBase({
+                                view: 'day',
+                                date: ymd(d),
+                              })}
+                              className="block px-1 text-[10px] text-muted-foreground hover:text-foreground"
+                            >
+                              +{dayItems.length - 3} más
+                            </Link>
+                          )}
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              ))}
+            </div>
+          </div>
+        ) : view === 'week' ? (
           <div className="overflow-x-auto rounded-xl border border-border bg-card">
             <div className="grid min-w-[900px]" style={{ gridTemplateColumns: 'repeat(7, 1fr)' }}>
               {dayList.map((d, i) => {
