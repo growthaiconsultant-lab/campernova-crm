@@ -114,8 +114,12 @@ export function prismaCalendarDeps(db: PrismaClient): CalendarDeps {
     },
 
     async listEvents(from, to): Promise<EventRow[]> {
+      // Los cancelados / no-show no se muestran en el calendario (no ocurrieron).
       return db.calendarEvent.findMany({
-        where: { startAt: { gte: from, lt: to } },
+        where: {
+          startAt: { gte: from, lt: to },
+          status: { notIn: ['CANCELADO', 'NO_SHOW'] },
+        },
         select: {
           id: true,
           type: true,
