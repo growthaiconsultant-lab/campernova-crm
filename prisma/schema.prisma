@@ -188,6 +188,24 @@ enum LostReason {
   OTRO
 }
 
+/// Portal de origen de una captación de vehículo (fase 0 del vendedor).
+enum CapturePortal {
+  COCHES_NET
+  WALLAPOP
+  MILANUNCIOS
+  OTRO
+}
+
+/// Estado de una captación de vehículo captado en portales.
+enum CaptureStatus {
+  NO_CONTACTADO
+  CONTACTADO
+  EN_CURSO
+  ENTRADA_AGENDADA
+  CONVERTIDO
+  RECHAZADO
+}
+
 /// Próxima acción comercial sobre un lead (CAM-60).
 enum NextActionType {
   LLAMAR
@@ -413,6 +431,8 @@ model User {
   vehicleDocumentsUploaded VehicleDocument[]
   createdCalendarEvents    CalendarEvent[]        @relation("CreatedCalendarEvents")
   assignedCalendarEvents   CalendarEvent[]        @relation("AssignedCalendarEvents")
+  createdCaptures          VehicleCapture[]       @relation("CreatedCaptures")
+  assignedCaptures         VehicleCapture[]       @relation("AssignedCaptures")
 
   @@map("users")
 }
@@ -442,6 +462,7 @@ model SellerLead {
   documents      Document[]
   tradeInBuyer   BuyerLead?      @relation("BuyerTradeIn")
   calendarEvents CalendarEvent[]
+  capture        VehicleCapture?
 
   @@index([status])
   @@index([agentId])
@@ -1050,6 +1071,36 @@ model CalendarEvent {
   @@index([vehicleId])
   @@index([status])
   @@map("calendar_events")
+}
+
+/// Captación de vehículo encontrado por un comercial en un portal externo
+/// (Coches.net, Wallapop…). Entidad LIGERA = fase 0 del embudo del vendedor;
+/// convierte a SellerLead+Vehicle cuando el vehículo llega a la nave.
+model VehicleCapture {
+  id                 String        @id @default(cuid())
+  listingUrl         String        @map("listing_url")
+  phone              String
+  portal             CapturePortal @default(OTRO)
+  title              String? // etiqueta corta (marca/modelo) opcional
+  askingPrice        Decimal?      @map("asking_price") @db.Decimal(10, 2)
+  status             CaptureStatus @default(NO_CONTACTADO)
+  notes              String?
+  rejectionReason    LostReason?   @map("rejection_reason")
+  entradaScheduledAt DateTime?     @map("entrada_scheduled_at")
+  assignedToId       String?       @map("assigned_to_id")
+  createdById        String        @map("created_by_id")
+  sellerLeadId       String?       @unique @map("seller_lead_id")
+  createdAt          DateTime      @default(now()) @map("created_at")
+  updatedAt          DateTime      @updatedAt @map("updated_at")
+
+  assignedTo User?       @relation("AssignedCaptures", fields: [assignedToId], references: [id])
+  createdBy  User        @relation("CreatedCaptures", fields: [createdById], references: [id])
+  sellerLead SellerLead? @relation(fields: [sellerLeadId], references: [id], onDelete: SetNull)
+
+  @@index([status])
+  @@index([assignedToId, status])
+  @@index([entradaScheduledAt])
+  @@map("vehicle_captures")
 }
 
 /// Documento legal asociado al expediente del vehículo (DNI, contratos, ITV, etc.)

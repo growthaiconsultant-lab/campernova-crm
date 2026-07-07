@@ -13,6 +13,7 @@ import {
   CalendarCheck,
   CalendarDays,
   ShieldCheck,
+  Radar,
   LogOut,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
@@ -46,6 +47,12 @@ const NAV_SECTIONS: NavSection[] = [
         label: 'Vehículos',
         icon: Truck,
         roles: ['ADMIN', 'AGENTE', 'TALLER', 'MARKETING'],
+      },
+      {
+        href: '/captaciones',
+        label: 'Captaciones',
+        icon: Radar,
+        roles: ['ADMIN', 'AGENTE'],
       },
       {
         href: '/vendedores',
