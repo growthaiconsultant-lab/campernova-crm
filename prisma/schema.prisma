@@ -200,6 +200,31 @@ enum NextActionType {
   CERRAR
 }
 
+/// Tipos de evento propios del calendario (F2). Los que ya tienen hogar
+/// (entrega→Delivery, reparación/mejora→WorkOrder) NO viven aquí.
+enum CalendarEventType {
+  CITA
+  LIMPIEZA
+  SEGUIMIENTO
+  OTRO
+}
+
+enum CalendarEventStatus {
+  PROGRAMADO
+  CONFIRMADO
+  EN_CURSO
+  COMPLETADO
+  CANCELADO
+  NO_SHOW
+}
+
+enum CalendarEventPriority {
+  BAJA
+  MEDIA
+  ALTA
+  URGENTE
+}
+
 enum VehicleDocumentCategory {
   DNI_VENDEDOR
   CONTRATO_COMPRAVENTA
@@ -379,6 +404,8 @@ model User {
   postventaPhotosUploaded  PostventaTicketPhoto[]
   chargeChecksPerformed    Vehicle[]              @relation("ChargeChecks")
   vehicleDocumentsUploaded VehicleDocument[]
+  createdCalendarEvents    CalendarEvent[]        @relation("CreatedCalendarEvents")
+  assignedCalendarEvents   CalendarEvent[]        @relation("AssignedCalendarEvents")
 
   @@map("users")
 }
@@ -402,11 +429,12 @@ model SellerLead {
   createdAt       DateTime         @default(now()) @map("created_at")
   updatedAt       DateTime         @updatedAt @map("updated_at")
 
-  agent        User?      @relation("AgentSellerLeads", fields: [agentId], references: [id])
-  vehicle      Vehicle?
-  activities   Activity[]
-  documents    Document[]
-  tradeInBuyer BuyerLead? @relation("BuyerTradeIn")
+  agent          User?           @relation("AgentSellerLeads", fields: [agentId], references: [id])
+  vehicle        Vehicle?
+  activities     Activity[]
+  documents      Document[]
+  tradeInBuyer   BuyerLead?      @relation("BuyerTradeIn")
+  calendarEvents CalendarEvent[]
 
   @@index([status])
   @@index([agentId])
@@ -473,6 +501,7 @@ model Vehicle {
   deliveries      Delivery[]
   warranty        Warranty?
   documents       VehicleDocument[]
+  calendarEvents  CalendarEvent[]
 
   @@index([brand, model])
   @@index([status])
@@ -570,6 +599,7 @@ model BuyerLead {
   deliveries       Delivery[]
   warranty         Warranty?
   tradeInSellerLead SellerLead?      @relation("BuyerTradeIn", fields: [tradeInSellerLeadId], references: [id])
+  calendarEvents   CalendarEvent[]
 
   @@index([status])
   @@index([agentId])
@@ -629,8 +659,9 @@ model Match {
   createdAt   DateTime    @default(now()) @map("created_at")
   updatedAt   DateTime    @updatedAt @map("updated_at")
 
-  vehicle   Vehicle   @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
-  buyerLead BuyerLead @relation(fields: [buyerLeadId], references: [id], onDelete: Cascade)
+  vehicle        Vehicle         @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+  buyerLead      BuyerLead       @relation(fields: [buyerLeadId], references: [id], onDelete: Cascade)
+  calendarEvents CalendarEvent[]
 
   @@unique([vehicleId, buyerLeadId])
   @@index([buyerLeadId])
@@ -964,6 +995,53 @@ model PostventaFollowup {
   @@unique([warrantyId, type])
   @@index([status, scheduledFor])
   @@map("postventa_followups")
+}
+
+/// Evento propio del calendario operativo (F2): citas, limpiezas, seguimientos, otros.
+/// Se agrega en la vista de calendario junto a Entregas/Taller/Postventa/Próximas acciones.
+model CalendarEvent {
+  id              String                @id @default(cuid())
+  type            CalendarEventType
+  title           String
+  description     String?
+  status          CalendarEventStatus   @default(PROGRAMADO)
+  priority        CalendarEventPriority @default(MEDIA)
+  startAt         DateTime              @map("start_at")
+  endAt           DateTime?             @map("end_at")
+  durationMinutes Int?                  @map("duration_minutes")
+  allDay          Boolean               @default(false) @map("all_day")
+  location        String?
+
+  createdById  String  @map("created_by_id")
+  assignedToId String? @map("assigned_to_id")
+  buyerLeadId  String? @map("buyer_lead_id")
+  sellerLeadId String? @map("seller_lead_id")
+  vehicleId    String? @map("vehicle_id")
+  matchId      String? @map("match_id")
+
+  resultNotes        String? @map("result_notes")
+  internalNotes      String? @map("internal_notes")
+  specificData       Json?   @map("specific_data")
+  completedAt        DateTime? @map("completed_at")
+  cancelledAt        DateTime? @map("cancelled_at")
+  cancellationReason String?   @map("cancellation_reason")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  createdBy  User        @relation("CreatedCalendarEvents", fields: [createdById], references: [id])
+  assignedTo User?       @relation("AssignedCalendarEvents", fields: [assignedToId], references: [id])
+  buyerLead  BuyerLead?  @relation(fields: [buyerLeadId], references: [id], onDelete: Cascade)
+  sellerLead SellerLead? @relation(fields: [sellerLeadId], references: [id], onDelete: Cascade)
+  vehicle    Vehicle?    @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+  match      Match?      @relation(fields: [matchId], references: [id], onDelete: SetNull)
+
+  @@index([startAt])
+  @@index([assignedToId, startAt])
+  @@index([buyerLeadId])
+  @@index([vehicleId])
+  @@index([status])
+  @@map("calendar_events")
 }
 
 /// Documento legal asociado al expediente del vehículo (DNI, contratos, ITV, etc.)

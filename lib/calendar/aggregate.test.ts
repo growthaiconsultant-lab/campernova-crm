@@ -2,12 +2,14 @@ import { describe, expect, it } from 'vitest'
 import {
   applyFilters,
   deliveryToItem,
+  eventToItem,
   followupToItem,
   getCalendarItems,
   nextActionToItem,
   workOrderToItem,
   type CalendarDeps,
   type DeliveryRow,
+  type EventRow,
   type FollowupRow,
   type NextActionRow,
   type WorkOrderRow,
@@ -49,7 +51,30 @@ const nextAction: NextActionRow = {
   agent: { id: 'u1', name: 'Desirée' },
 }
 
+const event: EventRow = {
+  id: 'e1',
+  type: 'CITA',
+  title: 'Cita — ver McLouis',
+  status: 'CONFIRMADO',
+  startAt: new Date('2026-07-09T18:00:00'),
+  endAt: null,
+  allDay: false,
+  assignedTo: { id: 'u1', name: 'Desirée' },
+  buyerLead: { name: 'Carlos' },
+  sellerLead: null,
+  vehicle: { brand: 'McLouis', model: 'MC4' },
+}
+
 describe('mappers', () => {
+  it('event → item con href a /calendario/:id y contexto de comprador', () => {
+    const it_ = eventToItem(event)
+    expect(it_.id).toBe('event:e1')
+    expect(it_.source).toBe('event')
+    expect(it_.href).toBe('/calendario/e1')
+    expect(it_.kindLabel).toBe('Cita')
+    expect(it_.contextLabel).toBe('Carlos')
+  })
+
   it('delivery → item con href e info de cliente', () => {
     const it_ = deliveryToItem(delivery)
     expect(it_.id).toBe('delivery:d1')
@@ -94,12 +119,13 @@ describe('getCalendarItems', () => {
     listWorkOrders: async () => [workOrder],
     listFollowups: async () => [followup],
     listNextActions: async () => [nextAction],
+    listEvents: async () => [event],
   }
   const range = { from: new Date('2026-07-06'), to: new Date('2026-07-13') }
 
-  it('reúne los 4 orígenes y ordena por fecha ascendente', async () => {
+  it('reúne los 5 orígenes y ordena por fecha ascendente', async () => {
     const items = await getCalendarItems(deps, range, {}, new Date('2026-07-07'))
-    expect(items).toHaveLength(4)
+    expect(items).toHaveLength(5)
     const starts = items.map((i) => i.start.getTime())
     expect(starts).toEqual([...starts].sort((a, b) => a - b))
     // El primero es la orden de taller (08-jul)

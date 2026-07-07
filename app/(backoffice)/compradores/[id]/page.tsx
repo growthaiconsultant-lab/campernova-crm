@@ -166,6 +166,12 @@ export default async function FichaCompradorPage({
           orderBy: { score: 'desc' },
           take: 10,
         },
+        calendarEvents: {
+          where: { status: { notIn: ['CANCELADO', 'COMPLETADO', 'NO_SHOW'] } },
+          orderBy: { startAt: 'asc' },
+          take: 5,
+          select: { id: true, type: true, title: true, startAt: true, status: true },
+        },
       },
     }),
     db.user.findMany({ select: { id: true, name: true }, orderBy: { name: 'asc' } }),
@@ -792,6 +798,46 @@ export default async function FichaCompradorPage({
               nextActionType={lead.nextActionType}
               nextActionDueAt={lead.nextActionDueAt ? lead.nextActionDueAt.toISOString() : null}
             />
+
+            {/* Citas y eventos (F2 calendario) */}
+            <div className="rounded-xl border border-border bg-card p-5">
+              <div className="mb-3 flex items-center justify-between">
+                <p className="font-mono text-[10px] uppercase tracking-[0.12em] text-muted-foreground">
+                  Citas y eventos
+                </p>
+                <Link
+                  href={`/calendario/nuevo?type=CITA&buyer=${lead.id}`}
+                  className="text-[11px] font-medium text-sidebar-primary hover:underline"
+                >
+                  + Agendar
+                </Link>
+              </div>
+              {lead.calendarEvents.length === 0 ? (
+                <p className="text-[12px] text-muted-foreground">Sin citas próximas.</p>
+              ) : (
+                <div className="space-y-2">
+                  {lead.calendarEvents.map((ev) => (
+                    <Link
+                      key={ev.id}
+                      href={`/calendario/${ev.id}`}
+                      className="block rounded-lg border border-border px-3 py-2 transition-colors hover:bg-muted"
+                    >
+                      <p className="truncate text-[12.5px] font-medium text-foreground">
+                        {ev.title}
+                      </p>
+                      <p className="mt-0.5 font-mono text-[11px] text-muted-foreground">
+                        {new Date(ev.startAt).toLocaleString('es-ES', {
+                          day: 'numeric',
+                          month: 'short',
+                          hour: '2-digit',
+                          minute: '2-digit',
+                        })}
+                      </p>
+                    </Link>
+                  ))}
+                </div>
+              )}
+            </div>
 
             {/* Alert: open tickets */}
             {hasAlert && (
