@@ -9,6 +9,8 @@ const SOURCE_OPTIONS: { value: CalendarSource; label: string }[] = [
   { value: 'workorder', label: 'Taller' },
   { value: 'next_action', label: 'Próximas acciones' },
   { value: 'followup', label: 'Postventa' },
+  { value: 'captacion', label: 'Entradas' },
+  { value: 'event', label: 'Eventos' },
 ]
 
 type Agent = { id: string; name: string }

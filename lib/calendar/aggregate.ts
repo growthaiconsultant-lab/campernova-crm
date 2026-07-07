@@ -58,12 +58,21 @@ export type EventRow = {
   vehicle: { brand: string; model: string } | null
 }
 
+export type CaptureRow = {
+  id: string
+  entradaScheduledAt: Date
+  title: string | null
+  portalLabel: string
+  assignedTo: { id: string; name: string } | null
+}
+
 export type CalendarDeps = {
   listDeliveries: (from: Date, to: Date) => Promise<DeliveryRow[]>
   listWorkOrders: (from: Date, to: Date) => Promise<WorkOrderRow[]>
   listFollowups: (from: Date, to: Date) => Promise<FollowupRow[]>
   listNextActions: (from: Date, to: Date) => Promise<NextActionRow[]>
   listEvents: (from: Date, to: Date) => Promise<EventRow[]>
+  listCaptures: (from: Date, to: Date) => Promise<CaptureRow[]>
 }
 
 // ── Mappers puros ─────────────────────────────────────────────────────────────
@@ -205,6 +214,25 @@ export function eventToItem(r: EventRow): CalendarItem {
   }
 }
 
+export function captureToItem(r: CaptureRow): CalendarItem {
+  const label = r.title || 'vehículo'
+  return {
+    id: `captacion:${r.id}`,
+    source: 'captacion',
+    kindLabel: 'Entrada',
+    title: `Entrada · ${label} (${r.portalLabel})`,
+    start: r.entradaScheduledAt,
+    end: null,
+    allDay: false,
+    status: 'Agendada',
+    tone: 'default',
+    href: '/captaciones',
+    assigneeId: r.assignedTo?.id ?? null,
+    assigneeName: r.assignedTo?.name ?? null,
+    contextLabel: null,
+  }
+}
+
 // ── Agregación ────────────────────────────────────────────────────────────────
 
 /**
@@ -217,12 +245,13 @@ export async function getCalendarItems(
   filters: CalendarFilters = {},
   now: Date = new Date()
 ): Promise<CalendarItem[]> {
-  const [deliveries, workOrders, followups, nextActions, events] = await Promise.all([
+  const [deliveries, workOrders, followups, nextActions, events, captures] = await Promise.all([
     deps.listDeliveries(range.from, range.to),
     deps.listWorkOrders(range.from, range.to),
     deps.listFollowups(range.from, range.to),
     deps.listNextActions(range.from, range.to),
     deps.listEvents(range.from, range.to),
+    deps.listCaptures(range.from, range.to),
   ])
 
   const items: CalendarItem[] = [
@@ -231,6 +260,7 @@ export async function getCalendarItems(
     ...followups.map(followupToItem),
     ...nextActions.map((r) => nextActionToItem(r, now)),
     ...events.map(eventToItem),
+    ...captures.map(captureToItem),
   ]
 
   const filtered = applyFilters(items, filters, {
@@ -238,6 +268,7 @@ export async function getCalendarItems(
     workOrders,
     nextActions,
     events,
+    captures,
   })
 
   return filtered.sort((a, b) => a.start.getTime() - b.start.getTime())
@@ -252,6 +283,7 @@ export function applyFilters(
     workOrders: WorkOrderRow[]
     nextActions: NextActionRow[]
     events?: EventRow[]
+    captures?: CaptureRow[]
   }
 ): CalendarItem[] {
   let out = items
@@ -270,6 +302,7 @@ export function applyFilters(
     for (const n of raw.nextActions)
       assignee.set(`next_action:${n.leadKind}:${n.id}`, n.agent?.id ?? null)
     for (const e of raw.events ?? []) assignee.set(`event:${e.id}`, e.assignedTo?.id ?? null)
+    for (const c of raw.captures ?? []) assignee.set(`captacion:${c.id}`, c.assignedTo?.id ?? null)
     out = out.filter((i) => assignee.get(i.id) === id)
   }
 

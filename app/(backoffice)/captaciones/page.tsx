@@ -34,6 +34,7 @@ export default async function CaptacionesPage() {
     status: c.status,
     notes: c.notes,
     rejectionReason: c.rejectionReason,
+    entradaScheduledAt: c.entradaScheduledAt ? c.entradaScheduledAt.toISOString() : null,
     assignedToId: c.assignedToId,
     assignedToName: c.assignedTo?.name ?? null,
   }))

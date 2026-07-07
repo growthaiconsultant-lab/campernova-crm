@@ -2,8 +2,8 @@
 
 import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
-import { ExternalLink, MessageCircle, Pencil, Check } from 'lucide-react'
-import { updateCapture, updateCaptureStatus } from './actions'
+import { ExternalLink, MessageCircle, Pencil, Check, CalendarClock } from 'lucide-react'
+import { scheduleEntrada, updateCapture, updateCaptureStatus } from './actions'
 import { CAPTURE_STATUS_COLORS, CAPTURE_STATUS_LABELS, PORTAL_LABELS } from '@/lib/captacion'
 import { LOST_REASON_OPTIONS } from '@/lib/lost-reason'
 import { buildWhatsAppUrl } from '@/lib/whatsapp'
@@ -19,6 +19,7 @@ export type CaptureCardData = {
   status: CaptureStatus
   notes: string | null
   rejectionReason: LostReason | null
+  entradaScheduledAt: string | null
   assignedToId: string | null
   assignedToName: string | null
 }
@@ -42,6 +43,8 @@ export function CaptureCard({ c, agents }: { c: CaptureCardData; agents: Agent[]
   const [pending, startTransition] = useTransition()
   const [rejecting, setRejecting] = useState(false)
   const [reason, setReason] = useState('')
+  const [scheduling, setScheduling] = useState(false)
+  const [entradaAt, setEntradaAt] = useState('')
   const [editing, setEditing] = useState(false)
   const [notes, setNotes] = useState(c.notes ?? '')
   const [assignedToId, setAssignedToId] = useState(c.assignedToId ?? '')
@@ -50,6 +53,10 @@ export function CaptureCard({ c, agents }: { c: CaptureCardData; agents: Agent[]
   function changeStatus(next: CaptureStatus) {
     if (next === 'RECHAZADO') {
       setRejecting(true)
+      return
+    }
+    if (next === 'ENTRADA_AGENDADA') {
+      setScheduling(true)
       return
     }
     setError(null)
@@ -68,6 +75,19 @@ export function CaptureCard({ c, agents }: { c: CaptureCardData; agents: Agent[]
       if (res.error) setError(res.error)
       else {
         setRejecting(false)
+        router.refresh()
+      }
+    })
+  }
+
+  function confirmSchedule() {
+    if (!entradaAt) return setError('Indica fecha y hora de la entrada')
+    setError(null)
+    startTransition(async () => {
+      const res = await scheduleEntrada(c.id, new Date(entradaAt).toISOString())
+      if (res.error) setError(res.error)
+      else {
+        setScheduling(false)
         router.refresh()
       }
     })
@@ -129,6 +149,50 @@ export function CaptureCard({ c, agents }: { c: CaptureCardData; agents: Agent[]
         <p className="mt-1 text-[11px] text-red-600">
           Motivo: {LOST_REASON_OPTIONS.find((o) => o.value === c.rejectionReason)?.label}
         </p>
+      )}
+
+      {c.entradaScheduledAt && c.status === 'ENTRADA_AGENDADA' && (
+        <p className="mt-1 flex items-center gap-1 text-[11px] font-medium text-cyan-700">
+          <CalendarClock className="h-3 w-3" />
+          Entrada:{' '}
+          {new Date(c.entradaScheduledAt).toLocaleString('es-ES', {
+            day: 'numeric',
+            month: 'short',
+            hour: '2-digit',
+            minute: '2-digit',
+            timeZone: 'Europe/Madrid',
+          })}
+        </p>
+      )}
+
+      {/* Agendar entrada inline */}
+      {scheduling && (
+        <div className="mt-2 space-y-2 rounded border border-cyan-200 bg-cyan-50 p-2">
+          <p className="text-[11px] font-medium text-cyan-800">¿Cuándo trae el vehículo?</p>
+          <input
+            type="datetime-local"
+            value={entradaAt}
+            onChange={(e) => setEntradaAt(e.target.value)}
+            className="w-full rounded border border-cyan-200 px-2 py-1 text-[12px]"
+          />
+          <div className="flex gap-1.5">
+            <button
+              type="button"
+              onClick={confirmSchedule}
+              disabled={pending}
+              className="rounded bg-cyan-700 px-2 py-1 text-[11px] font-semibold text-white disabled:opacity-50"
+            >
+              Agendar entrada
+            </button>
+            <button
+              type="button"
+              onClick={() => setScheduling(false)}
+              className="rounded border border-cyan-200 px-2 py-1 text-[11px] text-cyan-700"
+            >
+              Cancelar
+            </button>
+          </div>
+        </div>
       )}
 
       {/* Edición inline */}
@@ -211,7 +275,7 @@ export function CaptureCard({ c, agents }: { c: CaptureCardData; agents: Agent[]
       {error && <p className="mt-1 text-[11px] text-red-600">{error}</p>}
 
       {/* Acciones */}
-      {!editing && !rejecting && (
+      {!editing && !rejecting && !scheduling && (
         <div className="mt-2 flex items-center gap-1.5">
           <label className="relative flex-1">
             <span

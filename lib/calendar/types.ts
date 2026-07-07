@@ -7,7 +7,13 @@
  * En F2 se añade un 5º origen: los `CalendarEvent` propios (citas, limpiezas…).
  */
 
-export type CalendarSource = 'delivery' | 'workorder' | 'followup' | 'next_action' | 'event'
+export type CalendarSource =
+  | 'delivery'
+  | 'workorder'
+  | 'followup'
+  | 'next_action'
+  | 'event'
+  | 'captacion'
 
 export type CalendarTone = 'default' | 'success' | 'warn' | 'danger' | 'muted'
 

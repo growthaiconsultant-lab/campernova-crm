@@ -1,6 +1,8 @@
 import type { PrismaClient } from '@prisma/client'
+import { PORTAL_LABELS } from '../captacion'
 import type {
   CalendarDeps,
+  CaptureRow,
   DeliveryRow,
   EventRow,
   FollowupRow,
@@ -134,6 +136,29 @@ export function prismaCalendarDeps(db: PrismaClient): CalendarDeps {
           vehicle: { select: { brand: true, model: true } },
         },
       })
+    },
+
+    async listCaptures(from, to): Promise<CaptureRow[]> {
+      const rows = await db.vehicleCapture.findMany({
+        where: {
+          status: 'ENTRADA_AGENDADA',
+          entradaScheduledAt: { gte: from, lt: to },
+        },
+        select: {
+          id: true,
+          entradaScheduledAt: true,
+          title: true,
+          portal: true,
+          assignedTo: { select: { id: true, name: true } },
+        },
+      })
+      return rows.map((r) => ({
+        id: r.id,
+        entradaScheduledAt: r.entradaScheduledAt as Date,
+        title: r.title,
+        portalLabel: PORTAL_LABELS[r.portal],
+        assignedTo: r.assignedTo,
+      }))
     },
   }
 }

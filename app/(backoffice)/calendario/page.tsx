@@ -22,6 +22,7 @@ const SOURCE_DOT: Record<CalendarSource, string> = {
   followup: '#7c3aed',
   next_action: '#2563eb',
   event: '#d97706',
+  captacion: '#0d9488',
 }
 
 function startOfDay(d: Date): Date {
@@ -425,6 +426,8 @@ export default async function CalendarioPage({
               ['workorder', 'Taller'],
               ['next_action', 'Próximas acciones'],
               ['followup', 'Postventa'],
+              ['captacion', 'Entradas'],
+              ['event', 'Eventos'],
             ] as [CalendarSource, string][]
           ).map(([s, label]) => (
             <span key={s} className="flex items-center gap-1.5">
