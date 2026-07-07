@@ -92,7 +92,19 @@ claude mcp add-json linear '{\"command\":\"npx\",\"args\":[\"-y\",\"mcp-linear@l
 
 `.claude/settings.json` y `.claude/settings.local.json` se mantienen como referencia de la estructura, pero la fuente de verdad funcional es el registro de la CLI.
 
-## Estado actual (Block 14 — Ficha Comprador: CAM-60→64 — DESPLEGADO A PROD ✅)
+## Estado actual (Block 14 — Ficha Comprador: CAM-60→64 + CAM-66 — DESPLEGADO A PROD ✅)
+
+### CAM-66 — Aviso de duplicados por teléfono (PR #49, squash `82cef40`, 2026-07-07)
+
+**Sin migración**.
+
+- **`lib/phone.ts`**: `normalizePhone` (móviles ES → prefijo 34) + `phonesMatch`; `formatPhoneForWhatsApp` reutiliza `normalizePhone`. 7 tests.
+- **`lib/buyer-dedup.ts`**: `findDuplicateBuyerByPhone` (deps-injectable) + `prismaBuyerDedupDeps`. Escanea `buyerLead.findMany` y compara por teléfono normalizado (escala pequeña, sin columna normalizada). 3 tests.
+- **`createBuyerLead(data, allowDuplicate=false)`**: si hay duplicado devuelve `{ duplicate: {id,name,status} }` en vez de crear; el form de alta muestra banner ámbar con enlace + "Crear de todas formas". 2 tests.
+- **Chat** (`register_buyer_lead`): si el teléfono existe, **reutiliza** el lead (vincula sesión + Activity "nueva conversación de comprador existente") en vez de duplicar.
+- Suite: **440 tests verdes**. Bloque Ficha de Comprador **completo** (CAM-60→66; CAM-65 quedó opcional, no implementado).
+
+### CAM-64 — Explicación del match (PR #48, squash `d200cf1`, 2026-07-07)
 
 ### CAM-64 — Explicación del match (PR #48, squash `d200cf1`, 2026-07-07)
 

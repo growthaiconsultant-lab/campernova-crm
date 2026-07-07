@@ -82,4 +82,4 @@ La distinción ya existe en datos (comentarios del schema + `lib/matching`); fal
 
 ---
 
-> Estado: **CAM-60→64 (PRs #44-#48) desplegados a prod (2026-07-07)**. Pendiente: CAM-65 (excluyentes vs preferencias visibles), CAM-66 (aviso de duplicados por teléfono).
+> Estado: **CAM-60→64 + CAM-66 (PRs #44-#49) desplegados a prod (2026-07-07)** — bloque completo. Solo queda **CAM-65** (excluyentes vs preferencias visibles), dejado como opcional.
