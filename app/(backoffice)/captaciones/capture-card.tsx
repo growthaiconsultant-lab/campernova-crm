@@ -1,9 +1,22 @@
 'use client'
 
 import { useState, useTransition } from 'react'
+import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { ExternalLink, MessageCircle, Pencil, Check, CalendarClock } from 'lucide-react'
-import { scheduleEntrada, updateCapture, updateCaptureStatus } from './actions'
+import {
+  ExternalLink,
+  MessageCircle,
+  Pencil,
+  Check,
+  CalendarClock,
+  ArrowRightLeft,
+} from 'lucide-react'
+import {
+  convertCaptureToSellerLead,
+  scheduleEntrada,
+  updateCapture,
+  updateCaptureStatus,
+} from './actions'
 import { CAPTURE_STATUS_COLORS, CAPTURE_STATUS_LABELS, PORTAL_LABELS } from '@/lib/captacion'
 import { LOST_REASON_OPTIONS } from '@/lib/lost-reason'
 import { buildWhatsAppUrl } from '@/lib/whatsapp'
@@ -22,6 +35,7 @@ export type CaptureCardData = {
   entradaScheduledAt: string | null
   assignedToId: string | null
   assignedToName: string | null
+  sellerLeadId: string | null
 }
 
 type Agent = { id: string; name: string }
@@ -48,6 +62,7 @@ export function CaptureCard({ c, agents }: { c: CaptureCardData; agents: Agent[]
   const [editing, setEditing] = useState(false)
   const [notes, setNotes] = useState(c.notes ?? '')
   const [assignedToId, setAssignedToId] = useState(c.assignedToId ?? '')
+  const [converting, startConvert] = useTransition()
   const [error, setError] = useState<string | null>(null)
 
   function changeStatus(next: CaptureStatus) {
@@ -90,6 +105,15 @@ export function CaptureCard({ c, agents }: { c: CaptureCardData; agents: Agent[]
         setScheduling(false)
         router.refresh()
       }
+    })
+  }
+
+  function convert() {
+    setError(null)
+    startConvert(async () => {
+      const res = await convertCaptureToSellerLead(c.id)
+      if (res.error) setError(res.error)
+      else if (res.sellerLeadId) router.push(`/vendedores/${res.sellerLeadId}`)
     })
   }
 
@@ -164,6 +188,33 @@ export function CaptureCard({ c, agents }: { c: CaptureCardData; agents: Agent[]
           })}
         </p>
       )}
+
+      {/* Convertida → enlace a la ficha del vendedor */}
+      {c.sellerLeadId && (
+        <Link
+          href={`/vendedores/${c.sellerLeadId}`}
+          className="mt-2 inline-flex items-center gap-1 text-[12px] font-medium text-emerald-700 hover:underline"
+        >
+          <ExternalLink className="h-3 w-3" /> Ver ficha de vendedor
+        </Link>
+      )}
+
+      {/* Convertir a ficha (cuando el vehículo va a entrar) */}
+      {!c.sellerLeadId &&
+        c.status === 'ENTRADA_AGENDADA' &&
+        !editing &&
+        !rejecting &&
+        !scheduling && (
+          <button
+            type="button"
+            onClick={convert}
+            disabled={converting}
+            className="mt-2 inline-flex w-full items-center justify-center gap-1.5 rounded bg-emerald-600 px-2 py-1.5 text-[11.5px] font-semibold text-white transition-opacity hover:opacity-90 disabled:opacity-50"
+          >
+            <ArrowRightLeft className="h-3.5 w-3.5" />
+            {converting ? 'Convirtiendo…' : 'Convertir a ficha de vendedor'}
+          </button>
+        )}
 
       {/* Agendar entrada inline */}
       {scheduling && (

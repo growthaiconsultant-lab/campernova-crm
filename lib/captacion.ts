@@ -57,6 +57,22 @@ export function isTerminalCaptureStatus(s: CaptureStatus): boolean {
   return s === 'CONVERTIDO' || s === 'RECHAZADO'
 }
 
+/**
+ * F3: parte el título libre del anuncio en marca / modelo para prellenar el
+ * Vehicle. Heurística simple: primera palabra = marca, resto = modelo. El
+ * comercial lo ajusta en la ficha. Si no hay título, deja placeholders editables.
+ */
+export function splitCaptureTitle(title: string | null | undefined): {
+  brand: string
+  model: string
+} {
+  const clean = (title ?? '').trim().replace(/\s+/g, ' ')
+  if (!clean) return { brand: 'Por determinar', model: 'Por determinar' }
+  const parts = clean.split(' ')
+  if (parts.length === 1) return { brand: parts[0], model: 'Por determinar' }
+  return { brand: parts[0], model: parts.slice(1).join(' ') }
+}
+
 export type CaptureRow = { id: string; phone: string; status: CaptureStatus }
 
 /**

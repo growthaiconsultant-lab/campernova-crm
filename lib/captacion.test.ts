@@ -7,6 +7,7 @@ import {
   isValidCaptureStatus,
   isValidPortal,
   PORTAL_LABELS,
+  splitCaptureTitle,
 } from './captacion'
 
 describe('labels/opciones', () => {
@@ -31,6 +32,25 @@ describe('isTerminalCaptureStatus', () => {
     expect(isTerminalCaptureStatus('CONVERTIDO')).toBe(true)
     expect(isTerminalCaptureStatus('RECHAZADO')).toBe(true)
     expect(isTerminalCaptureStatus('EN_CURSO')).toBe(false)
+  })
+})
+
+describe('splitCaptureTitle', () => {
+  it('marca = primera palabra, modelo = resto', () => {
+    expect(splitCaptureTitle('Benimar Tessoro 495')).toEqual({
+      brand: 'Benimar',
+      model: 'Tessoro 495',
+    })
+  })
+  it('una sola palabra → modelo por determinar', () => {
+    expect(splitCaptureTitle('California')).toEqual({
+      brand: 'California',
+      model: 'Por determinar',
+    })
+  })
+  it('vacío/nulo → placeholders editables', () => {
+    expect(splitCaptureTitle('')).toEqual({ brand: 'Por determinar', model: 'Por determinar' })
+    expect(splitCaptureTitle(null)).toEqual({ brand: 'Por determinar', model: 'Por determinar' })
   })
 })
 
