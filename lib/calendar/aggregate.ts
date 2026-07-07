@@ -1,5 +1,6 @@
 import { NEXT_ACTION_LABELS } from '../next-action'
-import type { NextActionType } from '@prisma/client'
+import { EVENT_STATUS_LABELS, EVENT_TYPE_LABELS } from './event-meta'
+import type { CalendarEventStatus, CalendarEventType, NextActionType } from '@prisma/client'
 import type { CalendarFilters, CalendarItem, CalendarTone } from './types'
 
 /**
@@ -42,11 +43,26 @@ export type NextActionRow = {
   agent: { id: string; name: string } | null
 }
 
+export type EventRow = {
+  id: string
+  type: CalendarEventType
+  title: string
+  status: CalendarEventStatus
+  startAt: Date
+  endAt: Date | null
+  allDay: boolean
+  assignedTo: { id: string; name: string } | null
+  buyerLead: { name: string } | null
+  sellerLead: { name: string } | null
+  vehicle: { brand: string; model: string } | null
+}
+
 export type CalendarDeps = {
   listDeliveries: (from: Date, to: Date) => Promise<DeliveryRow[]>
   listWorkOrders: (from: Date, to: Date) => Promise<WorkOrderRow[]>
   listFollowups: (from: Date, to: Date) => Promise<FollowupRow[]>
   listNextActions: (from: Date, to: Date) => Promise<NextActionRow[]>
+  listEvents: (from: Date, to: Date) => Promise<EventRow[]>
 }
 
 // ── Mappers puros ─────────────────────────────────────────────────────────────
@@ -153,6 +169,36 @@ export function nextActionToItem(r: NextActionRow, now: Date = new Date()): Cale
   }
 }
 
+const EVENT_TONE: Record<CalendarEventStatus, CalendarTone> = {
+  PROGRAMADO: 'default',
+  CONFIRMADO: 'default',
+  EN_CURSO: 'warn',
+  COMPLETADO: 'success',
+  CANCELADO: 'muted',
+  NO_SHOW: 'danger',
+}
+
+export function eventToItem(r: EventRow): CalendarItem {
+  const context =
+    r.buyerLead?.name ??
+    r.sellerLead?.name ??
+    (r.vehicle ? `${r.vehicle.brand} ${r.vehicle.model}` : null)
+  return {
+    id: `event:${r.id}`,
+    source: 'event',
+    kindLabel: EVENT_TYPE_LABELS[r.type],
+    title: r.title,
+    start: r.startAt,
+    end: r.endAt,
+    allDay: r.allDay,
+    status: EVENT_STATUS_LABELS[r.status],
+    tone: EVENT_TONE[r.status],
+    href: `/calendario/${r.id}`,
+    assigneeName: r.assignedTo?.name ?? null,
+    contextLabel: context,
+  }
+}
+
 // ── Agregación ────────────────────────────────────────────────────────────────
 
 /**
@@ -165,11 +211,12 @@ export async function getCalendarItems(
   filters: CalendarFilters = {},
   now: Date = new Date()
 ): Promise<CalendarItem[]> {
-  const [deliveries, workOrders, followups, nextActions] = await Promise.all([
+  const [deliveries, workOrders, followups, nextActions, events] = await Promise.all([
     deps.listDeliveries(range.from, range.to),
     deps.listWorkOrders(range.from, range.to),
     deps.listFollowups(range.from, range.to),
     deps.listNextActions(range.from, range.to),
+    deps.listEvents(range.from, range.to),
   ])
 
   const items: CalendarItem[] = [
@@ -177,12 +224,14 @@ export async function getCalendarItems(
     ...workOrders.map(workOrderToItem),
     ...followups.map(followupToItem),
     ...nextActions.map((r) => nextActionToItem(r, now)),
+    ...events.map(eventToItem),
   ]
 
   const filtered = applyFilters(items, filters, {
     deliveries,
     workOrders,
     nextActions,
+    events,
   })
 
   return filtered.sort((a, b) => a.start.getTime() - b.start.getTime())
@@ -196,6 +245,7 @@ export function applyFilters(
     deliveries: DeliveryRow[]
     workOrders: WorkOrderRow[]
     nextActions: NextActionRow[]
+    events?: EventRow[]
   }
 ): CalendarItem[] {
   let out = items
@@ -213,6 +263,7 @@ export function applyFilters(
     for (const w of raw.workOrders) assignee.set(`workorder:${w.id}`, w.assignedTo?.id ?? null)
     for (const n of raw.nextActions)
       assignee.set(`next_action:${n.leadKind}:${n.id}`, n.agent?.id ?? null)
+    for (const e of raw.events ?? []) assignee.set(`event:${e.id}`, e.assignedTo?.id ?? null)
     out = out.filter((i) => assignee.get(i.id) === id)
   }
 

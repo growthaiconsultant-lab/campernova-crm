@@ -152,6 +152,12 @@ export default async function CalendarioPage({
           </h1>
         </div>
         <div className="flex flex-wrap items-center gap-2">
+          <Link
+            href="/calendario/nuevo"
+            className="inline-flex items-center gap-1.5 rounded-lg bg-foreground px-3 py-2 text-[12.5px] font-semibold text-background transition-opacity hover:opacity-90"
+          >
+            + Nuevo evento
+          </Link>
           {/* Toggle vista */}
           <div className="flex overflow-hidden rounded-lg border border-border">
             <Link

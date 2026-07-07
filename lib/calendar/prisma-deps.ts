@@ -2,6 +2,7 @@ import type { PrismaClient } from '@prisma/client'
 import type {
   CalendarDeps,
   DeliveryRow,
+  EventRow,
   FollowupRow,
   NextActionRow,
   WorkOrderRow,
@@ -109,6 +110,25 @@ export function prismaCalendarDeps(db: PrismaClient): CalendarDeps {
         })
 
       return [...sellers.map(mapRow('seller')), ...buyers.map(mapRow('buyer'))]
+    },
+
+    async listEvents(from, to): Promise<EventRow[]> {
+      return db.calendarEvent.findMany({
+        where: { startAt: { gte: from, lt: to } },
+        select: {
+          id: true,
+          type: true,
+          title: true,
+          status: true,
+          startAt: true,
+          endAt: true,
+          allDay: true,
+          assignedTo: { select: { id: true, name: true } },
+          buyerLead: { select: { name: true } },
+          sellerLead: { select: { name: true } },
+          vehicle: { select: { brand: true, model: true } },
+        },
+      })
     },
   }
 }
