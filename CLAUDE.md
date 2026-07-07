@@ -92,7 +92,18 @@ claude mcp add-json linear '{\"command\":\"npx\",\"args\":[\"-y\",\"mcp-linear@l
 
 `.claude/settings.json` y `.claude/settings.local.json` se mantienen como referencia de la estructura, pero la fuente de verdad funcional es el registro de la CLI.
 
-## Estado actual (Block 14 — Ficha Comprador: CAM-60→63 — DESPLEGADO A PROD ✅)
+## Estado actual (Block 14 — Ficha Comprador: CAM-60→64 — DESPLEGADO A PROD ✅)
+
+### CAM-64 — Explicación del match (PR #48, squash `d200cf1`, 2026-07-07)
+
+**Sin migración** — reutiliza los ejes de scoring del matching.
+
+- **`lib/matching/explain.ts`**: `explainMatch(vehicle, buyer, breakdown)` + `buildMatchExplanation(vehicle, buyer)` generan determinista (sin LLM) motivos (✓) y riesgos (⚠) desde el `ScoreBreakdown` + datos del par: distribución, cama, equipamiento crítico que falta, precio vs presupuesto, antigüedad/km, zona. Exportado en `lib/matching/index.ts`. 7 tests.
+- **`MatchesSection`**: bloque de motivos (verde) + riesgos (ámbar) en cada tarjeta (ambos lados). Tipo `MatchExplanationData` opcional en `VehicleMatchData`/`BuyerMatchData`.
+- **Fichas comprador y vendedor**: computan la explicación por match en el server component vía `prismaMatchingDeps` (≤10 queries por ficha) y la pasan serializada al cliente.
+- Suite: **427 tests verdes**.
+
+### CAM-63 — Vehículo de parte de pago / trade-in (PR #47, squash `955fd4e`, 2026-07-07)
 
 ### CAM-63 — Vehículo de parte de pago / trade-in (PR #47, squash `955fd4e`, 2026-07-07)
 
