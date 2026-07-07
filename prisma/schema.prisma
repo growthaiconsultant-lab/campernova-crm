@@ -156,6 +156,14 @@ enum ActivityType {
   TITULARIDAD_TRANSFERIDA
   PUBLICACION_BLOQUEADA
   PROXIMA_ACCION_ACTUALIZADA
+  TEMPERATURA_ACTUALIZADA
+}
+
+/// Temperatura comercial del lead comprador (CAM-62).
+enum LeadTemperature {
+  HOT
+  WARM
+  COLD
 }
 
 /// Motivo estructurado de pérdida/descarte de un lead (CAM-61).
@@ -529,6 +537,7 @@ model BuyerLead {
   nextActionDueAt        DateTime?        @map("next_action_due_at")
   lostReason             LostReason?      @map("lost_reason")
   lostReasonNotes        String?          @map("lost_reason_notes")
+  temperature            LeadTemperature? @map("temperature")
   createdAt              DateTime         @default(now()) @map("created_at")
   updatedAt              DateTime         @updatedAt @map("updated_at")
 

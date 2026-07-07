@@ -4,6 +4,7 @@ import { db } from '@/lib/db'
 import { requireAuth } from '@/lib/auth'
 import { BuyerListFilters } from './buyer-list-filters'
 import { buildWhatsAppUrl } from '@/lib/whatsapp'
+import { TEMPERATURE_COLORS, TEMPERATURE_LABELS } from '@/lib/lead-temperature'
 import type { Prisma } from '@prisma/client'
 
 const PAGE_SIZE = 50
@@ -135,6 +136,7 @@ type SearchParams = {
   dateTo?: string
   budgetMin?: string
   seatsMin?: string
+  temp?: string
   sort?: string
   dir?: string
   page?: string
@@ -188,6 +190,12 @@ function buildWhere(
       conditions.push({ source: { in: ['CHAT', 'CHAT_WEB'] } })
     } else {
       conditions.push({ source: sp.source })
+    }
+  }
+
+  if (sp.temp) {
+    if (sp.temp === 'HOT' || sp.temp === 'WARM' || sp.temp === 'COLD') {
+      conditions.push({ temperature: sp.temp })
     }
   }
 
@@ -313,6 +321,7 @@ export default async function CompradoresPage({ searchParams }: { searchParams: 
     if (searchParams.vehicleType) sp.set('vehicleType', searchParams.vehicleType)
     if (searchParams.budgetMin) sp.set('budgetMin', searchParams.budgetMin)
     if (searchParams.seatsMin) sp.set('seatsMin', searchParams.seatsMin)
+    if (searchParams.temp) sp.set('temp', searchParams.temp)
     if (searchParams.dateFrom) sp.set('dateFrom', searchParams.dateFrom)
     if (searchParams.dateTo) sp.set('dateTo', searchParams.dateTo)
     if (searchParams.sort) sp.set('sort', searchParams.sort)
@@ -560,8 +569,17 @@ export default async function CompradoresPage({ searchParams }: { searchParams: 
                         {inits}
                       </div>
                       <div className="min-w-0 leading-snug">
-                        <div className="truncate text-[14px] font-semibold text-[#0a0a0a]">
-                          {lead.name}
+                        <div className="flex items-center gap-1.5">
+                          <span className="truncate text-[14px] font-semibold text-[#0a0a0a]">
+                            {lead.name}
+                          </span>
+                          {lead.temperature && (
+                            <span
+                              className="h-2 w-2 shrink-0 rounded-full"
+                              title={`Temperatura: ${TEMPERATURE_LABELS[lead.temperature]}`}
+                              style={{ background: TEMPERATURE_COLORS[lead.temperature].dot }}
+                            />
+                          )}
                         </div>
                         <div className="mt-0.5 font-mono text-[10.5px] text-[#64748b]">
                           #{lead.id.slice(-8)}{' '}

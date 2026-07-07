@@ -24,6 +24,13 @@ const SOURCE_OPTIONS = [
   { value: '__none__', label: 'Backoffice' },
 ]
 
+// CAM-62: temperatura del lead
+const TEMP_OPTIONS = [
+  { value: 'HOT', label: 'Caliente', dot: '#dc2626' },
+  { value: 'WARM', label: 'Templado', dot: '#f59e0b' },
+  { value: 'COLD', label: 'Frío', dot: '#38bdf8' },
+]
+
 type Agent = { id: string; name: string }
 type Props = { agents: Agent[] }
 
@@ -65,6 +72,7 @@ export function BuyerListFilters({ agents }: Props) {
   const currentSort = params.get('sort') ?? 'createdAt'
   const currentBudget = params.get('budgetMin') ?? ''
   const currentSeats = params.get('seatsMin') ?? ''
+  const currentTemp = params.get('temp') ?? ''
   const currentQ = params.get('q') ?? ''
 
   const hasFilters =
@@ -74,6 +82,7 @@ export function BuyerListFilters({ agents }: Props) {
     currentAgent ||
     currentBudget ||
     currentSeats ||
+    currentTemp ||
     currentQ
 
   const sortLabel =
@@ -226,6 +235,48 @@ export function BuyerListFilters({ agents }: Props) {
         >
           <option value="__all__">Cualquier origen</option>
           {SOURCE_OPTIONS.map((o) => (
+            <option key={o.value} value={o.value}>
+              {o.label}
+            </option>
+          ))}
+        </select>
+      </label>
+
+      {/* Temperatura chip (CAM-62) */}
+      <label className="relative cursor-pointer">
+        <span className={currentTemp ? chipActive : chipBase}>
+          {currentTemp ? (
+            <>
+              <span
+                className="h-1.5 w-1.5 rounded-full"
+                style={{
+                  background: TEMP_OPTIONS.find((o) => o.value === currentTemp)?.dot ?? '#64748b',
+                }}
+              />
+              {TEMP_OPTIONS.find((o) => o.value === currentTemp)?.label ?? 'Temperatura'}
+            </>
+          ) : (
+            'Temperatura'
+          )}
+          <svg
+            viewBox="0 0 24 24"
+            className="h-3.5 w-3.5 opacity-60"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth={1.6}
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
+            <polyline points="6 9 12 15 18 9" />
+          </svg>
+        </span>
+        <select
+          className="absolute inset-0 cursor-pointer opacity-0"
+          value={currentTemp}
+          onChange={(e) => push({ temp: e.target.value === '__all__' ? '' : e.target.value })}
+        >
+          <option value="__all__">Cualquier temperatura</option>
+          {TEMP_OPTIONS.map((o) => (
             <option key={o.value} value={o.value}>
               {o.label}
             </option>
