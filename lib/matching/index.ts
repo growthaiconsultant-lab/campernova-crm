@@ -1,5 +1,7 @@
 export { findMatchesForBuyer, findMatchesForVehicle, scorePair } from './find'
 export { passesHardFilters } from './filters'
+export { buildMatchExplanation, explainMatch } from './explain'
+export type { MatchExplanation } from './explain'
 export { prismaMatchingDeps } from './prisma-deps'
 export {
   computeRecalcDiff,
