@@ -44,8 +44,11 @@ function addDays(d: Date, n: number): Date {
   return x
 }
 
-const fmtDay = (d: Date) => d.toLocaleDateString('es-ES', { day: 'numeric', month: 'short' })
-const fmtTime = (d: Date) => d.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })
+const TZ = 'Europe/Madrid'
+const fmtDay = (d: Date) =>
+  d.toLocaleDateString('es-ES', { day: 'numeric', month: 'short', timeZone: TZ })
+const fmtTime = (d: Date) =>
+  d.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit', timeZone: TZ })
 
 /** Fecha local como YYYY-MM-DD (evita el desfase de toISOString en UTC+). */
 function ymd(d: Date): string {
@@ -154,9 +157,14 @@ export default async function CalendarioPage({
   const monthDate = new Date(now.getFullYear(), now.getMonth() + monthOffset, 1)
   const periodLabel =
     view === 'day'
-      ? dayList[0].toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long' })
+      ? dayList[0].toLocaleDateString('es-ES', {
+          weekday: 'long',
+          day: 'numeric',
+          month: 'long',
+          timeZone: TZ,
+        })
       : view === 'month'
-        ? monthDate.toLocaleDateString('es-ES', { month: 'long', year: 'numeric' })
+        ? monthDate.toLocaleDateString('es-ES', { month: 'long', year: 'numeric', timeZone: TZ })
         : `Semana del ${fmtDay(dayList[0])} al ${fmtDay(dayList[6])}`
 
   // Filas de semanas para la vista mensual (chunks de 7)
@@ -268,7 +276,7 @@ export default async function CalendarioPage({
 
       <div className="px-4 pb-16 pt-4 md:px-8">
         <div className="mb-3 flex items-center justify-between gap-3">
-          <p className="text-[13px] capitalize text-muted-foreground">{periodLabel}</p>
+          <p className="text-[13px] text-muted-foreground first-letter:uppercase">{periodLabel}</p>
           <CalendarFilters agents={agents} />
         </div>
 

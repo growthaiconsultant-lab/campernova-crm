@@ -17,6 +17,7 @@ const fmtDateTime = (d: Date) =>
     month: 'long',
     hour: '2-digit',
     minute: '2-digit',
+    timeZone: 'Europe/Madrid',
   })
 
 export default async function EventoDetallePage({ params }: { params: { id: string } }) {
@@ -63,7 +64,7 @@ export default async function EventoDetallePage({ params }: { params: { id: stri
       <div className="space-y-3 rounded-xl border border-border bg-card p-5 text-[13px]">
         <div className="flex items-center gap-2 text-foreground">
           <Clock className="h-4 w-4 text-muted-foreground" />
-          <span className="capitalize">{fmtDateTime(event.startAt)}</span>
+          <span className="first-letter:uppercase">{fmtDateTime(event.startAt)}</span>
           {event.durationMinutes && (
             <span className="text-muted-foreground">· {event.durationMinutes} min</span>
           )}
@@ -158,6 +159,7 @@ export default async function EventoDetallePage({ params }: { params: { id: stri
           day: 'numeric',
           month: 'short',
           year: 'numeric',
+          timeZone: 'Europe/Madrid',
         })}
       </p>
     </div>

@@ -39,8 +39,10 @@ export async function GET(request: Request) {
     weekday: 'long',
     day: 'numeric',
     month: 'long',
+    timeZone: 'Europe/Madrid',
   })
-  const fmtTime = (d: Date) => d.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })
+  const fmtTime = (d: Date) =>
+    d.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Madrid' })
 
   let sent = 0
   for (const user of users) {
