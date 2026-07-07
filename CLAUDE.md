@@ -92,7 +92,31 @@ claude mcp add-json linear '{\"command\":\"npx\",\"args\":[\"-y\",\"mcp-linear@l
 
 `.claude/settings.json` y `.claude/settings.local.json` se mantienen como referencia de la estructura, pero la fuente de verdad funcional es el registro de la CLI.
 
-## Estado actual (Block 14 — Ficha Comprador: CAM-60→66 COMPLETO — DESPLEGADO A PROD ✅)
+## Estado actual (Block 15 — Calendario operativo F1+F2 — DESPLEGADO A PROD ✅)
+
+Módulo de **Calendario / Agenda operativa** (spec del dueño en `docs/`). Decisión de arquitectura acordada con el dueño: **agregación, NO mega-tabla** — el calendario reúne lo ya agendado (Entregas, Taller, Postventa, Próximas acciones) en una vista unificada + una tabla `CalendarEvent` **solo** para tipos sin hogar (Citas primero). Se evita duplicar Delivery/WorkOrder → una sola fuente de verdad por entidad. El plan/mapeo vive en `docs/Calendario-Mapeo.md`.
+
+### F1 — Vista unificada (PR #51, squash `7cdc8e5`, 2026-07-07) — sin migración
+
+- **`lib/calendar/`**: modelo de lectura `CalendarItem` + mappers puros por origen (`deliveryToItem`, `workOrderToItem`, `followupToItem`, `nextActionToItem`, y en F2 `eventToItem`) + `getCalendarItems(deps, range, filters)` (deps inyectables) + `prisma-deps.ts`. Cada ítem enlaza a su ficha real.
+- **`/calendario`**: vista **semana** (7 columnas día) + **día** (lista), nav `?week=`, filtros por origen (chips) y responsable. CSS grid, sin librerías nuevas. Sidebar: entrada "Calendario" en Operaciones (ADMIN/AGENTE/TALLER/ENTREGAS).
+
+### F2 — CalendarEvent + Citas (PR #52, squash `eb4587d`, 2026-07-07)
+
+Migración additiva `20260707400000_add_calendar_events` aplicada a staging y prod antes del merge.
+
+- **Schema**: `CalendarEvent` + enums `CalendarEventType` (CITA, LIMPIEZA, SEGUIMIENTO, OTRO), `CalendarEventStatus` (PROGRAMADO→CONFIRMADO→EN_CURSO→COMPLETADO / CANCELADO / NO_SHOW), `CalendarEventPriority`. FKs opcionales a User (creador/responsable), BuyerLead, SellerLead, Vehicle, Match + `specificData Json`. **Reparación/Mejora siguen en WorkOrder; Entrega en Delivery** — NO se duplican aquí.
+- **`lib/calendar/event-meta.ts`**: labels/opciones + máquina de estados (`isValidEventTransition`, terminales).
+- **Agregación**: 5º origen `event` en `getCalendarItems` (mapper → href `/calendario/:id`).
+- **`createCalendarEvent` / `updateCalendarEventStatus`** (`calendario/actions.ts`): crear con `endAt` derivado de la duración; transiciones validadas; completar guarda `resultNotes`, cancelar/no-show guardan motivo. 6 tests.
+- **UI**: `/calendario/nuevo` (form por tipo + campos de cita: canal/teléfono/objetivo + asociaciones), `/calendario/[id]` (detalle + barra de estados), botón "Nuevo evento". **Ficha comprador**: card "Citas y eventos" en el rail + "Agendar" con comprador preseleccionado.
+- Suite: **460 tests verdes**.
+
+### Pendiente del spec de calendario (fases siguientes, cuando se quiera)
+
+Limpieza/Seguimiento/Otros sobre `CalendarEvent` (la tabla ya los soporta); `WorkOrder.kind` (REPARACION|MEJORA|LIMPIEZA) para diferenciar mejora; vista **mensual** + reporting (§27); recordatorios/notificaciones; **IA** de "crear evento desde texto natural" (§22). Base lista para todas.
+
+## Estado previo (Block 14 — Ficha Comprador: CAM-60→66 COMPLETO — DESPLEGADO A PROD ✅)
 
 ### CAM-65 — Excluyentes vs preferencias visibles (PR #50, squash `83c7d35`, 2026-07-07)
 
