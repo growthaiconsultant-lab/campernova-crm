@@ -54,9 +54,9 @@ Sección "Su vehículo actual" en la ficha del comprador (§11): `hasTradeIn`, t
 
 §13.5 del spec. Los ejes de scoring existentes (categoría 22 · cama 18 · precio 20 · equipo 15 · antig/km 15 · zona 10) ya contienen los porqués — generar la explicación **determinista** desde los sub-scores (encaja porque… / riesgos…) sin LLM, en `MatchesSection` y ficha. Opcional fase 2: "ángulo comercial" con IA (mismo patrón revisable de rv-suggest).
 
-### CAM-65 [P2] Excluyentes vs preferencias visibles en la ficha
+### CAM-65 [P2] Excluyentes vs preferencias visibles en la ficha ✅ HECHO (PR #50)
 
-La distinción ya existe en datos (comentarios del schema + `lib/matching`); falta UI: en la card de preferencias del rail, badge "excluyente" (rojo suave) vs "preferencia" (neutro) por campo. Opcional: campo libre `dealBreakersNotes` para lo que no cabe en la taxonomía.
+`lib/buyer-criteria.ts` clasifica cada criterio; card "Criterios de búsqueda" en el rail con badge excluyente/preferencia. (No se hizo el `dealBreakersNotes` libre — requería migración y no aportaba frente a la taxonomía existente.)
 
 ### CAM-66 [P2] Aviso de duplicados por teléfono
 
@@ -82,4 +82,4 @@ La distinción ya existe en datos (comentarios del schema + `lib/matching`); fal
 
 ---
 
-> Estado: **CAM-60→64 + CAM-66 (PRs #44-#49) desplegados a prod (2026-07-07)** — bloque completo. Solo queda **CAM-65** (excluyentes vs preferencias visibles), dejado como opcional.
+> Estado: **CAM-60→66 (PRs #44-#50) desplegados a prod (2026-07-07)** — bloque Ficha de Comprador **completo**. Todo el "Bloque 1 — Adoptar" del mapeo está entregado.

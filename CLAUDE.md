@@ -92,7 +92,17 @@ claude mcp add-json linear '{\"command\":\"npx\",\"args\":[\"-y\",\"mcp-linear@l
 
 `.claude/settings.json` y `.claude/settings.local.json` se mantienen como referencia de la estructura, pero la fuente de verdad funcional es el registro de la CLI.
 
-## Estado actual (Block 14 — Ficha Comprador: CAM-60→64 + CAM-66 — DESPLEGADO A PROD ✅)
+## Estado actual (Block 14 — Ficha Comprador: CAM-60→66 COMPLETO — DESPLEGADO A PROD ✅)
+
+### CAM-65 — Excluyentes vs preferencias visibles (PR #50, squash `83c7d35`, 2026-07-07)
+
+**Sin migración** — la distinción ya vivía en `lib/matching/filters.ts`, ahora se hace visible.
+
+- **`lib/buyer-criteria.ts`**: `classifyBuyerCriteria(buyer)` etiqueta cada criterio activo como **excluyente** (filtros duros: tipo, plazas mín., presupuesto, plazas dormir, baño obligatorio, carnet B, largo/alto máx.) o **preferencia** (scoring: distribución, cama, equipamiento, zona, invierno, garaje, niños). 5 tests.
+- **Ficha comprador (rail)**: card "Criterios de búsqueda" con badge rojo (excluyente) / gris (preferencia) + tooltip; oculta si no hay criterios.
+- Suite: **445 tests verdes**. **Bloque Ficha de Comprador cerrado: CAM-60→66 completo.**
+
+### CAM-66 — Aviso de duplicados por teléfono (PR #49, squash `82cef40`, 2026-07-07)
 
 ### CAM-66 — Aviso de duplicados por teléfono (PR #49, squash `82cef40`, 2026-07-07)
 
