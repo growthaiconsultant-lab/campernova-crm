@@ -8,9 +8,11 @@ import type { UserRole } from '@prisma/client'
 
 interface MobileSidebarProps {
   userRole: UserRole
+  userName: string
+  roleLabel: string
 }
 
-export function MobileSidebar({ userRole }: MobileSidebarProps) {
+export function MobileSidebar({ userRole, userName, roleLabel }: MobileSidebarProps) {
   const [open, setOpen] = useState(false)
   const pathname = usePathname()
 
@@ -51,7 +53,12 @@ export function MobileSidebar({ userRole }: MobileSidebarProps) {
 
           {/* Panel */}
           <div className="absolute inset-y-0 left-0 flex w-64 max-w-[85vw] flex-col shadow-xl">
-            <SidebarContent userRole={userRole} onNavigate={() => setOpen(false)} />
+            <SidebarContent
+              userRole={userRole}
+              userName={userName}
+              roleLabel={roleLabel}
+              onNavigate={() => setOpen(false)}
+            />
             <button
               type="button"
               onClick={() => setOpen(false)}

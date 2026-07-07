@@ -335,7 +335,7 @@ export default async function FichaVendedorPage({
   return (
     <div className="-mx-6 -mt-6 flex min-h-full flex-col">
       {/* ── Topbar sticky ── */}
-      <header className="sticky top-0 z-20 flex h-[73px] shrink-0 items-center justify-between gap-2 border-b border-border bg-card px-4 md:px-8">
+      <header className="z-20 flex min-h-[56px] shrink-0 items-center justify-between gap-2 border-b border-border bg-card px-4 py-2 md:px-8 lg:sticky lg:top-0 lg:h-[73px] lg:py-0">
         <nav className="flex items-center gap-2 font-mono text-[11px] uppercase tracking-[0.12em] text-muted-foreground">
           <Link
             href="/vendedores"

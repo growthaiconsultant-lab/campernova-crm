@@ -12,8 +12,10 @@ import {
   Wrench,
   CalendarCheck,
   ShieldCheck,
+  LogOut,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { logout } from '@/app/(backoffice)/actions'
 import type { UserRole } from '@prisma/client'
 
 interface NavItem {
@@ -85,10 +87,21 @@ const NAV_SECTIONS: NavSection[] = [
 
 interface SidebarProps {
   userRole: UserRole
+  userName: string
+  roleLabel: string
   onNavigate?: () => void
 }
 
-export function SidebarContent({ userRole, onNavigate }: SidebarProps) {
+function getInitials(name: string) {
+  return name
+    .split(' ')
+    .slice(0, 2)
+    .map((n) => n[0])
+    .join('')
+    .toUpperCase()
+}
+
+export function SidebarContent({ userRole, userName, roleLabel, onNavigate }: SidebarProps) {
   const pathname = usePathname()
 
   const isActive = (href: string) => pathname === href || pathname.startsWith(`${href}/`)
@@ -149,18 +162,45 @@ export function SidebarContent({ userRole, onNavigate }: SidebarProps) {
         )}
       </nav>
 
-      {/* Footer */}
-      <div className="shrink-0 px-4 pb-4">
-        <p className="text-[8px] text-sidebar-foreground/25">v0.1</p>
+      {/* Footer — usuario + logout */}
+      <div className="shrink-0 border-t border-sidebar-border px-3 py-3">
+        <div className="flex items-center gap-2.5">
+          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-sidebar-primary text-[11px] font-semibold text-sidebar-primary-foreground">
+            {getInitials(userName)}
+          </div>
+          <div className="min-w-0 flex-1">
+            <p className="truncate text-[13px] font-medium leading-tight text-sidebar-foreground">
+              {userName}
+            </p>
+            <p className="text-[10px] text-sidebar-foreground/50">{roleLabel}</p>
+          </div>
+          <button
+            type="button"
+            onClick={() => logout()}
+            aria-label="Cerrar sesión"
+            title="Cerrar sesión"
+            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-sidebar-foreground/50 transition-colors hover:bg-sidebar-accent hover:text-sidebar-foreground"
+          >
+            <LogOut className="h-4 w-4" />
+          </button>
+        </div>
       </div>
     </div>
   )
 }
 
-export function Sidebar({ userRole }: { userRole: UserRole }) {
+export function Sidebar({
+  userRole,
+  userName,
+  roleLabel,
+}: {
+  userRole: UserRole
+  userName: string
+  roleLabel: string
+}) {
   return (
     <aside className="hidden h-screen w-56 shrink-0 lg:flex">
-      <SidebarContent userRole={userRole} />
+      <SidebarContent userRole={userRole} userName={userName} roleLabel={roleLabel} />
     </aside>
   )
 }

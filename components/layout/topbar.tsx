@@ -30,8 +30,8 @@ function getInitials(name: string) {
 
 export function Topbar({ userName, userEmail, userRole, leading }: TopbarProps) {
   return (
-    <header className="flex h-16 shrink-0 items-center justify-between border-b border-border bg-card px-4 md:px-6">
-      {/* Left — menú móvil + reservado para breadcrumbs */}
+    <header className="flex h-14 shrink-0 items-center justify-between border-b border-border bg-card px-4 lg:hidden">
+      {/* Left — menú móvil */}
       <div className="flex items-center">{leading}</div>
 
       {/* Right — user menu */}

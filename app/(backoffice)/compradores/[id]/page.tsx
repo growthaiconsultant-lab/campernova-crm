@@ -314,7 +314,7 @@ export default async function FichaCompradorPage({
   return (
     <div className="-mx-6 -mt-6 flex min-h-full flex-col">
       {/* ── Topbar ── */}
-      <header className="sticky top-0 z-20 flex h-[73px] items-center gap-3 border-b border-border bg-card px-4 md:px-8">
+      <header className="z-20 flex min-h-[56px] items-center gap-3 border-b border-border bg-card px-4 py-2 md:px-8 lg:sticky lg:top-0 lg:h-[73px] lg:py-0">
         <Link
           href="/compradores"
           className="flex items-center gap-1 font-mono text-[11px] uppercase tracking-[0.12em] text-muted-foreground transition-colors hover:text-foreground"

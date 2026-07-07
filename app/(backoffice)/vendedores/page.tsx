@@ -402,7 +402,7 @@ export default async function VendedoresPage({ searchParams }: { searchParams: S
   return (
     <div className="-mx-6 -mt-6">
       {/* ── Topbar ─────────────────────────────────────────────── */}
-      <header className="sticky top-0 z-20 flex h-[73px] items-center justify-between border-b border-[#e2e8f0] bg-white px-4 md:px-10">
+      <header className="z-20 flex min-h-[64px] items-center justify-between border-b border-[#e2e8f0] bg-white px-4 py-2 md:px-10 lg:sticky lg:top-0 lg:h-[73px] lg:py-0">
         <div>
           <div className="font-mono text-[10px] uppercase tracking-[0.14em] text-[#64748b]">
             CRM · Oferta
