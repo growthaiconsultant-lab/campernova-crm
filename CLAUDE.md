@@ -92,7 +92,16 @@ claude mcp add-json linear '{\"command\":\"npx\",\"args\":[\"-y\",\"mcp-linear@l
 
 `.claude/settings.json` y `.claude/settings.local.json` se mantienen como referencia de la estructura, pero la fuente de verdad funcional es el registro de la CLI.
 
-## Estado actual (Block 15 — Calendario operativo F1→F5 — DESPLEGADO A PROD ✅)
+## Estado actual (Block 15 — Calendario operativo F1→F6 — DESPLEGADO A PROD ✅)
+
+### F6 — Recordatorios y notificaciones (PR #56, squash `93faabe`, 2026-07-07) — sin migración
+
+Spec §26. Dos piezas:
+
+- **Digest diario "tu agenda de mañana"** (`/api/cron/calendar-reminders`, cron 06:00 UTC en `vercel.json`): agrupa lo agendado para mañana (todos los orígenes) por responsable vía `groupItemsByAssignee` (`lib/calendar/reminders.ts`, puro, 2 tests) y envía email por responsable. Reutiliza `getCalendarItems`.
+- **Aviso inmediato al asignar**: `createCalendarEvent` con responsable ≠ creador → email al momento (no bloqueante).
+- `CalendarItem` gana `assigneeId` (5 mappers). Plantillas `calendar-digest.ts` + `sendCalendarDigest`/`sendCalendarEventAssigned`.
+- **Operativa**: el cron necesita `CRON_SECRET` en Vercel (mismo del cron de postventa); Resend con dominio verificado (ya hecho). Suite: **462 tests verdes**.
 
 ### F5 — Vista mensual (PR #55, squash `7a3e3e2`, 2026-07-07) — sin migración
 

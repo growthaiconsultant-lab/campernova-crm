@@ -41,4 +41,4 @@
 
 ---
 
-> Estado: **F1 (#51) + F2 (#52) + F3 (#53) + F4 (#54) desplegados a prod (2026-07-07)**. Los 8 tipos de la hoja del dueño se crean desde el calendario, sin duplicar (nativos como CalendarEvent; Entrega/Entrada/Reparación/Mejora redirigen a su módulo; Reparación vs Mejora ya distinguidas vía `WorkOrder.kind`). Pendiente: F5-reporting (métricas §27), F6 recordatorios, F7 IA. **Vista mensual hecha (F5, #55)** — las 3 vistas (semana/día/mes) del spec están.
+> Estado: **F1 (#51) + F2 (#52) + F3 (#53) + F4 (#54) desplegados a prod (2026-07-07)**. Los 8 tipos de la hoja del dueño se crean desde el calendario, sin duplicar (nativos como CalendarEvent; Entrega/Entrada/Reparación/Mejora redirigen a su módulo; Reparación vs Mejora ya distinguidas vía `WorkOrder.kind`). Pendiente: F5-reporting (métricas §27), F7 IA. **Vista mensual (F5, #55)** y **recordatorios (F6, #56: digest diario + aviso al asignar)** hechos. Las 3 vistas del spec están.
