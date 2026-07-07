@@ -92,7 +92,18 @@ claude mcp add-json linear '{\"command\":\"npx\",\"args\":[\"-y\",\"mcp-linear@l
 
 `.claude/settings.json` y `.claude/settings.local.json` se mantienen como referencia de la estructura, pero la fuente de verdad funcional es el registro de la CLI.
 
-## Estado actual (Block 14 — Ficha Comprador: CAM-60 + CAM-61 — DESPLEGADO A PROD ✅)
+## Estado actual (Block 14 — Ficha Comprador: CAM-60 + CAM-61 + CAM-62 — DESPLEGADO A PROD ✅)
+
+### CAM-62 — Temperatura del lead comprador (PR #46, squash `201457a`, 2026-07-07)
+
+Migración additiva `20260707200000_add_lead_temperature` aplicada a staging y prod antes del merge.
+
+- **Schema**: enum `LeadTemperature` (HOT/WARM/COLD) + `temperature` nullable en `BuyerLead`; `ActivityType` += `TEMPERATURA_ACTUALIZADA`.
+- **`lib/lead-temperature.ts`**: labels/colores + `suggestTemperatureFromTimeline` (<1 mes → HOT · 1-3 meses → WARM · resto/null → COLD). 6 tests.
+- **Ficha comprador**: selector segmented de un clic (`temperature-chip.tsx`) junto al StatusPill del hero; server action `setBuyerTemperature` (`temperature-actions.ts`) con Activity y no-op si no cambia.
+- **Listado**: punto de color junto al nombre + chip filtro "Temperatura" (`?temp=`).
+- **Sugerencia inicial** en `createBuyerLead` y tool del chat según `purchaseTimeline`.
+- Suite: **407 tests verdes**.
 
 ### CAM-61 — Motivo de pérdida estructurado (PR #45, squash `e43960a`, 2026-07-07)
 
