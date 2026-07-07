@@ -92,7 +92,41 @@ claude mcp add-json linear '{\"command\":\"npx\",\"args\":[\"-y\",\"mcp-linear@l
 
 `.claude/settings.json` y `.claude/settings.local.json` se mantienen como referencia de la estructura, pero la fuente de verdad funcional es el registro de la CLI.
 
-## Estado actual (Block 15 — Calendario operativo F1→F6 — DESPLEGADO A PROD ✅)
+## Estado actual (Block 16 — Captación de vehículos de portales F1→F3 — MERGED A MAIN ✅)
+
+Nuevo módulo pedido por el dueño (nota "GESTIÓN DE VENTA"): cómo los comerciales registran vehículos que encuentran en portales externos (Coches.net, Wallapop, Milanuncios) — **fase 0 del vendedor**, antes de que el vehículo entre en la nave. Plan en `docs/Captacion-Vendedor-Plan.md`. Entidad ligera `VehicleCapture` con tablero tipo pipeline; cuando el vehículo va a entrar, se convierte en `SellerLead` + `Vehicle` (una sola fuente de verdad, no se duplica).
+
+### F1 — Entidad + tablero + dedup (PR #60, `65c2c00`)
+
+Migración additiva `20260708000000_add_vehicle_captures` (2 enums + tabla + índices + FKs) aplicada a staging y prod antes del merge.
+
+- **Schema**: `VehicleCapture` + enums `CapturePortal` (COCHES_NET, WALLAPOP, MILANUNCIOS, OTRO) y `CaptureStatus` (NO_CONTACTADO → CONTACTADO → EN_CURSO → ENTRADA_AGENDADA → CONVERTIDO / RECHAZADO). Campos: listingUrl, phone, portal, title, askingPrice, notes, rejectionReason (`LostReason`), entradaScheduledAt, assignedTo/createdBy (User), `sellerLeadId @unique` (FK ON DELETE SET NULL). Back-relations en User (`createdCaptures`/`assignedCaptures`) y SellerLead (`capture`).
+- **`lib/captacion.ts`** (puro): labels/colores/opciones, `CAPTURE_BOARD_COLUMNS` (5 columnas, excluye RECHAZADO), validadores, `isTerminalCaptureStatus` (CONVERTIDO/RECHAZADO), `findDuplicateCaptureByPhone` (reutiliza `lib/phone`, ignora terminales). Tests.
+- **`/captaciones`** (RSC): quick-add inline (url+tel+portal+título+precio) con **aviso de duplicado** por teléfono (contra captaciones vivas Y seller leads) + "Captar de todas formas"; tablero de 5 columnas por estado + "Rechazadas" colapsable. Card client: badge de portal, precio, link al anuncio, WhatsApp, responsable, notas, selector de estado, rechazo inline (con `LostReason`), edición inline.
+- **`createCapture` / `updateCaptureStatus` / `updateCapture`** (`captaciones/actions.ts`, guard `requireAgente`).
+- **Sidebar**: "Captaciones" (icono Radar) antes de "Vendedores" en Pipeline (ADMIN/AGENTE).
+
+### F2 — Agendar Entrada + aparece en el calendario (PR #61, `31e8ea4`) — sin migración
+
+La "cita confirmada" de la nota del dueño es en realidad una **Entrada** (recepción del vehículo en la nave), no una cita de comprador. Nombre del estado: **Entrada agendada**.
+
+- **`scheduleEntrada(id, dateTimeIso)`**: pone `ENTRADA_AGENDADA` + `entradaScheduledAt`, revalida `/captaciones` y `/calendario`. Card: picker `datetime-local` inline + muestra la fecha formateada con `timeZone: 'Europe/Madrid'`.
+- **Calendario** (6º origen `captacion`): `captureToItem` (kindLabel "Entrada", href `/captaciones`), `listCaptures` en `CalendarDeps`/`prisma-deps` (status ENTRADA_AGENDADA con `entradaScheduledAt` en rango), incluido en `getCalendarItems`/`applyFilters`. Leyenda/filtros del calendario ganan "Entradas" (color #0d9488) + "Eventos".
+
+### F3 — Convertir a ficha de vendedor + vehículo (PR #62, `2a2d49b`) — sin migración
+
+Un clic (visible cuando la Entrada está agendada) cierra la fase 0 → pipeline normal del vendedor.
+
+- **`convertCaptureToSellerLead(id)`**: crea `SellerLead` (canal CN, `agentId` = responsable de la captación) + `Vehicle` prellenado — marca/modelo del título vía **`splitCaptureTitle`** (1ª palabra = marca, resto = modelo, placeholders editables), `desiredPrice` = precio pedido, tipo/año/km/plazas por defecto (AUTOCARAVANA / año actual / 0 / 4) que el comercial ajusta. Registra el origen en el timeline (portal, link, precio, observaciones), marca **CONVERTIDO**, vincula `sellerLeadId`. Tasación + recálculo de matches no bloqueantes. **Idempotente** (si ya está convertida, devuelve el lead existente). Patrón espejo de `createSellerLeadFromTradeIn`.
+- **UI**: botón "Convertir a ficha de vendedor" en la card + enlace directo a la ficha cuando ya está convertida.
+- ⚠️ **La captación NO trae email** (los portales no lo exponen) → el `SellerLead` se crea con `email: ''`; el comercial lo completa en la ficha.
+- Suite: **473 tests verdes**.
+
+### Pendiente del plan de captación (cuando se quiera)
+
+F4 (opcional): reporting de captaciones por portal, tasa de conversión, por comercial. Fuera de alcance de este bloque (viven en el flujo del vendedor real): contrato de depósito-venta con el vendedor y cuestionario de recepción del vehículo en la nave.
+
+## Estado previo (Block 15 — Calendario operativo F1→F6 — DESPLEGADO A PROD ✅)
 
 ### Fixes UX del calendario (PRs #58-#59, 2026-07-07) — sin migración
 
