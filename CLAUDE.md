@@ -94,6 +94,13 @@ claude mcp add-json linear '{\"command\":\"npx\",\"args\":[\"-y\",\"mcp-linear@l
 
 ## Estado actual (Block 15 — Calendario operativo F1→F6 — DESPLEGADO A PROD ✅)
 
+### Fixes UX del calendario (PRs #58-#59, 2026-07-07) — sin migración
+
+Detectados validando en producción en vivo con el dueño (navegador):
+
+- **Header cohesivo + scroll propio (#58, `f845b83`)**: el `-mt-6` metía el header en el padding del `<main>` (overflow container) y lo recortaba; la fila "Semana del…" flotaba suelta. Rediseño a layout de app: contenedor `lg:h-[calc(100vh-3rem)] flex flex-col`, **header fijo** (`shrink-0`) de 2 filas (título+acciones / periodo+filtros), y **rejilla con scroll propio** (`flex-1 overflow-auto`). El header nunca se recorta y queda fijo al scrollear.
+- **Ocultar cancelados (#59, `04e39ca`)**: `listEvents` filtra `status notIn [CANCELADO, NO_SHOW]` — los cancelados no se muestran en el calendario.
+
 ### Fix zona horaria — hora de España (PR #57, squash `dfc468e`, 2026-07-07) — sin migración
 
 Bug detectado validando en producción con el dueño: las horas se mostraban en **UTC** (Vercel corre en UTC), p.ej. una cita a las 12:00 salía como 10:00. El instante se guarda bien; era solo render.
