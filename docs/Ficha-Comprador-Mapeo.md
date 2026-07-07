@@ -82,4 +82,4 @@ La distinción ya existe en datos (comentarios del schema + `lib/matching`); fal
 
 ---
 
-> Estado: pendiente de crear CAM-60…66 en Linear y priorizar. CAM-60 recomendado como primero.
+> Estado: **CAM-60 desplegado a prod (2026-07-07, PR #44)**. Pendientes: CAM-61…66 (crear en Linear y priorizar).

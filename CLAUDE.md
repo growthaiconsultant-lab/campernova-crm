@@ -92,7 +92,19 @@ claude mcp add-json linear '{\"command\":\"npx\",\"args\":[\"-y\",\"mcp-linear@l
 
 `.claude/settings.json` y `.claude/settings.local.json` se mantienen como referencia de la estructura, pero la fuente de verdad funcional es el registro de la CLI.
 
-## Estado actual (Block 13 — Backoffice 100% responsive — DESPLEGADO A PROD ✅)
+## Estado actual (Block 14 — CAM-60 Próxima acción comercial — DESPLEGADO A PROD ✅)
+
+Desplegado el **2026-07-07** vía **PR #44** (squash `35a1dac`). Primer ticket del bloque Ficha de Comprador (`docs/Ficha-Comprador-Mapeo.md`). Migración additiva `20260707000000_add_next_action` aplicada a **staging y prod ANTES del merge** con `prisma migrate deploy` (staging dio P1001 al inicio — era una incidencia de Supabase, el proyecto estaba "Unhealthy", NO pausado; reintento OK).
+
+- **Schema**: enum `NextActionType` (LLAMAR, WHATSAPP, EMAIL, ENVIAR_VEHICULOS, PEDIR_DOCS, AGENDAR_VISITA, SEGUIMIENTO, CERRAR) + `nextActionType`/`nextActionDueAt` nullable + índice en `SellerLead` y `BuyerLead`; `ActivityType` += `PROXIMA_ACCION_ACTUALIZADA`.
+- **`lib/next-action.ts`**: labels/opciones, `defaultNextActionData()` ("Llamar mañana 10:00"), `isNextActionOverdue`, `formatNextActionDue`. 18 tests.
+- **`setNextAction`** (`app/(backoffice)/next-action-actions.ts`): server action polimórfica seller/buyer, guard `requireAgente`, transacción update+Activity, revalida ficha/listado/dashboard. 6 tests.
+- **`components/next-action-editor.tsx`**: editor inline (select + datetime-local) dentro de la `ProximaAccionCard` de ambas fichas; badge "⚠ Vencida"; fallback al texto heurístico por estado si no hay acción.
+- **Defaults al crear lead** en los 4 puntos de entrada: `createSellerLead`, `submitPublicLead` (/vender), `createBuyerLead`, tool del chat (/comprar).
+- **Dashboard**: la agenda abre con acciones vencidas (link a ficha) + contador de leads activos sin próxima acción (respeta el filtro de agente).
+- Suite: **398 tests verdes**.
+
+## Estado previo (Block 13 — Backoffice 100% responsive — DESPLEGADO A PROD ✅)
 
 Desplegado a producción el **2026-07-07** vía **PR #43** (squash-merge a `main`, commit `92fee20`). Sin migraciones — solo frontend. El backoffice era desktop-only; ahora es usable en móvil y tablet. La web pública no se tocó (ya era mobile-first).
 
