@@ -14,6 +14,7 @@ import {
 import { sendSellerLeadConfirmation, sendAgentLeadNotification } from '@/lib/email/send'
 import { runAndSaveAutoValuation } from '@/lib/valuation/save'
 import { recalculateMatchesForVehicle } from '@/lib/matching'
+import { defaultNextActionData } from '@/lib/next-action'
 
 const ALLOWED_MIME = ['image/jpeg', 'image/png', 'image/webp']
 const MAX_FILE_SIZE = 2 * 1024 * 1024
@@ -145,6 +146,7 @@ export async function submitPublicLead(formData: FormData) {
       canal: 'PRO',
       status: 'NUEVO',
       agentId: null,
+      ...defaultNextActionData(),
       gdprConsentAt: consentAt,
       gdprConsentIp: consentIp,
       vehicle: {

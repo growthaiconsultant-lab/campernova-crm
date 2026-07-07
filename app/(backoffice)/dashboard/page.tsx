@@ -5,6 +5,7 @@ import {
   BUYER_LEAD_STATUS_LABELS,
   VEHICLE_STATUS_LABELS,
 } from '@/lib/state-machine'
+import { NEXT_ACTION_LABELS, formatNextActionDue } from '@/lib/next-action'
 import {
   getSellerLeadCounts,
   getBuyerLeadCounts,
@@ -156,6 +157,34 @@ export default async function DashboardPage({
     db.postventaTicket.count({ where: { status: { in: ['ABIERTO', 'EN_PROGRESO'] } } }),
     db.postventaFollowup.count({ where: { status: 'PENDIENTE' } }),
   ])
+
+  // ── Próximas acciones (CAM-60) — vencidas y leads activos sin acción ─────
+  const SELLER_ACTIVE = { notIn: ['CERRADO', 'DESCARTADO'] as ('CERRADO' | 'DESCARTADO')[] }
+  const BUYER_ACTIVE = { notIn: ['CERRADO', 'PERDIDO'] as ('CERRADO' | 'PERDIDO')[] }
+  const agentFilter = effectiveAgentId ? { agentId: effectiveAgentId } : {}
+  const nowDate = new Date()
+  const [overdueSellerActions, overdueBuyerActions, sellersWithoutAction, buyersWithoutAction] =
+    await Promise.all([
+      db.sellerLead.findMany({
+        where: { status: SELLER_ACTIVE, nextActionDueAt: { lt: nowDate }, ...agentFilter },
+        select: { id: true, name: true, nextActionType: true, nextActionDueAt: true },
+        orderBy: { nextActionDueAt: 'asc' },
+        take: 3,
+      }),
+      db.buyerLead.findMany({
+        where: { status: BUYER_ACTIVE, nextActionDueAt: { lt: nowDate }, ...agentFilter },
+        select: { id: true, name: true, nextActionType: true, nextActionDueAt: true },
+        orderBy: { nextActionDueAt: 'asc' },
+        take: 3,
+      }),
+      db.sellerLead.count({
+        where: { status: SELLER_ACTIVE, nextActionType: null, ...agentFilter },
+      }),
+      db.buyerLead.count({
+        where: { status: BUYER_ACTIVE, nextActionType: null, ...agentFilter },
+      }),
+    ])
+  const leadsWithoutAction = sellersWithoutAction + buyersWithoutAction
 
   // ── State medians ────────────────────────────────────────────────────────
   const [sellerStateMedians, buyerStateMedians, vehicleStateMedians] = await Promise.all([
@@ -442,6 +471,35 @@ export default async function DashboardPage({
     href: string
   }
   const agendaItems: AgendaItem[] = []
+
+  // Próximas acciones vencidas (CAM-60) — lo más accionable, va primero
+  for (const l of overdueSellerActions.slice(0, 2)) {
+    agendaItems.push({
+      dot: 'bad',
+      title: `${l.name} · ${l.nextActionType ? NEXT_ACTION_LABELS[l.nextActionType] : 'acción'} vencida${l.nextActionDueAt ? ` (${formatNextActionDue(l.nextActionDueAt, now)})` : ''}`,
+      meta: 'VENDEDOR · PRÓXIMA ACCIÓN VENCIDA',
+      cta: 'Abrir',
+      href: `/vendedores/${l.id}`,
+    })
+  }
+  for (const l of overdueBuyerActions.slice(0, 2)) {
+    agendaItems.push({
+      dot: 'bad',
+      title: `${l.name} · ${l.nextActionType ? NEXT_ACTION_LABELS[l.nextActionType] : 'acción'} vencida${l.nextActionDueAt ? ` (${formatNextActionDue(l.nextActionDueAt, now)})` : ''}`,
+      meta: 'COMPRADOR · PRÓXIMA ACCIÓN VENCIDA',
+      cta: 'Abrir',
+      href: `/compradores/${l.id}`,
+    })
+  }
+  if (leadsWithoutAction > 0) {
+    agendaItems.push({
+      dot: 'warn',
+      title: `${leadsWithoutAction} lead${leadsWithoutAction !== 1 ? 's' : ''} activo${leadsWithoutAction !== 1 ? 's' : ''} sin próxima acción`,
+      meta: 'DEFINIR SIGUIENTE PASO COMERCIAL',
+      cta: 'Revisar',
+      href: sellersWithoutAction >= buyersWithoutAction ? '/vendedores' : '/compradores',
+    })
+  }
 
   for (const v of incompleteExpedientes.slice(0, 2)) {
     agendaItems.push({

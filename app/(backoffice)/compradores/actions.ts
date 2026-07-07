@@ -4,6 +4,7 @@ import { db } from '@/lib/db'
 import { requireAgente } from '@/lib/auth'
 import { createBuyerLeadSchema } from '@/lib/validators/buyer-lead'
 import { recalculateMatchesForBuyer } from '@/lib/matching'
+import { defaultNextActionData } from '@/lib/next-action'
 
 export async function createBuyerLead(data: unknown) {
   await requireAgente()
@@ -38,6 +39,7 @@ export async function createBuyerLead(data: unknown) {
       useZone: useZone ?? null,
       purchaseTimeline: purchaseTimeline ?? null,
       agentId: null,
+      ...defaultNextActionData(),
     },
   })
 

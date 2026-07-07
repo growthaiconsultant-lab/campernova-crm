@@ -3,6 +3,8 @@
 import { Phone, MessageCircle } from 'lucide-react'
 import { logWhatsApp } from '@/app/(backoffice)/whatsapp-actions'
 import { buildWhatsAppUrl, buyerWhatsAppMessage } from '@/lib/whatsapp'
+import { NextActionEditor } from '@/components/next-action-editor'
+import type { NextActionType } from '@prisma/client'
 
 const NEXT_ACTION_TEXT: Record<string, string> = {
   NUEVO: 'Contactar al comprador',
@@ -18,9 +20,18 @@ type Props = {
   leadId: string
   leadName: string
   status: string
+  nextActionType: NextActionType | null
+  nextActionDueAt: string | null
 }
 
-export function ProximaAccionCard({ phone, leadId, leadName, status }: Props) {
+export function ProximaAccionCard({
+  phone,
+  leadId,
+  leadName,
+  status,
+  nextActionType,
+  nextActionDueAt,
+}: Props) {
   function handleWhatsApp() {
     if (!phone) return
     logWhatsApp({ leadId, leadType: 'buyer', phone }).catch(console.error)
@@ -47,9 +58,13 @@ export function ProximaAccionCard({ phone, leadId, leadName, status }: Props) {
       >
         Próxima acción
       </p>
-      <p className="relative mt-2 text-[15px] font-semibold leading-snug text-white">
-        {NEXT_ACTION_TEXT[status] ?? 'Revisar el lead'}
-      </p>
+      <NextActionEditor
+        leadType="buyer"
+        leadId={leadId}
+        nextActionType={nextActionType}
+        nextActionDueAt={nextActionDueAt}
+        fallbackText={NEXT_ACTION_TEXT[status] ?? 'Revisar el lead'}
+      />
       {phone && (
         <div className="relative mt-4 flex gap-2">
           <button
