@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { db } from '@/lib/db'
 import { requireAuth } from '@/lib/auth'
 import { BuyerLeadEditForm } from './buyer-lead-edit-form'
+import { TradeInCard } from './trade-in-card'
 import { BuyerTopbarActions } from './buyer-topbar-actions'
 import { ProximaAccionCard } from './proxima-accion-card'
 import { MatchesSection } from '@/components/matches-section'
@@ -513,12 +514,26 @@ export default async function FichaCompradorPage({
         <div className="min-w-0 p-4 pb-10 md:p-8 md:pb-16">
           {/* ── TAB: FICHA ── */}
           {activeTab === 'ficha' && (
-            <BuyerLeadEditForm
-              leadId={lead.id}
-              defaultValues={defaultValues}
-              agents={agents}
-              isAdmin={isAdmin}
-            />
+            <div className="space-y-4">
+              <BuyerLeadEditForm
+                leadId={lead.id}
+                defaultValues={defaultValues}
+                agents={agents}
+                isAdmin={isAdmin}
+              />
+              <TradeInCard
+                leadId={lead.id}
+                hasTradeIn={lead.hasTradeIn}
+                type={lead.tradeInType}
+                brand={lead.tradeInBrand}
+                model={lead.tradeInModel}
+                year={lead.tradeInYear}
+                km={lead.tradeInKm}
+                financePending={lead.tradeInFinancePending}
+                notes={lead.tradeInNotes}
+                sellerLeadId={lead.tradeInSellerLeadId}
+              />
+            </div>
           )}
 
           {/* ── TAB: ACTIVIDAD ── */}

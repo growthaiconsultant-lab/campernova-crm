@@ -166,6 +166,16 @@ enum LeadTemperature {
   COLD
 }
 
+/// Tipo de vehículo que el comprador entrega como parte de pago (CAM-63).
+enum TradeInVehicleType {
+  COCHE
+  CAMPER
+  AUTOCARAVANA
+  FURGONETA
+  MOTO
+  OTRO
+}
+
 /// Motivo estructurado de pérdida/descarte de un lead (CAM-61).
 enum LostReason {
   PRECIO
@@ -392,10 +402,11 @@ model SellerLead {
   createdAt       DateTime         @default(now()) @map("created_at")
   updatedAt       DateTime         @updatedAt @map("updated_at")
 
-  agent      User?      @relation("AgentSellerLeads", fields: [agentId], references: [id])
-  vehicle    Vehicle?
-  activities Activity[]
-  documents  Document[]
+  agent        User?      @relation("AgentSellerLeads", fields: [agentId], references: [id])
+  vehicle      Vehicle?
+  activities   Activity[]
+  documents    Document[]
+  tradeInBuyer BuyerLead? @relation("BuyerTradeIn")
 
   @@index([status])
   @@index([agentId])
@@ -538,16 +549,27 @@ model BuyerLead {
   lostReason             LostReason?      @map("lost_reason")
   lostReasonNotes        String?          @map("lost_reason_notes")
   temperature            LeadTemperature? @map("temperature")
+  // ── Vehículo de parte de pago / trade-in (CAM-63) — nullable / additivo ──
+  hasTradeIn             Boolean?            @map("has_trade_in")
+  tradeInType            TradeInVehicleType? @map("trade_in_type")
+  tradeInBrand           String?             @map("trade_in_brand")
+  tradeInModel           String?             @map("trade_in_model")
+  tradeInYear            Int?                @map("trade_in_year")
+  tradeInKm              Int?                @map("trade_in_km")
+  tradeInFinancePending  Boolean?            @map("trade_in_finance_pending")
+  tradeInNotes           String?             @map("trade_in_notes")
+  tradeInSellerLeadId    String?             @unique @map("trade_in_seller_lead_id")
   createdAt              DateTime         @default(now()) @map("created_at")
   updatedAt              DateTime         @updatedAt @map("updated_at")
 
-  agent       User?             @relation("AgentBuyerLeads", fields: [agentId], references: [id])
-  matches     Match[]
-  activities  Activity[]
-  documents   Document[]
-  chatSession BuyerChatSession?
-  deliveries  Delivery[]
-  warranty    Warranty?
+  agent            User?             @relation("AgentBuyerLeads", fields: [agentId], references: [id])
+  matches          Match[]
+  activities       Activity[]
+  documents        Document[]
+  chatSession      BuyerChatSession?
+  deliveries       Delivery[]
+  warranty         Warranty?
+  tradeInSellerLead SellerLead?      @relation("BuyerTradeIn", fields: [tradeInSellerLeadId], references: [id])
 
   @@index([status])
   @@index([agentId])
