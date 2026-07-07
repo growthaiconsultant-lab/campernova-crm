@@ -7,6 +7,7 @@ import { registerBuyerLeadSchema } from '@/lib/chat/tools'
 import { sendBuyerChatLeadNotification } from '@/lib/email/send'
 import { defaultNextActionData } from '@/lib/next-action'
 import { suggestTemperatureFromTimeline } from '@/lib/lead-temperature'
+import { findDuplicateBuyerByPhone, prismaBuyerDedupDeps } from '@/lib/buyer-dedup'
 
 const MAX_TURNS = 10
 
@@ -79,60 +80,69 @@ export async function POST(req: NextRequest) {
             'Registra al comprador interesado y sus preferencias de vehículo. Invocar cuando se hayan capturado nombre, email, teléfono y la necesidad principal.',
           inputSchema: registerBuyerLeadSchema,
           execute: async (d) => {
+            // CAM-66: si ya existe un comprador con este teléfono, se reutiliza
+            // (no se crea un duplicado desde el chat).
+            const existing = await findDuplicateBuyerByPhone(d.telefono, prismaBuyerDedupDeps(db))
+
+            const sessionData = {
+              status: 'COMPLETED' as const,
+              completedAt: new Date(),
+              gdprConsentAt: new Date(),
+              gdprConsentIp: ip,
+              capturedNombre: d.nombre,
+              capturedEmail: d.email,
+              capturedTelefono: d.telefono,
+              capturedNecesidad: d.necesidad,
+              capturedPlazas: d.plazas,
+              capturedPresupuestoMin: d.presupuestoMin,
+              capturedPresupuestoMax: d.presupuestoMax,
+              capturedPlazos: d.plazos,
+              capturedEquipamiento: d.equipamiento ?? {},
+              capturedZona: d.zona,
+            }
+
             const dbResult = await db.$transaction(async (tx) => {
-              const lead = await tx.buyerLead.create({
-                data: {
-                  name: d.nombre,
-                  email: d.email,
-                  phone: d.telefono,
-                  source: 'CHAT',
-                  vehicleType: d.tipo ?? undefined,
-                  minSeats: d.plazas ?? undefined,
-                  maxBudget: d.presupuestoMax ?? undefined,
-                  useZone: d.zona ?? undefined,
-                  purchaseTimeline: d.plazos ?? undefined,
-                  criticalEquipment: d.equipamiento ?? {},
-                  // Taxonomía RV (Fase B) — preferencias capturadas por el asistente
-                  preferredCategory: d.categoria ?? undefined,
-                  preferredBedLayout: d.tipoCama ?? undefined,
-                  sleepingPlacesRequired: d.plazasDormir ?? undefined,
-                  bathroomRequired: d.banoObligatorio ?? undefined,
-                  licenseType: d.carnet ?? undefined,
-                  needsWinter: d.usoInvierno ?? undefined,
-                  needsGarage: d.garajeDeporte ?? undefined,
-                  maxLengthM: d.largoMaxM ?? undefined,
-                  maxHeightM: d.altoMaxM ?? undefined,
-                  hasKids: d.viajaConNinos ?? undefined,
-                  temperature: suggestTemperatureFromTimeline(d.plazos),
-                  ...defaultNextActionData(),
-                },
-              })
+              const lead = existing
+                ? await tx.buyerLead.findUniqueOrThrow({ where: { id: existing.id } })
+                : await tx.buyerLead.create({
+                    data: {
+                      name: d.nombre,
+                      email: d.email,
+                      phone: d.telefono,
+                      source: 'CHAT',
+                      vehicleType: d.tipo ?? undefined,
+                      minSeats: d.plazas ?? undefined,
+                      maxBudget: d.presupuestoMax ?? undefined,
+                      useZone: d.zona ?? undefined,
+                      purchaseTimeline: d.plazos ?? undefined,
+                      criticalEquipment: d.equipamiento ?? {},
+                      // Taxonomía RV (Fase B) — preferencias capturadas por el asistente
+                      preferredCategory: d.categoria ?? undefined,
+                      preferredBedLayout: d.tipoCama ?? undefined,
+                      sleepingPlacesRequired: d.plazasDormir ?? undefined,
+                      bathroomRequired: d.banoObligatorio ?? undefined,
+                      licenseType: d.carnet ?? undefined,
+                      needsWinter: d.usoInvierno ?? undefined,
+                      needsGarage: d.garajeDeporte ?? undefined,
+                      maxLengthM: d.largoMaxM ?? undefined,
+                      maxHeightM: d.altoMaxM ?? undefined,
+                      hasKids: d.viajaConNinos ?? undefined,
+                      temperature: suggestTemperatureFromTimeline(d.plazos),
+                      ...defaultNextActionData(),
+                    },
+                  })
 
               await tx.buyerChatSession.update({
                 where: { sessionToken: body.sessionToken! },
-                data: {
-                  status: 'COMPLETED',
-                  completedAt: new Date(),
-                  buyerLeadId: lead.id,
-                  gdprConsentAt: new Date(),
-                  gdprConsentIp: ip,
-                  capturedNombre: d.nombre,
-                  capturedEmail: d.email,
-                  capturedTelefono: d.telefono,
-                  capturedNecesidad: d.necesidad,
-                  capturedPlazas: d.plazas,
-                  capturedPresupuestoMin: d.presupuestoMin,
-                  capturedPresupuestoMax: d.presupuestoMax,
-                  capturedPlazos: d.plazos,
-                  capturedEquipamiento: d.equipamiento ?? {},
-                  capturedZona: d.zona,
-                },
+                data: { ...sessionData, buyerLeadId: lead.id },
               })
 
               await tx.activity.create({
                 data: {
                   type: 'LEAD_CREADO_CHAT',
-                  content: `Lead creado desde chat. Necesidad: ${d.necesidad}`,
+                  content: existing
+                    ? `Nueva conversación de chat de un comprador ya existente. Necesidad: ${d.necesidad}`
+                    : `Lead creado desde chat. Necesidad: ${d.necesidad}`,
                   buyerLeadId: lead.id,
                 },
               })

@@ -3,7 +3,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 const { mockDb } = vi.hoisted(() => ({
   mockDb: {
     buyerChatSession: { findUnique: vi.fn(), update: vi.fn() },
-    buyerLead: { create: vi.fn() },
+    buyerLead: { create: vi.fn(), findMany: vi.fn() },
     activity: { create: vi.fn() },
     user: { findMany: vi.fn() },
     $transaction: vi.fn(),
@@ -38,6 +38,7 @@ beforeEach(() => {
   vi.clearAllMocks()
   mockDb.buyerChatSession.update.mockResolvedValue({})
   mockDb.user.findMany.mockResolvedValue([])
+  mockDb.buyerLead.findMany.mockResolvedValue([]) // sin duplicados por defecto (CAM-66)
 })
 
 describe('POST /api/chat/buyer/message — guardas', () => {
