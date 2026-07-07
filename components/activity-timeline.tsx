@@ -54,6 +54,7 @@ const ACTIVITY_LABELS: Record<ActivityType, string> = {
   TITULARIDAD_TRANSFERIDA: 'Titularidad transferida',
   PUBLICACION_BLOQUEADA: 'Publicación bloqueada',
   PROXIMA_ACCION_ACTUALIZADA: 'Próxima acción',
+  TEMPERATURA_ACTUALIZADA: 'Temperatura',
 }
 
 const ICON_CLASSES: Record<ActivityType, string> = {
@@ -94,6 +95,7 @@ const ICON_CLASSES: Record<ActivityType, string> = {
   PUBLICACION_BLOQUEADA: 'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300',
   PROXIMA_ACCION_ACTUALIZADA:
     'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300',
+  TEMPERATURA_ACTUALIZADA: 'bg-rose-100 text-rose-700 dark:bg-rose-900/40 dark:text-rose-300',
 }
 
 function ActivityIcon({ type }: { type: ActivityType }) {
@@ -151,6 +153,8 @@ function ActivityIcon({ type }: { type: ActivityType }) {
       return <Ban className={cls} />
     case 'PROXIMA_ACCION_ACTUALIZADA':
       return <CalendarCheck className={cls} />
+    case 'TEMPERATURA_ACTUALIZADA':
+      return <Zap className={cls} />
   }
 }
 

@@ -5,6 +5,7 @@ import { requireAgente } from '@/lib/auth'
 import { createBuyerLeadSchema } from '@/lib/validators/buyer-lead'
 import { recalculateMatchesForBuyer } from '@/lib/matching'
 import { defaultNextActionData } from '@/lib/next-action'
+import { suggestTemperatureFromTimeline } from '@/lib/lead-temperature'
 
 export async function createBuyerLead(data: unknown) {
   await requireAgente()
@@ -39,6 +40,7 @@ export async function createBuyerLead(data: unknown) {
       useZone: useZone ?? null,
       purchaseTimeline: purchaseTimeline ?? null,
       agentId: null,
+      temperature: suggestTemperatureFromTimeline(purchaseTimeline),
       ...defaultNextActionData(),
     },
   })

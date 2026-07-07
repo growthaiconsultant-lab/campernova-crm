@@ -19,6 +19,7 @@ import { buyerWhatsAppMessage } from '@/lib/whatsapp'
 import { LeadTabNav } from '@/app/(backoffice)/vendedores/[id]/lead-tab-nav'
 import type { LeadTab } from '@/app/(backoffice)/vendedores/[id]/lead-tab-nav'
 import { StatusPill } from '@/components/status-pill'
+import { TemperatureChip } from './temperature-chip'
 import { InfoTooltip } from '@/components/info-tooltip'
 import { BUYER_LEAD_STATUS_LABELS, BUYER_LEAD_TRANSITIONS } from '@/lib/state-machine'
 import type { BuyerLeadStatus } from '@prisma/client'
@@ -356,6 +357,7 @@ export default async function FichaCompradorPage({
                 {needSummary}
               </h1>
               <StatusPill status={lead.status} entity="buyer" />
+              <TemperatureChip leadId={lead.id} temperature={lead.temperature} />
               {isTerminal && (
                 <span className="text-[11px] text-muted-foreground">Estado final</span>
               )}
