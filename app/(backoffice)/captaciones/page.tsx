@@ -37,6 +37,7 @@ export default async function CaptacionesPage() {
     entradaScheduledAt: c.entradaScheduledAt ? c.entradaScheduledAt.toISOString() : null,
     assignedToId: c.assignedToId,
     assignedToName: c.assignedTo?.name ?? null,
+    sellerLeadId: c.sellerLeadId,
   }))
 
   const byStatus = new Map<CaptureStatus, CaptureCardData[]>()
