@@ -149,6 +149,8 @@ function ActivityIcon({ type }: { type: ActivityType }) {
       return <FileText className={cls} />
     case 'PUBLICACION_BLOQUEADA':
       return <Ban className={cls} />
+    case 'PROXIMA_ACCION_ACTUALIZADA':
+      return <CalendarCheck className={cls} />
   }
 }
 
