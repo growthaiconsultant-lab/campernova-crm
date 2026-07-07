@@ -41,12 +41,13 @@ export function EventForm({ agents, buyers, vehicles, defaults }: Props) {
   const [vehicleId, setVehicleId] = useState(defaults.vehicleId ?? '')
   const [location, setLocation] = useState('')
   const [description, setDescription] = useState('')
-  // Cita-specific
+  // Cita / Llamada
   const [channel, setChannel] = useState('in_person')
   const [phone, setPhone] = useState('')
   const [goal, setGoal] = useState('')
 
   const isCita = type === 'CITA'
+  const isLlamada = type === 'LLAMADA'
 
   function submit() {
     setError(null)
@@ -59,7 +60,9 @@ export function EventForm({ agents, buyers, vehicles, defaults }: Props) {
           buyer_phone: phone || undefined,
           appointment_goal: goal || undefined,
         }
-      : undefined
+      : isLlamada
+        ? { buyer_phone: phone || undefined, call_reason: goal || undefined }
+        : undefined
 
     startTransition(async () => {
       const result = await createCalendarEvent({
@@ -240,6 +243,34 @@ export function EventForm({ agents, buyers, vehicles, defaults }: Props) {
                 value={goal}
                 onChange={(e) => setGoal(e.target.value)}
                 placeholder="Ver distribución y revisar financiación"
+                className={inputCls}
+              />
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Llamada-specific */}
+      {isLlamada && (
+        <div className="rounded-xl border border-border bg-card p-5">
+          <p className="mb-3 font-mono text-[10px] uppercase tracking-[0.12em] text-muted-foreground">
+            Detalles de la llamada
+          </p>
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <div>
+              <label className={labelCls}>Teléfono</label>
+              <input
+                value={phone}
+                onChange={(e) => setPhone(e.target.value)}
+                className={inputCls}
+              />
+            </div>
+            <div>
+              <label className={labelCls}>Motivo</label>
+              <input
+                value={goal}
+                onChange={(e) => setGoal(e.target.value)}
+                placeholder="Seguimiento tras la visita"
                 className={inputCls}
               />
             </div>

@@ -122,6 +122,16 @@ export default async function EventoDetallePage({ params }: { params: { id: stri
             {specific.appointment_goal}
           </p>
         )}
+        {typeof specific.call_reason === 'string' && specific.call_reason && (
+          <p className="text-muted-foreground">
+            <span className="font-medium text-foreground">Motivo:</span> {specific.call_reason}
+          </p>
+        )}
+        {typeof specific.buyer_phone === 'string' && specific.buyer_phone && (
+          <p className="text-muted-foreground">
+            <span className="font-medium text-foreground">Teléfono:</span> {specific.buyer_phone}
+          </p>
+        )}
         {event.resultNotes && (
           <p className="rounded-lg bg-green-50 p-2.5 text-green-800">
             <span className="font-medium">Resultado:</span> {event.resultNotes}
