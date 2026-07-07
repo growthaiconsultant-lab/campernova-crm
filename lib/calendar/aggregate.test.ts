@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   applyFilters,
   deliveryToItem,
+  captureToItem,
   eventToItem,
   followupToItem,
   getCalendarItems,
@@ -67,6 +68,21 @@ const event: EventRow = {
 }
 
 describe('mappers', () => {
+  it('capture → item Entrada con href a /captaciones', () => {
+    const item = captureToItem({
+      id: 'cap1',
+      entradaScheduledAt: new Date('2026-07-10T11:00:00'),
+      title: 'Benimar',
+      portalLabel: 'Wallapop',
+      assignedTo: { id: 'u1', name: 'Desirée' },
+    })
+    expect(item.id).toBe('captacion:cap1')
+    expect(item.source).toBe('captacion')
+    expect(item.kindLabel).toBe('Entrada')
+    expect(item.href).toBe('/captaciones')
+    expect(item.title).toContain('Benimar')
+  })
+
   it('event → item con href a /calendario/:id y contexto de comprador', () => {
     const it_ = eventToItem(event)
     expect(it_.id).toBe('event:e1')
@@ -122,10 +138,11 @@ describe('getCalendarItems', () => {
     listFollowups: async () => [followup],
     listNextActions: async () => [nextAction],
     listEvents: async () => [event],
+    listCaptures: async () => [],
   }
   const range = { from: new Date('2026-07-06'), to: new Date('2026-07-13') }
 
-  it('reúne los 5 orígenes y ordena por fecha ascendente', async () => {
+  it('reúne los orígenes y ordena por fecha ascendente', async () => {
     const items = await getCalendarItems(deps, range, {}, new Date('2026-07-07'))
     expect(items).toHaveLength(5)
     const starts = items.map((i) => i.start.getTime())

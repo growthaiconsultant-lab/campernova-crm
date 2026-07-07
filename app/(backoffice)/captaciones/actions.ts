@@ -92,6 +92,31 @@ export async function updateCaptureStatus(
   return {}
 }
 
+/**
+ * F2: agenda la Entrada (recepción del vehículo en la nave) con fecha/hora.
+ * Pone el estado en ENTRADA_AGENDADA. La entrada aparece en el calendario.
+ */
+export async function scheduleEntrada(
+  id: string,
+  dateTimeIso: string
+): Promise<{ error?: string }> {
+  await requireAgente()
+  const date = new Date(dateTimeIso)
+  if (isNaN(date.getTime())) return { error: 'Fecha no válida' }
+
+  const capture = await db.vehicleCapture.findUnique({ where: { id }, select: { id: true } })
+  if (!capture) return { error: 'Captación no encontrada' }
+
+  await db.vehicleCapture.update({
+    where: { id },
+    data: { status: 'ENTRADA_AGENDADA', entradaScheduledAt: date },
+  })
+
+  revalidatePath('/captaciones')
+  revalidatePath('/calendario')
+  return {}
+}
+
 type EditInput = {
   notes?: string | null
   assignedToId?: string | null
