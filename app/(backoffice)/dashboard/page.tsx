@@ -6,6 +6,7 @@ import {
   VEHICLE_STATUS_LABELS,
 } from '@/lib/state-machine'
 import { NEXT_ACTION_LABELS, formatNextActionDue } from '@/lib/next-action'
+import { LOST_REASON_LABELS } from '@/lib/lost-reason'
 import {
   getSellerLeadCounts,
   getBuyerLeadCounts,
@@ -36,7 +37,7 @@ import { withDashboardCache, withDashboardCacheGlobal } from '@/lib/dashboard/ca
 import { DashboardFilters } from './dashboard-filters'
 import { ForbiddenToast } from '@/components/forbidden-toast'
 import { AlertTriangle, FileWarning, ShieldAlert } from 'lucide-react'
-import type { SellerLeadStatus, BuyerLeadStatus, VehicleStatus } from '@prisma/client'
+import type { SellerLeadStatus, BuyerLeadStatus, VehicleStatus, LostReason } from '@prisma/client'
 import { calculateCompletionPercent } from '@/lib/vehicle-legal'
 import type { VehicleLegalInput, DocumentSummary } from '@/lib/vehicle-legal'
 import type { VehicleDocumentCategory } from '@prisma/client'
@@ -185,6 +186,48 @@ export default async function DashboardPage({
       }),
     ])
   const leadsWithoutAction = sellersWithoutAction + buyersWithoutAction
+
+  // ── Motivos de pérdida (CAM-61) — últimos 90 días ─────────────────────────
+  const ninetyDaysAgo = new Date(Date.now() - 90 * 86400000)
+  const [lostReasonsBuyer, lostReasonsSeller] = await Promise.all([
+    db.buyerLead.groupBy({
+      by: ['lostReason'],
+      where: {
+        status: 'PERDIDO',
+        lostReason: { not: null },
+        updatedAt: { gte: ninetyDaysAgo },
+        ...agentFilter,
+      },
+      _count: { _all: true },
+    }),
+    db.sellerLead.groupBy({
+      by: ['lostReason'],
+      where: {
+        status: 'DESCARTADO',
+        lostReason: { not: null },
+        updatedAt: { gte: ninetyDaysAgo },
+        ...agentFilter,
+      },
+      _count: { _all: true },
+    }),
+  ])
+  const lostReasonCounts = new Map<string, { buyers: number; sellers: number }>()
+  for (const row of lostReasonsBuyer) {
+    if (!row.lostReason) continue
+    const entry = lostReasonCounts.get(row.lostReason) ?? { buyers: 0, sellers: 0 }
+    entry.buyers += row._count._all
+    lostReasonCounts.set(row.lostReason, entry)
+  }
+  for (const row of lostReasonsSeller) {
+    if (!row.lostReason) continue
+    const entry = lostReasonCounts.get(row.lostReason) ?? { buyers: 0, sellers: 0 }
+    entry.sellers += row._count._all
+    lostReasonCounts.set(row.lostReason, entry)
+  }
+  const lostReasonRows = Array.from(lostReasonCounts.entries())
+    .map(([reason, c]) => ({ reason, total: c.buyers + c.sellers, ...c }))
+    .sort((a, b) => b.total - a.total)
+  const lostReasonTotal = lostReasonRows.reduce((s, r) => s + r.total, 0)
 
   // ── State medians ────────────────────────────────────────────────────────
   const [sellerStateMedians, buyerStateMedians, vehicleStateMedians] = await Promise.all([
@@ -1145,6 +1188,54 @@ export default async function DashboardPage({
                   </div>
                 </div>
               )}
+            </div>
+          </div>
+        </>
+      )}
+
+      {/* ── Motivos de pérdida (CAM-61) ───────────────────────────────────── */}
+      {(isAdmin || isAgente) && lostReasonRows.length > 0 && (
+        <>
+          <SectionEyebrow label="Por qué perdemos leads" color="bad" />
+          <div className="rounded-[14px] border border-[#e6dfd0] bg-white p-6">
+            <div className="mb-4 flex items-center justify-between">
+              <h3 className="text-[16px] font-semibold tracking-[-0.01em]">
+                Motivos de pérdida · últimos 90 días
+              </h3>
+              <span className="font-mono text-[10px] uppercase tracking-[0.12em] text-[#6b645c]">
+                {lostReasonTotal} lead{lostReasonTotal !== 1 ? 's' : ''}
+              </span>
+            </div>
+            <div className="space-y-2.5">
+              {lostReasonRows.map((r) => {
+                const pct = lostReasonTotal > 0 ? Math.round((r.total / lostReasonTotal) * 100) : 0
+                return (
+                  <div
+                    key={r.reason}
+                    className="grid items-center gap-3"
+                    style={{ gridTemplateColumns: '140px 1fr auto' }}
+                  >
+                    <span className="truncate text-[13px] font-medium">
+                      {LOST_REASON_LABELS[r.reason as LostReason] ?? r.reason}
+                    </span>
+                    <div className="h-3 overflow-hidden rounded bg-[#f5f0e6]">
+                      <div
+                        className="h-full rounded"
+                        style={{
+                          width: `${Math.max(pct, 2)}%`,
+                          background: 'linear-gradient(90deg,#d97706,#f59e0b)',
+                        }}
+                      />
+                    </div>
+                    <span className="whitespace-nowrap font-mono text-[12px] text-[#6b645c]">
+                      {r.total} · {pct}%
+                      <span className="ml-1.5 text-[10px]">
+                        ({r.buyers}C/{r.sellers}V)
+                      </span>
+                    </span>
+                  </div>
+                )
+              })}
             </div>
           </div>
         </>

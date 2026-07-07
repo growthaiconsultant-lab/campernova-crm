@@ -158,6 +158,18 @@ enum ActivityType {
   PROXIMA_ACCION_ACTUALIZADA
 }
 
+/// Motivo estructurado de pérdida/descarte de un lead (CAM-61).
+enum LostReason {
+  PRECIO
+  FINANCIACION
+  COMPRO_A_OTRO
+  NO_RESPONDE
+  APLAZA
+  SIN_STOCK
+  EXPECTATIVAS
+  OTRO
+}
+
 /// Próxima acción comercial sobre un lead (CAM-60).
 enum NextActionType {
   LLAMAR
@@ -365,6 +377,8 @@ model SellerLead {
   agentId         String?          @map("agent_id")
   nextActionType  NextActionType?  @map("next_action_type")
   nextActionDueAt DateTime?        @map("next_action_due_at")
+  lostReason      LostReason?      @map("lost_reason")
+  lostReasonNotes String?          @map("lost_reason_notes")
   gdprConsentAt   DateTime?        @map("gdpr_consent_at")
   gdprConsentIp   String?          @map("gdpr_consent_ip")
   createdAt       DateTime         @default(now()) @map("created_at")
@@ -513,6 +527,8 @@ model BuyerLead {
   source                 String?
   nextActionType         NextActionType?  @map("next_action_type")
   nextActionDueAt        DateTime?        @map("next_action_due_at")
+  lostReason             LostReason?      @map("lost_reason")
+  lostReasonNotes        String?          @map("lost_reason_notes")
   createdAt              DateTime         @default(now()) @map("created_at")
   updatedAt              DateTime         @updatedAt @map("updated_at")
 
