@@ -94,6 +94,14 @@ claude mcp add-json linear '{\"command\":\"npx\",\"args\":[\"-y\",\"mcp-linear@l
 
 ## Estado actual (Block 15 — Calendario operativo F1→F6 — DESPLEGADO A PROD ✅)
 
+### Fix zona horaria — hora de España (PR #57, squash `dfc468e`, 2026-07-07) — sin migración
+
+Bug detectado validando en producción con el dueño: las horas se mostraban en **UTC** (Vercel corre en UTC), p.ej. una cita a las 12:00 salía como 10:00. El instante se guarda bien; era solo render.
+
+- **`instrumentation.ts`** fija `process.env.TZ = 'Europe/Madrid'` en runtime nodejs. **GOTCHA: Vercel RESERVA el nombre de env var `TZ`** — no se puede poner desde el panel (da "name is reserved"); por eso se hace en código. Node relee `process.env.TZ` → arregla display **y** lógica de creación (ej. "llamar mañana 10:00") en toda la app.
+- **Garantía por formateador**: `timeZone: 'Europe/Madrid'` explícito en todos los `toLocaleString`/`toLocaleDateString` del calendario (vista, detalle, cron recordatorios, digest, card de citas en ficha comprador).
+- Cosmético: `capitalize` (mayúscula por palabra) → `first-letter:uppercase` en los títulos del calendario.
+
 ### F6 — Recordatorios y notificaciones (PR #56, squash `93faabe`, 2026-07-07) — sin migración
 
 Spec §26. Dos piezas:
