@@ -183,103 +183,104 @@ export default async function CalendarioPage({
   }
 
   return (
-    <div className="-mx-6 -mt-6">
-      <header className="z-20 flex min-h-[64px] flex-wrap items-center justify-between gap-3 border-b border-border bg-card px-4 py-2 md:px-8 lg:sticky lg:top-0 lg:h-[73px] lg:py-0">
-        <div>
-          <div className="font-mono text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
-            CRM · Operación
+    <div className="-mx-6 flex flex-col lg:h-[calc(100vh-3rem)]">
+      <header className="z-20 shrink-0 border-b border-border bg-card">
+        <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-3 md:px-8">
+          <div>
+            <div className="font-mono text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
+              CRM · Operación
+            </div>
+            <h1 className="mt-0.5 text-[20px] font-bold tracking-tight text-foreground">
+              Calendario
+            </h1>
           </div>
-          <h1 className="mt-0.5 text-[20px] font-bold tracking-tight text-foreground">
-            Calendario
-          </h1>
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <Link
-            href="/calendario/nuevo"
-            className="inline-flex items-center gap-1.5 rounded-lg bg-foreground px-3 py-2 text-[12.5px] font-semibold text-background transition-opacity hover:opacity-90"
-          >
-            + Nuevo evento
-          </Link>
-          {/* Toggle vista */}
-          <div className="flex overflow-hidden rounded-lg border border-border">
+          <div className="flex flex-wrap items-center gap-2">
             <Link
-              href={navBase({ view: 'week', week: String(offset) })}
-              className={`px-3 py-1.5 text-[12.5px] font-medium ${view === 'week' ? 'bg-foreground text-background' : 'text-muted-foreground hover:bg-muted'}`}
+              href="/calendario/nuevo"
+              className="inline-flex items-center gap-1.5 rounded-lg bg-foreground px-3 py-2 text-[12.5px] font-semibold text-background transition-opacity hover:opacity-90"
             >
-              Semana
+              + Nuevo evento
             </Link>
-            <Link
-              href={navBase({ view: 'day' })}
-              className={`px-3 py-1.5 text-[12.5px] font-medium ${view === 'day' ? 'bg-foreground text-background' : 'text-muted-foreground hover:bg-muted'}`}
-            >
-              Día
-            </Link>
-            <Link
-              href={navBase({ view: 'month', month: String(monthOffset) })}
-              className={`px-3 py-1.5 text-[12.5px] font-medium ${view === 'month' ? 'bg-foreground text-background' : 'text-muted-foreground hover:bg-muted'}`}
-            >
-              Mes
-            </Link>
-          </div>
-          {/* Navegación semana */}
-          {view === 'week' && (
-            <div className="flex items-center gap-1">
+            {/* Toggle vista */}
+            <div className="flex overflow-hidden rounded-lg border border-border">
               <Link
-                href={navBase({ view: 'week', week: String(offset - 1) })}
-                className="inline-flex h-8 items-center rounded-lg border border-border px-2.5 text-sm text-muted-foreground hover:bg-muted"
+                href={navBase({ view: 'week', week: String(offset) })}
+                className={`px-3 py-1.5 text-[12.5px] font-medium ${view === 'week' ? 'bg-foreground text-background' : 'text-muted-foreground hover:bg-muted'}`}
               >
-                ‹
+                Semana
               </Link>
-              {offset !== 0 && (
-                <Link
-                  href={navBase({ view: 'week' })}
-                  className="inline-flex h-8 items-center rounded-lg border border-border px-2.5 text-[12.5px] text-muted-foreground hover:bg-muted"
-                >
-                  Hoy
-                </Link>
-              )}
               <Link
-                href={navBase({ view: 'week', week: String(offset + 1) })}
-                className="inline-flex h-8 items-center rounded-lg border border-border px-2.5 text-sm text-muted-foreground hover:bg-muted"
+                href={navBase({ view: 'day' })}
+                className={`px-3 py-1.5 text-[12.5px] font-medium ${view === 'day' ? 'bg-foreground text-background' : 'text-muted-foreground hover:bg-muted'}`}
               >
-                ›
+                Día
+              </Link>
+              <Link
+                href={navBase({ view: 'month', month: String(monthOffset) })}
+                className={`px-3 py-1.5 text-[12.5px] font-medium ${view === 'month' ? 'bg-foreground text-background' : 'text-muted-foreground hover:bg-muted'}`}
+              >
+                Mes
               </Link>
             </div>
-          )}
-          {/* Navegación mes */}
-          {view === 'month' && (
-            <div className="flex items-center gap-1">
-              <Link
-                href={navBase({ view: 'month', month: String(monthOffset - 1) })}
-                className="inline-flex h-8 items-center rounded-lg border border-border px-2.5 text-sm text-muted-foreground hover:bg-muted"
-              >
-                ‹
-              </Link>
-              {monthOffset !== 0 && (
+            {/* Navegación semana */}
+            {view === 'week' && (
+              <div className="flex items-center gap-1">
                 <Link
-                  href={navBase({ view: 'month' })}
-                  className="inline-flex h-8 items-center rounded-lg border border-border px-2.5 text-[12.5px] text-muted-foreground hover:bg-muted"
+                  href={navBase({ view: 'week', week: String(offset - 1) })}
+                  className="inline-flex h-8 items-center rounded-lg border border-border px-2.5 text-sm text-muted-foreground hover:bg-muted"
                 >
-                  Hoy
+                  ‹
                 </Link>
-              )}
-              <Link
-                href={navBase({ view: 'month', month: String(monthOffset + 1) })}
-                className="inline-flex h-8 items-center rounded-lg border border-border px-2.5 text-sm text-muted-foreground hover:bg-muted"
-              >
-                ›
-              </Link>
-            </div>
-          )}
+                {offset !== 0 && (
+                  <Link
+                    href={navBase({ view: 'week' })}
+                    className="inline-flex h-8 items-center rounded-lg border border-border px-2.5 text-[12.5px] text-muted-foreground hover:bg-muted"
+                  >
+                    Hoy
+                  </Link>
+                )}
+                <Link
+                  href={navBase({ view: 'week', week: String(offset + 1) })}
+                  className="inline-flex h-8 items-center rounded-lg border border-border px-2.5 text-sm text-muted-foreground hover:bg-muted"
+                >
+                  ›
+                </Link>
+              </div>
+            )}
+            {/* Navegación mes */}
+            {view === 'month' && (
+              <div className="flex items-center gap-1">
+                <Link
+                  href={navBase({ view: 'month', month: String(monthOffset - 1) })}
+                  className="inline-flex h-8 items-center rounded-lg border border-border px-2.5 text-sm text-muted-foreground hover:bg-muted"
+                >
+                  ‹
+                </Link>
+                {monthOffset !== 0 && (
+                  <Link
+                    href={navBase({ view: 'month' })}
+                    className="inline-flex h-8 items-center rounded-lg border border-border px-2.5 text-[12.5px] text-muted-foreground hover:bg-muted"
+                  >
+                    Hoy
+                  </Link>
+                )}
+                <Link
+                  href={navBase({ view: 'month', month: String(monthOffset + 1) })}
+                  className="inline-flex h-8 items-center rounded-lg border border-border px-2.5 text-sm text-muted-foreground hover:bg-muted"
+                >
+                  ›
+                </Link>
+              </div>
+            )}
+          </div>
         </div>
-      </header>
-
-      <div className="px-4 pb-16 pt-4 md:px-8">
-        <div className="mb-3 flex items-center justify-between gap-3">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border/60 px-4 py-2 md:px-8">
           <p className="text-[13px] text-muted-foreground first-letter:uppercase">{periodLabel}</p>
           <CalendarFilters agents={agents} />
         </div>
+      </header>
 
+      <div className="flex-1 overflow-auto px-4 py-4 md:px-8">
         {view === 'month' ? (
           <div className="overflow-x-auto rounded-xl border border-border bg-card">
             <div className="min-w-[720px]">
