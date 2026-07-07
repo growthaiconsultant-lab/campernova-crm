@@ -537,7 +537,7 @@ export default async function DashboardPage({
       <ForbiddenToast />
 
       {/* ── Topbar ─────────────────────────────────────────────────────────── */}
-      <div className="flex items-start justify-between pb-0 pt-1">
+      <div className="flex flex-wrap items-start justify-between gap-3 pb-0 pt-1">
         <div>
           <p className="font-mono text-[11px] uppercase tracking-[0.14em] text-[#6b645c]">
             Vista general ·{' '}
@@ -1480,9 +1480,8 @@ export default async function DashboardPage({
               return (
                 <div
                   key={v.id}
-                  className="grid items-center gap-[18px] py-3.5"
+                  className="grid grid-cols-[24px_1fr_auto_auto] items-center gap-3 py-3.5 md:grid-cols-[24px_1fr_140px_auto_auto] md:gap-[18px]"
                   style={{
-                    gridTemplateColumns: '24px 1fr 140px auto auto',
                     borderBottom: i < top5Rentabilidad.length - 1 ? '1px solid #e6dfd0' : 'none',
                   }}
                 >
@@ -1503,7 +1502,7 @@ export default async function DashboardPage({
                       </span>
                     )}
                   </div>
-                  <div className="h-1.5 overflow-hidden rounded-full bg-[#f5f0e6]">
+                  <div className="hidden h-1.5 overflow-hidden rounded-full bg-[#f5f0e6] md:block">
                     <div
                       className="h-full rounded-full"
                       style={{

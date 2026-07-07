@@ -1,5 +1,6 @@
 import { requireAuth } from '@/lib/auth'
 import { Sidebar } from '@/components/layout/sidebar'
+import { MobileSidebar } from '@/components/layout/mobile-sidebar'
 import { Topbar } from '@/components/layout/topbar'
 import { Toaster } from 'sonner'
 
@@ -18,10 +19,18 @@ export default async function BackofficeLayout({ children }: { children: React.R
 
   return (
     <div className="flex h-screen overflow-hidden bg-background">
-      <Sidebar userRole={user.role} />
+      <Sidebar userRole={user.role} userName={user.name} roleLabel={roleLabel} />
 
       <div className="flex flex-1 flex-col overflow-hidden">
-        <Topbar userName={user.name} userEmail={user.email} userRole={roleLabel} />
+        {/* Barra global solo en móvil/tablet — en desktop el usuario vive en el sidebar */}
+        <Topbar
+          userName={user.name}
+          userEmail={user.email}
+          userRole={roleLabel}
+          leading={
+            <MobileSidebar userRole={user.role} userName={user.name} roleLabel={roleLabel} />
+          }
+        />
 
         <main className="flex-1 overflow-y-auto bg-background p-6">{children}</main>
       </div>

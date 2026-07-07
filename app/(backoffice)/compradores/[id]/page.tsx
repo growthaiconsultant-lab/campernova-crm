@@ -314,7 +314,7 @@ export default async function FichaCompradorPage({
   return (
     <div className="-mx-6 -mt-6 flex min-h-full flex-col">
       {/* ── Topbar ── */}
-      <header className="sticky top-0 z-20 flex h-[73px] items-center gap-3 border-b border-border bg-card px-8">
+      <header className="z-20 flex min-h-[56px] items-center gap-3 border-b border-border bg-card px-4 py-2 md:px-8 lg:sticky lg:top-0 lg:h-[73px] lg:py-0">
         <Link
           href="/compradores"
           className="flex items-center gap-1 font-mono text-[11px] uppercase tracking-[0.12em] text-muted-foreground transition-colors hover:text-foreground"
@@ -343,7 +343,7 @@ export default async function FichaCompradorPage({
       </header>
 
       {/* ── Hero section ── */}
-      <section className="border-b border-border bg-background px-8 pb-0 pt-6">
+      <section className="border-b border-border bg-background px-4 pb-0 pt-6 md:px-8">
         {/* Identity row — centrada en la necesidad */}
         <div className="flex items-start gap-4">
           <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-muted text-lg font-semibold text-foreground">
@@ -498,7 +498,7 @@ export default async function FichaCompradorPage({
         </div>
 
         {/* Tabs — via LeadTabNav (client, URL-driven) */}
-        <div className="-mx-8 mt-6">
+        <div className="-mx-4 mt-6 md:-mx-8">
           <Suspense fallback={<div className="h-12 border-t border-border" />}>
             <LeadTabNav tabs={tabs} defaultTab="ficha" />
           </Suspense>
@@ -506,9 +506,9 @@ export default async function FichaCompradorPage({
       </section>
 
       {/* ── Body grid ── */}
-      <div className="grid flex-1 grid-cols-[1fr_320px]">
+      <div className="grid flex-1 grid-cols-1 lg:grid-cols-[1fr_320px]">
         {/* ── Main content ── */}
-        <div className="min-w-0 p-8 pb-16">
+        <div className="min-w-0 p-4 pb-10 md:p-8 md:pb-16">
           {/* ── TAB: FICHA ── */}
           {activeTab === 'ficha' && (
             <BuyerLeadEditForm
@@ -729,8 +729,8 @@ export default async function FichaCompradorPage({
         </div>
 
         {/* ── Right sidebar ── */}
-        <aside className="border-l border-border">
-          <div className="sticky top-[130px] space-y-4 p-5">
+        <aside className="border-t border-border lg:border-l lg:border-t-0">
+          <div className="space-y-4 p-4 md:p-5 lg:sticky lg:top-[130px]">
             {/* Próxima acción — dark gradient card (client, logs WhatsApp) */}
             <ProximaAccionCard
               phone={lead.phone}

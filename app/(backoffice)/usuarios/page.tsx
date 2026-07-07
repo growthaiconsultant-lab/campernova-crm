@@ -15,7 +15,7 @@ export default async function UsuariosPage() {
 
   return (
     <div className="p-6 lg:p-8">
-      <div className="mb-6 flex items-center justify-between">
+      <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold text-cn-teal-900">Usuarios</h1>
           <p className="mt-1 text-sm text-cn-ink-500">Gestiona el equipo que accede al CRM.</p>
@@ -29,8 +29,8 @@ export default async function UsuariosPage() {
         </Link>
       </div>
 
-      <div className="overflow-hidden rounded-xl border border-cn-line bg-white">
-        <table className="w-full text-sm">
+      <div className="overflow-x-auto rounded-xl border border-cn-line bg-white">
+        <table className="w-full min-w-[640px] text-sm">
           <thead>
             <tr className="border-b border-cn-line bg-cn-cream-50">
               <th className="px-5 py-3 text-left font-medium text-cn-ink-500">Nombre</th>
