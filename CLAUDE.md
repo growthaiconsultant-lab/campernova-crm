@@ -92,7 +92,19 @@ claude mcp add-json linear '{\"command\":\"npx\",\"args\":[\"-y\",\"mcp-linear@l
 
 `.claude/settings.json` y `.claude/settings.local.json` se mantienen como referencia de la estructura, pero la fuente de verdad funcional es el registro de la CLI.
 
-## Estado actual (Block 14 — Ficha Comprador: CAM-60 + CAM-61 + CAM-62 — DESPLEGADO A PROD ✅)
+## Estado actual (Block 14 — Ficha Comprador: CAM-60→63 — DESPLEGADO A PROD ✅)
+
+### CAM-63 — Vehículo de parte de pago / trade-in (PR #47, squash `955fd4e`, 2026-07-07)
+
+Migración additiva `20260707300000_add_trade_in` aplicada a staging y prod antes del merge.
+
+- **Schema**: enum `TradeInVehicleType` (COCHE, CAMPER, AUTOCARAVANA, FURGONETA, MOTO, OTRO) + campos `hasTradeIn`/`tradeInType`/`tradeInBrand`/`tradeInModel`/`tradeInYear`/`tradeInKm`/`tradeInFinancePending`/`tradeInNotes` + relación 1:1 opcional `tradeInSellerLead` (`tradeInSellerLeadId @unique`, FK ON DELETE SET NULL) en `BuyerLead`.
+- **`lib/trade-in.ts`**: labels + `isStockEligibleTradeIn` (solo camper/autocaravana = stock) + `tradeInTypeToVehicleType`. 9 tests.
+- **Ficha comprador** (pestaña Ficha, `trade-in-card.tsx`): sección "Vehículo de parte de pago" con toggle + form; `updateTradeIn` guarda/limpia.
+- **`createSellerLeadFromTradeIn`** (`trade-in-actions.ts`): con camper/autocaravana + marca/modelo/año/km, crea `SellerLead` CN + `Vehicle` NUEVO (seats=4 por defecto), vincula, registra origen en ambos timelines, tasa + recalc matches. Idempotente (bloquea si ya hay `tradeInSellerLeadId`). 5 tests.
+- Suite: **420 tests verdes**.
+
+### CAM-62 — Temperatura del lead comprador (PR #46, squash `201457a`, 2026-07-07)
 
 ### CAM-62 — Temperatura del lead comprador (PR #46, squash `201457a`, 2026-07-07)
 
