@@ -85,9 +85,10 @@ const NAV_SECTIONS: NavSection[] = [
 
 interface SidebarProps {
   userRole: UserRole
+  onNavigate?: () => void
 }
 
-export function Sidebar({ userRole }: SidebarProps) {
+export function SidebarContent({ userRole, onNavigate }: SidebarProps) {
   const pathname = usePathname()
 
   const isActive = (href: string) => pathname === href || pathname.startsWith(`${href}/`)
@@ -101,7 +102,7 @@ export function Sidebar({ userRole }: SidebarProps) {
     )
 
   return (
-    <aside className="flex h-screen w-56 flex-col bg-sidebar text-sidebar-foreground">
+    <div className="flex h-full flex-col bg-sidebar text-sidebar-foreground">
       {/* Logo */}
       <div className="flex h-16 shrink-0 items-center gap-2.5 border-b border-sidebar-border px-4">
         <LogoCampersNova variant="cream" className="[--logo-campers:9px] [--logo-nova:24px]" />
@@ -126,7 +127,7 @@ export function Sidebar({ userRole }: SidebarProps) {
                 </p>
               )}
               {visibleItems.map(({ href, label, icon: Icon }) => (
-                <Link key={href} href={href} className={navLinkClass(href)}>
+                <Link key={href} href={href} className={navLinkClass(href)} onClick={onNavigate}>
                   <Icon className="h-[17px] w-[17px] shrink-0" />
                   {label}
                 </Link>
@@ -140,7 +141,7 @@ export function Sidebar({ userRole }: SidebarProps) {
             <p className="mb-1 px-3 text-[10px] font-semibold uppercase tracking-[0.16em] text-sidebar-foreground/30">
               Sistema
             </p>
-            <Link href="/usuarios" className={navLinkClass('/usuarios')}>
+            <Link href="/usuarios" className={navLinkClass('/usuarios')} onClick={onNavigate}>
               <UserCog className="h-[17px] w-[17px] shrink-0" />
               Usuarios
             </Link>
@@ -152,6 +153,14 @@ export function Sidebar({ userRole }: SidebarProps) {
       <div className="shrink-0 px-4 pb-4">
         <p className="text-[8px] text-sidebar-foreground/25">v0.1</p>
       </div>
+    </div>
+  )
+}
+
+export function Sidebar({ userRole }: { userRole: UserRole }) {
+  return (
+    <aside className="hidden h-screen w-56 shrink-0 lg:flex">
+      <SidebarContent userRole={userRole} />
     </aside>
   )
 }

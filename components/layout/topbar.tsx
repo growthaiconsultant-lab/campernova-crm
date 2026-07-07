@@ -15,6 +15,8 @@ interface TopbarProps {
   userName: string
   userEmail: string
   userRole: string
+  /** Slot izquierdo — usado para el botón de menú móvil */
+  leading?: React.ReactNode
 }
 
 function getInitials(name: string) {
@@ -26,11 +28,11 @@ function getInitials(name: string) {
     .toUpperCase()
 }
 
-export function Topbar({ userName, userEmail, userRole }: TopbarProps) {
+export function Topbar({ userName, userEmail, userRole, leading }: TopbarProps) {
   return (
-    <header className="flex h-16 shrink-0 items-center justify-between border-b border-border bg-card px-6">
-      {/* Left — reserved for breadcrumbs (added in CAM-10 follow-ups) */}
-      <div />
+    <header className="flex h-16 shrink-0 items-center justify-between border-b border-border bg-card px-4 md:px-6">
+      {/* Left — menú móvil + reservado para breadcrumbs */}
+      <div className="flex items-center">{leading}</div>
 
       {/* Right — user menu */}
       <DropdownMenu>
