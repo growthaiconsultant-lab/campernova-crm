@@ -62,6 +62,7 @@ function revalidateTaller(woId?: string) {
 
 const createWorkOrderSchema = z.object({
   vehicleId: z.string().min(1),
+  kind: z.enum(['REPARACION', 'MEJORA']).default('REPARACION'),
   description: z.string().min(1, 'Descripción requerida').trim(),
   assignedToId: z.string().optional().nullable(),
   estimatedHours: z.coerce.number().positive().optional().nullable(),
@@ -107,6 +108,7 @@ export async function createWorkOrder(formData: unknown): Promise<ActionResult<{
 
   const {
     vehicleId,
+    kind,
     description,
     assignedToId,
     estimatedHours,
@@ -131,6 +133,7 @@ export async function createWorkOrder(formData: unknown): Promise<ActionResult<{
   const workOrder = await db.workOrder.create({
     data: {
       vehicleId,
+      kind,
       description,
       assignedToId: assignedToId ?? null,
       estimatedHours: estimatedHours ?? null,

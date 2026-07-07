@@ -8,9 +8,11 @@ import { WorkOrderForm } from './work-order-form'
 export default async function NuevaOrdenPage({
   searchParams,
 }: {
-  searchParams: { vehicleId?: string }
+  searchParams: { vehicleId?: string; kind?: string }
 }) {
   await requireCanViewTaller()
+
+  const initialKind = searchParams.kind === 'MEJORA' ? 'MEJORA' : 'REPARACION'
 
   const [vehicles, users] = await Promise.all([
     db.vehicle.findMany({
@@ -56,6 +58,7 @@ export default async function NuevaOrdenPage({
             vehicles={vehicleOptions}
             users={users}
             initialVehicleId={searchParams.vehicleId ?? ''}
+            initialKind={initialKind}
           />
         </CardContent>
       </Card>

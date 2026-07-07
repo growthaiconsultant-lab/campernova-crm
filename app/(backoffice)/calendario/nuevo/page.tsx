@@ -48,14 +48,14 @@ const CHOICES: {
     label: 'Reparación',
     desc: 'Orden de taller (corregir un problema)',
     icon: Wrench,
-    hrefFor: (sp) => `/taller/nueva${sp.vehicle ? `?vehicleId=${sp.vehicle}` : ''}`,
+    hrefFor: (sp) => `/taller/nueva?kind=REPARACION${sp.vehicle ? `&vehicleId=${sp.vehicle}` : ''}`,
   },
   {
     key: 'MEJORA',
     label: 'Mejora',
     desc: 'Trabajo que aumenta el valor del vehículo',
     icon: Sparkles,
-    hrefFor: (sp) => `/taller/nueva${sp.vehicle ? `?vehicleId=${sp.vehicle}` : ''}`,
+    hrefFor: (sp) => `/taller/nueva?kind=MEJORA${sp.vehicle ? `&vehicleId=${sp.vehicle}` : ''}`,
   },
   {
     key: 'CITA',

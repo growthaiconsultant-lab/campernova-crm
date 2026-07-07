@@ -22,13 +22,20 @@ interface Props {
   vehicles: Vehicle[]
   users: User[]
   initialVehicleId?: string
+  initialKind?: 'REPARACION' | 'MEJORA'
 }
 
-export function WorkOrderForm({ vehicles, users, initialVehicleId = '' }: Props) {
+export function WorkOrderForm({
+  vehicles,
+  users,
+  initialVehicleId = '',
+  initialKind = 'REPARACION',
+}: Props) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
 
   const [vehicleId, setVehicleId] = useState(initialVehicleId)
+  const [kind, setKind] = useState<'REPARACION' | 'MEJORA'>(initialKind)
   const [description, setDescription] = useState('')
   const [assignedToId, setAssignedToId] = useState('')
   const [estimatedHours, setEstimatedHours] = useState('')
@@ -44,6 +51,7 @@ export function WorkOrderForm({ vehicles, users, initialVehicleId = '' }: Props)
     startTransition(async () => {
       const result = await createWorkOrder({
         vehicleId,
+        kind,
         description,
         assignedToId: assignedToId || null,
         estimatedHours: estimatedHours ? parseFloat(estimatedHours) : null,
@@ -62,6 +70,33 @@ export function WorkOrderForm({ vehicles, users, initialVehicleId = '' }: Props)
 
   return (
     <form onSubmit={handleSubmit} className="space-y-5">
+      {/* Tipo de trabajo (F4) */}
+      <div>
+        <label className="mb-1.5 block text-xs font-medium text-cn-ink-700">Tipo de trabajo</label>
+        <div className="flex gap-2">
+          {(
+            [
+              ['REPARACION', 'Reparación', 'Corregir un problema'],
+              ['MEJORA', 'Mejora', 'Añadir valor al vehículo'],
+            ] as const
+          ).map(([value, label, hint]) => (
+            <button
+              key={value}
+              type="button"
+              onClick={() => setKind(value)}
+              title={hint}
+              className={`flex-1 rounded-lg border px-3 py-2 text-sm font-medium transition-colors ${
+                kind === value
+                  ? 'border-cn-teal-900 bg-cn-teal-900 text-white'
+                  : 'border-cn-line text-cn-ink-500 hover:border-cn-teal-900/40'
+              }`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+      </div>
+
       {/* Vehículo */}
       <div>
         <label className="mb-1.5 block text-xs font-medium text-cn-ink-700">

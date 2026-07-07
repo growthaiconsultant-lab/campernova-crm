@@ -260,6 +260,12 @@ enum WorkOrderStatus {
   RECHAZADA
 }
 
+/// Naturaleza del trabajo de taller (F4): reparar un problema vs añadir valor.
+enum WorkOrderKind {
+  REPARACION
+  MEJORA
+}
+
 enum WorkOrderApprovalLevel {
   NO_REQUIERE
   REQUIERE_CEO
@@ -749,6 +755,7 @@ model WorkOrder {
   id             String                 @id @default(cuid())
   vehicleId      String                 @map("vehicle_id")
   status         WorkOrderStatus        @default(PENDIENTE)
+  kind           WorkOrderKind          @default(REPARACION)
   description    String
   assignedToId   String?                @map("assigned_to_id")
   estimatedHours Decimal?               @map("estimated_hours") @db.Decimal(6, 2)

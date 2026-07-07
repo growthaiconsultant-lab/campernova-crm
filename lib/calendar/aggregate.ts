@@ -21,6 +21,7 @@ export type WorkOrderRow = {
   scheduledStart: Date
   scheduledEnd: Date | null
   status: string
+  kind: 'REPARACION' | 'MEJORA'
   description: string
   vehicle: { brand: string; model: string } | null
   assignedTo: { id: string; name: string } | null
@@ -112,7 +113,7 @@ export function workOrderToItem(r: WorkOrderRow): CalendarItem {
   return {
     id: `workorder:${r.id}`,
     source: 'workorder',
-    kindLabel: 'Taller',
+    kindLabel: r.kind === 'MEJORA' ? 'Taller · Mejora' : 'Taller · Reparación',
     title: `${veh} · ${r.description}`,
     start: r.scheduledStart,
     end: r.scheduledEnd,

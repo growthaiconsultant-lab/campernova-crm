@@ -143,6 +143,15 @@ export default async function WorkOrderPage({ params }: { params: { id: string }
             >
               {STATUS_LABELS[wo.status]}
             </span>
+            <span
+              className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${
+                wo.kind === 'MEJORA'
+                  ? 'bg-violet-100 text-violet-700'
+                  : 'bg-slate-100 text-slate-600'
+              }`}
+            >
+              {wo.kind === 'MEJORA' ? 'Mejora' : 'Reparación'}
+            </span>
           </div>
           <p className="mt-0.5 text-sm text-muted-foreground">
             Orden #{wo.id.slice(-8)} ·{' '}
