@@ -43,7 +43,7 @@ export default async function EntregasPage({
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold">Entregas</h1>
           <p className="mt-0.5 text-sm text-muted-foreground">{deliveries.length} entregas</p>
@@ -93,8 +93,8 @@ export default async function EntregasPage({
           </Button>
         </div>
       ) : (
-        <div className="overflow-hidden rounded-xl border border-cn-line">
-          <table className="w-full text-sm">
+        <div className="overflow-x-auto rounded-xl border border-cn-line">
+          <table className="w-full min-w-[560px] text-sm">
             <thead>
               <tr className="border-b border-cn-line bg-cn-cream-50">
                 <th className="px-4 py-2.5 text-left font-medium text-cn-ink-500">Vehículo</th>

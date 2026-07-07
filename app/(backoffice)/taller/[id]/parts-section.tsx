@@ -179,8 +179,8 @@ export function PartsSection({ woId, parts, isAdmin, isClosed }: Props) {
       {parts.length === 0 ? (
         <p className="text-cn-ink-400 py-4 text-center text-sm">Sin piezas registradas.</p>
       ) : (
-        <div className="overflow-hidden rounded-xl border border-cn-line">
-          <table className="w-full text-sm">
+        <div className="overflow-x-auto rounded-xl border border-cn-line">
+          <table className="w-full min-w-[560px] text-sm">
             <thead>
               <tr className="border-b border-cn-line bg-cn-cream-50">
                 <th className="px-4 py-2.5 text-left font-medium text-cn-ink-500">Pieza</th>
