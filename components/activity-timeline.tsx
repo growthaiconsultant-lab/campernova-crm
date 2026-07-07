@@ -53,6 +53,7 @@ const ACTIVITY_LABELS: Record<ActivityType, string> = {
   CARGAS_VERIFICADAS: 'Cargas verificadas',
   TITULARIDAD_TRANSFERIDA: 'Titularidad transferida',
   PUBLICACION_BLOQUEADA: 'Publicación bloqueada',
+  PROXIMA_ACCION_ACTUALIZADA: 'Próxima acción',
 }
 
 const ICON_CLASSES: Record<ActivityType, string> = {
@@ -91,6 +92,8 @@ const ICON_CLASSES: Record<ActivityType, string> = {
   TITULARIDAD_TRANSFERIDA:
     'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-300',
   PUBLICACION_BLOQUEADA: 'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300',
+  PROXIMA_ACCION_ACTUALIZADA:
+    'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300',
 }
 
 function ActivityIcon({ type }: { type: ActivityType }) {

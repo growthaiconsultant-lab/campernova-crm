@@ -1137,6 +1137,8 @@ export default async function FichaVendedorPage({
                 leadName={lead.name}
                 vehicleInfo={v ? { type: v.type, brand: v.brand, model: v.model } : undefined}
                 nextAction={nextAction}
+                nextActionType={lead.nextActionType}
+                nextActionDueAt={lead.nextActionDueAt ? lead.nextActionDueAt.toISOString() : null}
               />
             </div>
 

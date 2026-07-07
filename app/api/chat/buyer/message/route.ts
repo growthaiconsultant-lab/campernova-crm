@@ -5,6 +5,7 @@ import { db } from '@/lib/db'
 import { BUYER_SYSTEM_PROMPT } from '@/lib/chat/system-prompt'
 import { registerBuyerLeadSchema } from '@/lib/chat/tools'
 import { sendBuyerChatLeadNotification } from '@/lib/email/send'
+import { defaultNextActionData } from '@/lib/next-action'
 
 const MAX_TURNS = 10
 
@@ -101,6 +102,7 @@ export async function POST(req: NextRequest) {
                   maxLengthM: d.largoMaxM ?? undefined,
                   maxHeightM: d.altoMaxM ?? undefined,
                   hasKids: d.viajaConNinos ?? undefined,
+                  ...defaultNextActionData(),
                 },
               })
 

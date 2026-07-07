@@ -737,6 +737,8 @@ export default async function FichaCompradorPage({
               leadId={lead.id}
               leadName={lead.name}
               status={lead.status}
+              nextActionType={lead.nextActionType}
+              nextActionDueAt={lead.nextActionDueAt ? lead.nextActionDueAt.toISOString() : null}
             />
 
             {/* Alert: open tickets */}

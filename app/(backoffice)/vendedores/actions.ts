@@ -5,6 +5,7 @@ import { requireAgente } from '@/lib/auth'
 import { createSellerLeadSchema } from '@/lib/validators/seller-lead'
 import { runAndSaveAutoValuation } from '@/lib/valuation/save'
 import { recalculateMatchesForVehicle } from '@/lib/matching'
+import { defaultNextActionData } from '@/lib/next-action'
 
 export async function createSellerLead(data: unknown) {
   await requireAgente()
@@ -39,6 +40,7 @@ export async function createSellerLead(data: unknown) {
       canal: 'CN',
       status: 'NUEVO',
       agentId: null,
+      ...defaultNextActionData(),
       vehicle: {
         create: {
           type,

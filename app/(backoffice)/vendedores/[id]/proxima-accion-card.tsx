@@ -3,6 +3,8 @@
 import { Phone, MessageCircle } from 'lucide-react'
 import { logWhatsApp } from '@/app/(backoffice)/whatsapp-actions'
 import { buildWhatsAppUrl, sellerWhatsAppMessage } from '@/lib/whatsapp'
+import { NextActionEditor } from '@/components/next-action-editor'
+import type { NextActionType } from '@prisma/client'
 
 type NextAction = {
   title: string
@@ -16,9 +18,19 @@ type Props = {
   leadName: string
   vehicleInfo?: { type: string; brand: string; model: string }
   nextAction: NextAction
+  nextActionType: NextActionType | null
+  nextActionDueAt: string | null
 }
 
-export function ProximaAccionCard({ phone, leadId, leadName, vehicleInfo, nextAction }: Props) {
+export function ProximaAccionCard({
+  phone,
+  leadId,
+  leadName,
+  vehicleInfo,
+  nextAction,
+  nextActionType,
+  nextActionDueAt,
+}: Props) {
   function handleWhatsApp() {
     if (!phone) return
     logWhatsApp({ leadId, leadType: 'seller', phone }).catch(console.error)
@@ -59,8 +71,16 @@ export function ProximaAccionCard({ phone, leadId, leadName, vehicleInfo, nextAc
             {nextAction.urgency}
           </span>
         </div>
-        <p className="text-sm font-semibold text-white">{nextAction.title}</p>
-        <p className="mt-1 text-xs leading-relaxed text-white/60">{nextAction.description}</p>
+        <NextActionEditor
+          leadType="seller"
+          leadId={leadId}
+          nextActionType={nextActionType}
+          nextActionDueAt={nextActionDueAt}
+          fallbackText={nextAction.title}
+        />
+        {!nextActionType && (
+          <p className="mt-1 text-xs leading-relaxed text-white/60">{nextAction.description}</p>
+        )}
         <div className="mt-4 flex gap-2">
           {phone && (
             <a
