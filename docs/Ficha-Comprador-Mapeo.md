@@ -82,4 +82,4 @@ La distinción ya existe en datos (comentarios del schema + `lib/matching`); fal
 
 ---
 
-> Estado: **CAM-60 desplegado a prod (2026-07-07, PR #44)**. Pendientes: CAM-61…66 (crear en Linear y priorizar).
+> Estado: **CAM-60 (PR #44) y CAM-61 (PR #45) desplegados a prod (2026-07-07)**. Pendientes: CAM-62…66.

@@ -92,9 +92,22 @@ claude mcp add-json linear '{\"command\":\"npx\",\"args\":[\"-y\",\"mcp-linear@l
 
 `.claude/settings.json` y `.claude/settings.local.json` se mantienen como referencia de la estructura, pero la fuente de verdad funcional es el registro de la CLI.
 
-## Estado actual (Block 14 — CAM-60 Próxima acción comercial — DESPLEGADO A PROD ✅)
+## Estado actual (Block 14 — Ficha Comprador: CAM-60 + CAM-61 — DESPLEGADO A PROD ✅)
 
-Desplegado el **2026-07-07** vía **PR #44** (squash `35a1dac`). Primer ticket del bloque Ficha de Comprador (`docs/Ficha-Comprador-Mapeo.md`). Migración additiva `20260707000000_add_next_action` aplicada a **staging y prod ANTES del merge** con `prisma migrate deploy` (staging dio P1001 al inicio — era una incidencia de Supabase, el proyecto estaba "Unhealthy", NO pausado; reintento OK).
+### CAM-61 — Motivo de pérdida estructurado (PR #45, squash `e43960a`, 2026-07-07)
+
+Migración additiva `20260707100000_add_lost_reason` aplicada a staging y prod antes del merge.
+
+- **Schema**: enum `LostReason` (PRECIO, FINANCIACION, COMPRO_A_OTRO, NO_RESPONDE, APLAZA, SIN_STOCK, EXPECTATIVAS, OTRO) + `lostReason`/`lostReasonNotes` nullable en ambos leads.
+- **`lib/lost-reason.ts`**: labels/opciones/validador (compartido comprador+vendedor).
+- **`archiveBuyerLead`/`archiveSellerLead`**: motivo obligatorio (validado server-side), notas máx 500 → null si vacías, incluido en la Activity `CAMBIO_ESTADO`.
+- **Diálogos de archivar** (ambas fichas): select obligatorio + detalle opcional + error inline.
+- **Dashboard**: card "Por qué perdemos leads · últimos 90 días" (ADMIN+AGENTE, respeta filtro de agente, oculta si no hay datos) con desglose compradores/vendedores por motivo.
+- Suite: **401 tests verdes**.
+
+### CAM-60 — Próxima acción comercial (PR #44, squash `35a1dac`, 2026-07-07)
+
+Primer ticket del bloque Ficha de Comprador (`docs/Ficha-Comprador-Mapeo.md`). Migración additiva `20260707000000_add_next_action` aplicada a **staging y prod ANTES del merge** con `prisma migrate deploy` (staging dio P1001 al inicio — era una incidencia de Supabase, el proyecto estaba "Unhealthy", NO pausado; reintento OK).
 
 - **Schema**: enum `NextActionType` (LLAMAR, WHATSAPP, EMAIL, ENVIAR_VEHICULOS, PEDIR_DOCS, AGENDAR_VISITA, SEGUIMIENTO, CERRAR) + `nextActionType`/`nextActionDueAt` nullable + índice en `SellerLead` y `BuyerLead`; `ActivityType` += `PROXIMA_ACCION_ACTUALIZADA`.
 - **`lib/next-action.ts`**: labels/opciones, `defaultNextActionData()` ("Llamar mañana 10:00"), `isNextActionOverdue`, `formatNextActionDue`. 18 tests.
