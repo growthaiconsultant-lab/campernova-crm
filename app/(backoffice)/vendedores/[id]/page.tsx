@@ -335,7 +335,7 @@ export default async function FichaVendedorPage({
   return (
     <div className="-mx-6 -mt-6 flex min-h-full flex-col">
       {/* ── Topbar sticky ── */}
-      <header className="sticky top-0 z-20 flex h-[73px] shrink-0 items-center justify-between border-b border-border bg-card px-8">
+      <header className="sticky top-0 z-20 flex h-[73px] shrink-0 items-center justify-between gap-2 border-b border-border bg-card px-4 md:px-8">
         <nav className="flex items-center gap-2 font-mono text-[11px] uppercase tracking-[0.12em] text-muted-foreground">
           <Link
             href="/vendedores"
@@ -363,18 +363,20 @@ export default async function FichaVendedorPage({
             />
           )}
           {primaryNextStatus && (
-            <QuickAdvanceButton
-              leadId={lead.id}
-              nextStatus={primaryNextStatus}
-              label={`Mover a ${SELLER_LEAD_STATUS_LABELS[primaryNextStatus as SellerLeadStatus]}`}
-              variant="outline"
-            />
+            <div className="hidden sm:block">
+              <QuickAdvanceButton
+                leadId={lead.id}
+                nextStatus={primaryNextStatus}
+                label={`Mover a ${SELLER_LEAD_STATUS_LABELS[primaryNextStatus as SellerLeadStatus]}`}
+                variant="outline"
+              />
+            </div>
           )}
         </div>
       </header>
 
       {/* ── Hero ── */}
-      <section className="border-b border-border bg-background px-10 pb-0 pt-7">
+      <section className="border-b border-border bg-background px-4 pb-0 pt-7 md:px-10">
         {/* Identity row — centrado en el vehículo */}
         <div className="mb-6 flex flex-col gap-5 sm:flex-row sm:items-center">
           {/* Miniatura del vehículo */}
@@ -551,7 +553,7 @@ export default async function FichaVendedorPage({
         )}
 
         {/* Tabs — sticky at top-[73px] via the wrapper div below */}
-        <div className="-mx-10">
+        <div className="-mx-4 md:-mx-10">
           <Suspense fallback={<div className="h-12 border-b border-border" />}>
             <LeadTabNav tabs={tabs} />
           </Suspense>
@@ -561,7 +563,7 @@ export default async function FichaVendedorPage({
       {/* ── Contenido principal ── */}
       <div className="grid flex-1 grid-cols-1 lg:grid-cols-[1fr_320px]">
         {/* Main content */}
-        <div className="min-w-0 p-8 pb-16">
+        <div className="min-w-0 p-4 pb-10 md:p-8 md:pb-16">
           {/* ─────────────── RESUMEN ─────────────── */}
           {activeTab === 'resumen' && (
             <div className="space-y-6">
