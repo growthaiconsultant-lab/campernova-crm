@@ -126,9 +126,14 @@ Migración **additiva** `20260711000000_add_kpi_events` (tabla `kpi_events` + í
 - **`components/analytics/bar-list.tsx`** (barras horizontales reutilizables).
 - **`/analytics/operaciones`** (ADMIN/AGENTE/ENTREGAS/TALLER/MARKETING). Sidebar: "Operaciones" (icono Boxes).
 
+### F3 — Dashboard Matching (PR #71, `236ed0b`) — sin migración
+
+- **`lib/kpi/matching.ts`**: matches generados/útiles (score≥70), score medio, rechazados, **embudo por estado** (Sugerido→Propuesto→Visita→Oferta→Cerrado), **distribución de score** (buckets), **match→oferta** (`offers.matchId`), top vehículos con más demanda compatible.
+- **`/analytics/matching`** (ADMIN/AGENTE/MARKETING). Sidebar: "Matching" (icono Zap).
+
 ### Pendiente del sistema de KPIs (siguientes fases)
 
-Hooks de eventos restantes (vehículo publicado/vendido/valorado, match, cita, entrega) + validaciones de producto (cita sin outcome, venta sin margen). **F3** Matching, **F4** Inteligencia de mercado, **F5** Comercial (día a día), **F6** Calidad de datos + export/API. Fase Plataforma bloqueada por decisión del dueño (portal profesional). Detalle en `docs/Dashboards-KPIs-Plan.md`.
+Hooks de eventos restantes (vehículo publicado/vendido/valorado, match, cita, entrega) + validaciones de producto (cita sin outcome, venta sin margen). **F4** Inteligencia de mercado, **F5** Comercial (día a día), **F6** Calidad de datos + export/API. Fase Plataforma bloqueada por decisión del dueño (portal profesional). Detalle en `docs/Dashboards-KPIs-Plan.md`.
 
 ## Estado previo (Block 20 — Trust Passport unificado — MERGED A MAIN ✅)
 
