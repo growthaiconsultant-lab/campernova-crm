@@ -5,6 +5,8 @@ import { db } from '@/lib/db'
 import { requireAgente } from '@/lib/auth'
 import { buildTrustPassport } from '@/lib/trust-passport'
 import { getTrustPassportInput } from '@/lib/trust-passport/prisma-deps'
+import { emitKpiEvent } from '@/lib/kpi/emit'
+import { KPI_EVENTS } from '@/lib/kpi/events'
 
 /**
  * Block 20: otorga el sello "Verificado por CampersNova" a un vehículo.
@@ -50,6 +52,14 @@ export async function grantTrustSeal(
       },
     }),
   ])
+
+  await emitKpiEvent({
+    event: KPI_EVENTS.TRUST_PASSPORT_GRANTED,
+    entityType: 'vehicle',
+    entityId: vehicleId,
+    actorUserId: actor.id,
+    source: 'ui',
+  })
 
   revalidatePath(`/vendedores/${vehicle.sellerLeadId}`)
   revalidatePath('/vendedores')

@@ -474,8 +474,34 @@ model User {
   createdCaptures          VehicleCapture[]       @relation("CreatedCaptures")
   assignedCaptures         VehicleCapture[]       @relation("AssignedCaptures")
   createdOffers            Offer[]                @relation("CreatedOffers")
+  kpiEvents                KpiEvent[]             @relation("KpiEventActor")
 
   @@map("users")
+}
+
+/// Bloque F0 KPIs — evento atómico auditable de negocio. Fuente de verdad para
+/// los KPIs de flujo (leads nuevos, conversión, ventas). Se emite desde las
+/// server actions en cada transición relevante. `eventName` es String (no enum)
+/// para añadir eventos sin migración; los nombres válidos viven en `lib/kpi/events.ts`.
+model KpiEvent {
+  id                String   @id @default(cuid())
+  eventName         String   @map("event_name")
+  entityType        String   @map("entity_type")
+  entityId          String   @map("entity_id")
+  relatedEntityType String?  @map("related_entity_type")
+  relatedEntityId   String?  @map("related_entity_id")
+  actorUserId       String?  @map("actor_user_id")
+  source            String? // 'ui' | 'system' | 'chat' | 'cron'
+  metadata          Json     @default("{}")
+  occurredAt        DateTime @default(now()) @map("occurred_at")
+  createdAt         DateTime @default(now()) @map("created_at")
+
+  actor User? @relation("KpiEventActor", fields: [actorUserId], references: [id])
+
+  @@index([eventName, occurredAt])
+  @@index([entityType, entityId])
+  @@index([occurredAt])
+  @@map("kpi_events")
 }
 
 /// Lead de vendedor — persona que quiere vender su vehículo.

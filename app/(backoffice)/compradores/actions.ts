@@ -7,9 +7,11 @@ import { recalculateMatchesForBuyer } from '@/lib/matching'
 import { defaultNextActionData } from '@/lib/next-action'
 import { suggestTemperatureFromTimeline } from '@/lib/lead-temperature'
 import { findDuplicateBuyerByPhone, prismaBuyerDedupDeps } from '@/lib/buyer-dedup'
+import { emitKpiEvent } from '@/lib/kpi/emit'
+import { KPI_EVENTS } from '@/lib/kpi/events'
 
 export async function createBuyerLead(data: unknown, allowDuplicate = false) {
-  await requireAgente()
+  const actor = await requireAgente()
 
   const parsed = createBuyerLeadSchema.safeParse(data)
   if (!parsed.success) {
@@ -57,6 +59,14 @@ export async function createBuyerLead(data: unknown, allowDuplicate = false) {
   })
 
   await recalculateMatchesForBuyer(lead.id, db)
+
+  await emitKpiEvent({
+    event: KPI_EVENTS.BUYER_CREATED,
+    entityType: 'buyer',
+    entityId: lead.id,
+    actorUserId: actor.id,
+    source: 'ui',
+  })
 
   return { leadId: lead.id }
 }

@@ -6,6 +6,8 @@ import { requireAgente } from '@/lib/auth'
 import { isValidOfferStatus, isValidOfferTransition, OFFER_STATUS_LABELS } from '@/lib/offers'
 import { isValidTransition, VEHICLE_TRANSITIONS } from '@/lib/state-machine'
 import { isValidLostReason } from '@/lib/lost-reason'
+import { emitKpiEvent } from '@/lib/kpi/emit'
+import { KPI_EVENTS } from '@/lib/kpi/events'
 import type { OfferStatus, LostReason } from '@prisma/client'
 
 type CreateOfferInput = {
@@ -74,6 +76,17 @@ export async function createOffer(
           ]
         : []),
     ],
+  })
+
+  await emitKpiEvent({
+    event: KPI_EVENTS.OFFER_CREATED,
+    entityType: 'offer',
+    entityId: offer.id,
+    relatedEntityType: 'vehicle',
+    relatedEntityId: data.vehicleId,
+    actorUserId: actor.id,
+    source: 'ui',
+    metadata: { amount: data.amount, buyerLeadId: data.buyerLeadId },
   })
 
   revalidateOffer(buyer.id, vehicle.sellerLeadId)
@@ -191,6 +204,28 @@ export async function updateOfferStatus(
       })
     }
   })
+
+  // Eventos KPI de la transición transaccional
+  const kpiEvent =
+    next === 'ACEPTADA' && extra.depositAmount
+      ? KPI_EVENTS.RESERVATION_CREATED
+      : next === 'CANCELADA' || (wasReservation && (next === 'RETIRADA' || next === 'EXPIRADA'))
+        ? KPI_EVENTS.RESERVATION_CANCELLED
+        : next === 'CONVERTIDA'
+          ? KPI_EVENTS.SALE_CLOSED
+          : null
+  if (kpiEvent) {
+    await emitKpiEvent({
+      event: kpiEvent,
+      entityType: 'offer',
+      entityId: offer.id,
+      relatedEntityType: 'vehicle',
+      relatedEntityId: veh.id,
+      actorUserId: actor.id,
+      source: 'ui',
+      metadata: { amount: Number(offer.amount), status: next },
+    })
+  }
 
   revalidateOffer(offer.buyerLeadId, veh.sellerLeadId)
   revalidatePath('/vendedores')
