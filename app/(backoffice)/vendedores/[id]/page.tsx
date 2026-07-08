@@ -40,6 +40,8 @@ import { calculateCompletionPercent } from '@/lib/vehicle-legal'
 import type { VehicleLegalInput, DocumentSummary } from '@/lib/vehicle-legal'
 import type { VehicleDocumentCategory } from '@prisma/client'
 import { calculateLeadScore, calculateClosureProbability, leadScoreColor } from '@/lib/lead-score'
+import { sellerAcquisitionScore, ACTIVE_DEMAND_MATCH_THRESHOLD } from '@/lib/scoring'
+import { ScoreInfo } from '@/components/score-info'
 import { generateLeadInsights, getNextAction } from '@/lib/lead-insights'
 import { LeadTabNav } from './lead-tab-nav'
 import type { LeadTab } from './lead-tab-nav'
@@ -250,6 +252,19 @@ export default async function FichaVendedorPage({
     daysSinceLastActivity: daysSinceActivity,
     isPro: lead.canal === 'PRO',
     vehicleStatus: v?.status ?? null,
+  })
+
+  // Block 19 — demanda activa + score de captación
+  const activeDemandCount = vehicleMatches.filter(
+    (m) => m.score >= ACTIVE_DEMAND_MATCH_THRESHOLD
+  ).length
+  const acquisition = sellerAcquisitionScore({
+    desiredPrice: v?.desiredPrice ? Number(v.desiredPrice) : null,
+    minPrice: lead.minPrice ? Number(lead.minPrice) : null,
+    valuationRecommended: v?.valuationRecommended ? Number(v.valuationRecommended) : null,
+    urgency: lead.urgency,
+    riskLevel: lead.riskLevel,
+    activeDemandCount,
   })
 
   const insightInput = {
@@ -586,6 +601,24 @@ export default async function FichaVendedorPage({
                 <span className="text-sm font-normal text-muted-foreground">/100</span>
               </p>
             </div>
+
+            {/* Score de captación (Block 19) */}
+            {v && (
+              <div className="rounded-xl border border-border bg-card px-4 py-3">
+                <div className="mb-1 flex items-center gap-1">
+                  <p className="font-mono text-[10px] uppercase tracking-[0.12em] text-muted-foreground">
+                    Score captación
+                  </p>
+                  <ScoreInfo breakdown={acquisition.breakdown} side="bottom" />
+                </div>
+                <p
+                  className={`text-xl font-bold tracking-[-0.02em] ${acquisition.score >= 70 ? 'text-green-600' : acquisition.score >= 40 ? 'text-amber-600' : 'text-muted-foreground'}`}
+                >
+                  {acquisition.score}
+                  <span className="text-sm font-normal text-muted-foreground">/100</span>
+                </p>
+              </div>
+            )}
 
             {/* Listo para publicar */}
             <div className="rounded-xl border border-border bg-card px-4 py-3">
@@ -1217,6 +1250,31 @@ export default async function FichaVendedorPage({
                       {closedMatch.buyerLead.name}
                     </p>
                     <p className="text-xs text-muted-foreground">Operación cerrada · ver ficha →</p>
+                  </div>
+                </Link>
+              </div>
+            )}
+
+            {/* Demanda activa (Block 19) — el argumento de captación */}
+            {v && activeDemandCount > 0 && (
+              <div className="p-5">
+                <p className="mb-2 font-mono text-[10px] uppercase tracking-[0.12em] text-muted-foreground">
+                  Demanda activa
+                </p>
+                <Link
+                  href={`/vendedores/${lead.id}?tab=compradores`}
+                  className="flex items-center gap-3 rounded-lg border border-emerald-200 bg-emerald-50 p-3 transition-colors hover:bg-emerald-100 dark:border-emerald-900/40 dark:bg-emerald-950/30"
+                >
+                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-emerald-600 text-sm font-bold text-white">
+                    {activeDemandCount}
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-sm font-semibold text-emerald-800 dark:text-emerald-300">
+                      {activeDemandCount} comprador{activeDemandCount === 1 ? '' : 'es'} esperando
+                    </p>
+                    <p className="text-xs text-emerald-700/80 dark:text-emerald-400/70">
+                      Compatibles y activos · ver compradores →
+                    </p>
                   </div>
                 </Link>
               </div>

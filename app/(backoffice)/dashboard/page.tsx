@@ -7,6 +7,7 @@ import {
 } from '@/lib/state-machine'
 import { NEXT_ACTION_LABELS, formatNextActionDue } from '@/lib/next-action'
 import { LOST_REASON_LABELS } from '@/lib/lost-reason'
+import { ACTIVE_DEMAND_MATCH_THRESHOLD } from '@/lib/scoring'
 import {
   getSellerLeadCounts,
   getBuyerLeadCounts,
@@ -347,6 +348,49 @@ export default async function DashboardPage({
     })
     .filter((v) => v.completionPct < 100)
     .slice(0, 5)
+
+  // ── Demanda activa esperando (Block 19) — argumento de captación ──────────
+  const vehiclesWithDemandRaw =
+    isAdmin || isAgente
+      ? await db.vehicle.findMany({
+          where: {
+            status: { in: ['PUBLICADO', 'TASADO'] },
+            ...(filter.agentId ? { sellerLead: { agentId: filter.agentId } } : {}),
+            matches: {
+              some: {
+                score: { gte: ACTIVE_DEMAND_MATCH_THRESHOLD },
+                buyerLead: { status: { notIn: ['CERRADO', 'PERDIDO'] } },
+              },
+            },
+          },
+          select: {
+            id: true,
+            brand: true,
+            model: true,
+            year: true,
+            status: true,
+            sellerLead: { select: { id: true } },
+            matches: {
+              where: {
+                score: { gte: ACTIVE_DEMAND_MATCH_THRESHOLD },
+                buyerLead: { status: { notIn: ['CERRADO', 'PERDIDO'] } },
+              },
+              select: { id: true },
+            },
+          },
+          take: 30,
+        })
+      : []
+  const vehiclesWithDemand = vehiclesWithDemandRaw
+    .map((v) => ({
+      id: v.id,
+      label: `${v.brand} ${v.model} (${v.year})`,
+      status: v.status,
+      sellerLeadId: v.sellerLead?.id ?? null,
+      demandCount: v.matches.length,
+    }))
+    .sort((a, b) => b.demandCount - a.demandCount)
+    .slice(0, 6)
 
   // ── Financial metrics (ADMIN + MARKETING) ────────────────────────────────
   const showFinancials = isAdmin || isMarketing
@@ -1292,6 +1336,39 @@ export default async function DashboardPage({
                 </div>
               </div>
             )}
+          </div>
+        </>
+      )}
+
+      {/* ── Demanda activa esperando (Block 19) — argumento de captación ───── */}
+      {(isAdmin || isAgente) && vehiclesWithDemand.length > 0 && (
+        <>
+          <SectionEyebrow label="Demanda activa esperando" color="ok" />
+          <div
+            className="rounded-[14px] p-[22px]"
+            style={{
+              border: '1px solid #10b981',
+              background: 'linear-gradient(180deg, #fff, #f2fbf6)',
+            }}
+          >
+            <p className="mb-4 text-[13px] text-[#5a6b62]">
+              Vehículos en stock con compradores activos compatibles esperando. Úsalo como palanca
+              comercial (y para captar más stock parecido).
+            </p>
+            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
+              {vehiclesWithDemand.map((v) => (
+                <Link
+                  key={v.id}
+                  href={v.sellerLeadId ? `/vendedores/${v.sellerLeadId}?tab=compradores` : '#'}
+                  className="flex items-center justify-between gap-2 rounded-lg border border-emerald-200 bg-white p-3 transition-colors hover:bg-emerald-50"
+                >
+                  <span className="truncate text-[13px] font-medium text-[#2a2622]">{v.label}</span>
+                  <span className="flex shrink-0 items-center gap-1 rounded-full bg-emerald-100 px-2 py-0.5 text-[11px] font-semibold text-emerald-700">
+                    {v.demandCount} 👤
+                  </span>
+                </Link>
+              ))}
+            </div>
           </div>
         </>
       )}

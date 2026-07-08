@@ -9,6 +9,9 @@ import { BuyerTopbarActions } from './buyer-topbar-actions'
 import { ProximaAccionCard } from './proxima-accion-card'
 import { MatchesSection } from '@/components/matches-section'
 import { OffersSection } from '@/components/offers-section'
+import { isActiveHold } from '@/lib/offers'
+import { buyerScore } from '@/lib/scoring'
+import { ScoreInfo } from '@/components/score-info'
 import { prismaMatchingDeps, buildMatchExplanation } from '@/lib/matching'
 import { classifyBuyerCriteria } from '@/lib/buyer-criteria'
 import type { BuyerMatchData } from '@/components/matches-section'
@@ -58,42 +61,6 @@ const EQUIPMENT_LABELS: Record<string, string> = {
   bathroom: 'Baño',
   shower: 'Ducha',
   heating: 'Calefacción',
-}
-
-function calcBuyerScore(
-  lead: {
-    phone: string | null
-    vehicleType: string | null
-    maxBudget: unknown
-    minSeats: number | null
-    useZone: string | null
-    purchaseTimeline: string | null
-    status: string
-  },
-  bestMatchScore: number
-): number {
-  let score = 0
-  if (lead.phone) score += 10
-  score += 5
-  if (lead.vehicleType) score += 8
-  if (lead.maxBudget) score += 12
-  if (lead.minSeats) score += 5
-  if (lead.useZone) score += 5
-  if (lead.purchaseTimeline) score += 5
-  if (bestMatchScore >= 80) score += 25
-  else if (bestMatchScore >= 60) score += 18
-  else if (bestMatchScore >= 40) score += 10
-  else if (bestMatchScore > 0) score += 5
-  const statusBonus: Record<string, number> = {
-    NUEVO: 0,
-    CONTACTADO: 8,
-    CUALIFICADO: 15,
-    EN_NEGOCIACION: 20,
-    CERRADO: 25,
-    PERDIDO: 0,
-  }
-  score += statusBonus[lead.status] ?? 0
-  return Math.min(100, score)
 }
 
 // ── Page ──────────────────────────────────────────────────────────────────────
@@ -213,7 +180,21 @@ export default async function FichaCompradorPage({
 
   const bestMatch = lead.matches[0]
   const bestMatchScore = bestMatch ? bestMatch.score : 0
-  const leadScore = calcBuyerScore(lead, bestMatchScore)
+  const hasActiveOffer = lead.offers.some((o) => isActiveHold(o.status))
+  const scoreResult = buyerScore({
+    phone: lead.phone,
+    email: lead.email,
+    vehicleType: lead.vehicleType,
+    minSeats: lead.minSeats,
+    maxBudget: lead.maxBudget ? Number(lead.maxBudget) : null,
+    financingNeeded: lead.financingNeeded,
+    purchaseTimeline: lead.purchaseTimeline,
+    temperature: lead.temperature,
+    status: lead.status,
+    bestMatchScore,
+    hasActiveOffer,
+  })
+  const leadScore = scoreResult.score
 
   const equipment = (lead.criticalEquipment ?? {}) as Record<string, boolean>
   const activeEquipment = Object.entries(equipment)
@@ -541,10 +522,7 @@ export default async function FichaCompradorPage({
               <p className="font-mono text-[10px] uppercase tracking-[0.12em] text-muted-foreground">
                 Calidad lead
               </p>
-              <InfoTooltip
-                text="Puntuación 0-100: contacto, preferencias completas, matches activos y engagement por estado."
-                side="bottom"
-              />
+              <ScoreInfo breakdown={scoreResult.breakdown} side="bottom" />
             </div>
             <p
               className={`text-xl font-bold tracking-[-0.02em] ${leadScore >= 75 ? 'text-green-600' : leadScore >= 50 ? 'text-amber-600' : 'text-muted-foreground'}`}
