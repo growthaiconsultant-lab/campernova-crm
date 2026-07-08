@@ -20,6 +20,7 @@ import {
   Boxes,
   Zap,
   TrendingUp,
+  Target,
   LogOut,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
@@ -122,6 +123,12 @@ const NAV_SECTIONS: NavSection[] = [
         href: '/analytics/crm',
         label: 'CRM',
         icon: BarChart3,
+        roles: ['ADMIN', 'AGENTE', 'MARKETING'],
+      },
+      {
+        href: '/analytics/comercial',
+        label: 'Comercial',
+        icon: Target,
         roles: ['ADMIN', 'AGENTE', 'MARKETING'],
       },
       {
