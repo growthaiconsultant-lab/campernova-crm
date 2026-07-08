@@ -131,9 +131,15 @@ Migración **additiva** `20260711000000_add_kpi_events` (tabla `kpi_events` + í
 - **`lib/kpi/matching.ts`**: matches generados/útiles (score≥70), score medio, rechazados, **embudo por estado** (Sugerido→Propuesto→Visita→Oferta→Cerrado), **distribución de score** (buckets), **match→oferta** (`offers.matchId`), top vehículos con más demanda compatible.
 - **`/analytics/matching`** (ADMIN/AGENTE/MARKETING). Sidebar: "Matching" (icono Zap).
 
+### F4 — Inteligencia de Mercado (PR #72, `a4c2e0b`) · F5 — Comercial (PR #73, `872d580`) — sin migración
+
+- **F4 `lib/kpi/mercado.ts`** + **`/analytics/mercado`**: demanda por tipo y por rango de precio, **gap oferta/demanda por segmento** (palanca de captación), **rotación por modelo** (días de venta), precio medio de cierre (ofertas convertidas). Sidebar "Mercado" (TrendingUp).
+- **F5 `lib/kpi/comercial.ts`** + **`/analytics/comercial`**: mi día (tareas hoy/vencidas, citas hoy, calientes, reservas activas), **lista priorizada** (reservas en riesgo → tareas vencidas → calientes), reservas en riesgo, compradores calientes. El AGENTE ve lo suyo. Sidebar "Comercial" (Target).
+- **6 dashboards vivos** en el grupo Analytics: Dirección · CRM · Comercial · Operaciones · Matching · Mercado.
+
 ### Pendiente del sistema de KPIs (siguientes fases)
 
-Hooks de eventos restantes (vehículo publicado/vendido/valorado, match, cita, entrega) + validaciones de producto (cita sin outcome, venta sin margen). **F4** Inteligencia de mercado, **F5** Comercial (día a día), **F6** Calidad de datos + export/API. Fase Plataforma bloqueada por decisión del dueño (portal profesional). Detalle en `docs/Dashboards-KPIs-Plan.md`.
+Hooks de eventos restantes (vehículo publicado/vendido/valorado, match, cita, entrega) + validaciones de producto (cita sin outcome, venta sin margen). **F6** Calidad de datos + export/API (CSV/PDF, endpoints `/api/kpis/*`). Fase Plataforma bloqueada por decisión del dueño (portal profesional). Detalle en `docs/Dashboards-KPIs-Plan.md`.
 
 ## Estado previo (Block 20 — Trust Passport unificado — MERGED A MAIN ✅)
 
