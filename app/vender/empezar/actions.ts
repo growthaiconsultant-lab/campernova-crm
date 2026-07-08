@@ -15,6 +15,8 @@ import { sendSellerLeadConfirmation, sendAgentLeadNotification } from '@/lib/ema
 import { runAndSaveAutoValuation } from '@/lib/valuation/save'
 import { recalculateMatchesForVehicle } from '@/lib/matching'
 import { defaultNextActionData } from '@/lib/next-action'
+import { emitKpiEvent } from '@/lib/kpi/emit'
+import { KPI_EVENTS } from '@/lib/kpi/events'
 
 const ALLOWED_MIME = ['image/jpeg', 'image/png', 'image/webp']
 const MAX_FILE_SIZE = 2 * 1024 * 1024
@@ -175,6 +177,16 @@ export async function submitPublicLead(formData: FormData) {
   })
 
   const vehicleId = lead.vehicle!.id
+
+  await emitKpiEvent({
+    event: KPI_EVENTS.SELLER_CREATED,
+    entityType: 'seller',
+    entityId: lead.id,
+    relatedEntityType: 'vehicle',
+    relatedEntityId: vehicleId,
+    source: 'system', // formulario público /vender
+    metadata: { canal: 'PRO' },
+  })
 
   // Auto-tasación — resultado usado en página de éxito y email
   const valuation = await runAndSaveAutoValuation(vehicleId, {
