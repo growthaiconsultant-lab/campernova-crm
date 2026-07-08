@@ -35,6 +35,7 @@ CRM interno para gestionar la compraventa de autocaravanas y campers semi-nuevas
 - `docs/Setup.md` — referencias de stack, MCPs y servicios
 - `docs/Quickstart.md` — receta paso a paso de arranque
 - `docs/Vision-CRM-360.md` — spec de referencia del CRM operativo end-to-end para los sprints post-launch (6-10). Modelo de negocio real, 8 fases, objetos, roles, reglas de bloqueo, KPIs.
+- `docs/Roadmap-Infraestructura-Estado.md` — **vista única** del estado de las 10 capas de "CampersNova OS", pendiente técnico por capa, y **decisiones que dependen del dueño**. Consolidado tras B20; consultar antes de proponer el siguiente bloque. (La visión estratégica completa con cifras es privada — solo en memoria.)
 
 ## Convenciones
 
