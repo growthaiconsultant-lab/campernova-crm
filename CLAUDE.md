@@ -92,7 +92,22 @@ claude mcp add-json linear '{\"command\":\"npx\",\"args\":[\"-y\",\"mcp-linear@l
 
 `.claude/settings.json` y `.claude/settings.local.json` se mantienen como referencia de la estructura, pero la fuente de verdad funcional es el registro de la CLI.
 
-## Estado actual (Block 18 — Ofertas y Reservas — MERGED A MAIN ✅)
+## Estado actual (Block 19 — Scoring + alertas de demanda activa — MERGED A MAIN ✅)
+
+Fase 2 del roadmap infraestructura: convierte los datos estructurados del **B17** (financiación, condiciones de operación) y del **B18** (ofertas) en **señales accionables**. **Sin migración** — todo se calcula en lectura. Plan en `docs/Scoring-Demanda-Plan.md`. PR #65 (`0dc6dbd`).
+
+- **`lib/scoring/`** (puro + tests): `buyerScore` (0-100 + desglose: contacto, necesidad, presupuesto, **financiación B17**, plazo, temperatura, mejor match, **oferta activa B18**) — sustituye el `calcBuyerScore` inline de la ficha de comprador; `sellerAcquisitionScore` (realismo de precio pide-vs-tasación, **urgencia + riesgo B17**, **demanda activa**); `scoreLabel`, `priceRealismPoints`, `ACTIVE_DEMAND_MATCH_THRESHOLD = 60`.
+- **`components/score-info.tsx`**: icono (i) con el desglose del score (eje · pts/máx) en tooltip.
+- **Ficha comprador**: KPI "Calidad lead" ahora usa `buyerScore` + desglose.
+- **Ficha vendedor**: KPI **"Score captación"** (con desglose) + card en el rail **"N compradores esperando"** (verde, enlaza a Compradores) cuando hay demanda activa compatible.
+- **Dashboard** (ADMIN/AGENTE): sección **"Demanda activa esperando"** — vehículos en stock (PUBLICADO/TASADO) con compradores activos compatibles (match ≥60), ordenados por nº de compradores. Palanca comercial + señal para captar más stock parecido. Respeta el filtro de agente.
+- Suite: **495 tests verdes**.
+
+### Pendiente (siguientes fases del scoring)
+
+Persistir scores si hace falta ordenar/filtrar listados por score (hoy en lectura). Alertas push/email cuando entra un vehículo que satisface una demanda activa concreta (hoy es pull desde dashboard/ficha). Vehicle completeness score ya cubierto por el expediente legal (Block 4). Siguiente capa mayor del roadmap: **B20 Trust Passport unificado** (fusionar expediente legal + checklist técnico del taller en una vista de verificación con estados + sello "Verificado por CampersNova").
+
+## Estado previo (Block 18 — Ofertas y Reservas — MERGED A MAIN ✅)
 
 Primera pieza de la **capa transaccional** (Transaction & Financing Layer) del roadmap infraestructura. Captura estructurada de ofertas y reservas comprador→vehículo — registra **importes negociados + señales** = "precios reales de cierre", el dato que el documento marca como el más difícil de replicar. Plan en `docs/Ofertas-Reservas-Plan.md`. PR #64 (`53776f9`).
 
