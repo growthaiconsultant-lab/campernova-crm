@@ -33,6 +33,8 @@ export const createBuyerLeadSchema = z.object({
     .optional()
     .nullable(),
   maxBudget: z.number().positive('Debe ser mayor que 0').optional().nullable(),
+  financingNeeded: z.boolean().optional().nullable(),
+  maxMonthlyPayment: z.number().positive('Debe ser mayor que 0').optional().nullable(),
   criticalEquipment: criticalEquipmentSchema.default({
     solar: false,
     kitchen: false,
@@ -62,6 +64,8 @@ export const updateBuyerLeadSchema = z.object({
     .optional()
     .nullable(),
   maxBudget: z.number().positive('Debe ser mayor que 0').optional().nullable(),
+  financingNeeded: z.boolean().optional().nullable(),
+  maxMonthlyPayment: z.number().positive('Debe ser mayor que 0').optional().nullable(),
   criticalEquipment: criticalEquipmentSchema.default({
     solar: false,
     kitchen: false,

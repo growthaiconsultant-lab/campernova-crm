@@ -31,7 +31,8 @@ export async function updateSellerLead(leadId: string, data: unknown) {
     return { error: parsed.error.flatten() }
   }
 
-  const { name, email, phone, status, agentId } = parsed.data
+  const { name, email, phone, status, agentId, minPrice, dealType, urgency, riskLevel, riskNotes } =
+    parsed.data
 
   const currentLead = await db.sellerLead.findUnique({
     where: { id: leadId },
@@ -77,7 +78,18 @@ export async function updateSellerLead(leadId: string, data: unknown) {
   await db.$transaction(async (tx) => {
     await tx.sellerLead.update({
       where: { id: leadId },
-      data: { name, email, phone, status, agentId: agentId ?? null },
+      data: {
+        name,
+        email,
+        phone,
+        status,
+        agentId: agentId ?? null,
+        minPrice: minPrice ?? null,
+        dealType: dealType ?? null,
+        urgency: urgency ?? null,
+        riskLevel: riskLevel ?? null,
+        riskNotes: riskNotes?.trim() || null,
+      },
     })
     if (agentChanging && agentActivityContent) {
       await tx.activity.create({

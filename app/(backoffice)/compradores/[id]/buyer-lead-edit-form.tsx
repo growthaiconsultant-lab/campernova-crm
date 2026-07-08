@@ -353,6 +353,63 @@ export function BuyerLeadEditForm({ leadId, defaultValues, agents, isAdmin }: Pr
                 )}
               />
 
+              {/* ¿Necesita financiación? */}
+              <FormField
+                control={form.control}
+                name="financingNeeded"
+                render={({ field }) => (
+                  <FormItem>
+                    <FieldLabel>¿Necesita financiación?</FieldLabel>
+                    <Select
+                      value={field.value == null ? 'none' : field.value ? 'yes' : 'no'}
+                      onValueChange={(v) => field.onChange(v === 'none' ? null : v === 'yes')}
+                    >
+                      <FormControl>
+                        <SelectTrigger className="h-9 border-[#e2e8f0] bg-[#f8fafc] text-[13.5px]">
+                          <SelectValue placeholder="Sin especificar" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="none">Sin especificar</SelectItem>
+                        <SelectItem value="yes">Sí</SelectItem>
+                        <SelectItem value="no">No</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <FormMessage className="text-[11px]" />
+                  </FormItem>
+                )}
+              />
+
+              {/* Cuota máxima mensual */}
+              <FormField
+                control={form.control}
+                name="maxMonthlyPayment"
+                render={({ field }) => (
+                  <FormItem>
+                    <FieldLabel>Cuota máxima mensual</FieldLabel>
+                    <FormControl>
+                      <div className="relative">
+                        <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[13px] text-[#94a3b8]">
+                          €
+                        </span>
+                        <input
+                          type="number"
+                          min={0}
+                          step="10"
+                          value={field.value ?? ''}
+                          onChange={(e) =>
+                            field.onChange(e.target.value === '' ? null : Number(e.target.value))
+                          }
+                          placeholder="Sin especificar"
+                          className={`${inputCls} pl-7`}
+                        />
+                      </div>
+                    </FormControl>
+                    <FormMessage className="text-[11px]" />
+                  </FormItem>
+                )}
+              />
+
               {/* Zona preferida */}
               <FormField
                 control={form.control}

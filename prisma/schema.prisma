@@ -188,6 +188,28 @@ enum LostReason {
   OTRO
 }
 
+/// Modalidad de acuerdo con el vendedor (Seller Supply Graph, Block 17).
+enum SellerDealType {
+  DEPOSITO_VENTA // consignación: custodia + venta a comisión (modelo core)
+  COMPRA_DIRECTA // CampersNova compra el vehículo
+  PARTE_PAGO // entra como parte de pago de otra compra
+  INDECISO // el vendedor aún no lo ha decidido
+}
+
+/// Urgencia real del vendedor por cerrar (Seller Supply Graph, Block 17).
+enum SellerUrgency {
+  ALTA
+  MEDIA
+  BAJA
+}
+
+/// Nivel de riesgo mecánico/documental del vehículo del vendedor (Block 17).
+enum SellerRisk {
+  BAJO
+  MEDIO
+  ALTO
+}
+
 /// Portal de origen de una captación de vehículo (fase 0 del vendedor).
 enum CapturePortal {
   COCHES_NET
@@ -451,6 +473,12 @@ model SellerLead {
   nextActionDueAt DateTime?        @map("next_action_due_at")
   lostReason      LostReason?      @map("lost_reason")
   lostReasonNotes String?          @map("lost_reason_notes")
+  // ── Condiciones de la operación (Seller Supply Graph, Block 17) — nullable / additivo ──
+  minPrice        Decimal?         @map("min_price") @db.Decimal(10, 2) // precio mínimo aceptado
+  dealType        SellerDealType?  @map("deal_type") // modalidad de acuerdo
+  urgency         SellerUrgency?   @map("urgency") // urgencia real por cerrar
+  riskLevel       SellerRisk?      @map("risk_level") // riesgo mecánico/documental
+  riskNotes       String?          @map("risk_notes") // detalle del riesgo
   gdprConsentAt   DateTime?        @map("gdpr_consent_at")
   gdprConsentIp   String?          @map("gdpr_consent_ip")
   createdAt       DateTime         @default(now()) @map("created_at")
@@ -585,6 +613,9 @@ model BuyerLead {
   vehicleType            VehicleType?     @map("vehicle_type")
   minSeats               Int?             @map("min_seats") // plazas de viaje requeridas (homologadas)
   maxBudget              Decimal?         @map("max_budget") @db.Decimal(10, 2)
+  // ── Financiación (Buyer Demand Graph, Block 17) — nullable / additivo ──
+  financingNeeded        Boolean?         @map("financing_needed") // ¿necesita financiación?
+  maxMonthlyPayment      Decimal?         @map("max_monthly_payment") @db.Decimal(10, 2) // cuota máx. mensual
   criticalEquipment      Json             @default("{}") @map("critical_equipment")
   useZone                String?          @map("use_zone")
   purchaseTimeline       String?          @map("purchase_timeline")

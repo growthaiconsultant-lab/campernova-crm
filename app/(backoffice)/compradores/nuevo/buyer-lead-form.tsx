@@ -58,6 +58,8 @@ export function BuyerLeadForm() {
       vehicleType: null,
       minSeats: null,
       maxBudget: null,
+      financingNeeded: null,
+      maxMonthlyPayment: null,
       criticalEquipment: {
         solar: false,
         kitchen: false,
@@ -213,6 +215,57 @@ export function BuyerLeadForm() {
                         min={0}
                         step="500"
                         placeholder="Ej: 40000"
+                        value={field.value ?? ''}
+                        onChange={(e) =>
+                          field.onChange(e.target.value === '' ? null : Number(e.target.value))
+                        }
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              {/* ¿Necesita financiación? */}
+              <FormField
+                control={form.control}
+                name="financingNeeded"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>¿Necesita financiación?</FormLabel>
+                    <Select
+                      value={field.value == null ? 'none' : field.value ? 'yes' : 'no'}
+                      onValueChange={(v) => field.onChange(v === 'none' ? null : v === 'yes')}
+                    >
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Sin especificar" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="none">Sin especificar</SelectItem>
+                        <SelectItem value="yes">Sí</SelectItem>
+                        <SelectItem value="no">No</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              {/* Cuota máxima mensual */}
+              <FormField
+                control={form.control}
+                name="maxMonthlyPayment"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Cuota máxima mensual (€)</FormLabel>
+                    <FormControl>
+                      <Input
+                        type="number"
+                        min={0}
+                        step="10"
+                        placeholder="Ej: 350"
                         value={field.value ?? ''}
                         onChange={(e) =>
                           field.onChange(e.target.value === '' ? null : Number(e.target.value))

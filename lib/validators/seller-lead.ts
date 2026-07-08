@@ -66,6 +66,15 @@ export const updateSellerLeadSchema = z.object({
   phone: z.string().min(6, 'Teléfono demasiado corto'),
   status: z.enum(['NUEVO', 'CONTACTADO', 'CUALIFICADO', 'EN_NEGOCIACION', 'CERRADO', 'DESCARTADO']),
   agentId: z.string().nullable(),
+  // ── Condiciones de la operación (Seller Supply Graph, Block 17) ──
+  minPrice: z.number().positive('Debe ser mayor que 0').optional().nullable(),
+  dealType: z
+    .enum(['DEPOSITO_VENTA', 'COMPRA_DIRECTA', 'PARTE_PAGO', 'INDECISO'])
+    .optional()
+    .nullable(),
+  urgency: z.enum(['ALTA', 'MEDIA', 'BAJA']).optional().nullable(),
+  riskLevel: z.enum(['BAJO', 'MEDIO', 'ALTO']).optional().nullable(),
+  riskNotes: z.string().max(500).optional().nullable(),
 })
 
 export type UpdateSellerLeadValues = z.input<typeof updateSellerLeadSchema>
