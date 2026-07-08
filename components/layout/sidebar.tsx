@@ -17,6 +17,7 @@ import {
   HandCoins,
   BarChart3,
   Building2,
+  Boxes,
   LogOut,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
@@ -120,6 +121,12 @@ const NAV_SECTIONS: NavSection[] = [
         label: 'CRM',
         icon: BarChart3,
         roles: ['ADMIN', 'AGENTE', 'MARKETING'],
+      },
+      {
+        href: '/analytics/operaciones',
+        label: 'Operaciones',
+        icon: Boxes,
+        roles: ['ADMIN', 'AGENTE', 'ENTREGAS', 'TALLER', 'MARKETING'],
       },
     ],
   },
