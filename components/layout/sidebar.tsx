@@ -15,6 +15,8 @@ import {
   ShieldCheck,
   Radar,
   HandCoins,
+  BarChart3,
+  Building2,
   LogOut,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
@@ -101,6 +103,23 @@ const NAV_SECTIONS: NavSection[] = [
         label: 'Postventa',
         icon: ShieldCheck,
         roles: ['ADMIN', 'AGENTE', 'ENTREGAS'],
+      },
+    ],
+  },
+  {
+    title: 'Analytics',
+    items: [
+      {
+        href: '/analytics/direccion',
+        label: 'Dirección',
+        icon: Building2,
+        roles: ['ADMIN', 'MARKETING'],
+      },
+      {
+        href: '/analytics/crm',
+        label: 'CRM',
+        icon: BarChart3,
+        roles: ['ADMIN', 'AGENTE', 'MARKETING'],
       },
     ],
   },
