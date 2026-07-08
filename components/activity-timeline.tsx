@@ -58,6 +58,8 @@ const ACTIVITY_LABELS: Record<ActivityType, string> = {
   TEMPERATURA_ACTUALIZADA: 'Temperatura',
   OFERTA_REGISTRADA: 'Oferta registrada',
   OFERTA_ACTUALIZADA: 'Oferta actualizada',
+  TRUST_SELLO_OTORGADO: 'Sello de confianza',
+  TRUST_SELLO_REVOCADO: 'Sello revocado',
 }
 
 const ICON_CLASSES: Record<ActivityType, string> = {
@@ -101,6 +103,9 @@ const ICON_CLASSES: Record<ActivityType, string> = {
   TEMPERATURA_ACTUALIZADA: 'bg-rose-100 text-rose-700 dark:bg-rose-900/40 dark:text-rose-300',
   OFERTA_REGISTRADA: 'bg-cyan-100 text-cyan-700 dark:bg-cyan-900/40 dark:text-cyan-300',
   OFERTA_ACTUALIZADA: 'bg-cyan-100 text-cyan-700 dark:bg-cyan-900/40 dark:text-cyan-300',
+  TRUST_SELLO_OTORGADO:
+    'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300',
+  TRUST_SELLO_REVOCADO: 'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300',
 }
 
 function ActivityIcon({ type }: { type: ActivityType }) {
@@ -163,6 +168,9 @@ function ActivityIcon({ type }: { type: ActivityType }) {
     case 'OFERTA_REGISTRADA':
     case 'OFERTA_ACTUALIZADA':
       return <HandCoins className={cls} />
+    case 'TRUST_SELLO_OTORGADO':
+    case 'TRUST_SELLO_REVOCADO':
+      return <ShieldCheck className={cls} />
   }
 }
 
