@@ -19,6 +19,7 @@ import {
   Building2,
   Boxes,
   Zap,
+  TrendingUp,
   LogOut,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
@@ -133,6 +134,12 @@ const NAV_SECTIONS: NavSection[] = [
         href: '/analytics/matching',
         label: 'Matching',
         icon: Zap,
+        roles: ['ADMIN', 'AGENTE', 'MARKETING'],
+      },
+      {
+        href: '/analytics/mercado',
+        label: 'Mercado',
+        icon: TrendingUp,
         roles: ['ADMIN', 'AGENTE', 'MARKETING'],
       },
     ],
