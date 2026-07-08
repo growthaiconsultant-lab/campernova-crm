@@ -42,6 +42,9 @@ import type { VehicleDocumentCategory } from '@prisma/client'
 import { calculateLeadScore, calculateClosureProbability, leadScoreColor } from '@/lib/lead-score'
 import { sellerAcquisitionScore, ACTIVE_DEMAND_MATCH_THRESHOLD } from '@/lib/scoring'
 import { ScoreInfo } from '@/components/score-info'
+import { buildTrustPassport } from '@/lib/trust-passport'
+import { getTrustPassportInput } from '@/lib/trust-passport/prisma-deps'
+import { TrustPassportPanel } from '@/components/trust-passport-panel'
 import { generateLeadInsights, getNextAction } from '@/lib/lead-insights'
 import { LeadTabNav } from './lead-tab-nav'
 import type { LeadTab } from './lead-tab-nav'
@@ -124,6 +127,7 @@ export default async function FichaVendedorPage({
               orderBy: { createdAt: 'asc' },
             },
             chargeCheckedBy: { select: { name: true } },
+            trustVerifiedBy: { select: { name: true } },
             workOrders: {
               where: {
                 status: { in: ['PENDIENTE', 'EN_DIAGNOSTICO', 'PRESUPUESTADA', 'EN_CURSO'] },
@@ -266,6 +270,10 @@ export default async function FichaVendedorPage({
     riskLevel: lead.riskLevel,
     activeDemandCount,
   })
+
+  // Block 20 — Trust Passport (agregación legal + taller)
+  const trustInput = v ? await getTrustPassportInput(db, v.id) : null
+  const trustPassport = trustInput ? buildTrustPassport(trustInput) : null
 
   const insightInput = {
     daysSinceLastActivity: daysSinceActivity,
@@ -1062,6 +1070,22 @@ export default async function FichaVendedorPage({
                 </div>
               </CardContent>
             </Card>
+          )}
+
+          {/* ─────────────── TRUST PASSPORT (Block 20) ─────────────── */}
+          {activeTab === 'preparacion' && v && trustPassport && (
+            <div className="mt-6">
+              <TrustPassportPanel
+                vehicleId={v.id}
+                sections={trustPassport.sections}
+                score={trustPassport.score}
+                level={trustPassport.level}
+                eligibleForSeal={trustPassport.eligibleForSeal}
+                blockers={trustPassport.blockers}
+                sealedAt={v.trustVerifiedAt ? v.trustVerifiedAt.toISOString() : null}
+                sealedByName={v.trustVerifiedBy?.name ?? null}
+              />
+            </div>
           )}
 
           {/* ─────────────── PUBLICACIÓN ─────────────── */}

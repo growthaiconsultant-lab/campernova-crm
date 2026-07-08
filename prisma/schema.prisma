@@ -172,6 +172,8 @@ enum ActivityType {
   TEMPERATURA_ACTUALIZADA
   OFERTA_REGISTRADA
   OFERTA_ACTUALIZADA
+  TRUST_SELLO_OTORGADO
+  TRUST_SELLO_REVOCADO
 }
 
 /// Temperatura comercial del lead comprador (CAM-62).
@@ -465,6 +467,7 @@ model User {
   postventaTicketsResp     PostventaTicket[]      @relation("ResponsibleTickets")
   postventaPhotosUploaded  PostventaTicketPhoto[]
   chargeChecksPerformed    Vehicle[]              @relation("ChargeChecks")
+  trustVerifications       Vehicle[]              @relation("TrustVerifications")
   vehicleDocumentsUploaded VehicleDocument[]
   createdCalendarEvents    CalendarEvent[]        @relation("CreatedCalendarEvents")
   assignedCalendarEvents   CalendarEvent[]        @relation("AssignedCalendarEvents")
@@ -556,6 +559,10 @@ model Vehicle {
   titleTransferredAt   DateTime?         @map("title_transferred_at")
   chargeCheckedAt      DateTime?         @map("charge_checked_at")
   chargeCheckedById    String?           @map("charge_checked_by_id")
+  // ── Trust Passport (Block 20) — sello "Verificado por CampersNova" ──
+  trustVerifiedAt      DateTime?         @map("trust_verified_at")
+  trustVerifiedById    String?           @map("trust_verified_by_id")
+  trustNotes           String?           @map("trust_notes")
   status               VehicleStatus     @default(NUEVO)
   publishedAt          DateTime?         @map("published_at")
   soldAt               DateTime?         @map("sold_at")
@@ -564,6 +571,7 @@ model Vehicle {
 
   sellerLead      SellerLead        @relation(fields: [sellerLeadId], references: [id], onDelete: Cascade)
   chargeCheckedBy User?             @relation("ChargeChecks", fields: [chargeCheckedById], references: [id])
+  trustVerifiedBy User?             @relation("TrustVerifications", fields: [trustVerifiedById], references: [id])
   photos          VehiclePhoto[]
   valuations      Valuation[]
   matches         Match[]

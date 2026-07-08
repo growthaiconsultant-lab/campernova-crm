@@ -38,6 +38,8 @@ export type PublicVehicle = {
   description: string | null
   equipment: PublicVehicleEquipment
   photos: PublicVehiclePhoto[]
+  /** Sello "Verificado por CampersNova" (Block 20). Dato público seguro. */
+  verified: boolean
 }
 
 const TYPE_LABELS: Record<VehicleType, string> = {
@@ -112,6 +114,7 @@ export function mapToPublicVehicle(v: VehicleWithPhotos): PublicVehicle {
       .slice()
       .sort((a, b) => a.order - b.order)
       .map((p) => ({ url: p.url, alt: p.altText ?? `${v.brand} ${v.model} ${v.year}` })),
+    verified: v.trustVerifiedAt != null,
   }
 }
 

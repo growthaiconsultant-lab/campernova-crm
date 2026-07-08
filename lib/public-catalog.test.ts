@@ -76,6 +76,7 @@ describe('mapToPublicVehicle — seguridad de datos', () => {
         'typeLabel',
         'year',
         'length',
+        'verified',
       ].sort()
     )
   })

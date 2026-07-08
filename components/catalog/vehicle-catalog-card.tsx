@@ -4,7 +4,7 @@
  */
 import Image from 'next/image'
 import Link from 'next/link'
-import { MapPin } from 'lucide-react'
+import { MapPin, BadgeCheck } from 'lucide-react'
 import type { PublicVehicle } from '@/lib/public-catalog'
 
 function eur(n: number) {
@@ -50,6 +50,15 @@ export function VehicleCatalogCard({ vehicle: v }: { vehicle: PublicVehicle }) {
         >
           {v.typeLabel}
         </span>
+        {v.verified && (
+          <span
+            className="absolute right-3 top-3 inline-flex items-center gap-1 rounded-full px-2 py-1 text-[10px] font-semibold text-white"
+            style={{ background: '#1f8a5b' }}
+          >
+            <BadgeCheck size={12} />
+            Verificado
+          </span>
+        )}
       </div>
 
       <div className="flex flex-1 flex-col p-4">
