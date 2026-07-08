@@ -14,6 +14,7 @@ import {
   CalendarDays,
   ShieldCheck,
   Radar,
+  HandCoins,
   LogOut,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
@@ -64,6 +65,12 @@ const NAV_SECTIONS: NavSection[] = [
         href: '/compradores',
         label: 'Compradores',
         icon: ShoppingCart,
+        roles: ['ADMIN', 'AGENTE'],
+      },
+      {
+        href: '/ofertas',
+        label: 'Ofertas',
+        icon: HandCoins,
         roles: ['ADMIN', 'AGENTE'],
       },
     ],
