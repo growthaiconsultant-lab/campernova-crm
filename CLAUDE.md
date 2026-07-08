@@ -93,7 +93,7 @@ claude mcp add-json linear '{\"command\":\"npx\",\"args\":[\"-y\",\"mcp-linear@l
 
 `.claude/settings.json` y `.claude/settings.local.json` se mantienen como referencia de la estructura, pero la fuente de verdad funcional es el registro de la CLI.
 
-## Estado actual (Block 21 — Sistema de KPIs y Dashboards F0+F1a — MERGED A MAIN ✅)
+## Estado actual (Block 21 — Sistema de KPIs y Dashboards F0+F1 — MERGED A MAIN ✅)
 
 Arranque del sistema de KPIs/dashboards a partir de los specs del dueño (`CampersNova_KPIs_Completos...` + `..._Dashboards_KPIs_UX...` + handoff de Claude Design). **Plan maestro en `docs/Dashboards-KPIs-Plan.md`** (fases F0→F6, hilado con lo ya existente). Umbrales del dueño: 7 ventas/mes, margen mín 4%, 1ª respuesta <24/48h, tiempo de venta <15/30d, aging >30/45d, Trust ≥70%, datos ≥80%.
 
@@ -113,9 +113,16 @@ Migración **additiva** `20260711000000_add_kpi_events` (tabla `kpi_events` + í
 - **Sidebar**: nuevo grupo "Analytics" (Dirección + CRM).
 - Suite: **521 tests verdes**.
 
+### F1b — Dashboard CRM (PR #69, `c1752fd`) — sin migración
+
+- **`lib/kpi/crm.ts`**: leads nuevos 30d (por tipo), leads sin dueño, sin próxima acción, tareas vencidas, motivos de pérdida (comprador/vendedor), filas accionables. El **AGENTE solo ve lo suyo**.
+- **`components/analytics/actionable-table.tsx`** (drill-down + semáforo + empty state).
+- **`/analytics/crm`** (ADMIN/AGENTE/MARKETING): salud CRM + funnels + motivos de pérdida + tablas accionables.
+- **Hooks inbound**: `submitPublicLead` (`/vender`) → SELLER_CREATED, chat comprador → BUYER_CREATED.
+
 ### Pendiente del sistema de KPIs (siguientes fases)
 
-**F1b**: Dashboard CRM (funnels con drill-down, 1ª respuesta, leads sin dueño/acción, tareas vencidas, motivos de pérdida) + hooks de eventos restantes + validaciones de producto (cita sin outcome, venta sin margen). **F2** Operaciones+Trust, **F3** Matching, **F4** Inteligencia de mercado, **F5** Comercial (día a día), **F6** Calidad de datos + export/API. Fase Plataforma bloqueada por decisión del dueño (portal profesional). Detalle en `docs/Dashboards-KPIs-Plan.md`.
+Hooks de eventos restantes (vehículo publicado/vendido/valorado, match, cita, entrega — se enganchan en F2/F3 donde se consumen) + validaciones de producto (cita sin outcome, venta sin margen). **F2** Operaciones+Trust, **F3** Matching, **F4** Inteligencia de mercado, **F5** Comercial (día a día), **F6** Calidad de datos + export/API. Fase Plataforma bloqueada por decisión del dueño (portal profesional). Detalle en `docs/Dashboards-KPIs-Plan.md`.
 
 ## Estado previo (Block 20 — Trust Passport unificado — MERGED A MAIN ✅)
 
