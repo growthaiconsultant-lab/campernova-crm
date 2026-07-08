@@ -120,9 +120,15 @@ Migración **additiva** `20260711000000_add_kpi_events` (tabla `kpi_events` + í
 - **`/analytics/crm`** (ADMIN/AGENTE/MARKETING): salud CRM + funnels + motivos de pérdida + tablas accionables.
 - **Hooks inbound**: `submitPublicLead` (`/vender`) → SELLER_CREATED, chat comprador → BUYER_CREATED.
 
+### F2 — Dashboard Operaciones + Trust (PR #70, `2094aee`) — sin migración
+
+- **`lib/kpi/operaciones.ts`**: stock por estado, **bloqueados por motivo** (evalúa el expediente legal por vehículo con `lib/vehicle-legal`), **aging de stock** (buckets 0-15/16-30/31-45/45+), **Trust Passport pendiente**, entregas próximas. Filas accionables.
+- **`components/analytics/bar-list.tsx`** (barras horizontales reutilizables).
+- **`/analytics/operaciones`** (ADMIN/AGENTE/ENTREGAS/TALLER/MARKETING). Sidebar: "Operaciones" (icono Boxes).
+
 ### Pendiente del sistema de KPIs (siguientes fases)
 
-Hooks de eventos restantes (vehículo publicado/vendido/valorado, match, cita, entrega — se enganchan en F2/F3 donde se consumen) + validaciones de producto (cita sin outcome, venta sin margen). **F2** Operaciones+Trust, **F3** Matching, **F4** Inteligencia de mercado, **F5** Comercial (día a día), **F6** Calidad de datos + export/API. Fase Plataforma bloqueada por decisión del dueño (portal profesional). Detalle en `docs/Dashboards-KPIs-Plan.md`.
+Hooks de eventos restantes (vehículo publicado/vendido/valorado, match, cita, entrega) + validaciones de producto (cita sin outcome, venta sin margen). **F3** Matching, **F4** Inteligencia de mercado, **F5** Comercial (día a día), **F6** Calidad de datos + export/API. Fase Plataforma bloqueada por decisión del dueño (portal profesional). Detalle en `docs/Dashboards-KPIs-Plan.md`.
 
 ## Estado previo (Block 20 — Trust Passport unificado — MERGED A MAIN ✅)
 
