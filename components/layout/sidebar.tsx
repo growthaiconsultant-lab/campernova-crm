@@ -18,6 +18,7 @@ import {
   BarChart3,
   Building2,
   Boxes,
+  Zap,
   LogOut,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
@@ -127,6 +128,12 @@ const NAV_SECTIONS: NavSection[] = [
         label: 'Operaciones',
         icon: Boxes,
         roles: ['ADMIN', 'AGENTE', 'ENTREGAS', 'TALLER', 'MARKETING'],
+      },
+      {
+        href: '/analytics/matching',
+        label: 'Matching',
+        icon: Zap,
+        roles: ['ADMIN', 'AGENTE', 'MARKETING'],
       },
     ],
   },
