@@ -92,7 +92,24 @@ claude mcp add-json linear '{\"command\":\"npx\",\"args\":[\"-y\",\"mcp-linear@l
 
 `.claude/settings.json` y `.claude/settings.local.json` se mantienen como referencia de la estructura, pero la fuente de verdad funcional es el registro de la CLI.
 
-## Estado actual (Block 17 — Modelo de datos estructurado: demanda + oferta — MERGED A MAIN ✅)
+## Estado actual (Block 18 — Ofertas y Reservas — MERGED A MAIN ✅)
+
+Primera pieza de la **capa transaccional** (Transaction & Financing Layer) del roadmap infraestructura. Captura estructurada de ofertas y reservas comprador→vehículo — registra **importes negociados + señales** = "precios reales de cierre", el dato que el documento marca como el más difícil de replicar. Plan en `docs/Ofertas-Reservas-Plan.md`. PR #64 (`53776f9`).
+
+Migración **additiva** `20260709000000_add_offers` (enum `OfferStatus` + `ALTER TYPE ActivityType ADD VALUE` ×2 + tabla `offers` + índices + FKs) aplicada a **staging y prod** antes del merge.
+
+- **Modelado**: una sola entidad `Offer` cubre oferta→reserva→venta. Una oferta **ACEPTADA con señal** (`depositAmount`) **es una reserva** (no se duplica en otra tabla). La **venta final** (`Vehicle → VENDIDO`) sigue en el flujo de `Delivery`; aquí solo se marca `CONVERTIDA`. Una fuente de verdad por concepto.
+- **Schema**: `Offer` (vehicleId, buyerLeadId, matchId?, amount, depositAmount?, reservedUntil?, notes, rejectionReason? `LostReason`, createdById, decidedAt?) + índices `(vehicleId,status)`/`(buyerLeadId,status)`/`status`. Back-relations en Vehicle/BuyerLead/Match/User. `ActivityType += OFERTA_REGISTRADA, OFERTA_ACTUALIZADA`.
+- **`lib/offers.ts`** (puro): máquina de estados `PROPUESTA → CONTRAOFERTA → ACEPTADA → CONVERTIDA` (+ terminales RECHAZADA/EXPIRADA/RETIRADA/CANCELADA); `isReservation` (ACEPTADA+señal>0), `isActiveHold` (ocupa stock), labels/colores/opciones. Tests.
+- **Server actions** (`ofertas/actions.ts`, guard `requireAgente`): `createOffer`/`updateOfferStatus`/`updateOffer`. **Efectos sobre el stock**: ACEPTADA → Vehicle `RESERVADO` (si estaba PUBLICADO); cancelar/retirar/expirar una reserva → libera a `PUBLICADO`. Transiciones de vehículo validadas con `VEHICLE_TRANSITIONS`. Traza en el timeline de **ambos lados** (comprador + vendedor).
+- **UI**: `components/offers-section.tsx` reutilizable (alta inline eligiendo contraparte de los matches + transiciones con diálogos: señal+fecha al aceptar, motivo al rechazar). Pestaña **Ofertas** en ficha comprador (candidatos = vehículos matcheados); bloque bajo los matches en ficha vendedor (candidatos = compradores matcheados). **`/ofertas`**: tablero por estado (4 columnas) + cerradas colapsables + KPIs (ofertas vivas, reservas activas, valor en negociación, señales retenidas). Sidebar "Ofertas" (icono HandCoins) en Pipeline (ADMIN/AGENTE).
+- Suite: **483 tests verdes**.
+
+### Pendiente de la capa transaccional (fases siguientes)
+
+Contratos/pagos, integración con financiera y gestoría, y **reporting de precios reales de cierre** (alimenta valoración v2 + Market Intelligence). "Reserva vence" como recordatorio de calendario (patrón de agregación ya disponible). Sigue pendiente **B19 (scoring + alertas de demanda activa)**.
+
+## Estado previo (Block 17 — Modelo de datos estructurado: demanda + oferta — MERGED A MAIN ✅)
 
 Primer bloque guiado por el documento estratégico fundacional (visión "de concesionario a infraestructura"): estructura la información comercial clave que vivía en notas libres, para habilitar el scoring (B19) y las ofertas/reservas (B18). Plan en `docs/Modelo-Datos-Estructurado-Plan.md`. PR #63 (`e3b268e`).
 
