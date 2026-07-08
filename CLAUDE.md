@@ -93,7 +93,31 @@ claude mcp add-json linear '{\"command\":\"npx\",\"args\":[\"-y\",\"mcp-linear@l
 
 `.claude/settings.json` y `.claude/settings.local.json` se mantienen como referencia de la estructura, pero la fuente de verdad funcional es el registro de la CLI.
 
-## Estado actual (Block 20 — Trust Passport unificado — MERGED A MAIN ✅)
+## Estado actual (Block 21 — Sistema de KPIs y Dashboards F0+F1a — MERGED A MAIN ✅)
+
+Arranque del sistema de KPIs/dashboards a partir de los specs del dueño (`CampersNova_KPIs_Completos...` + `..._Dashboards_KPIs_UX...` + handoff de Claude Design). **Plan maestro en `docs/Dashboards-KPIs-Plan.md`** (fases F0→F6, hilado con lo ya existente). Umbrales del dueño: 7 ventas/mes, margen mín 4%, 1ª respuesta <24/48h, tiempo de venta <15/30d, aging >30/45d, Trust ≥70%, datos ≥80%.
+
+### F0 — Fundaciones (PR #67, `9bfe494`)
+
+Migración **additiva** `20260711000000_add_kpi_events` (tabla `kpi_events` + índices + FK actor) aplicada a **staging y prod**.
+
+- **`lib/kpi/`**: `events.ts` (catálogo de eventos, `eventName` String para no migrar), `emit.ts` (`emitKpiEvent` **no bloqueante**, acepta cliente `tx`), `stage-map.ts` (adaptador estados reales→etapas de funnel, sin migrar enums).
+- **`lib/scoring/completeness.ts`** (puro + tests): `buyerCompleteness`/`sellerCompleteness`/`vehicleCompleteness` (pesos del spec) + `operationStructure` (gates del North Star: comprador+vehículo ≥70, valoración, match, workflow, próxima acción).
+- **Hooks emitidos**: `createBuyerLead`, `createSellerLead`, `createOffer`, `updateOfferStatus` (reserva/venta), `grantTrustSeal`. **Pendientes** (F1b): form público `/vender`, chat, vehículo publicado/vendido/valorado, match, cita, entrega.
+
+### F1a — Analytics + Dashboard Dirección (PR #68, `b148129`) — sin migración
+
+- **`lib/kpi/thresholds.ts`**: objetivos + semáforos (`sem.*`) del dueño + tests.
+- **`components/analytics/`**: `KpiCard` (valor+variación+semáforo+tooltip+drill-down), `FunnelChart` (conversión+caída+drill-down).
+- **`lib/kpi/direccion.ts`** + **`/analytics/direccion`** (ADMIN/MARKETING, filtro de agente): North Star (operaciones estructuradas), ventas/margen (reutiliza `lib/dashboard`), stock, demanda activa, matches útiles, % Trust Passport, funnels comprador/vehículo. Se lee de tablas → funciona desde el día 1.
+- **Sidebar**: nuevo grupo "Analytics" (Dirección + CRM).
+- Suite: **521 tests verdes**.
+
+### Pendiente del sistema de KPIs (siguientes fases)
+
+**F1b**: Dashboard CRM (funnels con drill-down, 1ª respuesta, leads sin dueño/acción, tareas vencidas, motivos de pérdida) + hooks de eventos restantes + validaciones de producto (cita sin outcome, venta sin margen). **F2** Operaciones+Trust, **F3** Matching, **F4** Inteligencia de mercado, **F5** Comercial (día a día), **F6** Calidad de datos + export/API. Fase Plataforma bloqueada por decisión del dueño (portal profesional). Detalle en `docs/Dashboards-KPIs-Plan.md`.
+
+## Estado previo (Block 20 — Trust Passport unificado — MERGED A MAIN ✅)
 
 Capa de **confianza** (Trust Layer) del roadmap infraestructura. Fusiona el **expediente legal** (Block 4) + el **checklist técnico del taller** en una única **vista de verificación con estados**, un score y el sello **"Verificado por CampersNova"** — palanca de demanda pull hacia el comprador. Plan en `docs/Trust-Passport-Plan.md`. PR #66 (`ff98f88`).
 
