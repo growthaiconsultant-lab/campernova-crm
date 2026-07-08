@@ -44,6 +44,13 @@ import { LeadTabNav } from './lead-tab-nav'
 import type { LeadTab } from './lead-tab-nav'
 import { SellerTopbarActions } from './seller-topbar-actions'
 import { ProximaAccionCard } from './proxima-accion-card'
+import {
+  SELLER_DEAL_TYPE_LABELS,
+  SELLER_URGENCY_LABELS,
+  SELLER_URGENCY_COLORS,
+  SELLER_RISK_LABELS,
+  SELLER_RISK_COLORS,
+} from '@/lib/deal-terms'
 import { StatusPill } from '@/components/status-pill'
 import { AlertTriangle, Info, CheckCircle2, Phone, Mail, ChevronLeft } from 'lucide-react'
 import { QuickAdvanceButton } from './quick-advance-button'
@@ -301,6 +308,11 @@ export default async function FichaVendedorPage({
     phone: lead.phone,
     status: lead.status,
     agentId: lead.agentId,
+    minPrice: lead.minPrice ? Number(lead.minPrice) : null,
+    dealType: lead.dealType ?? null,
+    urgency: lead.urgency ?? null,
+    riskLevel: lead.riskLevel ?? null,
+    riskNotes: lead.riskNotes ?? null,
   }
 
   const vehicleDefaultValues = v
@@ -1178,6 +1190,66 @@ export default async function FichaVendedorPage({
                     <p className="text-xs text-muted-foreground">Operación cerrada · ver ficha →</p>
                   </div>
                 </Link>
+              </div>
+            )}
+
+            {/* Condiciones de la operación (Seller Supply Graph, Block 17) */}
+            {(lead.minPrice != null || lead.dealType || lead.urgency || lead.riskLevel) && (
+              <div className="p-5">
+                <p className="mb-3 font-mono text-[10px] uppercase tracking-[0.12em] text-muted-foreground">
+                  Operación
+                </p>
+                <div className="space-y-2">
+                  {lead.minPrice != null && (
+                    <div className="flex items-center justify-between">
+                      <span className="text-[11px] text-muted-foreground">Precio mínimo</span>
+                      <span className="text-[12px] font-medium text-foreground">
+                        {EUR(Number(lead.minPrice))}
+                      </span>
+                    </div>
+                  )}
+                  {lead.dealType && (
+                    <div className="flex items-center justify-between">
+                      <span className="text-[11px] text-muted-foreground">Modalidad</span>
+                      <span className="text-[12px] font-medium text-foreground">
+                        {SELLER_DEAL_TYPE_LABELS[lead.dealType]}
+                      </span>
+                    </div>
+                  )}
+                  {lead.urgency && (
+                    <div className="flex items-center justify-between">
+                      <span className="text-[11px] text-muted-foreground">Urgencia</span>
+                      <span
+                        className="inline-flex items-center gap-1.5 text-[12px] font-medium"
+                        style={{ color: SELLER_URGENCY_COLORS[lead.urgency] }}
+                      >
+                        <span
+                          className="h-1.5 w-1.5 rounded-full"
+                          style={{ background: SELLER_URGENCY_COLORS[lead.urgency] }}
+                        />
+                        {SELLER_URGENCY_LABELS[lead.urgency]}
+                      </span>
+                    </div>
+                  )}
+                  {lead.riskLevel && (
+                    <div className="flex items-center justify-between">
+                      <span className="text-[11px] text-muted-foreground">Riesgo</span>
+                      <span
+                        className="inline-flex items-center gap-1.5 text-[12px] font-medium"
+                        style={{ color: SELLER_RISK_COLORS[lead.riskLevel] }}
+                      >
+                        <span
+                          className="h-1.5 w-1.5 rounded-full"
+                          style={{ background: SELLER_RISK_COLORS[lead.riskLevel] }}
+                        />
+                        {SELLER_RISK_LABELS[lead.riskLevel]}
+                      </span>
+                    </div>
+                  )}
+                  {lead.riskNotes && (
+                    <p className="pt-1 text-[11px] text-muted-foreground">{lead.riskNotes}</p>
+                  )}
+                </div>
               </div>
             )}
 

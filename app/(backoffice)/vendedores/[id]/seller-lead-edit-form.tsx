@@ -21,6 +21,11 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { updateSellerLeadSchema, type UpdateSellerLeadValues } from '@/lib/validators/seller-lead'
+import {
+  SELLER_DEAL_TYPE_OPTIONS,
+  SELLER_URGENCY_OPTIONS,
+  SELLER_RISK_OPTIONS,
+} from '@/lib/deal-terms'
 import { updateSellerLead } from './actions'
 import {
   SELLER_LEAD_TRANSITIONS,
@@ -181,6 +186,141 @@ export function SellerLeadEditForm({ leadId, defaultValues, agents, isAdmin }: P
               </FormItem>
             )}
           />
+        </div>
+
+        {/* ── Condiciones de la operación (Seller Supply Graph, Block 17) ── */}
+        <div className="rounded-lg border border-border bg-muted/30 p-4">
+          <p className="mb-3 font-mono text-[10px] uppercase tracking-[0.12em] text-muted-foreground">
+            Condiciones de la operación
+          </p>
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <FormField
+              control={form.control}
+              name="minPrice"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Precio mínimo aceptado (€)</FormLabel>
+                  <FormControl>
+                    <Input
+                      type="number"
+                      min={0}
+                      step="500"
+                      placeholder="Sin definir"
+                      value={field.value ?? ''}
+                      onChange={(e) =>
+                        field.onChange(e.target.value === '' ? null : Number(e.target.value))
+                      }
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="dealType"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Modalidad de acuerdo</FormLabel>
+                  <Select
+                    value={field.value ?? '__none__'}
+                    onValueChange={(v) => field.onChange(v === '__none__' ? null : v)}
+                  >
+                    <FormControl>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Sin definir" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      <SelectItem value="__none__">Sin definir</SelectItem>
+                      {SELLER_DEAL_TYPE_OPTIONS.map((o) => (
+                        <SelectItem key={o.value} value={o.value}>
+                          {o.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="urgency"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Urgencia por cerrar</FormLabel>
+                  <Select
+                    value={field.value ?? '__none__'}
+                    onValueChange={(v) => field.onChange(v === '__none__' ? null : v)}
+                  >
+                    <FormControl>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Sin definir" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      <SelectItem value="__none__">Sin definir</SelectItem>
+                      {SELLER_URGENCY_OPTIONS.map((o) => (
+                        <SelectItem key={o.value} value={o.value}>
+                          {o.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="riskLevel"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Riesgo mecánico/documental</FormLabel>
+                  <Select
+                    value={field.value ?? '__none__'}
+                    onValueChange={(v) => field.onChange(v === '__none__' ? null : v)}
+                  >
+                    <FormControl>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Sin definir" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      <SelectItem value="__none__">Sin definir</SelectItem>
+                      {SELLER_RISK_OPTIONS.map((o) => (
+                        <SelectItem key={o.value} value={o.value}>
+                          {o.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="riskNotes"
+              render={({ field }) => (
+                <FormItem className="sm:col-span-2">
+                  <FormLabel>Detalle del riesgo</FormLabel>
+                  <FormControl>
+                    <Input
+                      placeholder="Humedad en el techo, ITV a punto de caducar…"
+                      maxLength={500}
+                      value={field.value ?? ''}
+                      onChange={(e) =>
+                        field.onChange(e.target.value === '' ? null : e.target.value)
+                      }
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+          </div>
         </div>
 
         {serverError && <p className="text-sm text-destructive">{serverError}</p>}

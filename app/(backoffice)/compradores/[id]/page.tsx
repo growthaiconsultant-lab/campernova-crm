@@ -240,6 +240,8 @@ export default async function FichaCompradorPage({
     vehicleType: lead.vehicleType ?? null,
     minSeats: lead.minSeats ?? null,
     maxBudget: lead.maxBudget ? Number(lead.maxBudget) : null,
+    financingNeeded: lead.financingNeeded ?? null,
+    maxMonthlyPayment: lead.maxMonthlyPayment ? Number(lead.maxMonthlyPayment) : null,
     criticalEquipment: {
       solar: equipment.solar ?? false,
       kitchen: equipment.kitchen ?? false,
@@ -1074,6 +1076,16 @@ export default async function FichaCompradorPage({
                     },
                     { label: 'Estado', value: statusLabel },
                     { label: 'Matches activos', value: String(lead.matches.length) },
+                    lead.financingNeeded != null
+                      ? {
+                          label: 'Financiación',
+                          value: lead.financingNeeded
+                            ? lead.maxMonthlyPayment
+                              ? `Sí · ${EUR(Number(lead.maxMonthlyPayment))}/mes`
+                              : 'Sí'
+                            : 'No',
+                        }
+                      : null,
                     lead.source ? { label: 'Canal origen', value: lead.source } : null,
                     lead.vehicleType
                       ? {

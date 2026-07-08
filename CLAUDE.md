@@ -92,7 +92,22 @@ claude mcp add-json linear '{\"command\":\"npx\",\"args\":[\"-y\",\"mcp-linear@l
 
 `.claude/settings.json` y `.claude/settings.local.json` se mantienen como referencia de la estructura, pero la fuente de verdad funcional es el registro de la CLI.
 
-## Estado actual (Block 16 — Captación de vehículos de portales F1→F3 — MERGED A MAIN ✅)
+## Estado actual (Block 17 — Modelo de datos estructurado: demanda + oferta — PR #63, CI verde, PENDIENTE prod+merge)
+
+Primer bloque guiado por el documento estratégico fundacional (visión "de concesionario a infraestructura"): estructura la información comercial clave que vivía en notas libres, para habilitar el scoring (B19) y las ofertas/reservas (B18). Plan en `docs/Modelo-Datos-Estructurado-Plan.md`.
+
+Migración **additiva** `20260708100000_add_structured_deal_fields` (3 enums + columnas nullable). **Aplicada a staging.** ⚠️ **Pendiente aplicar a prod ANTES del merge** (el auto-classifier bloqueó el deploy a prod y requiere autorización explícita del usuario). Orden seguro: migración prod → merge → deploy.
+
+- **Comprador (`BuyerLead`)** — `financingNeeded` (Boolean?) + `maxMonthlyPayment` (Decimal?). Financiación como dato de cualificación (no filtro de matching): campos en alta + ficha, resumen en el rail.
+- **Vendedor (`SellerLead`)** — `minPrice` (precio mínimo aceptado), `dealType` (`SellerDealType`: DEPOSITO_VENTA/COMPRA_DIRECTA/PARTE_PAGO/INDECISO), `urgency` (`SellerUrgency`: ALTA/MEDIA/BAJA), `riskLevel` (`SellerRisk`: BAJO/MEDIO/ALTO), `riskNotes`. Sección "Condiciones de la operación" en el form + card "Operación" en el rail (urgencia/riesgo coloreados). El **margen NO se duplica** (vive en `Vehicle`).
+- **`lib/deal-terms.ts`** (puro): labels/opciones/colores/validadores de los 3 enums de vendedor + tests. Validadores (buyer/seller) y server actions (`createBuyerLead`/`updateBuyerLead`/`updateSellerLead`) actualizados.
+- Suite: **476 tests verdes**. typecheck + lint OK.
+
+### Contexto estratégico (memoria privada)
+
+El dueño compartió (2026-07-08) el **documento estratégico fundacional** de CampersNova (privado, NO en el repo — guardado solo en memoria local). Tesis: el concesionario/marketplace es el motor; el activo es convertirse en la **infraestructura del caravaning** ("CampersNova OS", 10 capas + flywheel de datos). El roadmap del CRM se ordena ahora por ese marco: **B17 datos estructurados → B18 ofertas/reservas (precios reales de cierre) → B19 scoring + alertas de demanda activa → B20 Trust Passport unificado**. Filtro de priorización: una feature entra si aumenta operaciones, captura mejores datos, reduce riesgo o crea dependencia.
+
+## Estado previo (Block 16 — Captación de vehículos de portales F1→F3 — MERGED A MAIN ✅)
 
 Nuevo módulo pedido por el dueño (nota "GESTIÓN DE VENTA"): cómo los comerciales registran vehículos que encuentran en portales externos (Coches.net, Wallapop, Milanuncios) — **fase 0 del vendedor**, antes de que el vehículo entre en la nave. Plan en `docs/Captacion-Vendedor-Plan.md`. Entidad ligera `VehicleCapture` con tablero tipo pipeline; cuando el vehículo va a entrar, se convierte en `SellerLead` + `Vehicle` (una sola fuente de verdad, no se duplica).
 
