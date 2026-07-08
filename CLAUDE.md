@@ -92,11 +92,11 @@ claude mcp add-json linear '{\"command\":\"npx\",\"args\":[\"-y\",\"mcp-linear@l
 
 `.claude/settings.json` y `.claude/settings.local.json` se mantienen como referencia de la estructura, pero la fuente de verdad funcional es el registro de la CLI.
 
-## Estado actual (Block 17 — Modelo de datos estructurado: demanda + oferta — PR #63, CI verde, PENDIENTE prod+merge)
+## Estado actual (Block 17 — Modelo de datos estructurado: demanda + oferta — MERGED A MAIN ✅)
 
-Primer bloque guiado por el documento estratégico fundacional (visión "de concesionario a infraestructura"): estructura la información comercial clave que vivía en notas libres, para habilitar el scoring (B19) y las ofertas/reservas (B18). Plan en `docs/Modelo-Datos-Estructurado-Plan.md`.
+Primer bloque guiado por el documento estratégico fundacional (visión "de concesionario a infraestructura"): estructura la información comercial clave que vivía en notas libres, para habilitar el scoring (B19) y las ofertas/reservas (B18). Plan en `docs/Modelo-Datos-Estructurado-Plan.md`. PR #63 (`e3b268e`).
 
-Migración **additiva** `20260708100000_add_structured_deal_fields` (3 enums + columnas nullable). **Aplicada a staging.** ⚠️ **Pendiente aplicar a prod ANTES del merge** (el auto-classifier bloqueó el deploy a prod y requiere autorización explícita del usuario). Orden seguro: migración prod → merge → deploy.
+Migración **additiva** `20260708100000_add_structured_deal_fields` (3 enums + columnas nullable) aplicada a **staging y prod** antes del merge (orden seguro: migración → merge → deploy).
 
 - **Comprador (`BuyerLead`)** — `financingNeeded` (Boolean?) + `maxMonthlyPayment` (Decimal?). Financiación como dato de cualificación (no filtro de matching): campos en alta + ficha, resumen en el rail.
 - **Vendedor (`SellerLead`)** — `minPrice` (precio mínimo aceptado), `dealType` (`SellerDealType`: DEPOSITO_VENTA/COMPRA_DIRECTA/PARTE_PAGO/INDECISO), `urgency` (`SellerUrgency`: ALTA/MEDIA/BAJA), `riskLevel` (`SellerRisk`: BAJO/MEDIO/ALTO), `riskNotes`. Sección "Condiciones de la operación" en el form + card "Operación" en el rail (urgencia/riesgo coloreados). El **margen NO se duplica** (vive en `Vehicle`).
