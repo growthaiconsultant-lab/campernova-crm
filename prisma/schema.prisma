@@ -121,6 +121,19 @@ enum MatchStatus {
   RECHAZADO
 }
 
+/// Ciclo de vida de una oferta comprador→vehículo (Transaction Layer, Block 18).
+/// Una oferta ACEPTADA con señal (`depositAmount`) es una reserva.
+enum OfferStatus {
+  PROPUESTA // oferta presentada al vendedor/CampersNova
+  CONTRAOFERTA // en negociación
+  ACEPTADA // aceptada; con señal = reserva activa
+  CONVERTIDA // cerrada como venta (pasa a entrega)
+  RECHAZADA // no aceptada
+  EXPIRADA // caducó sin cerrar
+  RETIRADA // el comprador la retiró
+  CANCELADA // reserva caída tras aceptación
+}
+
 enum ActivityType {
   CAMBIO_ESTADO
   NOTA
@@ -157,6 +170,8 @@ enum ActivityType {
   PUBLICACION_BLOQUEADA
   PROXIMA_ACCION_ACTUALIZADA
   TEMPERATURA_ACTUALIZADA
+  OFERTA_REGISTRADA
+  OFERTA_ACTUALIZADA
 }
 
 /// Temperatura comercial del lead comprador (CAM-62).
@@ -455,6 +470,7 @@ model User {
   assignedCalendarEvents   CalendarEvent[]        @relation("AssignedCalendarEvents")
   createdCaptures          VehicleCapture[]       @relation("CreatedCaptures")
   assignedCaptures         VehicleCapture[]       @relation("AssignedCaptures")
+  createdOffers            Offer[]                @relation("CreatedOffers")
 
   @@map("users")
 }
@@ -558,6 +574,7 @@ model Vehicle {
   warranty        Warranty?
   documents       VehicleDocument[]
   calendarEvents  CalendarEvent[]
+  offers          Offer[]
 
   @@index([brand, model])
   @@index([status])
@@ -659,6 +676,7 @@ model BuyerLead {
   warranty         Warranty?
   tradeInSellerLead SellerLead?      @relation("BuyerTradeIn", fields: [tradeInSellerLeadId], references: [id])
   calendarEvents   CalendarEvent[]
+  offers           Offer[]
 
   @@index([status])
   @@index([agentId])
@@ -721,10 +739,42 @@ model Match {
   vehicle        Vehicle         @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
   buyerLead      BuyerLead       @relation(fields: [buyerLeadId], references: [id], onDelete: Cascade)
   calendarEvents CalendarEvent[]
+  offers         Offer[]
 
   @@unique([vehicleId, buyerLeadId])
   @@index([buyerLeadId])
   @@map("matches")
+}
+
+/// Oferta de un comprador por un vehículo (Transaction & Financing Layer, Block 18).
+/// Captura el importe negociado y la señal — la base de "precios reales de cierre".
+/// Reserva = oferta ACEPTADA con `depositAmount`. La venta final (VENDIDO) sigue
+/// viviendo en el flujo de Vehicle/Delivery; aquí no se duplica.
+model Offer {
+  id              String      @id @default(cuid())
+  vehicleId       String      @map("vehicle_id")
+  buyerLeadId     String      @map("buyer_lead_id")
+  matchId         String?     @map("match_id")
+  amount          Decimal     @map("amount") @db.Decimal(10, 2) // importe ofertado / acordado
+  depositAmount   Decimal?    @map("deposit_amount") @db.Decimal(10, 2) // señal (si reservado)
+  status          OfferStatus @default(PROPUESTA)
+  reservedUntil   DateTime?   @map("reserved_until") // reserva válida hasta
+  notes           String?
+  rejectionReason LostReason? @map("rejection_reason")
+  createdById     String      @map("created_by_id")
+  decidedAt       DateTime?   @map("decided_at") // cuándo se aceptó/rechazó/cerró
+  createdAt       DateTime    @default(now()) @map("created_at")
+  updatedAt       DateTime    @updatedAt @map("updated_at")
+
+  vehicle   Vehicle   @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+  buyerLead BuyerLead @relation(fields: [buyerLeadId], references: [id], onDelete: Cascade)
+  match     Match?    @relation(fields: [matchId], references: [id], onDelete: SetNull)
+  createdBy User      @relation("CreatedOffers", fields: [createdById], references: [id])
+
+  @@index([vehicleId, status])
+  @@index([buyerLeadId, status])
+  @@index([status])
+  @@map("offers")
 }
 
 /// Timeline de actividad polimórfico: cada row pertenece a un SellerLead O a un BuyerLead.

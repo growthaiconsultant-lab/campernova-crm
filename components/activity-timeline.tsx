@@ -15,6 +15,7 @@ import {
   Ticket,
   FileText,
   Ban,
+  HandCoins,
 } from 'lucide-react'
 import type { ActivityType } from '@prisma/client'
 import { DeleteNoteButton } from './delete-note-button'
@@ -55,6 +56,8 @@ const ACTIVITY_LABELS: Record<ActivityType, string> = {
   PUBLICACION_BLOQUEADA: 'Publicación bloqueada',
   PROXIMA_ACCION_ACTUALIZADA: 'Próxima acción',
   TEMPERATURA_ACTUALIZADA: 'Temperatura',
+  OFERTA_REGISTRADA: 'Oferta registrada',
+  OFERTA_ACTUALIZADA: 'Oferta actualizada',
 }
 
 const ICON_CLASSES: Record<ActivityType, string> = {
@@ -96,6 +99,8 @@ const ICON_CLASSES: Record<ActivityType, string> = {
   PROXIMA_ACCION_ACTUALIZADA:
     'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300',
   TEMPERATURA_ACTUALIZADA: 'bg-rose-100 text-rose-700 dark:bg-rose-900/40 dark:text-rose-300',
+  OFERTA_REGISTRADA: 'bg-cyan-100 text-cyan-700 dark:bg-cyan-900/40 dark:text-cyan-300',
+  OFERTA_ACTUALIZADA: 'bg-cyan-100 text-cyan-700 dark:bg-cyan-900/40 dark:text-cyan-300',
 }
 
 function ActivityIcon({ type }: { type: ActivityType }) {
@@ -155,6 +160,9 @@ function ActivityIcon({ type }: { type: ActivityType }) {
       return <CalendarCheck className={cls} />
     case 'TEMPERATURA_ACTUALIZADA':
       return <Zap className={cls} />
+    case 'OFERTA_REGISTRADA':
+    case 'OFERTA_ACTUALIZADA':
+      return <HandCoins className={cls} />
   }
 }
 

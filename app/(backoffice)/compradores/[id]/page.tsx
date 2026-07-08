@@ -8,6 +8,7 @@ import { TradeInCard } from './trade-in-card'
 import { BuyerTopbarActions } from './buyer-topbar-actions'
 import { ProximaAccionCard } from './proxima-accion-card'
 import { MatchesSection } from '@/components/matches-section'
+import { OffersSection } from '@/components/offers-section'
 import { prismaMatchingDeps, buildMatchExplanation } from '@/lib/matching'
 import { classifyBuyerCriteria } from '@/lib/buyer-criteria'
 import type { BuyerMatchData } from '@/components/matches-section'
@@ -172,6 +173,12 @@ export default async function FichaCompradorPage({
           take: 5,
           select: { id: true, type: true, title: true, startAt: true, status: true },
         },
+        offers: {
+          orderBy: { createdAt: 'desc' },
+          include: {
+            vehicle: { select: { brand: true, model: true, year: true, sellerLeadId: true } },
+          },
+        },
       },
     }),
     db.user.findMany({ select: { id: true, name: true }, orderBy: { name: 'asc' } }),
@@ -296,6 +303,22 @@ export default async function FichaCompradorPage({
     }
   })
 
+  // Block 18 — ofertas del comprador + candidatos (vehículos matcheados)
+  const offerCandidates = lead.matches.map((m) => ({
+    id: m.vehicle.id,
+    label: `${m.vehicle.brand} ${m.vehicle.model} (${m.vehicle.year})`,
+  }))
+  const offerRows = lead.offers.map((o) => ({
+    id: o.id,
+    amount: Number(o.amount),
+    depositAmount: o.depositAmount ? Number(o.depositAmount) : null,
+    status: o.status,
+    reservedUntil: o.reservedUntil ? o.reservedUntil.toISOString() : null,
+    notes: o.notes,
+    counterpartLabel: `${o.vehicle.brand} ${o.vehicle.model} (${o.vehicle.year})`,
+    counterpartHref: `/vendedores/${o.vehicle.sellerLeadId}`,
+  }))
+
   // CAM-65: criterios excluyentes vs preferencias
   const buyerCriteria = classifyBuyerCriteria({
     vehicleType: lead.vehicleType,
@@ -349,6 +372,7 @@ export default async function FichaCompradorPage({
     { key: 'ficha', label: 'Ficha' },
     { key: 'actividad', label: 'Actividad', badge: activities.length },
     { key: 'matches', label: 'Vehículos sugeridos', badge: lead.matches.length },
+    { key: 'ofertas', label: 'Ofertas', badge: offerRows.length || undefined },
     ...(hasChat
       ? [{ key: 'conversacion', label: 'Conversación', badge: chatUserMsgCount } as LeadTab]
       : []),
@@ -623,6 +647,16 @@ export default async function FichaCompradorPage({
                 </div>
               )}
             </>
+          )}
+
+          {/* ── TAB: OFERTAS ── */}
+          {activeTab === 'ofertas' && (
+            <OffersSection
+              side="buyer"
+              fixedId={lead.id}
+              candidates={offerCandidates}
+              offers={offerRows}
+            />
           )}
 
           {/* ── TAB: CONVERSACIÓN (CAM-55) ── */}

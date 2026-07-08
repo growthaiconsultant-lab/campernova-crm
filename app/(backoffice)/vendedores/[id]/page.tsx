@@ -12,6 +12,7 @@ import { VehicleEditForm } from './vehicle-edit-form'
 import { ValuationOverrideForm } from './valuation-override-form'
 import { MatchesSection } from '@/components/matches-section'
 import type { VehicleMatchData } from '@/components/matches-section'
+import { OffersSection } from '@/components/offers-section'
 import { prismaMatchingDeps, buildMatchExplanation } from '@/lib/matching'
 import { ActivityTimeline } from '@/components/activity-timeline'
 import type { ActivityItem } from '@/components/activity-timeline'
@@ -103,6 +104,10 @@ export default async function FichaVendedorPage({
               orderBy: { score: 'desc' },
               take: 10,
             },
+            offers: {
+              orderBy: { createdAt: 'desc' },
+              include: { buyerLead: { select: { id: true, name: true } } },
+            },
             ads: {
               include: { createdBy: { select: { name: true } } },
               orderBy: { createdAt: 'desc' },
@@ -175,6 +180,22 @@ export default async function FichaVendedorPage({
       maxBudget: m.buyerLead.maxBudget ? Number(m.buyerLead.maxBudget) : null,
       criticalEquipment: (m.buyerLead.criticalEquipment ?? {}) as Record<string, boolean>,
     },
+  }))
+
+  // Block 18 — ofertas por el vehículo + candidatos (compradores matcheados)
+  const offerCandidates = (v?.matches ?? []).map((m) => ({
+    id: m.buyerLead.id,
+    label: m.buyerLead.name,
+  }))
+  const offerRows = (v?.offers ?? []).map((o) => ({
+    id: o.id,
+    amount: Number(o.amount),
+    depositAmount: o.depositAmount ? Number(o.depositAmount) : null,
+    status: o.status,
+    reservedUntil: o.reservedUntil ? o.reservedUntil.toISOString() : null,
+    notes: o.notes,
+    counterpartLabel: o.buyerLead.name,
+    counterpartHref: `/compradores/${o.buyerLead.id}`,
   }))
 
   // Comprador de la operación (match cerrado) — para el cruce vehículo↔comprador
@@ -920,7 +941,15 @@ export default async function FichaVendedorPage({
 
           {/* ─────────────── COMPRADORES ─────────────── */}
           {activeTab === 'compradores' && v && (
-            <MatchesSection side="vehicle" matches={vehicleMatches} defaultOpen />
+            <div className="space-y-5">
+              <MatchesSection side="vehicle" matches={vehicleMatches} defaultOpen />
+              <OffersSection
+                side="vehicle"
+                fixedId={v.id}
+                candidates={offerCandidates}
+                offers={offerRows}
+              />
+            </div>
           )}
 
           {/* ─────────────── ACTIVIDAD ─────────────── */}
