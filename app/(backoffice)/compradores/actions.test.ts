@@ -6,12 +6,16 @@ vi.mock('@/lib/auth', () => ({ requireAgente: vi.fn() }))
 vi.mock('@/lib/matching', () => ({ recalculateMatchesForBuyer: vi.fn() }))
 
 const { mockDb } = vi.hoisted(() => {
-  const mockDb = { buyerLead: { create: vi.fn(), findMany: vi.fn() } }
+  const mockDb = {
+    buyerLead: { create: vi.fn(), findMany: vi.fn() },
+    kpiEvent: { create: vi.fn() },
+  }
   return { mockDb }
 })
 vi.mock('@/lib/db', () => ({ db: mockDb }))
 
 import { recalculateMatchesForBuyer } from '@/lib/matching'
+import { requireAgente } from '@/lib/auth'
 import { createBuyerLead } from './actions'
 
 const validInput = {
@@ -26,6 +30,7 @@ const validInput = {
 
 beforeEach(() => {
   vi.clearAllMocks()
+  vi.mocked(requireAgente).mockResolvedValue({ id: 'agent-1' } as never)
   mockDb.buyerLead.create.mockResolvedValue({ id: 'buyer-1' })
   mockDb.buyerLead.findMany.mockResolvedValue([]) // sin duplicados por defecto
 })

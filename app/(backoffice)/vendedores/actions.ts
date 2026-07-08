@@ -6,9 +6,11 @@ import { createSellerLeadSchema } from '@/lib/validators/seller-lead'
 import { runAndSaveAutoValuation } from '@/lib/valuation/save'
 import { recalculateMatchesForVehicle } from '@/lib/matching'
 import { defaultNextActionData } from '@/lib/next-action'
+import { emitKpiEvent } from '@/lib/kpi/emit'
+import { KPI_EVENTS } from '@/lib/kpi/events'
 
 export async function createSellerLead(data: unknown) {
-  await requireAgente()
+  const actor = await requireAgente()
 
   const parsed = createSellerLeadSchema.safeParse(data)
   if (!parsed.success) {
@@ -72,6 +74,16 @@ export async function createSellerLead(data: unknown) {
     equipment,
   })
   await recalculateMatchesForVehicle(vehicleId, db)
+
+  await emitKpiEvent({
+    event: KPI_EVENTS.SELLER_CREATED,
+    entityType: 'seller',
+    entityId: lead.id,
+    relatedEntityType: 'vehicle',
+    relatedEntityId: vehicleId,
+    actorUserId: actor.id,
+    source: 'ui',
+  })
 
   return { leadId: lead.id }
 }
