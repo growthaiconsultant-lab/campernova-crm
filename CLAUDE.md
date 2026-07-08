@@ -92,7 +92,24 @@ claude mcp add-json linear '{\"command\":\"npx\",\"args\":[\"-y\",\"mcp-linear@l
 
 `.claude/settings.json` y `.claude/settings.local.json` se mantienen como referencia de la estructura, pero la fuente de verdad funcional es el registro de la CLI.
 
-## Estado actual (Block 19 — Scoring + alertas de demanda activa — MERGED A MAIN ✅)
+## Estado actual (Block 20 — Trust Passport unificado — MERGED A MAIN ✅)
+
+Capa de **confianza** (Trust Layer) del roadmap infraestructura. Fusiona el **expediente legal** (Block 4) + el **checklist técnico del taller** en una única **vista de verificación con estados**, un score y el sello **"Verificado por CampersNova"** — palanca de demanda pull hacia el comprador. Plan en `docs/Trust-Passport-Plan.md`. PR #66 (`ff98f88`).
+
+Migración **additiva** `20260710000000_add_trust_passport` (`Vehicle.trustVerifiedAt`/`trustVerifiedById` FK/`trustNotes` + `ActivityType += TRUST_SELLO_OTORGADO, TRUST_SELLO_REVOCADO`) aplicada a **staging y prod** antes del merge.
+
+- **Modelado**: **agregación en lectura, no tabla de checks** (coherente con el calendario B15). Solo se persiste el **sello**.
+- **`lib/trust-passport/`** (puro + tests): `buildTrustPassport(input, now)` → secciones (Documentación legal + Estado técnico) con estados por check (`ok`/`warn`/`fail`/`pending`), **score 0-100**, **level** (VERIFICADO/PARCIAL/INCOMPLETO), **`eligibleForSeal` + `blockers`**. Legal: ITV vigente (warn <60d, fail caducada), cargas DGT, titularidad, VIN, 7 docs obligatorios. Técnico: agrega el checklist del **último parte de taller** por categoría (Mecánica/Camper/Electricidad) — `NECESITA_REPARACION`→fail, `PENDIENTE`→pending, resto→ok; sin parte→pending. `aggregateTechnicalCategory`, `CHECK_STATE_LABELS/COLORS`. `prisma-deps` → `getTrustPassportInput(db, vehicleId)`.
+- **Server actions** (`vendedores/[id]/trust-actions.ts`, guard `requireAgente`): `grantTrustSeal(vehicleId, notes?)` (solo si `eligibleForSeal`; idempotente) + `revokeTrustSeal`, con traza en el timeline.
+- **UI**: `components/trust-passport-panel.tsx` en la pestaña **Preparación** del vendedor — badge nivel+score, estado del sello (emitir / emitido con fecha+autor / revocar), lista de bloqueos, secciones con checks coloreados.
+- **Público** (dato seguro `PublicVehicle.verified = trustVerifiedAt != null`): badge **"Verificado por CampersNova"** en `/comprar/[id]` y en la card del catálogo (`components/catalog/vehicle-catalog-card.tsx`). Palanca comercial de cara al comprador.
+- Suite: **506 tests verdes**.
+
+### Pendiente (siguientes fases de confianza)
+
+Sello externo/URL verificable (QR), verificación por terceros vía API (capa 9 del roadmap), checks técnicos dedicados de trust (humedades/gas/agua) como ítems propios si se quiere separar del checklist del taller.
+
+## Estado previo (Block 19 — Scoring + alertas de demanda activa — MERGED A MAIN ✅)
 
 Fase 2 del roadmap infraestructura: convierte los datos estructurados del **B17** (financiación, condiciones de operación) y del **B18** (ofertas) en **señales accionables**. **Sin migración** — todo se calcula en lectura. Plan en `docs/Scoring-Demanda-Plan.md`. PR #65 (`0dc6dbd`).
 
