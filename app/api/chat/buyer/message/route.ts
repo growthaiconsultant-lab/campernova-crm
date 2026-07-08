@@ -8,6 +8,8 @@ import { sendBuyerChatLeadNotification } from '@/lib/email/send'
 import { defaultNextActionData } from '@/lib/next-action'
 import { suggestTemperatureFromTimeline } from '@/lib/lead-temperature'
 import { findDuplicateBuyerByPhone, prismaBuyerDedupDeps } from '@/lib/buyer-dedup'
+import { emitKpiEvent } from '@/lib/kpi/emit'
+import { KPI_EVENTS } from '@/lib/kpi/events'
 
 const MAX_TURNS = 10
 
@@ -149,6 +151,15 @@ export async function POST(req: NextRequest) {
 
               return lead
             })
+
+            if (!existing) {
+              await emitKpiEvent({
+                event: KPI_EVENTS.BUYER_CREATED,
+                entityType: 'buyer',
+                entityId: dbResult.id,
+                source: 'chat',
+              })
+            }
 
             // Non-blocking agent notification
             db.user
