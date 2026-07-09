@@ -20,6 +20,7 @@ import {
 import { CAPTURE_STATUS_COLORS, CAPTURE_STATUS_LABELS, PORTAL_LABELS } from '@/lib/captacion'
 import { LOST_REASON_OPTIONS } from '@/lib/lost-reason'
 import { buildWhatsAppUrl } from '@/lib/whatsapp'
+import { cn } from '@/lib/utils'
 import type { CaptureStatus, CapturePortal, LostReason } from '@prisma/client'
 
 export type CaptureCardData = {
@@ -52,6 +53,15 @@ const STATUS_ORDER: CaptureStatus[] = [
 const EUR = (n: number) =>
   n.toLocaleString('es-ES', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 })
 
+function initialsOf(name: string) {
+  return name
+    .split(' ')
+    .slice(0, 2)
+    .map((n) => n[0])
+    .join('')
+    .toUpperCase()
+}
+
 export function CaptureCard({ c, agents }: { c: CaptureCardData; agents: Agent[] }) {
   const router = useRouter()
   const [pending, startTransition] = useTransition()
@@ -66,14 +76,8 @@ export function CaptureCard({ c, agents }: { c: CaptureCardData; agents: Agent[]
   const [error, setError] = useState<string | null>(null)
 
   function changeStatus(next: CaptureStatus) {
-    if (next === 'RECHAZADO') {
-      setRejecting(true)
-      return
-    }
-    if (next === 'ENTRADA_AGENDADA') {
-      setScheduling(true)
-      return
-    }
+    if (next === 'RECHAZADO') return setRejecting(true)
+    if (next === 'ENTRADA_AGENDADA') return setScheduling(true)
     setError(null)
     startTransition(async () => {
       const res = await updateCaptureStatus(c.id, next)
@@ -130,55 +134,70 @@ export function CaptureCard({ c, agents }: { c: CaptureCardData; agents: Agent[]
   }
 
   const dot = CAPTURE_STATUS_COLORS[c.status]
+  const idle = !editing && !rejecting && !scheduling
 
   return (
-    <div className="rounded-lg border border-[#e6e9ee] bg-white p-3 text-[13px]">
+    <div className="rounded-[11px] border border-line bg-card p-[11px] shadow-[0_1px_2px_rgba(20,25,34,0.04)]">
+      {/* Portal + precio */}
       <div className="mb-1.5 flex items-center justify-between gap-2">
-        <span className="rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-slate-600">
+        <span className="rounded-[5px] bg-track px-1.5 py-[3px] font-mono text-[9px] font-semibold tracking-[0.03em] text-ink2">
           {PORTAL_LABELS[c.portal]}
         </span>
         {c.askingPrice != null && (
-          <span className="text-[12px] font-semibold text-[#141922]">{EUR(c.askingPrice)}</span>
+          <span className="font-mono text-[11px] font-semibold text-ink">{EUR(c.askingPrice)}</span>
         )}
       </div>
 
-      <p className="truncate font-medium text-[#141922]">{c.title || 'Vehículo sin título'}</p>
+      {/* Título */}
+      <p className="truncate font-hanken text-[12.5px] font-semibold leading-[1.25] text-ink">
+        {c.title || 'Vehículo sin título'}
+      </p>
 
-      <div className="mt-1.5 flex items-center gap-2">
-        <a
-          href={c.listingUrl}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="inline-flex items-center gap-1 text-[12px] text-blue-600 hover:underline"
-        >
-          <ExternalLink className="h-3 w-3" /> Anuncio
-        </a>
-        <a
-          href={buildWhatsAppUrl(c.phone, 'Hola, te contacto de CampersNova por tu anuncio.')}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="inline-flex items-center gap-1 text-[12px] text-green-600 hover:underline"
-        >
-          <MessageCircle className="h-3 w-3" /> {c.phone}
-        </a>
+      {/* Teléfono (WhatsApp) + responsable */}
+      <div className="mt-2 flex items-center justify-between gap-2">
+        <div className="flex items-center gap-2">
+          <a
+            href={c.listingUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            aria-label="Ver anuncio"
+            className="text-ink3 transition-colors hover:text-ink"
+          >
+            <ExternalLink size={13} strokeWidth={2} />
+          </a>
+          <a
+            href={buildWhatsAppUrl(c.phone, 'Hola, te contacto de CampersNova por tu anuncio.')}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-1 font-mono text-[10.5px] text-ink3 transition-colors hover:text-brand"
+          >
+            <MessageCircle size={12} strokeWidth={2} className="text-[#25D366]" />
+            {c.phone}
+          </a>
+        </div>
+        {c.assignedToName && (
+          <span
+            title={c.assignedToName}
+            className="flex h-[22px] w-[22px] shrink-0 items-center justify-center rounded-full bg-brand-tint font-hanken text-[9px] font-bold text-brand2"
+          >
+            {initialsOf(c.assignedToName)}
+          </span>
+        )}
       </div>
 
-      {c.assignedToName && <p className="mt-1 text-[11px] text-[#586173]">→ {c.assignedToName}</p>}
-
       {!editing && c.notes && (
-        <p className="mt-1.5 whitespace-pre-wrap text-[12px] text-[#475569]">{c.notes}</p>
+        <p className="mt-1.5 whitespace-pre-wrap font-hanken text-[12px] text-ink2">{c.notes}</p>
       )}
 
       {c.status === 'RECHAZADO' && c.rejectionReason && (
-        <p className="mt-1 text-[11px] text-red-600">
+        <p className="mt-1 font-hanken text-[11px] text-bad">
           Motivo: {LOST_REASON_OPTIONS.find((o) => o.value === c.rejectionReason)?.label}
         </p>
       )}
 
       {c.entradaScheduledAt && c.status === 'ENTRADA_AGENDADA' && (
-        <p className="mt-1 flex items-center gap-1 text-[11px] font-medium text-cyan-700">
-          <CalendarClock className="h-3 w-3" />
-          Entrada:{' '}
+        <p className="mt-1.5 inline-flex items-center gap-1 font-mono text-[11px] font-medium text-info">
+          <CalendarClock size={12} strokeWidth={2} />
           {new Date(c.entradaScheduledAt).toLocaleString('es-ES', {
             day: 'numeric',
             month: 'short',
@@ -189,56 +208,50 @@ export function CaptureCard({ c, agents }: { c: CaptureCardData; agents: Agent[]
         </p>
       )}
 
-      {/* Convertida → enlace a la ficha del vendedor */}
       {c.sellerLeadId && (
         <Link
           href={`/vendedores/${c.sellerLeadId}`}
-          className="mt-2 inline-flex items-center gap-1 text-[12px] font-medium text-emerald-700 hover:underline"
+          className="mt-2 inline-flex items-center gap-1 font-hanken text-[12px] font-semibold text-brand hover:underline"
         >
-          <ExternalLink className="h-3 w-3" /> Ver ficha de vendedor
+          <ExternalLink size={12} strokeWidth={2} /> Ver ficha de vendedor
         </Link>
       )}
 
-      {/* Convertir a ficha (cuando el vehículo va a entrar) */}
-      {!c.sellerLeadId &&
-        c.status === 'ENTRADA_AGENDADA' &&
-        !editing &&
-        !rejecting &&
-        !scheduling && (
-          <button
-            type="button"
-            onClick={convert}
-            disabled={converting}
-            className="mt-2 inline-flex w-full items-center justify-center gap-1.5 rounded bg-emerald-600 px-2 py-1.5 text-[11.5px] font-semibold text-white transition-opacity hover:opacity-90 disabled:opacity-50"
-          >
-            <ArrowRightLeft className="h-3.5 w-3.5" />
-            {converting ? 'Convirtiendo…' : 'Convertir a ficha de vendedor'}
-          </button>
-        )}
+      {!c.sellerLeadId && c.status === 'ENTRADA_AGENDADA' && idle && (
+        <button
+          type="button"
+          onClick={convert}
+          disabled={converting}
+          className="mt-2 inline-flex w-full items-center justify-center gap-1.5 rounded-[9px] bg-brand px-2 py-[7px] font-hanken text-[11.5px] font-semibold text-white transition-colors hover:bg-brand2 disabled:opacity-50"
+        >
+          <ArrowRightLeft size={14} strokeWidth={2} />
+          {converting ? 'Convirtiendo…' : 'Convertir a ficha de vendedor'}
+        </button>
+      )}
 
       {/* Agendar entrada inline */}
       {scheduling && (
-        <div className="mt-2 space-y-2 rounded border border-cyan-200 bg-cyan-50 p-2">
-          <p className="text-[11px] font-medium text-cyan-800">¿Cuándo trae el vehículo?</p>
+        <div className="border-info/30 mt-2 space-y-2 rounded-[9px] border bg-info-tint p-2">
+          <p className="font-hanken text-[11px] font-medium text-info">¿Cuándo trae el vehículo?</p>
           <input
             type="datetime-local"
             value={entradaAt}
             onChange={(e) => setEntradaAt(e.target.value)}
-            className="w-full rounded border border-cyan-200 px-2 py-1 text-[12px]"
+            className="w-full rounded-[8px] border border-line px-2 py-1 font-hanken text-[12px] outline-none"
           />
           <div className="flex gap-1.5">
             <button
               type="button"
               onClick={confirmSchedule}
               disabled={pending}
-              className="rounded bg-cyan-700 px-2 py-1 text-[11px] font-semibold text-white disabled:opacity-50"
+              className="rounded-[8px] bg-info px-2 py-1 font-hanken text-[11px] font-semibold text-white disabled:opacity-50"
             >
               Agendar entrada
             </button>
             <button
               type="button"
               onClick={() => setScheduling(false)}
-              className="rounded border border-cyan-200 px-2 py-1 text-[11px] text-cyan-700"
+              className="rounded-[8px] border border-line px-2 py-1 font-hanken text-[11px] text-ink2"
             >
               Cancelar
             </button>
@@ -254,12 +267,12 @@ export function CaptureCard({ c, agents }: { c: CaptureCardData; agents: Agent[]
             onChange={(e) => setNotes(e.target.value)}
             rows={2}
             placeholder="Observaciones…"
-            className="w-full rounded border border-[#e6e9ee] px-2 py-1 text-[12px] outline-none focus:ring-2 focus:ring-ring"
+            className="w-full rounded-[8px] border border-line px-2 py-1 font-hanken text-[12px] outline-none focus:border-brand"
           />
           <select
             value={assignedToId}
             onChange={(e) => setAssignedToId(e.target.value)}
-            className="w-full rounded border border-[#e6e9ee] px-2 py-1 text-[12px]"
+            className="w-full rounded-[8px] border border-line px-2 py-1 font-hanken text-[12px]"
           >
             <option value="">Sin asignar</option>
             {agents.map((a) => (
@@ -273,14 +286,14 @@ export function CaptureCard({ c, agents }: { c: CaptureCardData; agents: Agent[]
               type="button"
               onClick={saveEdit}
               disabled={pending}
-              className="inline-flex items-center gap-1 rounded bg-primary px-2 py-1 text-[11px] font-semibold text-white disabled:opacity-50"
+              className="inline-flex items-center gap-1 rounded-[8px] bg-brand px-2 py-1 font-hanken text-[11px] font-semibold text-white disabled:opacity-50"
             >
-              <Check className="h-3 w-3" /> Guardar
+              <Check size={12} strokeWidth={2.4} /> Guardar
             </button>
             <button
               type="button"
               onClick={() => setEditing(false)}
-              className="rounded border border-[#e6e9ee] px-2 py-1 text-[11px] text-[#586173]"
+              className="rounded-[8px] border border-line px-2 py-1 font-hanken text-[11px] text-ink2"
             >
               Cancelar
             </button>
@@ -290,11 +303,11 @@ export function CaptureCard({ c, agents }: { c: CaptureCardData; agents: Agent[]
 
       {/* Rechazo inline */}
       {rejecting && (
-        <div className="mt-2 space-y-2 rounded border border-red-200 bg-red-50 p-2">
+        <div className="border-bad/30 mt-2 space-y-2 rounded-[9px] border bg-bad-tint p-2">
           <select
             value={reason}
             onChange={(e) => setReason(e.target.value)}
-            className="w-full rounded border border-red-200 px-2 py-1 text-[12px]"
+            className="w-full rounded-[8px] border border-line px-2 py-1 font-hanken text-[12px]"
           >
             <option value="">Motivo del rechazo…</option>
             {LOST_REASON_OPTIONS.map((o) => (
@@ -308,14 +321,14 @@ export function CaptureCard({ c, agents }: { c: CaptureCardData; agents: Agent[]
               type="button"
               onClick={confirmReject}
               disabled={pending}
-              className="rounded bg-red-600 px-2 py-1 text-[11px] font-semibold text-white disabled:opacity-50"
+              className="rounded-[8px] bg-bad px-2 py-1 font-hanken text-[11px] font-semibold text-white disabled:opacity-50"
             >
               Rechazar
             </button>
             <button
               type="button"
               onClick={() => setRejecting(false)}
-              className="rounded border border-red-200 px-2 py-1 text-[11px] text-red-600"
+              className="rounded-[8px] border border-line px-2 py-1 font-hanken text-[11px] text-bad"
             >
               Cancelar
             </button>
@@ -323,14 +336,16 @@ export function CaptureCard({ c, agents }: { c: CaptureCardData; agents: Agent[]
         </div>
       )}
 
-      {error && <p className="mt-1 text-[11px] text-red-600">{error}</p>}
+      {error && <p className="mt-1 font-hanken text-[11px] text-bad">{error}</p>}
 
-      {/* Acciones */}
-      {!editing && !rejecting && !scheduling && (
-        <div className="mt-2 flex items-center gap-1.5">
+      {/* Acciones: selector de estado + editar */}
+      {idle && (
+        <div className="mt-2.5 flex items-center gap-1.5">
           <label className="relative flex-1">
             <span
-              className="flex items-center gap-1.5 rounded border border-[#e6e9ee] px-2 py-1 text-[11.5px] font-medium"
+              className={cn(
+                'flex items-center gap-1.5 rounded-[8px] border border-line px-2 py-1 font-hanken text-[11.5px] font-semibold'
+              )}
               style={{ color: dot }}
             >
               <span className="h-1.5 w-1.5 rounded-full" style={{ background: dot }} />
@@ -353,9 +368,9 @@ export function CaptureCard({ c, agents }: { c: CaptureCardData; agents: Agent[]
             type="button"
             onClick={() => setEditing(true)}
             aria-label="Editar"
-            className="flex h-7 w-7 items-center justify-center rounded border border-[#e6e9ee] text-[#586173] hover:bg-[#f8fafc]"
+            className="flex h-7 w-7 items-center justify-center rounded-[8px] border border-line text-ink2 transition-colors hover:bg-canvas"
           >
-            <Pencil className="h-3.5 w-3.5" />
+            <Pencil size={13} strokeWidth={2} />
           </button>
         </div>
       )}
