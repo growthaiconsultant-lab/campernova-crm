@@ -60,10 +60,10 @@ export const SEMAPHORE_TEXT: Record<Semaphore, string> = {
   gray: 'text-muted-foreground',
 }
 
-/** Color hex por semáforo (dots/badges). */
+/** Color hex por semáforo (dots/badges). Alineado al semáforo del rebrand. */
 export const SEMAPHORE_HEX: Record<Semaphore, string> = {
-  green: '#1f8a5b',
-  amber: '#d97706',
-  red: '#dc2626',
-  gray: '#94a3b8',
+  green: '#1a9d5f',
+  amber: '#c9820a',
+  red: '#d64545',
+  gray: '#8b94a3',
 }

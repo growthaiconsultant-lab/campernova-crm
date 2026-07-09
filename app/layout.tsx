@@ -1,5 +1,11 @@
 import type { Metadata } from 'next'
-import { Inter, Fraunces, JetBrains_Mono, Cormorant_Garamond } from 'next/font/google'
+import {
+  Inter,
+  Fraunces,
+  JetBrains_Mono,
+  Cormorant_Garamond,
+  Hanken_Grotesk,
+} from 'next/font/google'
 import './globals.css'
 import { CookieBanner } from '@/components/cookie-banner'
 import { PostHogProvider } from '@/components/posthog-provider'
@@ -29,6 +35,15 @@ const cormorant = Cormorant_Garamond({
   subsets: ['latin'],
   weight: ['400', '600', '700'],
   variable: '--font-cormorant',
+  display: 'swap',
+})
+
+// Rebrand del CRM (Block 22): Hanken Grotesk para toda la UI del backoffice.
+// Solo se aplica dentro de `.crm-theme` (globals.css) — la web pública sigue con Inter.
+const hanken = Hanken_Grotesk({
+  subsets: ['latin'],
+  weight: ['400', '500', '600', '700', '800'],
+  variable: '--font-hanken',
   display: 'swap',
 })
 
@@ -71,7 +86,7 @@ export default function RootLayout({
   return (
     <html lang="es">
       <body
-        className={`${inter.variable} ${fraunces.variable} ${jetbrainsMono.variable} ${cormorant.variable} min-h-screen font-sans antialiased`}
+        className={`${inter.variable} ${fraunces.variable} ${jetbrainsMono.variable} ${cormorant.variable} ${hanken.variable} min-h-screen font-sans antialiased`}
       >
         <PostHogProvider>{children}</PostHogProvider>
         <GoogleTagManager />
