@@ -188,10 +188,11 @@
     --cn-cream-50: #ffffff;
     --cn-cream-100: #f4f6f8;
     --cn-cream-200: #eef1f5;
-    /* Fuente base de la UI del CRM. Remapear --font-inter → Hanken para que
-       las utilidades `font-sans` (que apuntan a --font-inter) también cambien. */
-    --font-inter: var(--font-hanken);
-    font-family: var(--font-hanken), system-ui, sans-serif;
+    /* Fuente base de la UI del CRM. Remapear --font-inter → --font-crm para que
+       las utilidades `font-sans` (que apuntan a --font-inter) también cambien.
+       Cambiar de tipografía = cambiar --font-crm en app/layout.tsx (1 línea). */
+    --font-inter: var(--font-crm);
+    font-family: var(--font-crm), system-ui, sans-serif;
   }
 }
 
