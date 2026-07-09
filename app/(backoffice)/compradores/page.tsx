@@ -321,10 +321,24 @@ export default async function CompradoresPage({ searchParams }: { searchParams: 
             <b className="text-ink">{total}</b> comprador{total === 1 ? '' : 'es'}
           </p>
         </div>
-        <ButtonLink href="/compradores/nuevo" variant="primary">
-          <Plus size={15} strokeWidth={2.2} className="mr-1.5" />
-          Nuevo comprador
-        </ButtonLink>
+        <div className="flex items-center gap-2">
+          {/* Toggle Lista | Pipeline (mockup P1) */}
+          <div className="inline-flex overflow-hidden rounded-[9px] border border-line bg-card">
+            <span className="bg-brand-tint px-3 py-[7px] font-hanken text-[12px] font-semibold text-brand">
+              Lista
+            </span>
+            <Link
+              href="/compradores/pipeline"
+              className="border-l border-line px-3 py-[7px] font-hanken text-[12px] font-medium text-ink2 transition-colors hover:bg-canvas"
+            >
+              Pipeline
+            </Link>
+          </div>
+          <ButtonLink href="/compradores/nuevo" variant="primary">
+            <Plus size={15} strokeWidth={2.2} className="mr-1.5" />
+            Nuevo comprador
+          </ButtonLink>
+        </div>
       </div>
 
       {/* Vistas guardadas */}

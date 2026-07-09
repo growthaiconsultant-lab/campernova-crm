@@ -364,7 +364,7 @@ export default async function FichaCompradorPage({
   return (
     <div className="-mx-6 -mt-6 flex min-h-full flex-col">
       {/* ── Topbar ── */}
-      <header className="z-20 flex min-h-[56px] items-center gap-3 border-b border-border bg-card px-4 py-2 md:px-8 lg:sticky lg:top-0 lg:h-[73px] lg:py-0">
+      <header className="z-20 flex min-h-[56px] items-center gap-3 border-b border-border bg-card px-4 py-2 md:px-8 lg:sticky lg:top-0 lg:h-[60px] lg:py-0">
         <Link
           href="/compradores"
           className="flex items-center gap-1 font-mono text-[11px] uppercase tracking-[0.12em] text-muted-foreground transition-colors hover:text-foreground"
@@ -802,7 +802,7 @@ export default async function FichaCompradorPage({
 
         {/* ── Right sidebar ── */}
         <aside className="border-t border-border lg:border-l lg:border-t-0">
-          <div className="space-y-4 p-4 md:p-5 lg:sticky lg:top-[130px]">
+          <div className="space-y-4 p-4 md:p-5 lg:sticky lg:top-[118px]">
             {/* Próxima acción — dark gradient card (client, logs WhatsApp) */}
             <ProximaAccionCard
               phone={lead.phone}

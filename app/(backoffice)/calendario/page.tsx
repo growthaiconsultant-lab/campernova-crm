@@ -17,11 +17,11 @@ const TONE_CLASSES: Record<CalendarTone, string> = {
 }
 
 const SOURCE_DOT: Record<CalendarSource, string> = {
-  delivery: '#16a34a',
+  delivery: '#1a9d5f',
   workorder: '#0891b2',
   followup: '#7c3aed',
-  next_action: '#2563eb',
-  event: '#d97706',
+  next_action: '#3a6fd4',
+  event: '#c9820a',
   captacion: '#0d9488',
 }
 
