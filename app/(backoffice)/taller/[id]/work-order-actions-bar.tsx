@@ -82,7 +82,7 @@ export function WorkOrderActionsBar({ woId, status, approvalLevel, isAdmin }: Pr
           className={`rounded-lg px-3 py-1.5 text-sm font-medium transition hover:opacity-90 disabled:opacity-50 ${
             s === 'RECHAZADA'
               ? 'border border-red-200 text-red-600 hover:bg-red-50'
-              : 'bg-cn-teal-900 text-white'
+              : 'bg-primary text-white'
           }`}
         >
           → {STATUS_LABELS[s]}

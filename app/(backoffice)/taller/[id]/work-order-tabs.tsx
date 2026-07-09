@@ -32,7 +32,7 @@ export function WorkOrderTabs({ defaultTab = 'resumen', children }: TabsProps) {
               onClick={() => setActiveTab(tab.id)}
               className={`px-4 py-2.5 text-sm font-medium transition-colors ${
                 activeTab === tab.id
-                  ? 'border-b-2 border-cn-teal-900 text-cn-teal-900'
+                  ? 'border-b-2 border-primary text-cn-teal-900'
                   : 'text-cn-ink-500 hover:text-cn-ink-700'
               }`}
             >

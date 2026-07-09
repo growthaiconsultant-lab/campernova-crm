@@ -32,7 +32,7 @@ export function UserToggleButton({ userId, field, value }: Props) {
       disabled={isPending}
       aria-label={value ? 'Desactivar' : 'Activar'}
       className="relative inline-flex h-5 w-9 cursor-pointer items-center rounded-full transition-colors disabled:opacity-50"
-      style={{ background: value ? 'var(--cn-teal-900)' : '#e6e9ee' }}
+      style={{ background: value ? 'hsl(var(--primary))' : '#e6e9ee' }}
     >
       <span
         className="inline-block h-3.5 w-3.5 rounded-full bg-white shadow transition-transform"

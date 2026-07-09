@@ -177,6 +177,10 @@
     --sidebar-ring: 170 80% 27%;
     /* Vars --cn-* remapeadas para usos inline `var(--cn-*)` del backoffice */
     --cn-teal-900: #141922;
+    --cn-teal-700: #0e7d6b; /* links → verde de marca */
+    --cn-teal-500: #8b94a3;
+    --cn-teal-300: #b9c0cb;
+    --cn-sand-300: #cbd5e1;
     --cn-ink-900: #141922;
     --cn-ink-700: #586173;
     --cn-ink-500: #8b94a3;

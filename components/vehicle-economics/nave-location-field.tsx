@@ -31,7 +31,7 @@ export function NaveLocationField({ vehicleId, entryDate, naveLocation }: Props)
   }
 
   const inputClass =
-    'h-9 w-full rounded-lg border border-cn-line bg-white px-3 text-sm focus:outline-none focus:ring-2 focus:ring-cn-teal-900/20'
+    'h-9 w-full rounded-lg border border-cn-line bg-white px-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20'
 
   return (
     <form onSubmit={handleSubmit} className="grid grid-cols-1 gap-3 sm:grid-cols-3">
@@ -60,7 +60,7 @@ export function NaveLocationField({ vehicleId, entryDate, naveLocation }: Props)
         <button
           type="submit"
           disabled={isPending}
-          className="h-9 rounded-lg bg-cn-teal-900 px-4 text-sm font-medium text-white hover:opacity-90 disabled:opacity-50"
+          className="h-9 rounded-lg bg-primary px-4 text-sm font-medium text-white hover:opacity-90 disabled:opacity-50"
         >
           Guardar
         </button>

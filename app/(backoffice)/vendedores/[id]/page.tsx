@@ -1063,7 +1063,7 @@ export default async function FichaVendedorPage({
                   </p>
                   <a
                     href={`/taller/nueva?vehicleId=${v.id}`}
-                    className="mt-3 inline-flex h-9 items-center rounded-lg bg-cn-teal-900 px-4 text-sm font-medium text-white hover:opacity-90"
+                    className="mt-3 inline-flex h-9 items-center rounded-lg bg-primary px-4 text-sm font-medium text-white hover:opacity-90"
                   >
                     Crear orden de taller
                   </a>

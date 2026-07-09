@@ -76,7 +76,7 @@ export default async function PostventaPage({
         </select>
         <button
           type="submit"
-          className="h-9 rounded-lg bg-cn-teal-900 px-4 text-sm font-medium text-white hover:opacity-90"
+          className="h-9 rounded-lg bg-primary px-4 text-sm font-medium text-white hover:opacity-90"
         >
           Filtrar
         </button>

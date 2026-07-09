@@ -22,7 +22,7 @@ export default async function UsuariosPage() {
         </div>
         <Link
           href="/usuarios/nuevo"
-          className="inline-flex items-center gap-2 rounded-lg bg-cn-teal-900 px-4 py-2.5 text-sm font-medium text-white transition hover:opacity-90"
+          className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-sm font-medium text-white transition hover:opacity-90"
         >
           <UserPlus className="h-4 w-4" />
           Nuevo usuario
@@ -76,8 +76,8 @@ export default async function UsuariosPage() {
 }
 
 const ROLE_BADGE: Record<string, { label: string; className: string }> = {
-  ADMIN: { label: 'Admin', className: 'bg-blue-950 text-white' },
-  AGENTE: { label: 'Agente', className: 'bg-cn-teal-900/10 text-cn-teal-900' },
+  ADMIN: { label: 'Admin', className: 'bg-primary/10 text-primary' },
+  AGENTE: { label: 'Agente', className: 'bg-secondary text-secondary-foreground' },
   TALLER: { label: 'Taller', className: 'bg-amber-100 text-amber-800' },
   ENTREGAS: { label: 'Entregas', className: 'bg-indigo-100 text-indigo-800' },
   MARKETING: { label: 'Marketing', className: 'bg-pink-100 text-pink-800' },

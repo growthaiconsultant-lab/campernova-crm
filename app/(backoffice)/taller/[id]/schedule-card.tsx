@@ -34,7 +34,7 @@ function fmt(value: string): string {
 }
 
 const inputClass =
-  'h-10 w-full rounded-lg border border-cn-line bg-white px-3 text-sm focus:outline-none focus:ring-2 focus:ring-cn-teal-900/20'
+  'h-10 w-full rounded-lg border border-cn-line bg-white px-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20'
 
 export function ScheduleCard({
   woId,
@@ -170,7 +170,7 @@ export function ScheduleCard({
             <button
               onClick={handleSuggest}
               disabled={isPending}
-              className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-cn-teal-900 px-3 text-sm font-medium text-cn-teal-900 hover:bg-cn-cream-50 disabled:opacity-50"
+              className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-primary px-3 text-sm font-medium text-cn-teal-900 hover:bg-cn-cream-50 disabled:opacity-50"
             >
               <CalendarClock className="h-4 w-4" />
               Sugerir fecha de entrega
@@ -217,7 +217,7 @@ export function ScheduleCard({
             <button
               onClick={handlePlanificar}
               disabled={isPending}
-              className="h-10 rounded-lg bg-cn-teal-900 px-5 text-sm font-medium text-white hover:opacity-90 disabled:opacity-50"
+              className="h-10 rounded-lg bg-primary px-5 text-sm font-medium text-white hover:opacity-90 disabled:opacity-50"
             >
               Planificar y bloquear en agenda
             </button>

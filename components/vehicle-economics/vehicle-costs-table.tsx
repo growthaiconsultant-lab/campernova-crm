@@ -99,7 +99,7 @@ export function VehicleCostsTable({ vehicleId, costs, currentUserId, isAdmin }: 
   }
 
   const inputClass =
-    'h-9 w-full rounded-lg border border-cn-line bg-white px-3 text-sm focus:outline-none focus:ring-2 focus:ring-cn-teal-900/20'
+    'h-9 w-full rounded-lg border border-cn-line bg-white px-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20'
 
   return (
     <div className="space-y-3">
@@ -119,7 +119,7 @@ export function VehicleCostsTable({ vehicleId, costs, currentUserId, isAdmin }: 
         </select>
         <button
           onClick={() => setShowForm((v) => !v)}
-          className="inline-flex items-center gap-1.5 rounded-lg bg-cn-teal-900 px-3 py-2 text-sm font-medium text-white hover:opacity-90"
+          className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-3 py-2 text-sm font-medium text-white hover:opacity-90"
         >
           <Plus className="h-3.5 w-3.5" />
           Añadir coste manual
@@ -196,7 +196,7 @@ export function VehicleCostsTable({ vehicleId, costs, currentUserId, isAdmin }: 
             <button
               type="submit"
               disabled={isPending}
-              className="rounded-lg bg-cn-teal-900 px-3 py-1.5 text-sm font-medium text-white hover:opacity-90 disabled:opacity-50"
+              className="rounded-lg bg-primary px-3 py-1.5 text-sm font-medium text-white hover:opacity-90 disabled:opacity-50"
             >
               Guardar coste
             </button>

@@ -39,7 +39,7 @@ export function CreateTicketForm({ warrantyId, onCreated }: Props) {
     return (
       <button
         onClick={() => setOpen(true)}
-        className="inline-flex h-9 items-center rounded-lg bg-cn-teal-900 px-4 text-sm font-medium text-white hover:opacity-90"
+        className="inline-flex h-9 items-center rounded-lg bg-primary px-4 text-sm font-medium text-white hover:opacity-90"
       >
         + Nuevo ticket
       </button>
@@ -115,7 +115,7 @@ export function CreateTicketForm({ warrantyId, onCreated }: Props) {
         <button
           type="submit"
           disabled={isPending}
-          className="inline-flex h-9 items-center rounded-lg bg-cn-teal-900 px-4 text-sm font-medium text-white hover:opacity-90 disabled:opacity-50"
+          className="inline-flex h-9 items-center rounded-lg bg-primary px-4 text-sm font-medium text-white hover:opacity-90 disabled:opacity-50"
         >
           {isPending ? 'Creando…' : 'Crear ticket'}
         </button>

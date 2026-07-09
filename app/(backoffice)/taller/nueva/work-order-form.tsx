@@ -44,7 +44,7 @@ export function WorkOrderForm({
   const [notes, setNotes] = useState('')
 
   const inputClass =
-    'h-10 w-full rounded-lg border border-cn-line bg-white px-3 text-sm focus:outline-none focus:ring-2 focus:ring-cn-teal-900/20'
+    'h-10 w-full rounded-lg border border-cn-line bg-white px-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20'
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -87,8 +87,8 @@ export function WorkOrderForm({
               title={hint}
               className={`flex-1 rounded-lg border px-3 py-2 text-sm font-medium transition-colors ${
                 kind === value
-                  ? 'border-cn-teal-900 bg-cn-teal-900 text-white'
-                  : 'border-cn-line text-cn-ink-500 hover:border-cn-teal-900/40'
+                  ? 'border-primary bg-primary text-white'
+                  : 'border-cn-line text-cn-ink-500 hover:border-primary/40'
               }`}
             >
               {label}
@@ -129,7 +129,7 @@ export function WorkOrderForm({
           required
           rows={3}
           placeholder="Revisión pre-venta completa: mecánica, agua, gas, electricidad…"
-          className="w-full rounded-lg border border-cn-line bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-cn-teal-900/20"
+          className="w-full rounded-lg border border-cn-line bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20"
         />
       </div>
 
@@ -211,7 +211,7 @@ export function WorkOrderForm({
           onChange={(e) => setNotes(e.target.value)}
           rows={2}
           placeholder="Observaciones adicionales para el mecánico…"
-          className="w-full rounded-lg border border-cn-line bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-cn-teal-900/20"
+          className="w-full rounded-lg border border-cn-line bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20"
         />
       </div>
 
@@ -226,7 +226,7 @@ export function WorkOrderForm({
         <button
           type="submit"
           disabled={isPending}
-          className="h-10 rounded-lg bg-cn-teal-900 px-5 text-sm font-medium text-white hover:opacity-90 disabled:opacity-50"
+          className="h-10 rounded-lg bg-primary px-5 text-sm font-medium text-white hover:opacity-90 disabled:opacity-50"
         >
           Crear orden
         </button>

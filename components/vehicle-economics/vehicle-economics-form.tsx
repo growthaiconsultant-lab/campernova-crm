@@ -41,7 +41,7 @@ export function VehicleEconomicsForm({
   }
 
   const inputClass =
-    'h-10 w-full rounded-lg border border-cn-line bg-white px-3 text-sm focus:outline-none focus:ring-2 focus:ring-cn-teal-900/20'
+    'h-10 w-full rounded-lg border border-cn-line bg-white px-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20'
 
   return (
     <form onSubmit={handleSubmit} className="grid grid-cols-1 gap-4 sm:grid-cols-3">
@@ -106,7 +106,7 @@ export function VehicleEconomicsForm({
         <button
           type="submit"
           disabled={isPending}
-          className="rounded-lg bg-cn-teal-900 px-4 py-2 text-sm font-medium text-white transition hover:opacity-90 disabled:opacity-50"
+          className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white transition hover:opacity-90 disabled:opacity-50"
         >
           Guardar datos económicos
         </button>
