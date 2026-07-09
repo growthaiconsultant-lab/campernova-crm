@@ -132,17 +132,17 @@ export function CaptureCard({ c, agents }: { c: CaptureCardData; agents: Agent[]
   const dot = CAPTURE_STATUS_COLORS[c.status]
 
   return (
-    <div className="rounded-lg border border-[#e2e8f0] bg-white p-3 text-[13px]">
+    <div className="rounded-lg border border-[#e6e9ee] bg-white p-3 text-[13px]">
       <div className="mb-1.5 flex items-center justify-between gap-2">
         <span className="rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-slate-600">
           {PORTAL_LABELS[c.portal]}
         </span>
         {c.askingPrice != null && (
-          <span className="text-[12px] font-semibold text-[#0a0a0a]">{EUR(c.askingPrice)}</span>
+          <span className="text-[12px] font-semibold text-[#141922]">{EUR(c.askingPrice)}</span>
         )}
       </div>
 
-      <p className="truncate font-medium text-[#0a0a0a]">{c.title || 'Vehículo sin título'}</p>
+      <p className="truncate font-medium text-[#141922]">{c.title || 'Vehículo sin título'}</p>
 
       <div className="mt-1.5 flex items-center gap-2">
         <a
@@ -163,7 +163,7 @@ export function CaptureCard({ c, agents }: { c: CaptureCardData; agents: Agent[]
         </a>
       </div>
 
-      {c.assignedToName && <p className="mt-1 text-[11px] text-[#64748b]">→ {c.assignedToName}</p>}
+      {c.assignedToName && <p className="mt-1 text-[11px] text-[#586173]">→ {c.assignedToName}</p>}
 
       {!editing && c.notes && (
         <p className="mt-1.5 whitespace-pre-wrap text-[12px] text-[#475569]">{c.notes}</p>
@@ -254,12 +254,12 @@ export function CaptureCard({ c, agents }: { c: CaptureCardData; agents: Agent[]
             onChange={(e) => setNotes(e.target.value)}
             rows={2}
             placeholder="Observaciones…"
-            className="w-full rounded border border-[#e2e8f0] px-2 py-1 text-[12px] outline-none focus:ring-2 focus:ring-ring"
+            className="w-full rounded border border-[#e6e9ee] px-2 py-1 text-[12px] outline-none focus:ring-2 focus:ring-ring"
           />
           <select
             value={assignedToId}
             onChange={(e) => setAssignedToId(e.target.value)}
-            className="w-full rounded border border-[#e2e8f0] px-2 py-1 text-[12px]"
+            className="w-full rounded border border-[#e6e9ee] px-2 py-1 text-[12px]"
           >
             <option value="">Sin asignar</option>
             {agents.map((a) => (
@@ -273,14 +273,14 @@ export function CaptureCard({ c, agents }: { c: CaptureCardData; agents: Agent[]
               type="button"
               onClick={saveEdit}
               disabled={pending}
-              className="inline-flex items-center gap-1 rounded bg-[#0a0a0a] px-2 py-1 text-[11px] font-semibold text-white disabled:opacity-50"
+              className="inline-flex items-center gap-1 rounded bg-[#141922] px-2 py-1 text-[11px] font-semibold text-white disabled:opacity-50"
             >
               <Check className="h-3 w-3" /> Guardar
             </button>
             <button
               type="button"
               onClick={() => setEditing(false)}
-              className="rounded border border-[#e2e8f0] px-2 py-1 text-[11px] text-[#64748b]"
+              className="rounded border border-[#e6e9ee] px-2 py-1 text-[11px] text-[#586173]"
             >
               Cancelar
             </button>
@@ -330,7 +330,7 @@ export function CaptureCard({ c, agents }: { c: CaptureCardData; agents: Agent[]
         <div className="mt-2 flex items-center gap-1.5">
           <label className="relative flex-1">
             <span
-              className="flex items-center gap-1.5 rounded border border-[#e2e8f0] px-2 py-1 text-[11.5px] font-medium"
+              className="flex items-center gap-1.5 rounded border border-[#e6e9ee] px-2 py-1 text-[11.5px] font-medium"
               style={{ color: dot }}
             >
               <span className="h-1.5 w-1.5 rounded-full" style={{ background: dot }} />
@@ -353,7 +353,7 @@ export function CaptureCard({ c, agents }: { c: CaptureCardData; agents: Agent[]
             type="button"
             onClick={() => setEditing(true)}
             aria-label="Editar"
-            className="flex h-7 w-7 items-center justify-center rounded border border-[#e2e8f0] text-[#64748b] hover:bg-[#f8fafc]"
+            className="flex h-7 w-7 items-center justify-center rounded border border-[#e6e9ee] text-[#586173] hover:bg-[#f8fafc]"
           >
             <Pencil className="h-3.5 w-3.5" />
           </button>

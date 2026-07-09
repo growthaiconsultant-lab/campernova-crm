@@ -107,7 +107,7 @@ export function NextActionEditor({
             onClick={save}
             disabled={pending}
             className="flex flex-1 items-center justify-center gap-1 rounded-lg py-1.5 text-[12px] font-semibold text-black disabled:opacity-50"
-            style={{ background: '#b59e7d' }}
+            style={{ background: '#0e7d6b' }}
           >
             <Check className="h-3.5 w-3.5" />
             Guardar
