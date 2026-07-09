@@ -338,7 +338,7 @@ export default async function FichaCompradorPage({
     PERDIDO: 0,
   }
   const scoreEngagement = statusEngagementMap[lead.status] ?? 15
-  const scoreColor = (s: number) => (s >= 70 ? '#1f8a5b' : s >= 45 ? '#d97706' : '#94a3b8')
+  const scoreColor = (s: number) => (s >= 70 ? '#1a9d5f' : s >= 45 ? '#c9820a' : '#8b94a3')
 
   // Chat session (CAM-55) — leads originados en el chat /comprar
   const chatSession = lead.chatSession
@@ -1016,8 +1016,8 @@ export default async function FichaCompradorPage({
                   className="relative flex h-16 w-16 shrink-0 items-center justify-center rounded-full"
                   style={{
                     background: `conic-gradient(${
-                      leadScore >= 75 ? '#1f8a5b' : leadScore >= 50 ? '#d97706' : '#dc2626'
-                    } ${leadScore * 3.6}deg, #f1f5f9 0)`,
+                      leadScore >= 75 ? '#1a9d5f' : leadScore >= 50 ? '#c9820a' : '#d64545'
+                    } ${leadScore * 3.6}deg, #eef1f5 0)`,
                   }}
                 >
                   <div className="flex h-11 w-11 items-center justify-center rounded-full bg-card">
@@ -1025,7 +1025,7 @@ export default async function FichaCompradorPage({
                       className="text-[14px] font-bold"
                       style={{
                         color:
-                          leadScore >= 75 ? '#1f8a5b' : leadScore >= 50 ? '#d97706' : '#dc2626',
+                          leadScore >= 75 ? '#1a9d5f' : leadScore >= 50 ? '#c9820a' : '#d64545',
                       }}
                     >
                       {leadScore}

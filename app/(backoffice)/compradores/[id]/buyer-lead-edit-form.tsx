@@ -63,14 +63,14 @@ type Props = {
 
 function FieldLabel({ children }: { children: React.ReactNode }) {
   return (
-    <p className="mb-1 font-mono text-[10px] uppercase tracking-[0.12em] text-[#94a3b8]">
+    <p className="mb-1 font-mono text-[10px] uppercase tracking-[0.12em] text-[#8b94a3]">
       {children}
     </p>
   )
 }
 
 const inputCls =
-  'h-9 w-full rounded-lg border border-[#e2e8f0] bg-[#f8fafc] px-3 text-[13.5px] text-[#0a0a0a] placeholder-[#94a3b8] outline-none transition-colors focus:border-[#294e4c] focus:bg-white focus:shadow-[0_0_0_3px_rgba(41,78,76,0.12)]'
+  'h-9 w-full rounded-lg border border-[#e6e9ee] bg-[#f8fafc] px-3 text-[13.5px] text-[#141922] placeholder-[#8b94a3] outline-none transition-colors focus:border-[#0e7d6b] focus:bg-white focus:shadow-[0_0_0_3px_rgba(14,125,107,0.12)]'
 
 // ── Component ─────────────────────────────────────────────────────────────────
 
@@ -110,9 +110,9 @@ export function BuyerLeadEditForm({ leadId, defaultValues, agents, isAdmin }: Pr
     <Form {...form}>
       <form onSubmit={form.handleSubmit(onSubmit)}>
         {/* ── Card 1: Datos del comprador ── */}
-        <div className="overflow-hidden rounded-xl border border-[#e2e8f0] bg-white">
-          <div className="border-b border-[#e2e8f0] px-6 py-4">
-            <h2 className="text-[14px] font-semibold text-[#0a0a0a]">Datos del comprador</h2>
+        <div className="overflow-hidden rounded-xl border border-[#e6e9ee] bg-white">
+          <div className="border-b border-[#e6e9ee] px-6 py-4">
+            <h2 className="text-[14px] font-semibold text-[#141922]">Datos del comprador</h2>
           </div>
           <div className="p-6">
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
@@ -174,14 +174,14 @@ export function BuyerLeadEditForm({ leadId, defaultValues, agents, isAdmin }: Pr
                       disabled={isTerminal}
                     >
                       <FormControl>
-                        <SelectTrigger className="h-9 border-[#e2e8f0] bg-[#f8fafc] text-[13.5px] data-[disabled]:opacity-60">
+                        <SelectTrigger className="h-9 border-[#e6e9ee] bg-[#f8fafc] text-[13.5px] data-[disabled]:opacity-60">
                           <div className="flex items-center gap-2">
                             <span
                               className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-medium ${BUYER_LEAD_STATUS_CLASSES[field.value as BuyerLeadStatus]}`}
                             >
                               {BUYER_LEAD_STATUS_LABELS[field.value as BuyerLeadStatus]}
                             </span>
-                            {isTerminal && <Lock className="h-3 w-3 text-[#94a3b8]" />}
+                            {isTerminal && <Lock className="h-3 w-3 text-[#8b94a3]" />}
                           </div>
                         </SelectTrigger>
                       </FormControl>
@@ -215,11 +215,11 @@ export function BuyerLeadEditForm({ leadId, defaultValues, agents, isAdmin }: Pr
                       disabled={!isAdmin}
                     >
                       <FormControl>
-                        <SelectTrigger className="h-9 border-[#e2e8f0] bg-[#f8fafc] text-[13.5px] data-[disabled]:opacity-60">
+                        <SelectTrigger className="h-9 border-[#e6e9ee] bg-[#f8fafc] text-[13.5px] data-[disabled]:opacity-60">
                           <SelectValue>
                             {field.value ? (
                               <div className="flex items-center gap-2">
-                                <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-[#294e4c] text-[9px] font-bold text-white">
+                                <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-[#0e7d6b] text-[9px] font-bold text-white">
                                   {agents
                                     .find((a) => a.id === field.value)
                                     ?.name.charAt(0)
@@ -230,19 +230,19 @@ export function BuyerLeadEditForm({ leadId, defaultValues, agents, isAdmin }: Pr
                                 </span>
                               </div>
                             ) : (
-                              <span className="text-[#94a3b8]">Sin asignar</span>
+                              <span className="text-[#8b94a3]">Sin asignar</span>
                             )}
                           </SelectValue>
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
                         <SelectItem value="__none__">
-                          <span className="text-[#94a3b8]">Sin asignar</span>
+                          <span className="text-[#8b94a3]">Sin asignar</span>
                         </SelectItem>
                         {agents.map((a) => (
                           <SelectItem key={a.id} value={a.id}>
                             <div className="flex items-center gap-2">
-                              <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-[#294e4c] text-[9px] font-bold text-white">
+                              <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-[#0e7d6b] text-[9px] font-bold text-white">
                                 {a.name.charAt(0).toUpperCase()}
                               </span>
                               {a.name}
@@ -252,7 +252,7 @@ export function BuyerLeadEditForm({ leadId, defaultValues, agents, isAdmin }: Pr
                       </SelectContent>
                     </Select>
                     {!isAdmin && (
-                      <p className="mt-1 text-[10px] text-[#94a3b8]">
+                      <p className="mt-1 text-[10px] text-[#8b94a3]">
                         Solo el admin puede reasignar
                       </p>
                     )}
@@ -265,9 +265,9 @@ export function BuyerLeadEditForm({ leadId, defaultValues, agents, isAdmin }: Pr
         </div>
 
         {/* ── Card 2: Preferencias de búsqueda ── */}
-        <div className="mt-5 overflow-hidden rounded-xl border border-[#e2e8f0] bg-white">
-          <div className="border-b border-[#e2e8f0] px-6 py-4">
-            <h2 className="text-[14px] font-semibold text-[#0a0a0a]">Preferencias de búsqueda</h2>
+        <div className="mt-5 overflow-hidden rounded-xl border border-[#e6e9ee] bg-white">
+          <div className="border-b border-[#e6e9ee] px-6 py-4">
+            <h2 className="text-[14px] font-semibold text-[#141922]">Preferencias de búsqueda</h2>
           </div>
           <div className="p-6">
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
@@ -283,7 +283,7 @@ export function BuyerLeadEditForm({ leadId, defaultValues, agents, isAdmin }: Pr
                       value={field.value ?? 'any'}
                     >
                       <FormControl>
-                        <SelectTrigger className="h-9 border-[#e2e8f0] bg-[#f8fafc] text-[13.5px]">
+                        <SelectTrigger className="h-9 border-[#e6e9ee] bg-[#f8fafc] text-[13.5px]">
                           <SelectValue placeholder="Cualquier tipo" />
                         </SelectTrigger>
                       </FormControl>
@@ -332,7 +332,7 @@ export function BuyerLeadEditForm({ leadId, defaultValues, agents, isAdmin }: Pr
                     <FieldLabel>Presupuesto máximo</FieldLabel>
                     <FormControl>
                       <div className="relative">
-                        <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[13px] text-[#94a3b8]">
+                        <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[13px] text-[#8b94a3]">
                           €
                         </span>
                         <input
@@ -365,7 +365,7 @@ export function BuyerLeadEditForm({ leadId, defaultValues, agents, isAdmin }: Pr
                       onValueChange={(v) => field.onChange(v === 'none' ? null : v === 'yes')}
                     >
                       <FormControl>
-                        <SelectTrigger className="h-9 border-[#e2e8f0] bg-[#f8fafc] text-[13.5px]">
+                        <SelectTrigger className="h-9 border-[#e6e9ee] bg-[#f8fafc] text-[13.5px]">
                           <SelectValue placeholder="Sin especificar" />
                         </SelectTrigger>
                       </FormControl>
@@ -389,7 +389,7 @@ export function BuyerLeadEditForm({ leadId, defaultValues, agents, isAdmin }: Pr
                     <FieldLabel>Cuota máxima mensual</FieldLabel>
                     <FormControl>
                       <div className="relative">
-                        <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[13px] text-[#94a3b8]">
+                        <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[13px] text-[#8b94a3]">
                           €
                         </span>
                         <input
@@ -441,7 +441,7 @@ export function BuyerLeadEditForm({ leadId, defaultValues, agents, isAdmin }: Pr
                       value={field.value ?? 'none'}
                     >
                       <FormControl>
-                        <SelectTrigger className="h-9 border-[#e2e8f0] bg-[#f8fafc] text-[13.5px]">
+                        <SelectTrigger className="h-9 border-[#e6e9ee] bg-[#f8fafc] text-[13.5px]">
                           <SelectValue placeholder="Sin especificar" />
                         </SelectTrigger>
                       </FormControl>
@@ -461,8 +461,8 @@ export function BuyerLeadEditForm({ leadId, defaultValues, agents, isAdmin }: Pr
             </div>
 
             {/* Equipamiento imprescindible */}
-            <div className="mt-5 border-t border-[#f1f5f9] pt-5">
-              <p className="mb-3 font-mono text-[10px] uppercase tracking-[0.12em] text-[#94a3b8]">
+            <div className="mt-5 border-t border-[#eef1f5] pt-5">
+              <p className="mb-3 font-mono text-[10px] uppercase tracking-[0.12em] text-[#8b94a3]">
                 Equipamiento imprescindible
               </p>
               <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
@@ -477,15 +477,15 @@ export function BuyerLeadEditForm({ leadId, defaultValues, agents, isAdmin }: Pr
                           <label
                             className={`flex cursor-pointer select-none items-center gap-2 rounded-lg border px-3 py-2 transition-all ${
                               field.value
-                                ? 'border-[#294e4c] bg-[#f0f7f6] text-[#294e4c]'
-                                : 'border-[#e2e8f0] bg-[#f8fafc] text-[#64748b] hover:bg-white'
+                                ? 'border-[#0e7d6b] bg-[#e6f4f0] text-[#0e7d6b]'
+                                : 'border-[#e6e9ee] bg-[#f8fafc] text-[#586173] hover:bg-white'
                             }`}
                           >
                             {/* Custom checkbox */}
                             <div
                               className={`flex h-4 w-4 shrink-0 items-center justify-center rounded border transition-all ${
                                 field.value
-                                  ? 'border-[#294e4c] bg-[#294e4c]'
+                                  ? 'border-[#0e7d6b] bg-[#0e7d6b]'
                                   : 'border-[#cbd5e1] bg-white'
                               }`}
                             >
@@ -522,8 +522,8 @@ export function BuyerLeadEditForm({ leadId, defaultValues, agents, isAdmin }: Pr
             </div>
 
             {/* Ficha técnica buscada (RV) */}
-            <div className="mt-5 border-t border-[#f1f5f9] pt-5">
-              <p className="mb-3 font-mono text-[10px] uppercase tracking-[0.12em] text-[#94a3b8]">
+            <div className="mt-5 border-t border-[#eef1f5] pt-5">
+              <p className="mb-3 font-mono text-[10px] uppercase tracking-[0.12em] text-[#8b94a3]">
                 Ficha técnica buscada (RV)
               </p>
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
@@ -539,7 +539,7 @@ export function BuyerLeadEditForm({ leadId, defaultValues, agents, isAdmin }: Pr
                         onValueChange={(v) => field.onChange(v === NONE ? null : v)}
                       >
                         <FormControl>
-                          <SelectTrigger className="h-9 border-[#e2e8f0] bg-[#f8fafc] text-[13.5px]">
+                          <SelectTrigger className="h-9 border-[#e6e9ee] bg-[#f8fafc] text-[13.5px]">
                             <SelectValue placeholder="Sin preferencia" />
                           </SelectTrigger>
                         </FormControl>
@@ -569,7 +569,7 @@ export function BuyerLeadEditForm({ leadId, defaultValues, agents, isAdmin }: Pr
                         onValueChange={(v) => field.onChange(v === NONE ? null : v)}
                       >
                         <FormControl>
-                          <SelectTrigger className="h-9 border-[#e2e8f0] bg-[#f8fafc] text-[13.5px]">
+                          <SelectTrigger className="h-9 border-[#e6e9ee] bg-[#f8fafc] text-[13.5px]">
                             <SelectValue placeholder="Sin preferencia" />
                           </SelectTrigger>
                         </FormControl>
@@ -599,7 +599,7 @@ export function BuyerLeadEditForm({ leadId, defaultValues, agents, isAdmin }: Pr
                         onValueChange={(v) => field.onChange(v === NONE ? null : v)}
                       >
                         <FormControl>
-                          <SelectTrigger className="h-9 border-[#e2e8f0] bg-[#f8fafc] text-[13.5px]">
+                          <SelectTrigger className="h-9 border-[#e6e9ee] bg-[#f8fafc] text-[13.5px]">
                             <SelectValue placeholder="Sin especificar" />
                           </SelectTrigger>
                         </FormControl>
@@ -706,14 +706,14 @@ export function BuyerLeadEditForm({ leadId, defaultValues, agents, isAdmin }: Pr
                           <label
                             className={`flex cursor-pointer select-none items-center gap-2 rounded-lg border px-3 py-2 transition-all ${
                               field.value
-                                ? 'border-[#294e4c] bg-[#f0f7f6] text-[#294e4c]'
-                                : 'border-[#e2e8f0] bg-[#f8fafc] text-[#64748b] hover:bg-white'
+                                ? 'border-[#0e7d6b] bg-[#e6f4f0] text-[#0e7d6b]'
+                                : 'border-[#e6e9ee] bg-[#f8fafc] text-[#586173] hover:bg-white'
                             }`}
                           >
                             <div
                               className={`flex h-4 w-4 shrink-0 items-center justify-center rounded border transition-all ${
                                 field.value
-                                  ? 'border-[#294e4c] bg-[#294e4c]'
+                                  ? 'border-[#0e7d6b] bg-[#0e7d6b]'
                                   : 'border-[#cbd5e1] bg-white'
                               }`}
                             >
@@ -753,7 +753,7 @@ export function BuyerLeadEditForm({ leadId, defaultValues, agents, isAdmin }: Pr
           {/* Save bar */}
           <div
             className={`flex items-center gap-3 border-t px-6 py-3 transition-colors ${
-              isDirty ? 'border-amber-200 bg-amber-50' : 'border-[#f1f5f9] bg-[#fafafa]'
+              isDirty ? 'border-amber-200 bg-amber-50' : 'border-[#eef1f5] bg-[#fafafa]'
             }`}
           >
             {isDirty && (
@@ -763,8 +763,8 @@ export function BuyerLeadEditForm({ leadId, defaultValues, agents, isAdmin }: Pr
               </span>
             )}
             {saved && !isDirty && (
-              <span className="flex items-center gap-1.5 text-[12px] text-[#1f8a5b]">
-                <span className="h-1.5 w-1.5 rounded-full bg-[#1f8a5b]" />
+              <span className="flex items-center gap-1.5 text-[12px] text-[#1a9d5f]">
+                <span className="h-1.5 w-1.5 rounded-full bg-[#1a9d5f]" />
                 Guardado
               </span>
             )}
@@ -774,7 +774,7 @@ export function BuyerLeadEditForm({ leadId, defaultValues, agents, isAdmin }: Pr
               <button
                 type="button"
                 onClick={() => form.reset()}
-                className="px-3 py-1.5 text-[12.5px] font-medium text-[#64748b] transition-colors hover:text-[#0a0a0a]"
+                className="px-3 py-1.5 text-[12.5px] font-medium text-[#586173] transition-colors hover:text-[#141922]"
               >
                 Descartar
               </button>
@@ -783,7 +783,7 @@ export function BuyerLeadEditForm({ leadId, defaultValues, agents, isAdmin }: Pr
               type="submit"
               size="sm"
               disabled={form.formState.isSubmitting}
-              className="h-8 bg-[#0a0a0a] px-4 text-[12.5px] text-white hover:bg-[#1a1a1a]"
+              className="h-8 bg-[#141922] px-4 text-[12.5px] text-white hover:bg-[#141922]"
             >
               {form.formState.isSubmitting ? 'Guardando…' : 'Guardar cambios'}
             </Button>

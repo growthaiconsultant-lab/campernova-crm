@@ -61,7 +61,7 @@ export function BuyerTopbarActions({ leadId, isTerminal }: Props) {
       <button
         onClick={() => !isTerminal && setArchiveOpen(true)}
         disabled={isTerminal}
-        className="flex h-8 w-8 items-center justify-center rounded-lg border border-[#e2e8f0] text-[#64748b] transition-colors hover:bg-[#f8fafc] disabled:cursor-not-allowed disabled:opacity-40"
+        className="flex h-8 w-8 items-center justify-center rounded-lg border border-[#e6e9ee] text-[#586173] transition-colors hover:bg-[#f8fafc] disabled:cursor-not-allowed disabled:opacity-40"
         title={isTerminal ? 'Lead en estado final' : 'Marcar como perdido'}
       >
         <Archive className="h-4 w-4" />
@@ -69,7 +69,7 @@ export function BuyerTopbarActions({ leadId, isTerminal }: Props) {
 
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
-          <button className="flex h-8 w-8 items-center justify-center rounded-lg border border-[#e2e8f0] text-[#64748b] transition-colors hover:bg-[#f8fafc]">
+          <button className="flex h-8 w-8 items-center justify-center rounded-lg border border-[#e6e9ee] text-[#586173] transition-colors hover:bg-[#f8fafc]">
             <MoreHorizontal className="h-4 w-4" />
           </button>
         </DropdownMenuTrigger>

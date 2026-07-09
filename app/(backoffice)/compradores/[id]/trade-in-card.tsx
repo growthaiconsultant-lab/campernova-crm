@@ -201,7 +201,7 @@ export function TradeInCard(props: Props) {
                       ? 'Crear un lead de vendedor con este vehículo'
                       : 'Guarda marca, modelo, año y km primero'
                   }
-                  className="inline-flex items-center gap-1.5 rounded-lg border border-[#b59e7d] bg-[#b59e7d]/10 px-4 py-2 text-[13px] font-semibold text-[#8a6f4f] transition-colors hover:bg-[#b59e7d]/20 disabled:cursor-not-allowed disabled:opacity-50"
+                  className="inline-flex items-center gap-1.5 rounded-lg border border-[#0e7d6b] bg-[#0e7d6b]/10 px-4 py-2 text-[13px] font-semibold text-[#0b5f52] transition-colors hover:bg-[#0e7d6b]/20 disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   <ArrowRightLeft className="h-3.5 w-3.5" />
                   {creating ? 'Creando…' : 'Crear lead de vendedor'}
