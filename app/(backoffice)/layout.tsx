@@ -2,6 +2,7 @@ import { requireAuth } from '@/lib/auth'
 import { Sidebar } from '@/components/layout/sidebar'
 import { MobileSidebar } from '@/components/layout/mobile-sidebar'
 import { Topbar } from '@/components/layout/topbar'
+import { CrmMobileTabBar } from '@/components/layout/crm-mobile-tabbar'
 import { Toaster } from 'sonner'
 
 const ROLE_LABELS: Record<string, string> = {
@@ -33,8 +34,11 @@ export default async function BackofficeLayout({ children }: { children: React.R
           }
         />
 
-        <main className="flex-1 overflow-y-auto bg-canvas p-6">{children}</main>
+        {/* En móvil, hueco inferior para la tab bar fija (~84px con safe area) */}
+        <main className="flex-1 overflow-y-auto bg-canvas p-6 pb-[96px] lg:pb-6">{children}</main>
       </div>
+      {/* Tab bar inferior — solo móvil (mockups M*) */}
+      <CrmMobileTabBar userRole={user.role} />
       <Toaster richColors position="top-right" />
     </div>
   )
