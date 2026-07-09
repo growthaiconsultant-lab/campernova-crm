@@ -28,7 +28,7 @@ export function TemperatureChip({ leadId, temperature }: Props) {
 
   return (
     <div
-      className={`inline-flex items-center gap-1 rounded-full border border-[#e2e8f0] bg-white p-0.5 ${pending ? 'opacity-60' : ''}`}
+      className={`inline-flex items-center gap-1 rounded-full border border-[#e6e9ee] bg-white p-0.5 ${pending ? 'opacity-60' : ''}`}
       role="radiogroup"
       aria-label="Temperatura del lead"
     >
@@ -48,7 +48,7 @@ export function TemperatureChip({ leadId, temperature }: Props) {
             style={
               active
                 ? { background: c.bg, color: c.text }
-                : { background: 'transparent', color: '#94a3b8' }
+                : { background: 'transparent', color: '#8b94a3' }
             }
           >
             <span

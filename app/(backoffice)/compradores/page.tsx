@@ -46,22 +46,22 @@ const EQUIP_LABELS: Record<string, string> = {
 
 // Pipeline stages config
 const PIPELINE_STAGES = [
-  { key: 'NUEVO', label: 'Nuevo', color: '#2563eb' },
+  { key: 'NUEVO', label: 'Nuevo', color: '#3a6fd4' },
   { key: 'CONTACTADO', label: 'Contactado', color: '#7c3aed' },
   { key: 'CUALIFICADO', label: 'Cualificado', color: '#0891b2' },
-  { key: 'EN_NEGOCIACION', label: 'Negociación', color: '#d97706' },
-  { key: 'CERRADO', label: 'Cerrado', color: '#1f8a5b' },
-  { key: 'PERDIDO', label: 'Perdido', color: '#94a3b8' },
+  { key: 'EN_NEGOCIACION', label: 'Negociación', color: '#c9820a' },
+  { key: 'CERRADO', label: 'Cerrado', color: '#1a9d5f' },
+  { key: 'PERDIDO', label: 'Perdido', color: '#8b94a3' },
 ]
 
 // Status pill styles (bg, text, dot)
 const STATUS_PILLS: Record<string, { bg: string; text: string; dot: string }> = {
-  NUEVO: { bg: '#eff6ff', text: '#2563eb', dot: '#2563eb' },
+  NUEVO: { bg: '#eff6ff', text: '#3a6fd4', dot: '#3a6fd4' },
   CONTACTADO: { bg: '#f5f3ff', text: '#7c3aed', dot: '#7c3aed' },
   CUALIFICADO: { bg: '#ecfeff', text: '#0891b2', dot: '#0891b2' },
-  EN_NEGOCIACION: { bg: '#fffbeb', text: '#d97706', dot: '#d97706' },
-  CERRADO: { bg: '#f0fdf4', text: '#1f8a5b', dot: '#1f8a5b' },
-  PERDIDO: { bg: '#f1f5f9', text: '#64748b', dot: '#cbd5e1' },
+  EN_NEGOCIACION: { bg: '#fffbeb', text: '#c9820a', dot: '#c9820a' },
+  CERRADO: { bg: '#f0fdf4', text: '#1a9d5f', dot: '#1a9d5f' },
+  PERDIDO: { bg: '#eef1f5', text: '#586173', dot: '#cbd5e1' },
 }
 
 function initials(name: string): string {
@@ -97,11 +97,11 @@ function getEquipmentLabels(equipment: unknown): string[] {
 
 function getAvatarGradient(name: string): string {
   const colors = [
-    ['#2563eb', '#7c3aed'],
+    ['#3a6fd4', '#7c3aed'],
     ['#7c3aed', '#0891b2'],
-    ['#1f8a5b', '#0891b2'],
-    ['#d97706', '#dc2626'],
-    ['#0891b2', '#2563eb'],
+    ['#1a9d5f', '#0891b2'],
+    ['#c9820a', '#d64545'],
+    ['#0891b2', '#3a6fd4'],
   ]
   const idx = name.charCodeAt(0) % colors.length
   const [a, b] = colors[idx]
@@ -109,18 +109,18 @@ function getAvatarGradient(name: string): string {
 }
 
 function getMatchPillStyle(score: number): { bg: string; text: string; border: string } {
-  if (score >= 80) return { bg: '#f0fdf4', text: '#1f8a5b', border: 'rgba(31,138,91,0.2)' }
-  if (score >= 60) return { bg: '#fffbeb', text: '#d97706', border: 'rgba(217,119,6,0.2)' }
-  return { bg: '#eff6ff', text: '#2563eb', border: 'rgba(37,99,235,0.2)' }
+  if (score >= 80) return { bg: '#f0fdf4', text: '#1a9d5f', border: 'rgba(31,138,91,0.2)' }
+  if (score >= 60) return { bg: '#fffbeb', text: '#c9820a', border: 'rgba(217,119,6,0.2)' }
+  return { bg: '#eff6ff', text: '#3a6fd4', border: 'rgba(37,99,235,0.2)' }
 }
 
 function getRowFlag(status: string, updatedAt: Date): { color: string } | null {
   const daysSinceUpdate = Math.floor((Date.now() - updatedAt.getTime()) / 86400000)
-  if (status === 'CERRADO') return { color: '#1f8a5b' }
+  if (status === 'CERRADO') return { color: '#1a9d5f' }
   if ((status === 'NUEVO' || status === 'CONTACTADO') && daysSinceUpdate >= 8)
-    return { color: '#dc2626' }
+    return { color: '#d64545' }
   if ((status === 'CUALIFICADO' || status === 'EN_NEGOCIACION') && daysSinceUpdate >= 5)
-    return { color: '#d97706' }
+    return { color: '#c9820a' }
   return null
 }
 
@@ -309,7 +309,7 @@ export default async function CompradoresPage({ searchParams }: { searchParams: 
   // Needs action count (for footer)
   const needsActionCount = leads.filter((l) => {
     const flag = getRowFlag(l.status, l.updatedAt)
-    return flag !== null && flag.color !== '#1f8a5b'
+    return flag !== null && flag.color !== '#1a9d5f'
   }).length
 
   // Page URL builder
@@ -349,17 +349,17 @@ export default async function CompradoresPage({ searchParams }: { searchParams: 
   return (
     <div className="-mx-6 -mt-6">
       {/* ── Topbar ─────────────────────────────────────────────── */}
-      <header className="z-20 flex min-h-[64px] items-center justify-between border-b border-[#e2e8f0] bg-white px-4 py-2 md:px-10 lg:sticky lg:top-0 lg:h-[73px] lg:py-0">
+      <header className="z-20 flex min-h-[64px] items-center justify-between border-b border-[#e6e9ee] bg-white px-4 py-2 md:px-10 lg:sticky lg:top-0 lg:h-[73px] lg:py-0">
         <div>
-          <div className="font-mono text-[10px] uppercase tracking-[0.14em] text-[#64748b]">
+          <div className="font-mono text-[10px] uppercase tracking-[0.14em] text-[#586173]">
             CRM · Demanda
           </div>
-          <h1 className="mt-1 text-[22px] font-bold tracking-tight text-[#0a0a0a]">Compradores</h1>
+          <h1 className="mt-1 text-[22px] font-bold tracking-tight text-[#141922]">Compradores</h1>
         </div>
         <div className="flex items-center gap-3">
           <Link
             href="/compradores/nuevo"
-            className="inline-flex items-center gap-2 rounded-lg bg-[#0a0a0a] px-4 py-2.5 text-[13px] font-semibold text-white transition-colors hover:bg-[#2563eb]"
+            className="inline-flex items-center gap-2 rounded-lg bg-[#141922] px-4 py-2.5 text-[13px] font-semibold text-white transition-colors hover:bg-[#3a6fd4]"
           >
             <svg
               viewBox="0 0 24 24"
@@ -380,7 +380,7 @@ export default async function CompradoresPage({ searchParams }: { searchParams: 
 
       <div className="px-4 pb-16 pt-6 md:px-10">
         {/* ── Pipeline strip ─────────────────────────────────────── */}
-        <div className="mb-5 overflow-x-auto rounded-xl border border-[#e2e8f0] bg-white">
+        <div className="mb-5 overflow-x-auto rounded-xl border border-[#e6e9ee] bg-white">
           <div
             className="min-w-[820px] items-stretch"
             style={{
@@ -389,11 +389,11 @@ export default async function CompradoresPage({ searchParams }: { searchParams: 
             }}
           >
             {/* Total */}
-            <div className="flex flex-col justify-center border-r border-[#e2e8f0] px-6 py-4">
-              <div className="font-mono text-[10px] uppercase tracking-[0.12em] text-[#64748b]">
+            <div className="flex flex-col justify-center border-r border-[#e6e9ee] px-6 py-4">
+              <div className="font-mono text-[10px] uppercase tracking-[0.12em] text-[#586173]">
                 Total
               </div>
-              <div className="mt-1 font-mono text-[26px] font-bold leading-none tracking-tight text-[#0a0a0a]">
+              <div className="mt-1 font-mono text-[26px] font-bold leading-none tracking-tight text-[#141922]">
                 {pipelineTotal}
               </div>
             </div>
@@ -408,14 +408,14 @@ export default async function CompradoresPage({ searchParams }: { searchParams: 
                   href={`/compradores?status=${stage.key}`}
                   className="group cursor-pointer rounded-lg px-4 py-3 transition-colors hover:bg-[#f8fafc]"
                 >
-                  <div className="text-[11.5px] font-medium text-[#64748b]">{stage.label}</div>
+                  <div className="text-[11.5px] font-medium text-[#586173]">{stage.label}</div>
                   <div
                     className="mt-0.5 text-[22px] font-bold leading-none tracking-tight"
                     style={{ color: count > 0 ? stage.color : '#cbd5e1' }}
                   >
                     {count}
                   </div>
-                  <div className="mt-2 h-[3px] overflow-hidden rounded-full bg-[#f1f5f9]">
+                  <div className="mt-2 h-[3px] overflow-hidden rounded-full bg-[#eef1f5]">
                     <div
                       className="h-full rounded-full"
                       style={{ width: `${pct}%`, background: stage.color }}
@@ -426,13 +426,13 @@ export default async function CompradoresPage({ searchParams }: { searchParams: 
             })}
 
             {/* Conversion */}
-            <div className="flex flex-col justify-center border-l border-[#e2e8f0] px-5 py-4">
-              <div className="font-mono text-[10px] uppercase tracking-[0.12em] text-[#64748b]">
+            <div className="flex flex-col justify-center border-l border-[#e6e9ee] px-5 py-4">
+              <div className="font-mono text-[10px] uppercase tracking-[0.12em] text-[#586173]">
                 Conv. total
               </div>
               <div
                 className="mt-1 font-mono text-[22px] font-bold leading-none tracking-tight"
-                style={{ color: '#1f8a5b' }}
+                style={{ color: '#1a9d5f' }}
               >
                 {convRate}%
               </div>
@@ -441,7 +441,7 @@ export default async function CompradoresPage({ searchParams }: { searchParams: 
         </div>
 
         {/* ── Views tabs ─────────────────────────────────────────── */}
-        <div className="-mx-4 mb-4 flex items-center overflow-x-auto whitespace-nowrap border-b border-[#e2e8f0] px-4 md:-mx-10 md:px-10">
+        <div className="-mx-4 mb-4 flex items-center overflow-x-auto whitespace-nowrap border-b border-[#e6e9ee] px-4 md:-mx-10 md:px-10">
           {[
             { key: 'todos', label: 'Todos', count: pipelineTotal },
             { key: 'sin_asignar', label: 'Sin asignar', count: sinAsignarCount },
@@ -455,8 +455,8 @@ export default async function CompradoresPage({ searchParams }: { searchParams: 
                 href={viewUrl(key)}
                 className={`flex items-center gap-2 border-b-2 px-4 py-3 text-[13px] font-medium transition-colors ${
                   isActive
-                    ? 'border-[#0a0a0a] text-[#0a0a0a]'
-                    : 'border-transparent text-[#64748b] hover:text-[#0a0a0a]'
+                    ? 'border-[#141922] text-[#141922]'
+                    : 'border-transparent text-[#586173] hover:text-[#141922]'
                 }`}
                 style={{ marginBottom: '-1px' }}
               >
@@ -465,8 +465,8 @@ export default async function CompradoresPage({ searchParams }: { searchParams: 
                   className="rounded-full px-1.5 py-0.5 font-mono text-[11px] font-medium"
                   style={
                     isActive
-                      ? { background: '#0a0a0a', color: '#fff' }
-                      : { background: '#f1f5f9', color: '#64748b' }
+                      ? { background: '#141922', color: '#fff' }
+                      : { background: '#eef1f5', color: '#586173' }
                   }
                 >
                   {count}
@@ -482,11 +482,11 @@ export default async function CompradoresPage({ searchParams }: { searchParams: 
         </Suspense>
 
         {/* ── Table ──────────────────────────────────────────────── */}
-        <div className="overflow-x-auto rounded-xl border border-[#e2e8f0] bg-white">
+        <div className="overflow-x-auto rounded-xl border border-[#e6e9ee] bg-white">
           <div className="min-w-[980px]">
             {/* Table header */}
             <div
-              className="border-b border-[#e2e8f0] bg-[#f8fafc] font-mono text-[10px] uppercase tracking-[0.12em] text-[#64748b]"
+              className="border-b border-[#e6e9ee] bg-[#f8fafc] font-mono text-[10px] uppercase tracking-[0.12em] text-[#586173]"
               style={{
                 display: 'grid',
                 gridTemplateColumns: '32px 2.2fr 2fr 2.6fr 1fr 1fr 1fr 1.1fr 80px',
@@ -508,7 +508,7 @@ export default async function CompradoresPage({ searchParams }: { searchParams: 
 
             {/* Empty state */}
             {leads.length === 0 && (
-              <div className="px-6 py-14 text-center text-sm text-[#64748b]">
+              <div className="px-6 py-14 text-center text-sm text-[#586173]">
                 No hay compradores con los filtros aplicados.
               </div>
             )}
@@ -539,7 +539,7 @@ export default async function CompradoresPage({ searchParams }: { searchParams: 
               return (
                 <div
                   key={lead.id}
-                  className="group relative border-b border-[#f1f5f9] text-[13.5px] transition-colors last:border-0 hover:bg-[#f8fafc]"
+                  className="group relative border-b border-[#eef1f5] text-[13.5px] transition-colors last:border-0 hover:bg-[#f8fafc]"
                   style={{
                     display: 'grid',
                     gridTemplateColumns: '32px 2.2fr 2fr 2.6fr 1fr 1fr 1fr 1.1fr 80px',
@@ -570,7 +570,7 @@ export default async function CompradoresPage({ searchParams }: { searchParams: 
                       </div>
                       <div className="min-w-0 leading-snug">
                         <div className="flex items-center gap-1.5">
-                          <span className="truncate text-[14px] font-semibold text-[#0a0a0a]">
+                          <span className="truncate text-[14px] font-semibold text-[#141922]">
                             {lead.name}
                           </span>
                           {lead.temperature && (
@@ -581,7 +581,7 @@ export default async function CompradoresPage({ searchParams }: { searchParams: 
                             />
                           )}
                         </div>
-                        <div className="mt-0.5 font-mono text-[10.5px] text-[#64748b]">
+                        <div className="mt-0.5 font-mono text-[10.5px] text-[#586173]">
                           #{lead.id.slice(-8)}{' '}
                           <span className="font-semibold text-[#7c3aed]">{sourceLabel}</span>
                         </div>
@@ -591,10 +591,10 @@ export default async function CompradoresPage({ searchParams }: { searchParams: 
 
                   {/* Contact */}
                   <div className="min-w-0 leading-snug">
-                    <div className="flex items-center gap-1.5 overflow-hidden text-[13px] text-[#0a0a0a]">
+                    <div className="flex items-center gap-1.5 overflow-hidden text-[13px] text-[#141922]">
                       <svg
                         viewBox="0 0 24 24"
-                        className="h-3 w-3 shrink-0 text-[#64748b]"
+                        className="h-3 w-3 shrink-0 text-[#586173]"
                         fill="none"
                         stroke="currentColor"
                         strokeWidth={1.6}
@@ -606,7 +606,7 @@ export default async function CompradoresPage({ searchParams }: { searchParams: 
                       </svg>
                       <span className="truncate">{lead.email}</span>
                     </div>
-                    <div className="mt-0.5 flex items-center gap-1.5 font-mono text-[12px] text-[#64748b]">
+                    <div className="mt-0.5 flex items-center gap-1.5 font-mono text-[12px] text-[#586173]">
                       <svg
                         viewBox="0 0 24 24"
                         className="h-3 w-3 shrink-0"
@@ -631,7 +631,7 @@ export default async function CompradoresPage({ searchParams }: { searchParams: 
                           className="rounded-full border px-2 py-0.5 text-[11.5px] font-bold"
                           style={{
                             background: '#eff6ff',
-                            color: '#2563eb',
+                            color: '#3a6fd4',
                             borderColor: 'rgba(37,99,235,0.2)',
                             letterSpacing: '0.02em',
                           }}
@@ -642,9 +642,9 @@ export default async function CompradoresPage({ searchParams }: { searchParams: 
                         <span
                           className="rounded-full border px-2 py-0.5 text-[11.5px] italic"
                           style={{
-                            background: '#f1f5f9',
-                            color: '#64748b',
-                            borderColor: '#e2e8f0',
+                            background: '#eef1f5',
+                            color: '#586173',
+                            borderColor: '#e6e9ee',
                           }}
                         >
                           Cualquier tipo
@@ -656,9 +656,9 @@ export default async function CompradoresPage({ searchParams }: { searchParams: 
                         <span
                           className="rounded-full border px-2 py-0.5 text-[11.5px] font-medium"
                           style={{
-                            background: '#f1f5f9',
-                            color: '#1e293b',
-                            borderColor: '#e2e8f0',
+                            background: '#eef1f5',
+                            color: '#141922',
+                            borderColor: '#e6e9ee',
                           }}
                         >
                           {lead.minSeats}+ plazas
@@ -685,7 +685,7 @@ export default async function CompradoresPage({ searchParams }: { searchParams: 
                           className="rounded-full border px-2 py-0.5 text-[11.5px] font-medium"
                           style={{
                             background: '#fffbeb',
-                            color: '#d97706',
+                            color: '#c9820a',
                             borderColor: 'rgba(217,119,6,0.2)',
                           }}
                         >
@@ -697,7 +697,7 @@ export default async function CompradoresPage({ searchParams }: { searchParams: 
                     {/* Budget + equipment */}
                     <div className="mt-1.5 font-mono text-[12px]">
                       {lead.maxBudget ? (
-                        <span style={{ color: '#1f8a5b', fontWeight: 700 }}>
+                        <span style={{ color: '#1a9d5f', fontWeight: 700 }}>
                           hasta{' '}
                           {Number(lead.maxBudget).toLocaleString('es-ES', {
                             style: 'currency',
@@ -706,12 +706,12 @@ export default async function CompradoresPage({ searchParams }: { searchParams: 
                           })}
                         </span>
                       ) : (
-                        <span style={{ color: '#64748b' }}>Sin presupuesto definido</span>
+                        <span style={{ color: '#586173' }}>Sin presupuesto definido</span>
                       )}
                       {equipList.length > 0 && (
-                        <span style={{ color: '#94a3b8', margin: '0 4px' }}>·</span>
+                        <span style={{ color: '#8b94a3', margin: '0 4px' }}>·</span>
                       )}
-                      <span style={{ color: '#64748b' }}>{equipList.join(', ')}</span>
+                      <span style={{ color: '#586173' }}>{equipList.join(', ')}</span>
                     </div>
                   </div>
 
@@ -722,9 +722,9 @@ export default async function CompradoresPage({ searchParams }: { searchParams: 
                         <span
                           className="inline-flex items-center gap-1 rounded-full border border-dashed px-2 py-1 font-mono text-[11.5px] font-bold"
                           style={{
-                            background: '#f1f5f9',
-                            color: '#64748b',
-                            borderColor: '#e2e8f0',
+                            background: '#eef1f5',
+                            color: '#586173',
+                            borderColor: '#e6e9ee',
                           }}
                         >
                           — Sin matches
@@ -748,9 +748,9 @@ export default async function CompradoresPage({ searchParams }: { searchParams: 
                           )
                         })()}
                         {bestScore !== null && bestVehicle && (
-                          <span className="text-[11px]" style={{ color: '#64748b' }}>
+                          <span className="text-[11px]" style={{ color: '#586173' }}>
                             Mejor{' '}
-                            <b style={{ color: '#1f8a5b', fontFamily: 'var(--font-mono)' }}>
+                            <b style={{ color: '#1a9d5f', fontFamily: 'var(--font-mono)' }}>
                               {bestScore}%
                             </b>{' '}
                             · {bestVehicle}
@@ -777,31 +777,31 @@ export default async function CompradoresPage({ searchParams }: { searchParams: 
                       <>
                         <div
                           className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[10px] font-bold text-white"
-                          style={{ background: 'linear-gradient(135deg, #2563eb, #7c3aed)' }}
+                          style={{ background: 'linear-gradient(135deg, #3a6fd4, #7c3aed)' }}
                         >
                           {initials(lead.agent.name)}
                         </div>
-                        <span className="text-[12.5px] text-[#1e293b]">{lead.agent.name}</span>
+                        <span className="text-[12.5px] text-[#141922]">{lead.agent.name}</span>
                       </>
                     ) : (
                       <>
                         <div
-                          className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-dashed text-[14px] text-[#64748b]"
-                          style={{ borderColor: '#cbd5e1', background: '#f1f5f9' }}
+                          className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-dashed text-[14px] text-[#586173]"
+                          style={{ borderColor: '#cbd5e1', background: '#eef1f5' }}
                         >
                           +
                         </div>
-                        <span className="text-[12.5px] italic text-[#64748b]">Sin asignar</span>
+                        <span className="text-[12.5px] italic text-[#586173]">Sin asignar</span>
                       </>
                     )}
                   </div>
 
                   {/* Date */}
                   <div>
-                    <div className="font-mono text-[12px] text-[#1e293b]">
+                    <div className="font-mono text-[12px] text-[#141922]">
                       {formatDate(lead.createdAt)}
                     </div>
-                    <div className="mt-0.5 font-mono text-[10.5px] text-[#64748b]">
+                    <div className="mt-0.5 font-mono text-[10.5px] text-[#586173]">
                       {relativeDays(lead.createdAt)}
                     </div>
                   </div>
@@ -813,7 +813,7 @@ export default async function CompradoresPage({ searchParams }: { searchParams: 
                         href={waUrl}
                         target="_blank"
                         rel="noreferrer"
-                        className="flex h-7 w-7 items-center justify-center rounded-md border border-transparent text-[#64748b] hover:border-[#e2e8f0] hover:bg-white hover:text-[#25D366]"
+                        className="flex h-7 w-7 items-center justify-center rounded-md border border-transparent text-[#586173] hover:border-[#e6e9ee] hover:bg-white hover:text-[#25D366]"
                       >
                         <svg
                           viewBox="0 0 24 24"
@@ -830,7 +830,7 @@ export default async function CompradoresPage({ searchParams }: { searchParams: 
                     )}
                     <Link
                       href={`/compradores/${lead.id}`}
-                      className="flex h-7 w-7 items-center justify-center rounded-md border border-transparent text-[#64748b] hover:border-[#e2e8f0] hover:bg-white hover:text-[#0a0a0a]"
+                      className="flex h-7 w-7 items-center justify-center rounded-md border border-transparent text-[#586173] hover:border-[#e6e9ee] hover:bg-white hover:text-[#141922]"
                     >
                       <svg
                         viewBox="0 0 24 24"
@@ -853,18 +853,18 @@ export default async function CompradoresPage({ searchParams }: { searchParams: 
           </div>
 
           {/* ── Table footer ────────────────────────────────────── */}
-          <div className="flex flex-wrap items-center justify-between gap-3 border-t border-[#e2e8f0] px-4 py-4 md:px-6">
-            <div className="text-[12.5px] text-[#64748b]">
+          <div className="flex flex-wrap items-center justify-between gap-3 border-t border-[#e6e9ee] px-4 py-4 md:px-6">
+            <div className="text-[12.5px] text-[#586173]">
               Mostrando{' '}
-              <strong className="text-[#0a0a0a]">
+              <strong className="text-[#141922]">
                 {from}–{to}
               </strong>{' '}
-              de <strong className="text-[#0a0a0a]">{total}</strong> compradores
+              de <strong className="text-[#141922]">{total}</strong> compradores
               {needsActionCount > 0 && (
                 <>
                   {' '}
                   ·{' '}
-                  <span className="font-semibold text-[#dc2626]">
+                  <span className="font-semibold text-[#d64545]">
                     {needsActionCount} requieren acción
                   </span>
                 </>
@@ -874,32 +874,32 @@ export default async function CompradoresPage({ searchParams }: { searchParams: 
               {page > 1 ? (
                 <Link
                   href={pageUrl(page - 1)}
-                  className="rounded-md border border-[#e2e8f0] px-3 py-1.5 text-[12.5px] font-medium text-[#1e293b] hover:border-[#2563eb]"
+                  className="rounded-md border border-[#e6e9ee] px-3 py-1.5 text-[12.5px] font-medium text-[#141922] hover:border-[#3a6fd4]"
                 >
                   ← Anterior
                 </Link>
               ) : (
                 <button
                   disabled
-                  className="rounded-md border border-[#e2e8f0] px-3 py-1.5 text-[12.5px] font-medium text-[#1e293b] opacity-40"
+                  className="rounded-md border border-[#e6e9ee] px-3 py-1.5 text-[12.5px] font-medium text-[#141922] opacity-40"
                 >
                   ← Anterior
                 </button>
               )}
-              <span className="rounded-md bg-[#0a0a0a] px-2.5 py-1.5 font-mono text-[12px] text-white">
+              <span className="rounded-md bg-[#141922] px-2.5 py-1.5 font-mono text-[12px] text-white">
                 {page}
               </span>
               {page < totalPages ? (
                 <Link
                   href={pageUrl(page + 1)}
-                  className="rounded-md border border-[#e2e8f0] px-3 py-1.5 text-[12.5px] font-medium text-[#1e293b] hover:border-[#2563eb]"
+                  className="rounded-md border border-[#e6e9ee] px-3 py-1.5 text-[12.5px] font-medium text-[#141922] hover:border-[#3a6fd4]"
                 >
                   Siguiente →
                 </Link>
               ) : (
                 <button
                   disabled
-                  className="rounded-md border border-[#e2e8f0] px-3 py-1.5 text-[12.5px] font-medium text-[#1e293b] opacity-40"
+                  className="rounded-md border border-[#e6e9ee] px-3 py-1.5 text-[12.5px] font-medium text-[#141922] opacity-40"
                 >
                   Siguiente →
                 </button>

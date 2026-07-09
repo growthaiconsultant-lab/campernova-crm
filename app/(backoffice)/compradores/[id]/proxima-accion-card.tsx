@@ -45,16 +45,16 @@ export function ProximaAccionCard({
   return (
     <div
       className="relative overflow-hidden rounded-xl p-5"
-      style={{ background: 'linear-gradient(135deg, #0a0a0a 0%, #2a221c 100%)' }}
+      style={{ background: 'linear-gradient(135deg, #141922 0%, #1d222c 100%)' }}
     >
       {/* Glow blob */}
       <div
         className="pointer-events-none absolute right-[-40px] top-[-40px] h-[140px] w-[140px] rounded-full opacity-40"
-        style={{ background: '#294e4c', filter: 'blur(40px)' }}
+        style={{ background: '#0e7d6b', filter: 'blur(40px)' }}
       />
       <p
         className="relative font-mono text-[10px] uppercase tracking-[0.12em]"
-        style={{ color: '#b59e7d' }}
+        style={{ color: '#0e7d6b' }}
       >
         Próxima acción
       </p>
@@ -70,8 +70,8 @@ export function ProximaAccionCard({
           <button
             type="button"
             onClick={handleWhatsApp}
-            className="flex flex-1 items-center justify-center gap-1.5 rounded-lg py-2 text-[12.5px] font-medium text-[#0a0a0a] transition-opacity hover:opacity-90"
-            style={{ background: '#b59e7d' }}
+            className="flex flex-1 items-center justify-center gap-1.5 rounded-lg py-2 text-[12.5px] font-medium text-[#141922] transition-opacity hover:opacity-90"
+            style={{ background: '#0e7d6b' }}
           >
             <MessageCircle className="h-3.5 w-3.5" />
             WhatsApp
