@@ -139,6 +139,60 @@
     --sidebar-border: 0 0% 8%;
     --sidebar-ring: 35 28% 60%;
   }
+
+  /* ── Rebrand del CRM (Block 22) — tema scopeado al backoffice ─────────
+     Identidad verde/carbón + Hanken Grotesk. Se aplica solo en el <div> raíz
+     de app/(backoffice)/layout.tsx (.crm-theme). La web pública NO se toca. */
+  .crm-theme {
+    /* Superficie / neutros (handoff: --bg/--card/--line/--track) */
+    --background: 210 20% 96%; /* #f4f6f8 */
+    --foreground: 219 26% 11%; /* #141922 ink */
+    --card: 0 0% 100%; /* #ffffff */
+    --card-foreground: 219 26% 11%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 219 26% 11%;
+    /* Marca (verde CampersNova) */
+    --primary: 170 80% 27%; /* #0e7d6b brand */
+    --primary-foreground: 0 0% 100%;
+    --secondary: 214 26% 95%; /* #eef1f5 track */
+    --secondary-foreground: 219 26% 11%;
+    --muted: 214 26% 95%;
+    --muted-foreground: 220 13% 40%; /* #586173 ink2 */
+    --accent: 214 26% 95%;
+    --accent-foreground: 219 26% 11%;
+    --destructive: 0 64% 55%; /* #d64545 red */
+    --destructive-foreground: 0 0% 100%;
+    --border: 218 19% 92%; /* #e6e9ee line */
+    --input: 218 19% 92%;
+    --ring: 170 80% 27%;
+    --radius: 0.625rem; /* 10px */
+    /* Sidebar oscuro (handoff: --panel*) */
+    --sidebar-background: 222 22% 9%; /* #12151c */
+    --sidebar-foreground: 218 15% 71%; /* #aab2c0 */
+    --sidebar-primary: 170 80% 27%; /* verde activo */
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 222 21% 14%; /* #1d222c */
+    --sidebar-accent-foreground: 218 15% 88%;
+    --sidebar-border: 219 18% 18%; /* #262c37 */
+    --sidebar-ring: 170 80% 27%;
+    /* Vars --cn-* remapeadas para usos inline `var(--cn-*)` del backoffice */
+    --cn-teal-900: #141922;
+    --cn-ink-900: #141922;
+    --cn-ink-700: #586173;
+    --cn-ink-500: #8b94a3;
+    --cn-ink-300: #b9c0cb;
+    --cn-line: #e6e9ee;
+    --cn-terra-500: #0e7d6b;
+    --cn-terra-600: #0b5f52;
+    --cn-sand-500: #0e7d6b;
+    --cn-cream-50: #ffffff;
+    --cn-cream-100: #f4f6f8;
+    --cn-cream-200: #eef1f5;
+    /* Fuente base de la UI del CRM. Remapear --font-inter → Hanken para que
+       las utilidades `font-sans` (que apuntan a --font-inter) también cambien. */
+    --font-inter: var(--font-hanken);
+    font-family: var(--font-hanken), system-ui, sans-serif;
+  }
 }
 
 @layer base {

@@ -193,11 +193,14 @@ export function SidebarContent({ userRole, userName, roleLabel, onNavigate }: Si
     <div className="flex h-full flex-col bg-sidebar text-sidebar-foreground">
       {/* Logo */}
       <div className="flex h-16 shrink-0 items-center gap-2.5 border-b border-sidebar-border px-4">
-        <LogoCampersNova variant="cream" className="[--logo-campers:9px] [--logo-nova:24px]" />
         <span
-          className="rounded border px-1.5 py-0.5 text-[8px] font-semibold uppercase tracking-[0.20em] text-sidebar-foreground/50"
-          style={{ borderColor: 'rgba(239,233,216,0.22)' }}
+          className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-sidebar-primary text-[11px] font-bold tracking-tight text-sidebar-primary-foreground"
+          aria-hidden
         >
+          CN
+        </span>
+        <LogoCampersNova variant="cream" className="[--logo-campers:9px] [--logo-nova:24px]" />
+        <span className="rounded border border-sidebar-border px-1.5 py-0.5 text-[8px] font-semibold uppercase tracking-[0.20em] text-sidebar-foreground/50">
           CRM
         </span>
       </div>
@@ -274,7 +277,7 @@ export function Sidebar({
   roleLabel: string
 }) {
   return (
-    <aside className="hidden h-screen w-56 shrink-0 lg:flex">
+    <aside className="hidden h-screen w-[230px] shrink-0 lg:flex">
       <SidebarContent userRole={userRole} userName={userName} roleLabel={roleLabel} />
     </aside>
   )

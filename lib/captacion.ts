@@ -28,12 +28,12 @@ export const CAPTURE_STATUS_LABELS: Record<CaptureStatus, string> = {
 
 /** Colores por estado para el tablero (dot + acento). */
 export const CAPTURE_STATUS_COLORS: Record<CaptureStatus, string> = {
-  NO_CONTACTADO: '#94a3b8',
-  CONTACTADO: '#2563eb',
-  EN_CURSO: '#d97706',
-  ENTRADA_AGENDADA: '#0891b2',
-  CONVERTIDO: '#1f8a5b',
-  RECHAZADO: '#dc2626',
+  NO_CONTACTADO: '#8b94a3', // ink3
+  CONTACTADO: '#3a6fd4', // blue
+  EN_CURSO: '#c9820a', // amber
+  ENTRADA_AGENDADA: '#0e7d6b', // brand
+  CONVERTIDO: '#1a9d5f', // green
+  RECHAZADO: '#d64545', // red
 }
 
 /** Columnas del tablero, en orden de flujo. RECHAZADO va aparte (no es columna). */
