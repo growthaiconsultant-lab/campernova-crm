@@ -2,7 +2,6 @@ import { notFound } from 'next/navigation'
 import Link from 'next/link'
 import { db } from '@/lib/db'
 import { requireCanViewTaller } from '@/lib/auth'
-import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import type {
   WorkOrderStatus,
@@ -130,40 +129,65 @@ export default async function WorkOrderPage({ params }: { params: { id: string }
 
   return (
     <div className="space-y-6">
+      {/* Breadcrumb (mockup TAL2: módulo / Orden #OT-XXXX) */}
+      <nav className="flex items-center gap-2 font-mono text-[11px] uppercase tracking-[0.08em] text-ink2">
+        <Link
+          href="/taller"
+          className="inline-flex items-center gap-1 transition-colors hover:text-ink"
+        >
+          <span aria-hidden>‹</span> Taller
+        </Link>
+        <span className="text-ink3">/</span>
+        <span className="normal-case tracking-normal text-ink3">
+          Orden #{wo.id.slice(-8).toUpperCase()}
+        </span>
+      </nav>
+
       {/* Cabecera */}
       <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <div className="flex items-center gap-3">
-            <h1 className="text-xl font-bold">
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-center gap-3">
+            <h1 className="font-hanken text-[21px] font-bold leading-[1.1] tracking-[-0.01em] text-ink">
               {wo.vehicle.brand} {wo.vehicle.model}{' '}
-              <span className="text-cn-ink-400 font-normal">{wo.vehicle.year}</span>
+              <span className="font-normal text-ink3">{wo.vehicle.year}</span>
             </h1>
             <span
-              className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${STATUS_COLORS[wo.status]}`}
+              className={`inline-flex items-center rounded-[6px] px-2 py-[3px] text-[10.5px] font-semibold ${STATUS_COLORS[wo.status]}`}
             >
               {STATUS_LABELS[wo.status]}
             </span>
             <span
-              className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${
-                wo.kind === 'MEJORA'
-                  ? 'bg-violet-100 text-violet-700'
-                  : 'bg-slate-100 text-slate-600'
+              className={`inline-flex items-center rounded-[6px] px-2 py-[3px] text-[10.5px] font-semibold ${
+                wo.kind === 'MEJORA' ? 'bg-violet-100 text-violet-700' : 'bg-track text-ink2'
               }`}
             >
               {wo.kind === 'MEJORA' ? 'Mejora' : 'Reparación'}
             </span>
           </div>
-          <p className="mt-0.5 text-sm text-muted-foreground">
-            Orden #{wo.id.slice(-8)} ·{' '}
-            <Link href={`/vendedores/${wo.vehicle.sellerLead?.id}`} className="hover:underline">
+          <p className="mt-1 font-hanken text-[13px] text-ink2">
+            <Link
+              href={`/vendedores/${wo.vehicle.sellerLead?.id}`}
+              className="font-medium hover:text-brand2"
+            >
               {wo.vehicle.sellerLead?.name}
             </Link>{' '}
-            · {new Date(wo.createdAt).toLocaleDateString('es-ES')}
+            · creada {new Date(wo.createdAt).toLocaleDateString('es-ES')}
           </p>
         </div>
-        <Button asChild variant="ghost" size="sm">
-          <Link href="/taller">← Taller</Link>
-        </Button>
+        {wo.estimatedCost && (
+          <div className="shrink-0 text-right">
+            <div className="font-mono text-[10.5px] font-semibold uppercase tracking-[0.04em] text-ink3">
+              Coste est.
+            </div>
+            <div className="font-hanken text-[22px] font-bold tracking-[-0.02em] text-ink">
+              {Number(wo.estimatedCost).toLocaleString('es-ES', {
+                style: 'currency',
+                currency: 'EUR',
+                maximumFractionDigits: 0,
+              })}
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Acciones de estado */}
@@ -262,33 +286,66 @@ export default async function WorkOrderPage({ params }: { params: { id: string }
                 </div>
 
                 {plannedHours != null && (
-                  <div className="rounded-lg border border-cn-line p-3">
-                    <div className="flex flex-wrap items-center gap-x-6 gap-y-1 text-sm">
-                      <span className="text-cn-ink-500">
-                        Horas previstas:{' '}
-                        <span className="font-medium text-cn-ink-700">{plannedHours} h</span>
+                  /* Bloque grande Horas P→R (mockup TAL2): PREVISTAS → REALES + DESVIACIÓN */
+                  <div className="rounded-[14px] border border-line bg-card p-4">
+                    <div className="flex flex-wrap items-end gap-6">
+                      <div>
+                        <div className="font-mono text-[10px] font-medium uppercase tracking-[0.06em] text-ink3">
+                          Previstas
+                        </div>
+                        <div className="mt-1 font-hanken text-[26px] font-bold leading-none text-ink2">
+                          {plannedHours} h
+                        </div>
+                      </div>
+                      <span className="pb-1 text-[20px] leading-none text-ink3" aria-hidden>
+                        →
                       </span>
-                      <span className="text-cn-ink-500">
-                        Reales:{' '}
-                        <span className="font-medium text-cn-ink-700">{totalRealHours} h</span>
-                      </span>
-                      {totalRealHours > 0 && hoursDeviation.deviation != null && (
-                        <span
-                          className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${
-                            hoursDeviation.status === 'desviado_arriba'
-                              ? 'bg-red-100 text-red-700'
-                              : hoursDeviation.status === 'por_debajo'
-                                ? 'bg-blue-100 text-blue-700'
-                                : 'bg-green-100 text-green-700'
+                      <div>
+                        <div
+                          className={`font-mono text-[10px] font-medium uppercase tracking-[0.06em] ${
+                            hoursDeviation.status === 'desviado_arriba' ? 'text-bad' : 'text-ink3'
                           }`}
                         >
-                          {hoursDeviation.deviation > 0 ? '+' : ''}
-                          {hoursDeviation.deviation} h
-                          {hoursDeviation.deviationPct != null
-                            ? ` (${hoursDeviation.deviationPct > 0 ? '+' : ''}${Math.round(hoursDeviation.deviationPct)}%)`
-                            : ''}
-                          {hoursDeviation.status === 'desviado_arriba' ? ' · revisar' : ''}
-                        </span>
+                          Reales
+                        </div>
+                        <div
+                          className={`mt-1 font-hanken text-[26px] font-bold leading-none ${
+                            hoursDeviation.status === 'desviado_arriba'
+                              ? 'text-bad'
+                              : totalRealHours > 0
+                                ? 'text-good'
+                                : 'text-ink3'
+                          }`}
+                        >
+                          {totalRealHours} h
+                        </div>
+                      </div>
+                      {totalRealHours > 0 && hoursDeviation.deviation != null && (
+                        <div className="ml-auto text-right">
+                          <div className="font-mono text-[10px] font-medium uppercase tracking-[0.06em] text-ink3">
+                            Desviación
+                          </div>
+                          <div
+                            className={`mt-1 font-hanken text-[18px] font-bold leading-none ${
+                              hoursDeviation.status === 'desviado_arriba'
+                                ? 'text-bad'
+                                : hoursDeviation.status === 'por_debajo'
+                                  ? 'text-info'
+                                  : 'text-good'
+                            }`}
+                          >
+                            {hoursDeviation.deviation > 0 ? '+' : ''}
+                            {hoursDeviation.deviation} h
+                            {hoursDeviation.deviationPct != null
+                              ? ` · ${hoursDeviation.deviationPct > 0 ? '+' : ''}${Math.round(hoursDeviation.deviationPct)}%`
+                              : ''}
+                          </div>
+                          {hoursDeviation.status === 'desviado_arriba' && (
+                            <div className="mt-0.5 font-hanken text-[11px] font-semibold text-bad">
+                              revisar imputaciones
+                            </div>
+                          )}
+                        </div>
                       )}
                     </div>
                   </div>
