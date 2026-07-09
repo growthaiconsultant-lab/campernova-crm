@@ -93,7 +93,7 @@ claude mcp add-json linear '{\"command\":\"npx\",\"args\":[\"-y\",\"mcp-linear@l
 
 `.claude/settings.json` y `.claude/settings.local.json` se mantienen como referencia de la estructura, pero la fuente de verdad funcional es el registro de la CLI.
 
-## Estado actual (Block 21 — Sistema de KPIs y Dashboards F0+F1 — MERGED A MAIN ✅)
+## Estado actual (Block 21 — Sistema de KPIs y Dashboards F0→F6 COMPLETO — MERGED A MAIN ✅)
 
 Arranque del sistema de KPIs/dashboards a partir de los specs del dueño (`CampersNova_KPIs_Completos...` + `..._Dashboards_KPIs_UX...` + handoff de Claude Design). **Plan maestro en `docs/Dashboards-KPIs-Plan.md`** (fases F0→F6, hilado con lo ya existente). Umbrales del dueño: 7 ventas/mes, margen mín 4%, 1ª respuesta <24/48h, tiempo de venta <15/30d, aging >30/45d, Trust ≥70%, datos ≥80%.
 
@@ -135,11 +135,16 @@ Migración **additiva** `20260711000000_add_kpi_events` (tabla `kpi_events` + í
 
 - **F4 `lib/kpi/mercado.ts`** + **`/analytics/mercado`**: demanda por tipo y por rango de precio, **gap oferta/demanda por segmento** (palanca de captación), **rotación por modelo** (días de venta), precio medio de cierre (ofertas convertidas). Sidebar "Mercado" (TrendingUp).
 - **F5 `lib/kpi/comercial.ts`** + **`/analytics/comercial`**: mi día (tareas hoy/vencidas, citas hoy, calientes, reservas activas), **lista priorizada** (reservas en riesgo → tareas vencidas → calientes), reservas en riesgo, compradores calientes. El AGENTE ve lo suyo. Sidebar "Comercial" (Target).
-- **6 dashboards vivos** en el grupo Analytics: Dirección · CRM · Comercial · Operaciones · Matching · Mercado.
 
-### Pendiente del sistema de KPIs (siguientes fases)
+### F6 — Calidad de Datos + export (PR #74, `cba9010`) — sin migración
 
-Hooks de eventos restantes (vehículo publicado/vendido/valorado, match, cita, entrega) + validaciones de producto (cita sin outcome, venta sin margen). **F6** Calidad de datos + export/API (CSV/PDF, endpoints `/api/kpis/*`). Fase Plataforma bloqueada por decisión del dueño (portal profesional). Detalle en `docs/Dashboards-KPIs-Plan.md`.
+- **`lib/kpi/calidad.ts`**: completitud media comprador/vehículo (reutiliza `lib/scoring/completeness`), **% trazabilidad de eventos** (`kpi_events` con actor u origen), **incidencias críticas** (sin presupuesto/acción/valoración/margen), fichas de vehículo incompletas.
+- **`/analytics/calidad`** (ADMIN/MARKETING) + botón **export CSV** → `/api/analytics/incompletos.csv` (route handler autenticado, BOM para Excel). Sidebar "Calidad de datos" (BadgeCheck).
+- **7 dashboards vivos** en el grupo Analytics: Dirección · CRM · Comercial · Operaciones · Matching · Mercado · Calidad.
+
+### Pendiente del sistema de KPIs (mejoras opcionales)
+
+Hooks de eventos restantes (vehículo publicado/vendido/valorado, match generado, cita, entrega — hoy solo se emiten los de alta de lead/oferta/reserva/venta/sello; los dashboards ya funcionan porque leen de tablas). Validaciones de producto duras (bloquear cita sin outcome, venta sin margen). Export PDF + endpoints `/api/kpis/*` para consumo externo. Persistir scores/completitud si se quiere ordenar listados grandes. Fase Plataforma bloqueada por decisión del dueño (portal profesional). Detalle en `docs/Dashboards-KPIs-Plan.md`.
 
 ## Estado previo (Block 20 — Trust Passport unificado — MERGED A MAIN ✅)
 
