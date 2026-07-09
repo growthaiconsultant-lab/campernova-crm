@@ -4,7 +4,7 @@ import {
   Fraunces,
   JetBrains_Mono,
   Cormorant_Garamond,
-  Hanken_Grotesk,
+  IBM_Plex_Sans,
 } from 'next/font/google'
 import './globals.css'
 import { CookieBanner } from '@/components/cookie-banner'
@@ -38,12 +38,14 @@ const cormorant = Cormorant_Garamond({
   display: 'swap',
 })
 
-// Rebrand del CRM (Block 22): Hanken Grotesk para toda la UI del backoffice.
-// Solo se aplica dentro de `.crm-theme` (globals.css) — la web pública sigue con Inter.
-const hanken = Hanken_Grotesk({
+// Rebrand del CRM (Block 22): fuente de la UI del backoffice, expuesta tras la
+// variable genérica `--font-crm` para que cambiar de tipografía sea un swap de
+// una línea. Solo se aplica dentro de `.crm-theme` (globals.css) — la web
+// pública sigue con Inter. Elegida IBM Plex Sans por legibilidad en interfaz.
+const crmFont = IBM_Plex_Sans({
   subsets: ['latin'],
-  weight: ['400', '500', '600', '700', '800'],
-  variable: '--font-hanken',
+  weight: ['400', '500', '600', '700'],
+  variable: '--font-crm',
   display: 'swap',
 })
 
@@ -86,7 +88,7 @@ export default function RootLayout({
   return (
     <html lang="es">
       <body
-        className={`${inter.variable} ${fraunces.variable} ${jetbrainsMono.variable} ${cormorant.variable} ${hanken.variable} min-h-screen font-sans antialiased`}
+        className={`${inter.variable} ${fraunces.variable} ${jetbrainsMono.variable} ${cormorant.variable} ${crmFont.variable} min-h-screen font-sans antialiased`}
       >
         <PostHogProvider>{children}</PostHogProvider>
         <GoogleTagManager />
