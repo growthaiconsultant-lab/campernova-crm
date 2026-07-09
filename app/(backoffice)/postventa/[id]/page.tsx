@@ -158,7 +158,7 @@ export default async function PostventaDetailPage({ params }: { params: { id: st
             </div>
             <button
               type="submit"
-              className="inline-flex h-9 items-center rounded-lg bg-cn-teal-900 px-4 text-sm font-medium text-white hover:opacity-90"
+              className="inline-flex h-9 items-center rounded-lg bg-primary px-4 text-sm font-medium text-white hover:opacity-90"
             >
               Ampliar
             </button>

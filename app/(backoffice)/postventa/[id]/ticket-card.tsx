@@ -151,7 +151,7 @@ export function TicketCard({ ticket }: { ticket: Ticket }) {
             <button
               onClick={handleCostSave}
               disabled={isPending}
-              className="inline-flex h-7 items-center rounded-lg bg-cn-teal-900 px-3 text-xs font-medium text-white hover:opacity-90 disabled:opacity-50"
+              className="inline-flex h-7 items-center rounded-lg bg-primary px-3 text-xs font-medium text-white hover:opacity-90 disabled:opacity-50"
             >
               Guardar costes
             </button>
@@ -226,7 +226,7 @@ export function FollowupCard({ followup }: { followup: Followup }) {
           <button
             onClick={handleRespond}
             disabled={isPending || !notes.trim()}
-            className="inline-flex h-8 items-center rounded-lg bg-cn-teal-900 px-3 text-xs font-medium text-white hover:opacity-90 disabled:opacity-50"
+            className="inline-flex h-8 items-center rounded-lg bg-primary px-3 text-xs font-medium text-white hover:opacity-90 disabled:opacity-50"
           >
             Guardar respuesta
           </button>

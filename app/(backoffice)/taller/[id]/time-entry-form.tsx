@@ -33,7 +33,7 @@ export function TimeEntrySection({ woId, entries, currentUserId, isAdmin, isClos
   const totalCost = entries.reduce((sum, e) => sum + e.hours * e.hourlyRate, 0)
 
   const inputClass =
-    'h-9 w-full rounded-lg border border-cn-line bg-white px-3 text-sm focus:outline-none focus:ring-2 focus:ring-cn-teal-900/20'
+    'h-9 w-full rounded-lg border border-cn-line bg-white px-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20'
 
   function handleAdd(e: React.FormEvent) {
     e.preventDefault()
@@ -76,7 +76,7 @@ export function TimeEntrySection({ woId, entries, currentUserId, isAdmin, isClos
         {!isClosed && (
           <button
             onClick={() => setShowForm((v) => !v)}
-            className="rounded-lg bg-cn-teal-900 px-3 py-1.5 text-sm font-medium text-white hover:opacity-90"
+            className="rounded-lg bg-primary px-3 py-1.5 text-sm font-medium text-white hover:opacity-90"
           >
             + Imputar horas
           </button>
@@ -149,7 +149,7 @@ export function TimeEntrySection({ woId, entries, currentUserId, isAdmin, isClos
             <button
               type="submit"
               disabled={isPending}
-              className="rounded-lg bg-cn-teal-900 px-3 py-1.5 text-sm font-medium text-white hover:opacity-90 disabled:opacity-50"
+              className="rounded-lg bg-primary px-3 py-1.5 text-sm font-medium text-white hover:opacity-90 disabled:opacity-50"
             >
               Guardar
             </button>

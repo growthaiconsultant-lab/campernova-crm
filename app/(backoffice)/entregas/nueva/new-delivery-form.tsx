@@ -152,7 +152,7 @@ export function NewDeliveryForm({ vehicles, buyers, users }: Props) {
         <button
           type="submit"
           disabled={isPending}
-          className="inline-flex h-10 items-center rounded-lg bg-cn-teal-900 px-5 text-sm font-medium text-white hover:opacity-90 disabled:opacity-50"
+          className="inline-flex h-10 items-center rounded-lg bg-primary px-5 text-sm font-medium text-white hover:opacity-90 disabled:opacity-50"
         >
           {isPending ? 'Creando…' : 'Crear entrega'}
         </button>

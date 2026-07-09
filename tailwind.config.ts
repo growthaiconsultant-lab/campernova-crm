@@ -21,34 +21,35 @@ const config: Config = {
       colors: {
         /* CN design system palette — matches docs/design-claude/styles.css */
         cn: {
-          /* Escala estructural — negro/marrón (reemplaza teal) */
+          /* Paleta CN driven por CSS vars (definidas en :root = web pública,
+             y sobreescritas en `.crm-theme` = backoffice con la identidad nueva).
+             Así las utilidades cn-* se rebrandean solo dentro del CRM. */
           teal: {
-            900: '#0a0a0a',
-            700: '#584738',
-            500: '#7a6450',
-            300: '#a89683',
+            900: 'var(--cn-teal-900)',
+            700: 'var(--cn-teal-700)',
+            500: 'var(--cn-teal-500)',
+            300: 'var(--cn-teal-300)',
           },
           cream: {
-            50: '#faf6ed',
-            100: '#f5f0e6',
-            200: '#ece4d2',
+            50: 'var(--cn-cream-50)',
+            100: 'var(--cn-cream-100)',
+            200: 'var(--cn-cream-200)',
           },
           sand: {
-            300: '#d9c9a8',
-            500: '#b59e7d',
+            300: 'var(--cn-sand-300)',
+            500: 'var(--cn-sand-500)',
           },
-          /* Tan / acento (reemplaza terra/naranja) */
           terra: {
-            500: '#b59e7d',
-            600: '#9d8666',
+            500: 'var(--cn-terra-500)',
+            600: 'var(--cn-terra-600)',
           },
           ink: {
-            900: '#0a0a0a',
-            700: '#2a2622',
-            500: '#6b645c',
-            300: '#b3aca0',
+            900: 'var(--cn-ink-900)',
+            700: 'var(--cn-ink-700)',
+            500: 'var(--cn-ink-500)',
+            300: 'var(--cn-ink-300)',
           },
-          line: '#e6dfd0',
+          line: 'var(--cn-line)',
         },
         sand: 'hsl(var(--sand))',
         forest: 'hsl(var(--forest))',

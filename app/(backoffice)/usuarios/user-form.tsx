@@ -96,7 +96,7 @@ export function UserForm({ mode, user, isSelf = false, activeLeadCount = 0 }: Pr
           onChange={(e) => setName(e.target.value)}
           required
           minLength={2}
-          className="h-10 w-full rounded-lg border border-cn-line bg-white px-3 text-sm focus:outline-none focus:ring-2 focus:ring-cn-teal-900/20"
+          className="h-10 w-full rounded-lg border border-cn-line bg-white px-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20"
         />
         {errors.name && <p className="mt-1 text-xs text-red-600">{errors.name[0]}</p>}
       </div>
@@ -110,7 +110,7 @@ export function UserForm({ mode, user, isSelf = false, activeLeadCount = 0 }: Pr
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             required
-            className="h-10 w-full rounded-lg border border-cn-line bg-white px-3 text-sm focus:outline-none focus:ring-2 focus:ring-cn-teal-900/20"
+            className="h-10 w-full rounded-lg border border-cn-line bg-white px-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20"
           />
           {errors.email && <p className="mt-1 text-xs text-red-600">{errors.email[0]}</p>}
         </div>
@@ -123,7 +123,7 @@ export function UserForm({ mode, user, isSelf = false, activeLeadCount = 0 }: Pr
           value={role}
           onChange={(e) => setRole(e.target.value as UserRoleValue)}
           disabled={isSelf}
-          className="h-10 w-full rounded-lg border border-cn-line bg-white px-3 text-sm focus:outline-none focus:ring-2 focus:ring-cn-teal-900/20 disabled:cursor-not-allowed disabled:opacity-50"
+          className="h-10 w-full rounded-lg border border-cn-line bg-white px-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 disabled:cursor-not-allowed disabled:opacity-50"
         >
           {ROLE_OPTIONS.map((opt) => (
             <option key={opt.value} value={opt.value}>
@@ -184,7 +184,7 @@ export function UserForm({ mode, user, isSelf = false, activeLeadCount = 0 }: Pr
         <button
           type="submit"
           disabled={isPending}
-          className="rounded-lg bg-cn-teal-900 px-5 py-2.5 text-sm font-medium text-white transition hover:opacity-90 disabled:opacity-50"
+          className="rounded-lg bg-primary px-5 py-2.5 text-sm font-medium text-white transition hover:opacity-90 disabled:opacity-50"
         >
           {mode === 'create' ? 'Crear usuario' : 'Guardar cambios'}
         </button>
