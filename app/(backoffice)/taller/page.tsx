@@ -1,8 +1,18 @@
 import Link from 'next/link'
+import { Plus, CalendarDays, Wrench } from 'lucide-react'
 import { db } from '@/lib/db'
 import { requireCanViewTaller } from '@/lib/auth'
-import { Button } from '@/components/ui/button'
-import { Plus, CalendarDays } from 'lucide-react'
+import { computeHoursDeviation } from '@/lib/taller/scheduling'
+import {
+  Eyebrow,
+  Card,
+  ActionableTable,
+  HexPill,
+  ButtonLink,
+  EmptyState,
+  type Column,
+} from '@/components/redesign'
+import { cn } from '@/lib/utils'
 import type { WorkOrderStatus, WorkOrderApprovalLevel } from '@prisma/client'
 
 const STATUS_LABELS: Record<WorkOrderStatus, string> = {
@@ -14,28 +24,35 @@ const STATUS_LABELS: Record<WorkOrderStatus, string> = {
   RECHAZADA: 'Rechazada',
 }
 
-const STATUS_COLORS: Record<WorkOrderStatus, string> = {
-  PENDIENTE: 'bg-gray-100 text-gray-700',
-  EN_DIAGNOSTICO: 'bg-blue-100 text-blue-700',
-  PRESUPUESTADA: 'bg-yellow-100 text-yellow-700',
-  EN_CURSO: 'bg-teal-100 text-teal-700',
-  COMPLETADA: 'bg-green-100 text-green-700',
-  RECHAZADA: 'bg-red-100 text-red-700',
+// Semáforo del handoff: en curso = marca, pendiente = gris, presupuestada =
+// azul info, diagnóstico = ámbar, completada = verde, rechazada = rojo.
+const STATUS_HEX: Record<WorkOrderStatus, string> = {
+  PENDIENTE: '#8b94a3',
+  EN_DIAGNOSTICO: '#c9820a',
+  PRESUPUESTADA: '#3a6fd4',
+  EN_CURSO: '#0e7d6b',
+  COMPLETADA: '#1a9d5f',
+  RECHAZADA: '#d64545',
 }
 
 const APPROVAL_LABELS: Record<WorkOrderApprovalLevel, string> = {
-  NO_REQUIERE: 'Sin requerir',
+  NO_REQUIERE: '—',
   REQUIERE_CEO: 'Pendiente CEO',
   APROBADA_CEO: 'Aprobada',
   RECHAZADA_CEO: 'Rechazada CEO',
 }
 
-const APPROVAL_COLORS: Record<WorkOrderApprovalLevel, string> = {
-  NO_REQUIERE: 'bg-gray-100 text-gray-600',
-  REQUIERE_CEO: 'bg-orange-100 text-orange-700',
-  APROBADA_CEO: 'bg-green-100 text-green-700',
-  RECHAZADA_CEO: 'bg-red-100 text-red-700',
+const APPROVAL_HEX: Record<WorkOrderApprovalLevel, string | null> = {
+  NO_REQUIERE: null,
+  REQUIERE_CEO: '#c9820a',
+  APROBADA_CEO: '#1a9d5f',
+  RECHAZADA_CEO: '#d64545',
 }
+
+const EUR = (n: number) =>
+  n.toLocaleString('es-ES', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 })
+
+const fmtH = (n: number) => (Number.isInteger(n) ? String(n) : n.toFixed(1))
 
 export default async function TallerPage({
   searchParams,
@@ -62,6 +79,7 @@ export default async function TallerPage({
           },
         },
         assignedTo: { select: { id: true, name: true } },
+        timeEntries: { select: { hours: true } },
       },
       orderBy: { createdAt: 'desc' },
     }),
@@ -72,163 +90,208 @@ export default async function TallerPage({
     }),
   ])
 
+  const activeCount = workOrders.filter(
+    (wo) => wo.status !== 'COMPLETADA' && wo.status !== 'RECHAZADA'
+  ).length
+  const pendingCeo = workOrders.filter((wo) => wo.approvalLevel === 'REQUIERE_CEO').length
+  const enCurso = workOrders.filter((wo) => wo.status === 'EN_CURSO').length
+
+  type Row = (typeof workOrders)[number]
+
+  const columns: Column<Row>[] = [
+    {
+      key: 'vehicle',
+      header: 'Vehículo / Orden',
+      cell: (wo) => (
+        <div>
+          <div className="text-ink">
+            {wo.vehicle.brand} {wo.vehicle.model}
+          </div>
+          <div className="mt-0.5 max-w-[240px] truncate text-[11px] font-medium text-ink3">
+            {wo.description}
+          </div>
+        </div>
+      ),
+    },
+    {
+      key: 'status',
+      header: 'Estado',
+      cell: (wo) => <HexPill hex={STATUS_HEX[wo.status]}>{STATUS_LABELS[wo.status]}</HexPill>,
+    },
+    {
+      key: 'approval',
+      header: 'Aprob.',
+      cell: (wo) => {
+        const hex = APPROVAL_HEX[wo.approvalLevel]
+        return hex ? (
+          <HexPill hex={hex}>{APPROVAL_LABELS[wo.approvalLevel]}</HexPill>
+        ) : (
+          <span className="text-ink3">—</span>
+        )
+      },
+    },
+    {
+      key: 'hours',
+      header: 'Horas P→R',
+      align: 'center',
+      cell: (wo) => {
+        const real = wo.timeEntries.reduce((s, t) => s + Number(t.hours), 0)
+        const planned = wo.estimatedHours ? Number(wo.estimatedHours) : null
+        const dev = computeHoursDeviation(planned, real)
+        if (dev.planned == null && dev.real === 0)
+          return <span className="font-mono text-[11.5px] font-semibold text-ink3">— → —</span>
+        const color =
+          dev.status === 'desviado_arriba'
+            ? 'text-bad'
+            : dev.status === 'dentro' || dev.status === 'por_debajo'
+              ? dev.real > 0
+                ? 'text-good'
+                : 'text-ink3'
+              : 'text-ink3'
+        return (
+          <span className="inline-flex items-center gap-1.5">
+            <span className={cn('font-mono text-[11.5px] font-semibold', color)}>
+              {dev.planned != null ? fmtH(dev.planned) : '—'} →{' '}
+              {dev.real > 0 ? fmtH(dev.real) : '—'}
+            </span>
+            {dev.status === 'desviado_arriba' && dev.deviationPct != null && (
+              <span className="rounded-[5px] bg-bad-tint px-1.5 py-0.5 font-hanken text-[9px] font-semibold text-bad">
+                +{Math.round(dev.deviationPct)}%
+              </span>
+            )}
+          </span>
+        )
+      },
+    },
+    {
+      key: 'cost',
+      header: 'Coste est.',
+      mono: true,
+      align: 'right',
+      cell: (wo) =>
+        wo.estimatedCost ? EUR(Number(wo.estimatedCost)) : <span className="text-ink3">—</span>,
+    },
+    {
+      key: 'mechanic',
+      header: 'Mecánico',
+      cell: (wo) => (
+        <span className="font-medium text-ink2">{wo.assignedTo?.name ?? 'Sin asignar'}</span>
+      ),
+    },
+    {
+      key: 'delivery',
+      header: 'Entrega',
+      mono: true,
+      cell: (wo) =>
+        wo.scheduledEnd ? (
+          <span className="text-ink2">
+            {new Date(wo.scheduledEnd).toLocaleDateString('es-ES', {
+              day: '2-digit',
+              month: 'short',
+              timeZone: 'Europe/Madrid',
+            })}
+          </span>
+        ) : (
+          <span className="text-ink3">—</span>
+        ),
+    },
+  ]
+
   const statuses = Object.keys(STATUS_LABELS) as WorkOrderStatus[]
 
   return (
-    <div className="space-y-6">
-      {/* Cabecera */}
-      <div className="flex flex-wrap items-center justify-between gap-3">
+    <div>
+      <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold">Taller</h1>
-          <p className="mt-0.5 text-sm text-muted-foreground">
-            {workOrders.length} órdenes de trabajo
+          <Eyebrow>CRM · Operaciones</Eyebrow>
+          <h1 className="mt-1 font-hanken text-[23px] font-bold tracking-[-0.02em] text-ink">
+            Taller
+          </h1>
+          <p className="mt-1 font-hanken text-[13.5px] text-ink2">
+            <b className="text-ink">{activeCount}</b> orden{activeCount === 1 ? '' : 'es'} activa
+            {activeCount === 1 ? '' : 's'}
+            {pendingCeo > 0 && (
+              <>
+                {' '}
+                ·{' '}
+                <b className="text-warn">
+                  {pendingCeo} pendiente{pendingCeo === 1 ? '' : 's'} de CEO
+                </b>
+              </>
+            )}
+            {enCurso > 0 && <> · En curso {enCurso}</>}
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <Button asChild variant="outline">
-            <Link href="/taller/agenda">
-              <CalendarDays className="mr-1.5 h-4 w-4" />
-              Agenda
-            </Link>
-          </Button>
-          <Button asChild>
-            <Link href="/taller/nueva">
-              <Plus className="mr-1.5 h-4 w-4" />
-              Nueva orden
-            </Link>
-          </Button>
+          <ButtonLink href="/taller/agenda" variant="secondary">
+            <CalendarDays size={15} strokeWidth={1.9} className="mr-1.5" />
+            Agenda
+          </ButtonLink>
+          <ButtonLink href="/taller/nueva" variant="primary">
+            <Plus size={15} strokeWidth={2.2} className="mr-1.5" />
+            Nueva orden
+          </ButtonLink>
         </div>
       </div>
 
       {/* Filtros */}
-      <div className="flex flex-wrap gap-3">
-        <form className="flex flex-wrap gap-3">
-          <select
-            name="status"
-            defaultValue={searchParams.status ?? ''}
-            className="h-9 rounded-lg border border-cn-line bg-white px-3 text-sm focus:outline-none"
+      <form className="mb-4 flex flex-wrap gap-2">
+        <select
+          name="status"
+          defaultValue={searchParams.status ?? ''}
+          className="h-9 rounded-[10px] border border-line bg-card px-3 font-hanken text-[13px] text-ink outline-none focus:border-brand"
+        >
+          <option value="">Todos los estados</option>
+          {statuses.map((s) => (
+            <option key={s} value={s}>
+              {STATUS_LABELS[s]}
+            </option>
+          ))}
+        </select>
+        <select
+          name="assigned"
+          defaultValue={searchParams.assigned ?? ''}
+          className="h-9 rounded-[10px] border border-line bg-card px-3 font-hanken text-[13px] text-ink outline-none focus:border-brand"
+        >
+          <option value="">Todos los mecánicos</option>
+          {users.map((u) => (
+            <option key={u.id} value={u.id}>
+              {u.name}
+            </option>
+          ))}
+        </select>
+        <button
+          type="submit"
+          className="h-9 rounded-[10px] bg-brand px-4 font-hanken text-[13px] font-semibold text-white transition-colors hover:bg-brand2"
+        >
+          Filtrar
+        </button>
+        {(searchParams.status || searchParams.assigned) && (
+          <Link
+            href="/taller"
+            className="inline-flex h-9 items-center rounded-[10px] border border-line px-3 font-hanken text-[13px] text-ink2 hover:bg-canvas"
           >
-            <option value="">Todos los estados</option>
-            {statuses.map((s) => (
-              <option key={s} value={s}>
-                {STATUS_LABELS[s]}
-              </option>
-            ))}
-          </select>
-          <select
-            name="assigned"
-            defaultValue={searchParams.assigned ?? ''}
-            className="h-9 rounded-lg border border-cn-line bg-white px-3 text-sm focus:outline-none"
-          >
-            <option value="">Todos los mecánicos</option>
-            {users.map((u) => (
-              <option key={u.id} value={u.id}>
-                {u.name}
-              </option>
-            ))}
-          </select>
-          <button
-            type="submit"
-            className="h-9 rounded-lg bg-primary px-4 text-sm font-medium text-white hover:opacity-90"
-          >
-            Filtrar
-          </button>
-          {(searchParams.status || searchParams.assigned) && (
-            <a
-              href="/taller"
-              className="inline-flex h-9 items-center rounded-lg border border-cn-line px-3 text-sm text-cn-ink-500 hover:bg-cn-cream-50"
-            >
-              Limpiar
-            </a>
-          )}
-        </form>
-      </div>
+            Limpiar
+          </Link>
+        )}
+      </form>
 
-      {/* Tabla */}
-      {workOrders.length === 0 ? (
-        <div className="rounded-xl border border-cn-line py-16 text-center">
-          <p className="text-cn-ink-400 text-sm">No hay órdenes de trabajo.</p>
-          <Button asChild className="mt-4" variant="outline">
-            <Link href="/taller/nueva">Crear la primera orden</Link>
-          </Button>
-        </div>
-      ) : (
-        <div className="overflow-x-auto rounded-xl border border-cn-line">
-          <table className="w-full min-w-[760px] text-sm">
-            <thead>
-              <tr className="border-b border-cn-line bg-cn-cream-50">
-                <th className="px-4 py-2.5 text-left font-medium text-cn-ink-500">Vehículo</th>
-                <th className="px-4 py-2.5 text-left font-medium text-cn-ink-500">Descripción</th>
-                <th className="px-4 py-2.5 text-left font-medium text-cn-ink-500">Estado</th>
-                <th className="hidden px-4 py-2.5 text-left font-medium text-cn-ink-500 sm:table-cell">
-                  Aprobación
-                </th>
-                <th className="hidden px-4 py-2.5 text-right font-medium text-cn-ink-500 md:table-cell">
-                  Coste est.
-                </th>
-                <th className="hidden px-4 py-2.5 text-left font-medium text-cn-ink-500 lg:table-cell">
-                  Asignado
-                </th>
-                <th className="px-4 py-2.5 text-left font-medium text-cn-ink-500">Fecha</th>
-              </tr>
-            </thead>
-            <tbody>
-              {workOrders.map((wo) => (
-                <tr
-                  key={wo.id}
-                  className="border-b border-cn-line last:border-0 hover:bg-cn-cream-50"
-                >
-                  <td className="px-4 py-3">
-                    <Link
-                      href={`/taller/${wo.id}`}
-                      className="font-medium text-cn-teal-900 hover:underline"
-                    >
-                      {wo.vehicle.brand} {wo.vehicle.model}{' '}
-                      <span className="text-cn-ink-400 font-normal">{wo.vehicle.year}</span>
-                    </Link>
-                    <p className="text-cn-ink-400 text-xs">{wo.vehicle.sellerLead?.name}</p>
-                  </td>
-                  <td className="max-w-[200px] truncate px-4 py-3 text-cn-ink-700">
-                    {wo.description}
-                  </td>
-                  <td className="px-4 py-3">
-                    <span
-                      className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${STATUS_COLORS[wo.status]}`}
-                    >
-                      {STATUS_LABELS[wo.status]}
-                    </span>
-                  </td>
-                  <td className="hidden px-4 py-3 sm:table-cell">
-                    <span
-                      className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${APPROVAL_COLORS[wo.approvalLevel]}`}
-                    >
-                      {APPROVAL_LABELS[wo.approvalLevel]}
-                    </span>
-                  </td>
-                  <td className="hidden px-4 py-3 text-right font-medium text-cn-ink-700 md:table-cell">
-                    {wo.estimatedCost
-                      ? Number(wo.estimatedCost).toLocaleString('es-ES', {
-                          style: 'currency',
-                          currency: 'EUR',
-                          maximumFractionDigits: 0,
-                        })
-                      : '—'}
-                  </td>
-                  <td className="hidden px-4 py-3 text-cn-ink-500 lg:table-cell">
-                    {wo.assignedTo?.name ?? '—'}
-                  </td>
-                  <td className="text-cn-ink-400 px-4 py-3">
-                    {new Date(wo.createdAt).toLocaleDateString('es-ES', {
-                      day: 'numeric',
-                      month: 'short',
-                    })}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
+      <Card pad={false}>
+        <ActionableTable
+          columns={columns}
+          rows={workOrders}
+          rowKey={(wo) => wo.id}
+          rowHref={(wo) => `/taller/${wo.id}`}
+          empty={
+            <EmptyState
+              icon={<Wrench size={20} strokeWidth={1.9} />}
+              title="Sin órdenes de trabajo"
+              description="Aquí verás las órdenes del taller con su estado, aprobación CEO, horas previstas vs reales y coste estimado."
+              cta={{ label: 'Nueva orden', href: '/taller/nueva' }}
+            />
+          }
+        />
+      </Card>
     </div>
   )
 }
