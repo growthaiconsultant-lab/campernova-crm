@@ -93,7 +93,32 @@ claude mcp add-json linear '{\"command\":\"npx\",\"args\":[\"-y\",\"mcp-linear@l
 
 `.claude/settings.json` y `.claude/settings.local.json` se mantienen como referencia de la estructura, pero la fuente de verdad funcional es el registro de la CLI.
 
-## Estado actual (Block 22 — Rebrand visual del CRM COMPLETO — MERGED A MAIN ✅)
+## Estado actual (Block 23 — Rediseño fiel del CRM (handoff mockups) — EN PRODUCCIÓN ✅)
+
+**Reproducción fiel de los mockups** `design_handoff_campersnova` (no reskin): se conserva la capa de datos (rutas, modelos, enums, cálculos server-side) y se rehace la capa visual/UX para calcar los `.dc.html`. Alcance: **solo el CRM** (web pública intacta). PRs #85–#94, cada uno con typecheck + lint + **531 tests** verdes y validación en vivo en producción. Sin migraciones.
+
+- **F1 Fundamentos**: tokens EXACTOS del mockup como CSS vars crudas en `.crm-theme` (`--bg/--card/--line/--ink*/--panel*/--brand*` + semáforo `--green/amber/red/blue` con tints) + puente a los tokens shadcn. Utilidades Tailwind planas 1:1 (`bg-canvas`, `text-ink2`, `border-line`, `bg-brand`, `hover:bg-brand2`, `bg-panel2`, `text-good`, `bg-bad-tint`…). **Hanken Grotesk** (UI, tras `--font-crm`) + JetBrains Mono (datos); Inter/Fraunces solo para la web pública. Iconos Lucide según ESPEC §3 (trazo 1.9). **Shell fiel**: sidebar 246px `--panel` con logo "CN" verde + eyebrows mono + ítem activo con barra 3px; header 60px (buscador ⌘K visual + "Nuevo lead" + campana).
+- **F2 Kit** (`components/redesign/`): Pill/HexPill, Card/CardHeader/Eyebrow, KpiCard (barra de estado + delta), ActionableTable (cabecera mono, drill-down stretched-link, col CTA), Button/ButtonLink, DetailLayout, BoardKanban, Timeline, EmptyState/Skeleton/ErrorState, y chrome móvil (MobileTabBar/MobileActionBar/MobileDetailHeader/PhoneFrame).
+- **F3 Pantallas** (todas con título en contenido —fuera la doble cabecera—, EmptyState útil, `loading.tsx` skeleton y `error.tsx` con reintentar):
+  - **Ofertas (OF1)**: 4 KPI cards + 2 tablas accionables (sustituye el kanban de B18; la lógica `lib/offers` intacta). "Reservas paradas" = `RESERVATION_STALE_DAYS` o reserva vencida.
+  - **Captaciones (CAP1)**: tablero de sourcing + `CaptureCard` recalcada (badge portal mono, WhatsApp, avatar responsable) conservando toda la lógica.
+  - **Compradores (C1)**: bandeja con Temp./Etapa/Próxima acción (vencida en rojo)/Presup./Match/Resp. + vistas + toggle **Lista|Pipeline**.
+  - **Pipeline (P1)**: `/compradores/pipeline` — kanban del viaje del comprador con columnas **derivadas** (Lead→Cualificado→Cita→Oferta→Reserva; cada comprador en su columna más avanzada según status + citas CITA futuras + ofertas/reservas vivas). Lectura con drill-in: el avance se registra en la ficha (una fuente de verdad por entidad).
+  - **Vendedores (VEN1)**: bandeja con Estado/Tasación (+sobreprecio)/Acuerdo/Próxima acción.
+  - **Vehículos (V1)**: grid de cards (foto + badge de estado + matrícula mono + precio + chip de demanda con nº matches).
+  - **Taller (TAL1/TAL2)**: columna y bloque grande **Horas P→R** con desviación (`computeHoursDeviation` + suma `timeEntries`), aprob. CEO; ficha con breadcrumb + COSTE EST.
+  - **Entregas (ENT1/ENT2)**: **agenda por día** (HOY/MAÑANA) con barra de progreso del checklist; ficha con fecha/hora + barra + panel "al completar" (garantía+follow-ups).
+  - **Postventa (POST1/POST2)**: tarjetas de garantía con días restantes coloreados, tickets con "Vencido · escalar" (dueAt), follow-ups 7/30; ficha con barra de progreso de vigencia.
+  - **Dashboard «Mi día» (D1)**: `/dashboard` reconvertido a panel operativo — saludo+fecha, KPIs (vencidas/calientes/citas/reservas), "Tu día, priorizado" y "Agenda de hoy". Reutiliza `getComercialKpis` (B21) + `getCalendarItems` (B15); **el contenido financiero vive en `/analytics/*`**. `ForbiddenToast` y filtro de agente (ADMIN) conservados.
+  - **Analytics**: layout compartido con **conmutador de tabs** (7 dashboards, filtrado por rol) + fade ~0.3s.
+  - **Móvil**: tab bar inferior (Inicio·Compradores·Vehículos·Agenda, por rol; TALLER/ENTREGAS ven sus módulos) + **MobileFichaActions** (Llamar/WhatsApp fijos, con `logWhatsApp`) en fichas C2/VEN2 (z-50 sobre la tab bar).
+  - Fichas C2/VEN2: cabecera breadcrumb a 60px + offsets sticky 118px (mantienen su arquitectura hero+tabs+rail, ya token-coherente). Calendario: colores de origen al semáforo.
+
+### Pendiente del rediseño (pulido menor)
+
+Validación visual de TAL2/ENT2/POST2 **con datos** (prod aún sin órdenes/entregas/garantías; verificadas rutas, compilación y estados vacíos). Filtros globales de Analytics con rango de fechas (requiere extender `lib/kpi/*` con parámetros de rango — feature aparte con tests). Detalle fino de la rejilla del calendario (CA1) y de `/usuarios`. Buscador ⌘K y campana del header son visuales (cablear en fase posterior).
+
+## Estado previo (Block 22 — Rebrand visual del CRM COMPLETO — MERGED A MAIN ✅)
 
 Rebrand del **backoffice** a partir del handoff de Claude Design: nueva identidad **verde `#0e7d6b` + carbón `#12151c` + fondo `#f4f6f8`**, tipografía **IBM Plex Sans** (UI) + JetBrains Mono (datos). **Reskin, no rebuild** — rutas/entidades/flujos/KPIs intactos. Scopeado **solo al CRM**; la web pública mantiene su identidad (crema + Inter/Fraunces). Plan en el plan file de la sesión; diseño en **ADR `docs/adr/0008-crm-rebrand-scoped-theme.md`**.
 
