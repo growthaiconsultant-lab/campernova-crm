@@ -1,18 +1,32 @@
 import Link from 'next/link'
 import Image from 'next/image'
 import { Suspense } from 'react'
+import { Package } from 'lucide-react'
 import { db } from '@/lib/db'
-import { VEHICLE_STATUS_LABELS, VEHICLE_STATUS_CLASSES } from '@/lib/state-machine'
-import { Button } from '@/components/ui/button'
+import { VEHICLE_STATUS_LABELS } from '@/lib/state-machine'
 import { VehicleFilters } from './vehicle-filters'
-import type { Prisma } from '@prisma/client'
+import { Eyebrow, EmptyState } from '@/components/redesign'
+import type { Prisma, VehicleStatus } from '@prisma/client'
 
-const PAGE_SIZE = 50
+const PAGE_SIZE = 48
 
 const TYPE_LABELS: Record<string, string> = {
   CAMPER: 'Camper',
   AUTOCARAVANA: 'Autocaravana',
 }
+
+// Color de estado del vehículo (semáforo del handoff)
+const STATUS_HEX: Record<VehicleStatus, string> = {
+  NUEVO: '#8b94a3',
+  TASADO: '#3a6fd4',
+  PUBLICADO: '#1a9d5f',
+  RESERVADO: '#c9820a',
+  VENDIDO: '#141922',
+  DESCARTADO: '#8b94a3',
+}
+
+const EUR = (n: number) =>
+  n.toLocaleString('es-ES', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 })
 
 type SearchParams = {
   brand?: string
@@ -58,23 +72,18 @@ function buildWhere(sp: SearchParams): Prisma.VehicleWhereInput {
     const y = parseInt(sp.yearMin, 10)
     if (!isNaN(y)) conditions.push({ year: { gte: y } })
   }
-
   if (sp.yearMax) {
     const y = parseInt(sp.yearMax, 10)
     if (!isNaN(y)) conditions.push({ year: { lte: y } })
   }
-
   if (sp.kmMax) {
     const k = parseInt(sp.kmMax, 10)
     if (!isNaN(k)) conditions.push({ km: { lte: k } })
   }
-
   if (sp.priceMax) {
     const p = parseFloat(sp.priceMax)
     if (!isNaN(p)) {
-      conditions.push({
-        OR: [{ valuationRecommended: { lte: p } }, { desiredPrice: { lte: p } }],
-      })
+      conditions.push({ OR: [{ valuationRecommended: { lte: p } }, { desiredPrice: { lte: p } }] })
     }
   }
 
@@ -104,189 +113,134 @@ export default async function VehiculosPage({ searchParams }: { searchParams: Se
       include: {
         sellerLead: { select: { id: true, name: true } },
         photos: { take: 1, orderBy: { order: 'asc' } },
+        _count: { select: { matches: true } },
       },
     }),
   ])
 
   const totalPages = Math.ceil(total / PAGE_SIZE)
-  const from = total === 0 ? 0 : (page - 1) * PAGE_SIZE + 1
-  const to = Math.min(page * PAGE_SIZE, total)
 
   function pageUrl(p: number) {
-    const sp = new URLSearchParams()
-    if (searchParams.brand) sp.set('brand', searchParams.brand)
-    if (searchParams.status) sp.set('status', searchParams.status)
-    if (searchParams.type) sp.set('type', searchParams.type)
-    if (searchParams.yearMin) sp.set('yearMin', searchParams.yearMin)
-    if (searchParams.yearMax) sp.set('yearMax', searchParams.yearMax)
-    if (searchParams.kmMax) sp.set('kmMax', searchParams.kmMax)
-    if (searchParams.priceMax) sp.set('priceMax', searchParams.priceMax)
-    if (searchParams.sort) sp.set('sort', searchParams.sort)
-    if (searchParams.dir) sp.set('dir', searchParams.dir)
+    const sp = new URLSearchParams(searchParams as Record<string, string>)
     if (p > 1) sp.set('page', String(p))
+    else sp.delete('page')
     const qs = sp.toString()
     return `/vehiculos${qs ? `?${qs}` : ''}`
   }
 
   return (
-    <div className="space-y-5">
-      {/* Cabecera */}
-      <div>
-        <h1 className="text-2xl font-bold">Stock de vehículos</h1>
-        <p className="mt-0.5 text-sm text-muted-foreground">
-          {total} vehículo{total !== 1 ? 's' : ''} en total
+    <div>
+      <div className="mb-4">
+        <Eyebrow>CRM · Inventario</Eyebrow>
+        <h1 className="mt-1 font-hanken text-[23px] font-bold tracking-[-0.02em] text-ink">
+          Inventario
+        </h1>
+        <p className="mt-1 font-hanken text-[13.5px] text-ink2">
+          <b className="text-ink">{total}</b> vehículo{total === 1 ? '' : 's'} en stock
         </p>
       </div>
 
-      {/* Filtros */}
-      <Suspense>
-        <VehicleFilters />
-      </Suspense>
-
-      {/* Tabla */}
-      <div className="overflow-x-auto rounded-lg border">
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="border-b bg-muted/50">
-              <th className="w-16 px-4 py-3 text-left font-medium text-muted-foreground" />
-              <th className="px-4 py-3 text-left font-medium text-muted-foreground">Vehículo</th>
-              <th className="hidden px-4 py-3 text-left font-medium text-muted-foreground sm:table-cell">
-                Tipo
-              </th>
-              <th className="hidden px-4 py-3 text-left font-medium text-muted-foreground md:table-cell">
-                Año / Km
-              </th>
-              <th className="px-4 py-3 text-left font-medium text-muted-foreground">Estado</th>
-              <th className="hidden px-4 py-3 text-left font-medium text-muted-foreground lg:table-cell">
-                Precio tasado
-              </th>
-              <th className="hidden px-4 py-3 text-left font-medium text-muted-foreground xl:table-cell">
-                Vendedor
-              </th>
-            </tr>
-          </thead>
-          <tbody className="divide-y">
-            {vehicles.length === 0 && (
-              <tr>
-                <td colSpan={7} className="px-4 py-10 text-center text-muted-foreground">
-                  No hay vehículos con los filtros aplicados.
-                </td>
-              </tr>
-            )}
-            {vehicles.map((v) => {
-              const photo = v.photos[0]
-              const price = v.valuationRecommended?.toNumber() ?? null
-
-              return (
-                <tr key={v.id} className="transition-colors hover:bg-muted/30">
-                  {/* Miniatura */}
-                  <td className="px-4 py-3">
-                    {photo ? (
-                      <div className="relative h-10 w-14 overflow-hidden rounded">
-                        <Image
-                          src={photo.url}
-                          alt={photo.altText ?? `${v.brand} ${v.model}`}
-                          fill
-                          className="object-cover"
-                          sizes="56px"
-                        />
-                      </div>
-                    ) : (
-                      <div className="flex h-10 w-14 items-center justify-center rounded bg-muted text-xs text-muted-foreground">
-                        —
-                      </div>
-                    )}
-                  </td>
-
-                  {/* Marca + modelo */}
-                  <td className="px-4 py-3">
-                    <Link
-                      href={`/vendedores/${v.sellerLead.id}`}
-                      className="font-medium hover:underline"
-                    >
-                      {v.brand} {v.model}
-                    </Link>
-                  </td>
-
-                  {/* Tipo */}
-                  <td className="hidden px-4 py-3 sm:table-cell">
-                    <span className="inline-flex items-center rounded-full bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">
-                      {TYPE_LABELS[v.type] ?? v.type}
-                    </span>
-                  </td>
-
-                  {/* Año / km */}
-                  <td className="hidden px-4 py-3 text-muted-foreground md:table-cell">
-                    <div>{v.year ?? '—'}</div>
-                    <div className="text-xs">
-                      {v.km != null ? `${v.km.toLocaleString('es-ES')} km` : '—'}
-                    </div>
-                  </td>
-
-                  {/* Estado */}
-                  <td className="px-4 py-3">
-                    <span
-                      className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${VEHICLE_STATUS_CLASSES[v.status]}`}
-                    >
-                      {VEHICLE_STATUS_LABELS[v.status]}
-                    </span>
-                  </td>
-
-                  {/* Precio tasado */}
-                  <td className="hidden px-4 py-3 lg:table-cell">
-                    {price != null ? (
-                      <span className="font-medium tabular-nums">
-                        {price.toLocaleString('es-ES', {
-                          style: 'currency',
-                          currency: 'EUR',
-                          maximumFractionDigits: 0,
-                        })}
-                      </span>
-                    ) : (
-                      <span className="text-xs italic text-muted-foreground">Sin tasar</span>
-                    )}
-                  </td>
-
-                  {/* Vendedor */}
-                  <td className="hidden px-4 py-3 xl:table-cell">
-                    <Link
-                      href={`/vendedores/${v.sellerLead.id}`}
-                      className="text-xs text-muted-foreground hover:underline"
-                    >
-                      {v.sellerLead.name}
-                    </Link>
-                  </td>
-                </tr>
-              )
-            })}
-          </tbody>
-        </table>
+      <div className="mb-4">
+        <Suspense>
+          <VehicleFilters />
+        </Suspense>
       </div>
 
-      {/* Paginación */}
-      {total > 0 && (
-        <div className="flex items-center justify-between text-sm text-muted-foreground">
-          <span>
-            {from}–{to} de {total}
+      {vehicles.length === 0 ? (
+        <EmptyState
+          icon={<Package size={20} strokeWidth={1.9} />}
+          title="Sin vehículos en el inventario"
+          description="Los vehículos que custodiamos aparecerán aquí con su estado operativo, motivo de bloqueo para publicar y la demanda compatible."
+        />
+      ) : (
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+          {vehicles.map((v) => {
+            const photo = v.photos[0]
+            const priceN =
+              (v.salePrice ? Number(v.salePrice) : null) ??
+              (v.valuationRecommended ? Number(v.valuationRecommended) : null) ??
+              (v.desiredPrice ? Number(v.desiredPrice) : null)
+            return (
+              <Link
+                key={v.id}
+                href={`/vendedores/${v.sellerLead.id}`}
+                className="hover:border-ink3/40 group overflow-hidden rounded-[14px] border border-line bg-card transition-colors"
+              >
+                {/* Foto */}
+                <div className="relative h-[140px] w-full overflow-hidden bg-track">
+                  {photo ? (
+                    <Image
+                      src={photo.url}
+                      alt={photo.altText ?? `${v.brand} ${v.model}`}
+                      fill
+                      className="object-cover"
+                      sizes="(max-width:640px) 100vw, (max-width:1024px) 50vw, 25vw"
+                    />
+                  ) : (
+                    <div className="flex h-full items-center justify-center text-ink3">
+                      <Package size={28} strokeWidth={1.5} />
+                    </div>
+                  )}
+                  <span
+                    className="absolute left-2.5 top-2.5 rounded-[6px] px-2 py-[3px] font-hanken text-[10.5px] font-semibold text-white"
+                    style={{ backgroundColor: STATUS_HEX[v.status] }}
+                  >
+                    {VEHICLE_STATUS_LABELS[v.status]}
+                  </span>
+                  {v.plate && (
+                    <span className="absolute right-2.5 top-2.5 rounded-[6px] bg-white/90 px-2 py-[3px] font-mono text-[10px] font-semibold text-ink2">
+                      {v.plate}
+                    </span>
+                  )}
+                </div>
+
+                {/* Cuerpo */}
+                <div className="p-3">
+                  <div className="truncate font-hanken text-[13.5px] font-semibold text-ink">
+                    {v.brand} {v.model} {v.year}
+                  </div>
+                  <div className="mt-0.5 font-mono text-[11px] text-ink3">
+                    {TYPE_LABELS[v.type] ?? v.type}
+                    {v.km != null ? ` · ${v.km.toLocaleString('es-ES')} km` : ''}
+                  </div>
+                  <div className="mt-2 flex items-center justify-between gap-2">
+                    <span className="font-hanken text-[15px] font-bold text-ink">
+                      {priceN != null ? EUR(priceN) : <span className="text-ink3">Sin tasar</span>}
+                    </span>
+                    {v._count.matches > 0 && (
+                      <span className="rounded-[6px] bg-brand-tint px-2 py-[3px] font-hanken text-[11px] font-semibold text-brand">
+                        {v._count.matches} compatible{v._count.matches === 1 ? '' : 's'}
+                      </span>
+                    )}
+                  </div>
+                </div>
+              </Link>
+            )
+          })}
+        </div>
+      )}
+
+      {total > PAGE_SIZE && (
+        <div className="mt-5 flex items-center justify-between">
+          <span className="font-hanken text-[12.5px] text-ink2">
+            Página {page} de {totalPages}
           </span>
           <div className="flex gap-2">
-            {page > 1 ? (
-              <Button asChild variant="outline" size="sm">
-                <Link href={pageUrl(page - 1)}>← Anterior</Link>
-              </Button>
-            ) : (
-              <Button variant="outline" size="sm" disabled>
-                ← Anterior
-              </Button>
+            {page > 1 && (
+              <Link
+                href={pageUrl(page - 1)}
+                className="rounded-[9px] border border-line bg-card px-3 py-1.5 font-hanken text-[12.5px] font-semibold text-ink2 hover:bg-canvas"
+              >
+                Anterior
+              </Link>
             )}
-            {page < totalPages ? (
-              <Button asChild variant="outline" size="sm">
-                <Link href={pageUrl(page + 1)}>Siguiente →</Link>
-              </Button>
-            ) : (
-              <Button variant="outline" size="sm" disabled>
-                Siguiente →
-              </Button>
+            {page < totalPages && (
+              <Link
+                href={pageUrl(page + 1)}
+                className="rounded-[9px] border border-line bg-card px-3 py-1.5 font-hanken text-[12.5px] font-semibold text-ink2 hover:bg-canvas"
+              >
+                Siguiente
+              </Link>
             )}
           </div>
         </div>
