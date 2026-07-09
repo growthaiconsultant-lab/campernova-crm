@@ -1,7 +1,10 @@
 import Link from 'next/link'
+import { Clock, ShieldCheck } from 'lucide-react'
 import { db } from '@/lib/db'
 import { requireCanViewPostventa } from '@/lib/auth'
-import type { TicketStatus } from '@prisma/client'
+import { Eyebrow, HexPill, EmptyState } from '@/components/redesign'
+import { cn } from '@/lib/utils'
+import type { TicketStatus, FollowupType } from '@prisma/client'
 
 const TICKET_STATUS_LABELS: Record<TicketStatus, string> = {
   ABIERTO: 'Abierto',
@@ -11,12 +14,28 @@ const TICKET_STATUS_LABELS: Record<TicketStatus, string> = {
   ANULADO: 'Anulado',
 }
 
-const TICKET_STATUS_COLORS: Record<TicketStatus, string> = {
-  ABIERTO: 'bg-red-100 text-red-700',
-  EN_PROGRESO: 'bg-yellow-100 text-yellow-700',
-  RESUELTO: 'bg-blue-100 text-blue-700',
-  CERRADO: 'bg-green-100 text-green-700',
-  ANULADO: 'bg-gray-100 text-gray-500',
+// Semáforo del handoff: abierto = rojo, en progreso = ámbar, resuelto = azul,
+// cerrado = verde, anulado = gris.
+const TICKET_STATUS_HEX: Record<TicketStatus, string> = {
+  ABIERTO: '#d64545',
+  EN_PROGRESO: '#c9820a',
+  RESUELTO: '#3a6fd4',
+  CERRADO: '#1a9d5f',
+  ANULADO: '#8b94a3',
+}
+
+const FOLLOWUP_LABELS: Record<FollowupType, string> = {
+  DIA_7: 'Follow-up día 7',
+  DIA_30: 'Follow-up día 30',
+}
+
+const TZ = 'Europe/Madrid'
+
+function deliveredAgo(date: Date): string {
+  const days = Math.floor((Date.now() - date.getTime()) / 86_400_000)
+  if (days <= 0) return 'entregada hoy'
+  if (days === 1) return 'entregada ayer'
+  return `entregada hace ${days} días`
 }
 
 export default async function PostventaPage({
@@ -49,125 +68,181 @@ export default async function PostventaPage({
     : warranties
 
   const ticketStatuses = Object.keys(TICKET_STATUS_LABELS) as TicketStatus[]
+  const now = new Date()
+  const openTickets = warranties.reduce(
+    (s, w) =>
+      s + w.tickets.filter((t) => t.status === 'ABIERTO' || t.status === 'EN_PROGRESO').length,
+    0
+  )
+  const pendingFollowups = warranties.reduce((s, w) => s + w.followups.length, 0)
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-bold">Postventa</h1>
-          <p className="mt-0.5 text-sm text-muted-foreground">
-            {filteredWarranties.length} garantías activas
-          </p>
-        </div>
+    <div>
+      <div className="mb-4">
+        <Eyebrow>CRM · Operaciones</Eyebrow>
+        <h1 className="mt-1 font-hanken text-[23px] font-bold tracking-[-0.02em] text-ink">
+          Postventa
+        </h1>
+        <p className="mt-1 font-hanken text-[13.5px] text-ink2">
+          <b className="text-ink">{filteredWarranties.length}</b> garantía
+          {filteredWarranties.length === 1 ? '' : 's'}
+          {openTickets > 0 && (
+            <>
+              {' '}
+              ·{' '}
+              <b className="text-bad">
+                {openTickets} ticket{openTickets === 1 ? '' : 's'} vivo
+                {openTickets === 1 ? '' : 's'}
+              </b>
+            </>
+          )}
+          {pendingFollowups > 0 && (
+            <>
+              {' '}
+              · {pendingFollowups} follow-up{pendingFollowups === 1 ? '' : 's'} pendiente
+              {pendingFollowups === 1 ? '' : 's'}
+            </>
+          )}
+        </p>
       </div>
 
-      <form className="flex flex-wrap gap-3">
-        <select
-          name="status"
-          defaultValue={searchParams.status ?? ''}
-          className="h-9 rounded-lg border border-cn-line bg-white px-3 text-sm focus:outline-none"
+      {/* Filtro por estado de ticket */}
+      <div className="mb-5 flex flex-wrap items-center gap-1.5">
+        <Link
+          href="/postventa"
+          className={cn(
+            'inline-flex items-center rounded-[9px] border px-3 py-1.5 font-hanken text-[12.5px] font-semibold transition-colors',
+            !searchParams.status
+              ? 'border-brand bg-brand-tint text-brand'
+              : 'border-line bg-card text-ink2 hover:bg-canvas'
+          )}
         >
-          <option value="">Todas las garantías</option>
-          {ticketStatuses.map((s) => (
-            <option key={s} value={s}>
-              Tickets: {TICKET_STATUS_LABELS[s]}
-            </option>
-          ))}
-        </select>
-        <button
-          type="submit"
-          className="h-9 rounded-lg bg-primary px-4 text-sm font-medium text-white hover:opacity-90"
-        >
-          Filtrar
-        </button>
-        {searchParams.status && (
-          <a
-            href="/postventa"
-            className="inline-flex h-9 items-center rounded-lg border border-cn-line px-3 text-sm text-cn-ink-500 hover:bg-cn-cream-50"
+          Todas
+        </Link>
+        {ticketStatuses.map((s) => (
+          <Link
+            key={s}
+            href={`/postventa?status=${s}`}
+            className={cn(
+              'inline-flex items-center gap-1.5 rounded-[9px] border px-3 py-1.5 font-hanken text-[12.5px] font-semibold transition-colors',
+              searchParams.status === s
+                ? 'border-brand bg-brand-tint text-brand'
+                : 'border-line bg-card text-ink2 hover:bg-canvas'
+            )}
           >
-            Limpiar
-          </a>
-        )}
-      </form>
+            <span
+              className="h-1.5 w-1.5 rounded-full"
+              style={{ backgroundColor: TICKET_STATUS_HEX[s] }}
+              aria-hidden
+            />
+            {TICKET_STATUS_LABELS[s]}
+          </Link>
+        ))}
+      </div>
 
       {filteredWarranties.length === 0 ? (
-        <div className="rounded-xl border border-cn-line py-16 text-center">
-          <p className="text-cn-ink-400 text-sm">No hay garantías activas.</p>
-          <p className="mt-1 text-xs text-cn-ink-300">
-            Las garantías se activan automáticamente al completar una entrega.
-          </p>
-        </div>
+        <EmptyState
+          icon={<ShieldCheck size={20} strokeWidth={1.9} />}
+          title="Sin garantías que mostrar"
+          description="Las garantías se activan automáticamente al completar una entrega. Aquí verás sus días restantes, tickets y follow-ups de los días 7 y 30."
+        />
       ) : (
-        <div className="space-y-4">
+        <div className="flex flex-col gap-3.5">
           {filteredWarranties.map((warranty) => {
             const endDate = warranty.extendedTo ?? warranty.endDate
-            const isExpired = endDate < new Date()
-            const daysLeft = Math.ceil((endDate.getTime() - Date.now()) / (1000 * 60 * 60 * 24))
+            const isExpired = endDate < now
+            const daysLeft = Math.ceil((endDate.getTime() - now.getTime()) / 86_400_000)
+            const daysColor = isExpired ? '#8b94a3' : daysLeft <= 60 ? '#c9820a' : '#1a9d5f'
 
             return (
               <div
                 key={warranty.id}
-                className="overflow-hidden rounded-xl border border-cn-line bg-white"
+                className="overflow-hidden rounded-[14px] border border-line bg-card"
               >
-                <div className="flex items-start justify-between gap-4 p-5">
-                  <div>
-                    <Link
-                      href={`/postventa/${warranty.id}`}
-                      className="text-base font-semibold text-cn-teal-900 hover:underline"
-                    >
-                      {warranty.vehicle.brand} {warranty.vehicle.model}{' '}
-                      <span className="text-cn-ink-400 font-normal">{warranty.vehicle.year}</span>
-                    </Link>
-                    <p className="mt-0.5 text-sm text-cn-ink-500">{warranty.buyerLead.name}</p>
+                {/* Cabecera de la garantía */}
+                <Link
+                  href={`/postventa/${warranty.id}`}
+                  className="hover:bg-line2/40 flex items-start justify-between gap-4 p-[18px] transition-colors"
+                >
+                  <div className="min-w-0">
+                    <div className="truncate font-hanken text-[15px] font-bold text-ink">
+                      {warranty.vehicle.brand} {warranty.vehicle.model} {warranty.vehicle.year}
+                    </div>
+                    <div className="mt-0.5 truncate font-hanken text-[12px] font-medium text-ink2">
+                      {warranty.buyerLead.name} · {deliveredAgo(warranty.startDate)}
+                    </div>
                   </div>
-                  <div className="text-right">
-                    <p
-                      className={`text-sm font-medium ${isExpired ? 'text-red-600' : 'text-green-700'}`}
-                    >
-                      {isExpired ? 'Garantía expirada' : `${daysLeft} días restantes`}
-                    </p>
-                    <p className="text-cn-ink-400 text-xs">
-                      Hasta{' '}
-                      {endDate.toLocaleDateString('es-ES', {
-                        day: 'numeric',
-                        month: 'short',
-                        year: 'numeric',
-                      })}
-                    </p>
-                  </div>
-                </div>
-
-                {warranty.tickets.length > 0 && (
-                  <div className="border-t border-cn-line bg-cn-cream-50 px-5 py-3">
-                    <div className="mb-2 flex items-center justify-between">
-                      <span className="text-cn-ink-400 text-xs font-medium uppercase tracking-wide">
-                        Tickets recientes
+                  <div className="shrink-0 text-right">
+                    {isExpired ? (
+                      <span className="rounded-[7px] bg-track px-2.5 py-1 font-hanken text-[11px] font-semibold text-ink2">
+                        Garantía expirada
                       </span>
-                      <span className="text-cn-ink-400 text-xs">
-                        {warranty._count.tickets} total
+                    ) : (
+                      <>
+                        <div
+                          className="font-hanken text-[13px] font-semibold"
+                          style={{ color: daysColor }}
+                        >
+                          {daysLeft} días restantes
+                        </div>
+                        <div className="mt-0.5 font-hanken text-[10.5px] font-medium text-ink3">
+                          hasta{' '}
+                          {endDate.toLocaleDateString('es-ES', {
+                            day: 'numeric',
+                            month: 'short',
+                            year: 'numeric',
+                            timeZone: TZ,
+                          })}
+                        </div>
+                      </>
+                    )}
+                  </div>
+                </Link>
+
+                {/* Tickets */}
+                {warranty.tickets.length > 0 && (
+                  <div className="border-t border-line2 bg-canvas px-[18px] py-3">
+                    <div className="mb-2 flex items-center justify-between">
+                      <span className="font-mono text-[10px] font-semibold uppercase tracking-[0.06em] text-ink3">
+                        Tickets
+                      </span>
+                      <span className="font-hanken text-[11px] font-medium text-ink3">
+                        {warranty._count.tickets} en total
                       </span>
                     </div>
-                    <div className="space-y-1.5">
-                      {warranty.tickets.map((ticket) => (
-                        <div key={ticket.id} className="flex items-center justify-between gap-3">
-                          <span className="truncate text-sm text-cn-ink-700">{ticket.title}</span>
-                          <span
-                            className={`shrink-0 rounded-full px-2 py-0.5 text-xs font-medium ${TICKET_STATUS_COLORS[ticket.status]}`}
-                          >
-                            {TICKET_STATUS_LABELS[ticket.status]}
-                          </span>
-                        </div>
-                      ))}
+                    <div className="flex flex-col gap-1.5">
+                      {warranty.tickets.map((ticket) => {
+                        const overdue =
+                          ticket.dueAt &&
+                          ticket.dueAt < now &&
+                          (ticket.status === 'ABIERTO' || ticket.status === 'EN_PROGRESO')
+                        return (
+                          <div key={ticket.id} className="flex items-center justify-between gap-3">
+                            <span className="truncate font-hanken text-[12.5px] font-medium text-ink">
+                              {ticket.title}
+                            </span>
+                            <span className="flex shrink-0 items-center gap-1.5">
+                              {overdue && <HexPill hex="#d64545">Vencido · escalar</HexPill>}
+                              <HexPill hex={TICKET_STATUS_HEX[ticket.status]}>
+                                {TICKET_STATUS_LABELS[ticket.status]}
+                              </HexPill>
+                            </span>
+                          </div>
+                        )
+                      })}
                     </div>
                   </div>
                 )}
 
+                {/* Follow-ups pendientes */}
                 {warranty.followups.length > 0 && (
-                  <div className="border-t border-cn-line px-5 py-3">
-                    <span className="text-xs font-medium text-amber-600">
-                      {warranty.followups.length} follow-up
-                      {warranty.followups.length > 1 ? 's' : ''} pendiente
-                      {warranty.followups.length > 1 ? 's' : ''}
+                  <div className="flex items-center gap-2 border-t border-line2 px-[18px] py-[11px]">
+                    <Clock size={14} strokeWidth={2} className="shrink-0 text-warn" />
+                    <span className="font-hanken text-[12px] font-semibold text-warn">
+                      {FOLLOWUP_LABELS[warranty.followups[0].type]} pendiente
+                    </span>
+                    <span className="font-hanken text-[11.5px] font-medium text-ink3">
+                      · llamada de satisfacción
                     </span>
                   </div>
                 )}
