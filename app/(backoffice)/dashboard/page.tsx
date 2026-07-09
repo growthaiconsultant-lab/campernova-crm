@@ -1,1985 +1,289 @@
+import Link from 'next/link'
+import { Suspense } from 'react'
+import { Clock, Flame, CalendarDays } from 'lucide-react'
 import { db } from '@/lib/db'
 import { requireAuth } from '@/lib/auth'
-import {
-  SELLER_LEAD_STATUS_LABELS,
-  BUYER_LEAD_STATUS_LABELS,
-  VEHICLE_STATUS_LABELS,
-} from '@/lib/state-machine'
-import { NEXT_ACTION_LABELS, formatNextActionDue } from '@/lib/next-action'
-import { LOST_REASON_LABELS } from '@/lib/lost-reason'
-import { ACTIVE_DEMAND_MATCH_THRESHOLD } from '@/lib/scoring'
-import {
-  getSellerLeadCounts,
-  getBuyerLeadCounts,
-  getVehicleCounts,
-  getSalesMonthOverMonth,
-  getProFunnel,
-  type DashboardFilter,
-} from '@/lib/dashboard/queries'
-import {
-  aggregateMediansByState,
-  formatDuration,
-  type EntityActivities,
-  type StateMedianRow,
-} from '@/lib/dashboard/time-in-state'
-import {
-  getStockValue,
-  getAverageDaysInStock,
-  getStagnantVehicles,
-  getMonthlyNetMargin,
-  getPublishedToSoldRate,
-  getLeadAcceptanceRate,
-  getAveragePostventaCostPerVehicle,
-  getVehiclesPerCommercial,
-  getAverageWorkshopHoursPerVehicle,
-  getStockHistorySnapshot,
-} from '@/lib/dashboard/metrics'
-import { withDashboardCache, withDashboardCacheGlobal } from '@/lib/dashboard/cache'
-import { DashboardFilters } from './dashboard-filters'
+import { getComercialKpis, type ActionRow } from '@/lib/kpi/comercial'
+import { getCalendarItems } from '@/lib/calendar/aggregate'
+import { prismaCalendarDeps } from '@/lib/calendar/prisma-deps'
+import type { CalendarTone } from '@/lib/calendar/types'
 import { ForbiddenToast } from '@/components/forbidden-toast'
-import { AlertTriangle, FileWarning, ShieldAlert } from 'lucide-react'
-import type { SellerLeadStatus, BuyerLeadStatus, VehicleStatus, LostReason } from '@prisma/client'
-import { calculateCompletionPercent } from '@/lib/vehicle-legal'
-import type { VehicleLegalInput, DocumentSummary } from '@/lib/vehicle-legal'
-import type { VehicleDocumentCategory } from '@prisma/client'
-import Link from 'next/link'
-import { StockEvolutionChart } from '@/components/dashboard/stock-evolution-chart'
+import { DashboardFilters } from './dashboard-filters'
+import { Card, KpiCard, ButtonLink } from '@/components/redesign'
+import { cn } from '@/lib/utils'
 
-// ── Constants ─────────────────────────────────────────────────────────────────
+/**
+ * Dashboard «Mi día» (mockup D1/M1): la pantalla de inicio operativa — qué
+ * tengo que hacer hoy, qué está caliente y qué está en riesgo. Cards de
+ * resumen + lista priorizada de acciones + agenda del día.
+ * Los datos financieros/analíticos viven en /analytics/* (B21).
+ */
 
-const EUR = new Intl.NumberFormat('es-ES', {
-  style: 'currency',
-  currency: 'EUR',
-  maximumFractionDigits: 0,
-})
+const TZ = 'Europe/Madrid'
 
-const ACTIVE_SELLER_STATUSES: SellerLeadStatus[] = [
-  'NUEVO',
-  'CONTACTADO',
-  'CUALIFICADO',
-  'EN_NEGOCIACION',
-]
-const ACTIVE_BUYER_STATUSES: BuyerLeadStatus[] = [
-  'NUEVO',
-  'CONTACTADO',
-  'CUALIFICADO',
-  'EN_NEGOCIACION',
-]
-
-// Dot colors per status (CSS color strings)
-const STATUS_DOTS: Record<string, string> = {
-  NUEVO: '#3a6fd4',
-  CONTACTADO: '#7c3aed',
-  CUALIFICADO: '#0891b2',
-  EN_NEGOCIACION: '#c9820a',
-  CERRADO: '#1a9d5f',
-  DESCARTADO: '#8b94a3',
-  TASADO: '#7c3aed',
-  PUBLICADO: '#0891b2',
-  RESERVADO: '#c9820a',
-  VENDIDO: '#1a9d5f',
-  PERDIDO: '#8b94a3',
+const TONE_HEX: Record<CalendarTone, string> = {
+  default: '#0e7d6b',
+  success: '#1a9d5f',
+  warn: '#c9820a',
+  danger: '#d64545',
+  muted: '#8b94a3',
 }
 
-const TIME_DOTS = ['#3a6fd4', '#7c3aed', '#0891b2', '#c9820a', '#1a9d5f', '#8b94a3']
+const PRIORITY_STYLES: Record<ActionRow['priority'], string> = {
+  red: 'bg-bad-tint text-bad',
+  amber: 'bg-warn-tint text-warn',
+  green: 'bg-track text-ink2',
+}
 
-// ── Métricas cacheadas (data cache, keyed por filtro de agente) ────────────────
-// Las funciones puras siguen recibiendo `db` (testeable); aquí las envolvemos con caché
-// para que la navegación repetida del dashboard no re-ejecute todas las queries.
-const sellerCounts$ = withDashboardCache('seller-lead-counts', getSellerLeadCounts)
-const buyerCounts$ = withDashboardCache('buyer-lead-counts', getBuyerLeadCounts)
-const vehicleCounts$ = withDashboardCache('vehicle-counts', getVehicleCounts)
-const salesMoM$ = withDashboardCache('sales-mom', getSalesMonthOverMonth)
-const proFunnel$ = withDashboardCache('pro-funnel', getProFunnel)
-const stockValue$ = withDashboardCache('stock-value', getStockValue)
-const avgDaysInStock$ = withDashboardCache('avg-days-in-stock', getAverageDaysInStock)
-const monthlyMargin$ = withDashboardCache('monthly-margin', getMonthlyNetMargin)
-const pubToSoldRate$ = withDashboardCache('pub-to-sold-rate', getPublishedToSoldRate)
-const leadAcceptance$ = withDashboardCache('lead-acceptance', getLeadAcceptanceRate)
-const stagnant$ = withDashboardCache('stagnant-vehicles', getStagnantVehicles)
-const avgWorkshopHours$ = withDashboardCache(
-  'avg-workshop-hours',
-  getAverageWorkshopHoursPerVehicle
-)
-const avgPostventaCost$ = withDashboardCache(
-  'avg-postventa-cost',
-  getAveragePostventaCostPerVehicle
-)
-const vehiclesPerCommercial$ = withDashboardCacheGlobal(
-  'vehicles-per-commercial',
-  getVehiclesPerCommercial
-)
+function greetingFor(now: Date): string {
+  const hour = parseInt(
+    now.toLocaleTimeString('es-ES', { hour: '2-digit', hour12: false, timeZone: TZ }),
+    10
+  )
+  if (hour < 14) return 'Buenos días'
+  if (hour < 21) return 'Buenas tardes'
+  return 'Buenas noches'
+}
 
-// ── Page ──────────────────────────────────────────────────────────────────────
+function firstName(name: string): string {
+  return name.trim().split(/\s+/)[0] ?? name
+}
 
 export default async function DashboardPage({
   searchParams,
 }: {
-  searchParams: { agent?: string }
+  searchParams: { agent?: string; error?: string }
 }) {
   const currentUser = await requireAuth()
-
   const isAdmin = currentUser.role === 'ADMIN'
   const isAgente = currentUser.role === 'AGENTE'
-  const isTaller = currentUser.role === 'TALLER'
-  const isEntregas = currentUser.role === 'ENTREGAS'
-  const isMarketing = currentUser.role === 'MARKETING'
 
-  const requestedAgentId = searchParams.agent ?? null
-  const effectiveAgentId = isAdmin ? requestedAgentId : currentUser.id
-  const filter: DashboardFilter = { agentId: effectiveAgentId }
-
-  const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)
-
-  // ── Base queries ─────────────────────────────────────────────────────────
-  const [sellerCounts, buyerCounts, vehicleCounts, salesMoM, proFunnel, agents] = await Promise.all(
-    [
-      sellerCounts$(filter),
-      buyerCounts$(filter),
-      vehicleCounts$(filter),
-      salesMoM$(filter),
-      proFunnel$(filter),
-      isAdmin
-        ? db.user.findMany({
-            where: { active: true },
-            select: { id: true, name: true },
-            orderBy: { name: 'asc' },
-          })
-        : Promise.resolve([]),
-    ]
-  )
-
-  const totalSellerActive = sumWhere(sellerCounts, ACTIVE_SELLER_STATUSES)
-  const totalBuyerActive = sumWhere(buyerCounts, ACTIVE_BUYER_STATUSES)
-  const totalPublicados = sumWhere(vehicleCounts, ['PUBLICADO'])
-
-  // ── Postventa ────────────────────────────────────────────────────────────
-  const [activeWarranties, openTickets, pendingFollowups] = await Promise.all([
-    db.warranty.count({ where: { endDate: { gt: new Date() } } }),
-    db.postventaTicket.count({ where: { status: { in: ['ABIERTO', 'EN_PROGRESO'] } } }),
-    db.postventaFollowup.count({ where: { status: 'PENDIENTE' } }),
-  ])
-
-  // ── Próximas acciones (CAM-60) — vencidas y leads activos sin acción ─────
-  const SELLER_ACTIVE = { notIn: ['CERRADO', 'DESCARTADO'] as ('CERRADO' | 'DESCARTADO')[] }
-  const BUYER_ACTIVE = { notIn: ['CERRADO', 'PERDIDO'] as ('CERRADO' | 'PERDIDO')[] }
-  const agentFilter = effectiveAgentId ? { agentId: effectiveAgentId } : {}
-  const nowDate = new Date()
-  const [overdueSellerActions, overdueBuyerActions, sellersWithoutAction, buyersWithoutAction] =
-    await Promise.all([
-      db.sellerLead.findMany({
-        where: { status: SELLER_ACTIVE, nextActionDueAt: { lt: nowDate }, ...agentFilter },
-        select: { id: true, name: true, nextActionType: true, nextActionDueAt: true },
-        orderBy: { nextActionDueAt: 'asc' },
-        take: 3,
-      }),
-      db.buyerLead.findMany({
-        where: { status: BUYER_ACTIVE, nextActionDueAt: { lt: nowDate }, ...agentFilter },
-        select: { id: true, name: true, nextActionType: true, nextActionDueAt: true },
-        orderBy: { nextActionDueAt: 'asc' },
-        take: 3,
-      }),
-      db.sellerLead.count({
-        where: { status: SELLER_ACTIVE, nextActionType: null, ...agentFilter },
-      }),
-      db.buyerLead.count({
-        where: { status: BUYER_ACTIVE, nextActionType: null, ...agentFilter },
-      }),
-    ])
-  const leadsWithoutAction = sellersWithoutAction + buyersWithoutAction
-
-  // ── Motivos de pérdida (CAM-61) — últimos 90 días ─────────────────────────
-  const ninetyDaysAgo = new Date(Date.now() - 90 * 86400000)
-  const [lostReasonsBuyer, lostReasonsSeller] = await Promise.all([
-    db.buyerLead.groupBy({
-      by: ['lostReason'],
-      where: {
-        status: 'PERDIDO',
-        lostReason: { not: null },
-        updatedAt: { gte: ninetyDaysAgo },
-        ...agentFilter,
-      },
-      _count: { _all: true },
-    }),
-    db.sellerLead.groupBy({
-      by: ['lostReason'],
-      where: {
-        status: 'DESCARTADO',
-        lostReason: { not: null },
-        updatedAt: { gte: ninetyDaysAgo },
-        ...agentFilter,
-      },
-      _count: { _all: true },
-    }),
-  ])
-  const lostReasonCounts = new Map<string, { buyers: number; sellers: number }>()
-  for (const row of lostReasonsBuyer) {
-    if (!row.lostReason) continue
-    const entry = lostReasonCounts.get(row.lostReason) ?? { buyers: 0, sellers: 0 }
-    entry.buyers += row._count._all
-    lostReasonCounts.set(row.lostReason, entry)
-  }
-  for (const row of lostReasonsSeller) {
-    if (!row.lostReason) continue
-    const entry = lostReasonCounts.get(row.lostReason) ?? { buyers: 0, sellers: 0 }
-    entry.sellers += row._count._all
-    lostReasonCounts.set(row.lostReason, entry)
-  }
-  const lostReasonRows = Array.from(lostReasonCounts.entries())
-    .map(([reason, c]) => ({ reason, total: c.buyers + c.sellers, ...c }))
-    .sort((a, b) => b.total - a.total)
-  const lostReasonTotal = lostReasonRows.reduce((s, r) => s + r.total, 0)
-
-  // ── State medians ────────────────────────────────────────────────────────
-  const [sellerStateMedians, buyerStateMedians, vehicleStateMedians] = await Promise.all([
-    fetchSellerStateMedians(filter),
-    fetchBuyerStateMedians(filter),
-    fetchVehicleStateMedians(filter),
-  ])
-
-  // ── Legal alerts (ADMIN + AGENTE) ────────────────────────────────────────
-  const ALL_DOC_CATS: VehicleDocumentCategory[] = [
-    'DNI_VENDEDOR',
-    'CONTRATO_COMPRAVENTA',
-    'FICHA_TECNICA',
-    'PERMISO_CIRCULACION',
-    'ITV_VIGENTE',
-    'JUSTIFICANTE_PAGO',
-    'INFORME_CARGAS_DGT',
-    'LIBRO_MANTENIMIENTO',
-    'FACTURA_COMPRA_ORIGINAL',
-    'CONTRATO_FINAL_VENTA',
-    'OTRO',
-  ]
-
-  const [vehiclesTasadosRaw, vehiclesItvExpiring, vehiclesChargesPending] = await Promise.all([
-    isAdmin || isAgente
-      ? db.vehicle.findMany({
-          where: {
-            status: 'TASADO',
-            ...(filter.agentId ? { sellerLead: { agentId: filter.agentId } } : {}),
-          },
-          select: {
-            id: true,
-            brand: true,
-            model: true,
-            year: true,
-            plate: true,
-            vin: true,
-            itvValidUntil: true,
-            chargeCheckedAt: true,
-            purchasePrice: true,
-            salePrice: true,
-            desiredPrice: true,
-            photos: { select: { id: true } },
-            documents: { select: { category: true } },
-            workOrders: {
-              where: {
-                status: { in: ['PENDIENTE', 'EN_DIAGNOSTICO', 'PRESUPUESTADA', 'EN_CURSO'] },
-              },
-              select: { id: true },
-            },
-            sellerLead: { select: { id: true } },
-          },
-        })
-      : Promise.resolve([]),
-    isAdmin || isAgente
-      ? db.vehicle.findMany({
-          where: {
-            status: 'PUBLICADO',
-            itvValidUntil: { lt: new Date(Date.now() + 60 * 24 * 60 * 60 * 1000) },
-            ...(filter.agentId ? { sellerLead: { agentId: filter.agentId } } : {}),
-          },
-          select: {
-            id: true,
-            brand: true,
-            model: true,
-            year: true,
-            itvValidUntil: true,
-            sellerLead: { select: { id: true } },
-          },
-          orderBy: { itvValidUntil: 'asc' },
-          take: 10,
-        })
-      : Promise.resolve([]),
-    isAdmin || isAgente
-      ? db.vehicle.findMany({
-          where: {
-            purchasePrice: { not: null },
-            chargeCheckedAt: null,
-            status: { notIn: ['VENDIDO', 'DESCARTADO'] },
-            createdAt: { lt: new Date(Date.now() - 72 * 60 * 60 * 1000) },
-            ...(filter.agentId ? { sellerLead: { agentId: filter.agentId } } : {}),
-          },
-          select: {
-            id: true,
-            brand: true,
-            model: true,
-            year: true,
-            createdAt: true,
-            sellerLead: { select: { id: true } },
-          },
-          orderBy: { createdAt: 'asc' },
-          take: 10,
-        })
-      : Promise.resolve([]),
-  ])
-
-  const incompleteExpedientes = (vehiclesTasadosRaw as typeof vehiclesTasadosRaw)
-    .map((v) => {
-      const legalInput: VehicleLegalInput = {
-        id: v.id,
-        plate: v.plate ?? null,
-        vin: v.vin ?? null,
-        itvValidUntil: v.itvValidUntil ?? null,
-        chargeCheckedAt: v.chargeCheckedAt ?? null,
-        desiredPrice: v.desiredPrice,
-        purchasePrice: v.purchasePrice,
-        salePrice: v.salePrice,
-        photoCount: v.photos.length,
-        workOrdersBlockingCount: v.workOrders.length,
-      }
-      const docSummary: DocumentSummary[] = ALL_DOC_CATS.map((cat) => ({
-        category: cat,
-        exists: v.documents.some((d) => d.category === cat),
-      }))
-      const pct = calculateCompletionPercent(legalInput, docSummary)
-      return { ...v, completionPct: pct, sellerLeadId: v.sellerLead?.id ?? null }
-    })
-    .filter((v) => v.completionPct < 100)
-    .slice(0, 5)
-
-  // ── Demanda activa esperando (Block 19) — argumento de captación ──────────
-  const vehiclesWithDemandRaw =
-    isAdmin || isAgente
-      ? await db.vehicle.findMany({
-          where: {
-            status: { in: ['PUBLICADO', 'TASADO'] },
-            ...(filter.agentId ? { sellerLead: { agentId: filter.agentId } } : {}),
-            matches: {
-              some: {
-                score: { gte: ACTIVE_DEMAND_MATCH_THRESHOLD },
-                buyerLead: { status: { notIn: ['CERRADO', 'PERDIDO'] } },
-              },
-            },
-          },
-          select: {
-            id: true,
-            brand: true,
-            model: true,
-            year: true,
-            status: true,
-            sellerLead: { select: { id: true } },
-            matches: {
-              where: {
-                score: { gte: ACTIVE_DEMAND_MATCH_THRESHOLD },
-                buyerLead: { status: { notIn: ['CERRADO', 'PERDIDO'] } },
-              },
-              select: { id: true },
-            },
-          },
-          take: 30,
-        })
-      : []
-  const vehiclesWithDemand = vehiclesWithDemandRaw
-    .map((v) => ({
-      id: v.id,
-      label: `${v.brand} ${v.model} (${v.year})`,
-      status: v.status,
-      sellerLeadId: v.sellerLead?.id ?? null,
-      demandCount: v.matches.length,
-    }))
-    .sort((a, b) => b.demandCount - a.demandCount)
-    .slice(0, 6)
-
-  // ── Financial metrics (ADMIN + MARKETING) ────────────────────────────────
-  const showFinancials = isAdmin || isMarketing
-  const [stockValue, avgDaysInStock, monthlyMargin, pubToSoldRate, funnelComparison, stockHistory] =
-    await Promise.all([
-      showFinancials ? stockValue$(filter) : Promise.resolve(null),
-      showFinancials || isEntregas ? avgDaysInStock$(filter) : Promise.resolve(null),
-      isAdmin ? monthlyMargin$(filter) : Promise.resolve(null),
-      isAdmin ? pubToSoldRate$(filter) : Promise.resolve(null),
-      isAdmin ? leadAcceptance$(filter) : Promise.resolve(null),
-      showFinancials ? getStockHistorySnapshot() : Promise.resolve([]),
-    ])
-
-  // ── Operational metrics ───────────────────────────────────────────────────
-  const showOperational = isAdmin || isAgente || isMarketing
-  const [stagnantVehicles] = await Promise.all([
-    showOperational || isEntregas ? stagnant$(filter) : Promise.resolve([]),
-  ])
-
-  // ── Workshop metrics ──────────────────────────────────────────────────────
-  const showWorkshop = isAdmin || isTaller
-  const [avgWorkshopHours, workshopCostsLast30, vehiclesPerCommercial] = await Promise.all([
-    showWorkshop ? avgWorkshopHours$(filter) : Promise.resolve(null),
-    isAdmin
-      ? db.vehicleCost.aggregate({
-          where: {
-            createdAt: { gte: thirtyDaysAgo },
-            workOrderId: { not: null },
-            ...(filter.agentId ? { vehicle: { sellerLead: { agentId: filter.agentId } } } : {}),
-          },
-          _sum: { amount: true },
-        })
-      : Promise.resolve({ _sum: { amount: null } }),
-    isAdmin ? vehiclesPerCommercial$() : Promise.resolve([]),
-  ])
-
-  const avgPostventaCost = isAdmin ? await avgPostventaCost$(filter) : null
-
-  // ── Margin table ──────────────────────────────────────────────────────────
-  const vehiclesWithMargin = isAdmin
-    ? await db.vehicle.findMany({
-        where: {
-          purchasePrice: { not: null },
-          salePrice: { not: null },
-          ...(filter.agentId ? { sellerLead: { agentId: filter.agentId } } : {}),
-        },
-        select: {
-          id: true,
-          brand: true,
-          model: true,
-          year: true,
-          purchasePrice: true,
-          salePrice: true,
-          marginPercent: true,
-          costs: { select: { amount: true } },
-          sellerLead: { select: { id: true } },
-        },
-      })
-    : []
-
-  type VehicleMarginRow = {
-    id: string
-    brand: string
-    model: string
-    year: number | null
-    netMargin: number
-    netMarginPct: number
-    sellerLeadId: string | null
-  }
-
-  function computeMargins(vehicles: typeof vehiclesWithMargin) {
-    let belowTarget = 0
-    const rows: VehicleMarginRow[] = []
-    for (const v of vehicles) {
-      const purchase = Number(v.purchasePrice)
-      const sale = Number(v.salePrice)
-      const totalCosts = v.costs.reduce((s, c) => s + Number(c.amount), 0)
-      const gross = sale - purchase
-      const net = gross - totalCosts
-      const pct = sale > 0 ? (net / sale) * 100 : 0
-      const target = Number(v.marginPercent)
-      if (pct < target) belowTarget++
-      rows.push({
-        id: v.id,
-        brand: v.brand,
-        model: v.model,
-        year: v.year,
-        netMargin: net,
-        netMarginPct: pct,
-        sellerLeadId: v.sellerLead?.id ?? null,
-      })
-    }
-    return { belowTarget, rows }
-  }
-
-  const { rows: marginRows } = computeMargins(vehiclesWithMargin)
-  const top5Rentabilidad = isAdmin
-    ? marginRows.sort((a, b) => b.netMarginPct - a.netMarginPct).slice(0, 5)
-    : []
-  const workshopTotal = Number(workshopCostsLast30._sum.amount ?? 0)
-  const avgMargin =
-    marginRows.length === 0
-      ? null
-      : marginRows.reduce((s, r) => s + r.netMarginPct, 0) / marginRows.length
+  // AGENTE ve lo suyo; ADMIN puede filtrar por agente (o ver todo el equipo).
+  const agentId = isAgente ? currentUser.id : (searchParams.agent ?? null)
 
   const now = new Date()
+  const dayStart = new Date(now)
+  dayStart.setHours(0, 0, 0, 0)
+  const dayEnd = new Date(now)
+  dayEnd.setHours(23, 59, 59, 999)
 
-  // ── Derived / computed values ─────────────────────────────────────────────
+  const [kpis, agendaItems, agents] = await Promise.all([
+    getComercialKpis(db, agentId),
+    getCalendarItems(
+      prismaCalendarDeps(db),
+      { from: dayStart, to: dayEnd },
+      agentId ? { assigneeId: agentId } : {},
+      now
+    ),
+    isAdmin
+      ? db.user.findMany({
+          where: { active: true, role: { in: ['ADMIN', 'AGENTE'] } },
+          select: { id: true, name: true },
+          orderBy: { name: 'asc' },
+        })
+      : Promise.resolve([]),
+  ])
 
-  // Funnel values
-  const totalLeads = sellerCounts.reduce((a, c) => a + c.count, 0)
-  const cualificadosPlus = sumWhere(sellerCounts, ['CUALIFICADO', 'EN_NEGOCIACION', 'CERRADO'])
-  const vehiclesTotal = vehicleCounts.reduce((a, c) => a + c.count, 0)
-  const pubPlus = sumWhere(vehicleCounts, ['PUBLICADO', 'RESERVADO', 'VENDIDO'])
-  const resvPlus = sumWhere(vehicleCounts, ['RESERVADO', 'VENDIDO'])
-  const soldCount = sumWhere(vehicleCounts, ['VENDIDO'])
-  const funnelMax = Math.max(totalLeads, 1)
+  const dateLine = now.toLocaleDateString('es-ES', {
+    weekday: 'long',
+    day: 'numeric',
+    month: 'long',
+    timeZone: TZ,
+  })
 
-  const funnelStages = [
-    {
-      label: 'Leads',
-      value: totalLeads,
-      pct: 100,
-      grad: 'linear-gradient(180deg, #6366f1, #4f46e5)',
-    },
-    {
-      label: 'Cualificados',
-      value: cualificadosPlus,
-      pct: (cualificadosPlus / funnelMax) * 100,
-      grad: 'linear-gradient(180deg, #06b6d4, #0891b2)',
-    },
-    {
-      label: 'Publicados',
-      value: pubPlus,
-      pct: (pubPlus / funnelMax) * 100,
-      grad: 'linear-gradient(180deg, #14b8a6, #0d9488)',
-    },
-    {
-      label: 'Reservados',
-      value: resvPlus,
-      pct: (resvPlus / funnelMax) * 100,
-      grad: 'linear-gradient(180deg, #c9820a, #c9820a)',
-    },
-    {
-      label: 'Vendidos',
-      value: soldCount,
-      pct: (soldCount / funnelMax) * 100,
-      grad: 'linear-gradient(180deg, #22c55e, #16a34a)',
-    },
-  ]
+  const appointmentTimes = agendaItems
+    .filter((i) => !i.allDay)
+    .slice(0, 3)
+    .map((i) =>
+      i.start.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit', timeZone: TZ })
+    )
 
-  // Requires-action count
-  const requiresAction =
-    incompleteExpedientes.length +
-    stagnantVehicles.length +
-    (vehiclesItvExpiring as typeof vehiclesItvExpiring).length +
-    (vehiclesChargesPending as typeof vehiclesChargesPending).length
-
-  // Agenda items
-  type AgendaItem = {
-    dot: 'bad' | 'warn' | 'info' | 'ok'
-    title: string
-    meta: string
-    cta: string
-    href: string
-  }
-  const agendaItems: AgendaItem[] = []
-
-  // Próximas acciones vencidas (CAM-60) — lo más accionable, va primero
-  for (const l of overdueSellerActions.slice(0, 2)) {
-    agendaItems.push({
-      dot: 'bad',
-      title: `${l.name} · ${l.nextActionType ? NEXT_ACTION_LABELS[l.nextActionType] : 'acción'} vencida${l.nextActionDueAt ? ` (${formatNextActionDue(l.nextActionDueAt, now)})` : ''}`,
-      meta: 'VENDEDOR · PRÓXIMA ACCIÓN VENCIDA',
-      cta: 'Abrir',
-      href: `/vendedores/${l.id}`,
-    })
-  }
-  for (const l of overdueBuyerActions.slice(0, 2)) {
-    agendaItems.push({
-      dot: 'bad',
-      title: `${l.name} · ${l.nextActionType ? NEXT_ACTION_LABELS[l.nextActionType] : 'acción'} vencida${l.nextActionDueAt ? ` (${formatNextActionDue(l.nextActionDueAt, now)})` : ''}`,
-      meta: 'COMPRADOR · PRÓXIMA ACCIÓN VENCIDA',
-      cta: 'Abrir',
-      href: `/compradores/${l.id}`,
-    })
-  }
-  if (leadsWithoutAction > 0) {
-    agendaItems.push({
-      dot: 'warn',
-      title: `${leadsWithoutAction} lead${leadsWithoutAction !== 1 ? 's' : ''} activo${leadsWithoutAction !== 1 ? 's' : ''} sin próxima acción`,
-      meta: 'DEFINIR SIGUIENTE PASO COMERCIAL',
-      cta: 'Revisar',
-      href: sellersWithoutAction >= buyersWithoutAction ? '/vendedores' : '/compradores',
-    })
-  }
-
-  for (const v of incompleteExpedientes.slice(0, 2)) {
-    agendaItems.push({
-      dot: 'bad',
-      title: `${v.brand} ${v.model} ${v.year ?? ''} · expediente al ${v.completionPct}%`,
-      meta: 'TASADO · SIN DOCUMENTACIÓN COMPLETA',
-      cta: 'Completar',
-      href: v.sellerLeadId ? `/vendedores/${v.sellerLeadId}` : '/vendedores',
-    })
-  }
-  for (const v of stagnantVehicles.slice(0, 2)) {
-    agendaItems.push({
-      dot: v.daysInStatus > 180 ? 'bad' : 'warn',
-      title: `${v.brand} ${v.model} en nave hace ${v.daysInStatus} días`,
-      meta: 'SUGERENCIA: BAJAR PRECIO O REUBICAR',
-      cta: 'Decidir',
-      href: v.sellerLeadId ? `/vendedores/${v.sellerLeadId}` : '/vendedores',
-    })
-  }
-  for (const v of (vehiclesItvExpiring as typeof vehiclesItvExpiring).slice(0, 1)) {
-    const daysLeft = v.itvValidUntil
-      ? Math.floor((v.itvValidUntil.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
-      : null
-    agendaItems.push({
-      dot: 'warn',
-      title: `ITV de ${v.brand} ${v.model} vence en ${daysLeft ?? '?'}d`,
-      meta: 'VEHÍCULO PUBLICADO · REQUIERE RENOVACIÓN',
-      cta: 'Gestionar',
-      href: v.sellerLead?.id ? `/vendedores/${v.sellerLead.id}` : '/vendedores',
-    })
-  }
-  if (openTickets > 0) {
-    agendaItems.push({
-      dot: 'info',
-      title: `${openTickets} ticket${openTickets !== 1 ? 's' : ''} abierto${openTickets !== 1 ? 's' : ''} en postventa`,
-      meta: 'INCIDENCIAS SIN RESOLVER',
-      cta: 'Abrir',
-      href: '/postventa',
-    })
-  }
-  if (pendingFollowups > 0) {
-    agendaItems.push({
-      dot: 'info',
-      title: `${pendingFollowups} follow-up${pendingFollowups !== 1 ? 's' : ''} pendiente${pendingFollowups !== 1 ? 's' : ''}`,
-      meta: 'SEGUIMIENTO POST-ENTREGA DÍA 7 Y DÍA 30',
-      cta: 'Revisar',
-      href: '/postventa',
-    })
-  }
-  const agendaSlice = agendaItems.slice(0, 6)
-
-  const dotClass = {
-    bad: { bg: '#d64545', shadow: '0 0 0 4px #fde8e8' },
-    warn: { bg: '#c9820a', shadow: '0 0 0 4px #fef3e2' },
-    info: { bg: '#3a6fd4', shadow: '0 0 0 4px #e6efff' },
-    ok: { bg: '#1a9d5f', shadow: '0 0 0 4px #e3f5ec' },
-  } as const
-
-  // Seller counts map
-  const sellerMap = new Map(sellerCounts.map((c) => [c.status, c.count]))
-  const buyerMap = new Map(buyerCounts.map((c) => [c.status, c.count]))
-  const vehicleMap = new Map(vehicleCounts.map((c) => [c.status, c.count]))
-
-  const sellerTotal = sellerCounts.reduce((a, c) => a + c.count, 0)
-  const buyerTotal = buyerCounts.reduce((a, c) => a + c.count, 0)
-
-  // Stocks active
-  const stockActiveCount = showFinancials
-    ? (stockValue?.vehicleCount ??
-      sumWhere(vehicleCounts, ['NUEVO', 'TASADO', 'PUBLICADO', 'RESERVADO']))
-    : sumWhere(vehicleCounts, ['NUEVO', 'TASADO', 'PUBLICADO', 'RESERVADO'])
-
-  // Bar chart max (vehicles per commercial)
-  const barMax =
-    vehiclesPerCommercial.length > 0
-      ? Math.max(...vehiclesPerCommercial.map((r) => r.active), 1)
-      : 1
-
-  const barGrads = [
-    'linear-gradient(90deg,#3a6fd4,#7c3aed)',
-    'linear-gradient(90deg,#0891b2,#14b8a6)',
-    'linear-gradient(90deg,#c9820a,#c9820a)',
-    'linear-gradient(90deg,#db2777,#ec4899)',
-    'linear-gradient(90deg,#1a9d5f,#22c55e)',
-  ]
-
-  // Sales delta
-  const salesDelta = salesMoM.delta
-  const salesTrend = salesDelta > 0 ? 'up' : salesDelta < 0 ? 'down' : 'flat'
+  const riskyReservations = kpis.reservationRows.filter((r) => r.priority === 'red').length
+  const priorityList = kpis.priorityRows.slice(0, 6)
 
   return (
-    <div>
-      <ForbiddenToast />
+    <div className="mx-auto max-w-[1200px]">
+      <Suspense>
+        <ForbiddenToast />
+      </Suspense>
 
-      {/* ── Topbar ─────────────────────────────────────────────────────────── */}
-      <div className="flex flex-wrap items-start justify-between gap-3 pb-0 pt-1">
+      {/* Saludo + fecha */}
+      <div className="mb-[18px] flex flex-wrap items-end justify-between gap-3">
         <div>
-          <p className="font-mono text-[11px] uppercase tracking-[0.14em] text-[#586173]">
-            Vista general ·{' '}
-            {now.toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' })}
-          </p>
-          <h1 className="mt-1 text-[24px] font-semibold leading-tight tracking-[-0.015em]">
-            Buenos días, {currentUser.name?.split(' ')[0] ?? 'Joel'}.
+          <h1 className="font-hanken text-[23px] font-bold leading-[1.1] tracking-[-0.02em] text-ink">
+            {greetingFor(now)}, {firstName(currentUser.name)}
           </h1>
+          <p className="mt-[5px] font-hanken text-[13.5px] text-ink2 first-letter:uppercase">
+            {dateLine} · tienes <b className="text-ink">{kpis.tasksToday} tareas hoy</b>
+            {kpis.overdueTasks > 0 && (
+              <>
+                {' '}
+                y <b className="text-bad">{kpis.overdueTasks} vencidas</b>
+              </>
+            )}
+          </p>
         </div>
         {isAdmin && (
-          <div className="mt-1">
-            <DashboardFilters agents={agents} currentAgentId={requestedAgentId} />
-          </div>
+          <DashboardFilters agents={agents} currentAgentId={searchParams.agent ?? null} />
         )}
       </div>
 
-      {/* ── Hero KPIs ──────────────────────────────────────────────────────── */}
-      <SectionEyebrow label="Lo que importa hoy" color="info" />
-      <div className="grid grid-cols-2 gap-[14px] lg:grid-cols-4">
-        {/* 1 — Margen neto (dark gradient) — ADMIN/MARKETING only */}
-        {showFinancials ? (
-          <div
-            className="flex flex-col gap-3.5 rounded-[14px] p-6"
-            style={{ background: 'linear-gradient(135deg, #1a9d5f, #0f5132)', color: '#fff' }}
-          >
-            <div className="flex items-start justify-between">
-              <span
-                className="font-mono text-[10px] font-medium uppercase tracking-[0.14em]"
-                style={{ color: 'rgba(255,255,255,0.8)' }}
-              >
-                Margen neto · mes
+      {/* KPI cards */}
+      <div className="mb-[18px] grid grid-cols-2 gap-3.5 lg:grid-cols-4">
+        <KpiCard
+          label="Tareas vencidas"
+          value={
+            <span className={kpis.overdueTasks > 0 ? 'text-bad' : undefined}>
+              {kpis.overdueTasks}
+            </span>
+          }
+          tone={kpis.overdueTasks > 0 ? 'bad' : 'good'}
+          note={kpis.overdueTasks > 0 ? 'resolver primero' : 'todo al día'}
+        />
+        <KpiCard
+          label="Compradores calientes"
+          value={<span className="text-brand">{kpis.hotBuyers}</span>}
+          note="temperatura alta"
+          href="/compradores?temp=HOT"
+        />
+        <KpiCard
+          label="Citas hoy"
+          value={kpis.appointmentsToday}
+          note={appointmentTimes.length ? appointmentTimes.join(' · ') : 'sin citas'}
+          href="/calendario"
+        />
+        <KpiCard
+          label="Reservas abiertas"
+          value={kpis.activeReservations}
+          note={
+            riskyReservations > 0 ? (
+              <span className="inline-flex items-center gap-1.5">
+                <span className="h-[7px] w-[7px] rounded-full bg-warn" aria-hidden />
+                {riskyReservations} en riesgo
               </span>
-              <div
-                className="grid h-8 w-8 place-items-center rounded-lg"
-                style={{ background: 'rgba(255,255,255,0.08)' }}
-              >
-                <svg
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="1.6"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  className="h-4 w-4"
-                  style={{ opacity: 0.9 }}
+            ) : (
+              'sin riesgo'
+            )
+          }
+          href="/ofertas"
+        />
+      </div>
+
+      {/* Priorizado + agenda */}
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1.55fr_1fr]">
+        {/* Tu día, priorizado */}
+        <Card pad={false} className="self-start overflow-hidden">
+          <div className="flex items-center justify-between px-[18px] pb-3 pt-[15px]">
+            <h3 className="font-hanken text-[15px] font-bold tracking-[-0.01em] text-ink">
+              Tu día, priorizado
+            </h3>
+          </div>
+          {priorityList.length === 0 ? (
+            <div className="border-t border-line2 px-[18px] py-8 text-center font-hanken text-[13px] text-ink3">
+              Sin acciones pendientes. Cuando haya tareas vencidas, reservas en riesgo o compradores
+              calientes, aparecerán aquí ordenadas por prioridad.
+            </div>
+          ) : (
+            <div className="flex flex-col">
+              {priorityList.map((row) => (
+                <div
+                  key={row.id}
+                  className="flex items-center gap-[13px] border-t border-line2 px-[18px] py-[13px]"
                 >
-                  <line x1="12" y1="1" x2="12" y2="23" />
-                  <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
-                </svg>
-              </div>
-            </div>
-            <div className="text-[32px] font-bold tabular-nums leading-none tracking-[-0.025em]">
-              {monthlyMargin ? EUR.format(monthlyMargin.netMargin) : '—'}
-            </div>
-            {/* Spark */}
-            <svg
-              viewBox="0 0 200 40"
-              preserveAspectRatio="none"
-              className="-mx-1 mb-[-4px] mt-1 h-9"
-            >
-              <path
-                d="M0,30 L25,28 L50,22 L75,24 L100,18 L125,14 L150,16 L175,10 L200,6"
-                fill="none"
-                stroke="rgba(255,255,255,0.8)"
-                strokeWidth="2"
-              />
-              <path
-                d="M0,30 L25,28 L50,22 L75,24 L100,18 L125,14 L150,16 L175,10 L200,6 L200,40 L0,40 Z"
-                fill="rgba(255,255,255,0.12)"
-              />
-            </svg>
-            <div className="mt-auto flex items-center justify-between">
-              <span
-                className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11.5px] font-semibold"
-                style={{ background: 'rgba(255,255,255,0.18)' }}
-              >
-                {salesTrend === 'up' ? '↑' : salesTrend === 'down' ? '↓' : '→'}{' '}
-                {salesMoM.pctChange !== null
-                  ? `${salesMoM.pctChange > 0 ? '+' : ''}${salesMoM.pctChange.toFixed(0)}% vs anterior`
-                  : 'sin cambio'}
-              </span>
-              <span className="text-[11.5px]" style={{ color: 'rgba(255,255,255,0.75)' }}>
-                {monthlyMargin?.vehiclesSold ?? 0} venta
-                {monthlyMargin?.vehiclesSold !== 1 ? 's' : ''}
-              </span>
-            </div>
-          </div>
-        ) : (
-          /* Non-financial roles: show stock value placeholder */
-          <div className="flex flex-col gap-3.5 rounded-[14px] border border-[#e6e9ee] bg-white p-6">
-            <div className="flex items-start justify-between">
-              <span className="font-mono text-[10px] font-medium uppercase tracking-[0.14em] text-[#586173]">
-                Stock activo
-              </span>
-              <div className="grid h-8 w-8 place-items-center rounded-lg bg-cyan-50 text-cyan-600">
-                <svg
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="1.6"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  className="h-4 w-4"
-                >
-                  <path d="M3 17h11l3-7H6" />
-                  <circle cx="7" cy="20" r="2" />
-                  <circle cx="17" cy="20" r="2" />
-                </svg>
-              </div>
-            </div>
-            <div className="text-[32px] font-bold tabular-nums leading-none tracking-[-0.025em]">
-              {stockActiveCount}
-              <span className="ml-1 text-[18px] font-medium text-[#586173]">veh.</span>
-            </div>
-            <div className="mt-auto flex items-center justify-between">
-              <span className="inline-flex items-center gap-1 rounded-full bg-[#e3f5ec] px-2 py-0.5 text-[11.5px] font-semibold text-[#1a9d5f]">
-                ↑ en nave
-              </span>
-              <span className="text-[11.5px] text-[#586173]">
-                {avgDaysInStock?.averageDays != null
-                  ? `${avgDaysInStock.averageDays}d medios`
-                  : '—'}
-              </span>
-            </div>
-          </div>
-        )}
-
-        {/* 2 — Stock activo */}
-        <div className="flex flex-col gap-3.5 rounded-[14px] border border-[#e6e9ee] bg-white p-6">
-          <div className="flex items-start justify-between">
-            <span className="font-mono text-[10px] font-medium uppercase tracking-[0.14em] text-[#586173]">
-              Stock activo
-            </span>
-            <div className="grid h-8 w-8 place-items-center rounded-lg bg-cyan-50 text-cyan-600">
-              <svg
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="1.6"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                className="h-4 w-4"
-              >
-                <path d="M3 17h11l3-7H6" />
-                <circle cx="7" cy="20" r="2" />
-                <circle cx="17" cy="20" r="2" />
-              </svg>
-            </div>
-          </div>
-          <div className="text-[32px] font-bold tabular-nums leading-none tracking-[-0.025em]">
-            {stockActiveCount}
-            <span className="ml-1 text-[18px] font-medium text-[#586173]">veh.</span>
-          </div>
-          <svg viewBox="0 0 200 40" preserveAspectRatio="none" className="-mx-1 mb-[-4px] mt-1 h-9">
-            <path
-              d="M0,20 L25,18 L50,22 L75,16 L100,20 L125,14 L150,18 L175,12 L200,16"
-              fill="none"
-              stroke="#0891b2"
-              strokeWidth="2"
-            />
-          </svg>
-          <div className="mt-auto flex items-center justify-between">
-            <span className="inline-flex items-center gap-1 rounded-full bg-cyan-50 px-2 py-0.5 text-[11.5px] font-semibold text-cyan-600">
-              ↑{' '}
-              {avgDaysInStock?.averageDays != null
-                ? `${avgDaysInStock.averageDays}d medios`
-                : 'en nave'}
-            </span>
-            <span className="text-[11.5px] text-[#586173]">
-              {showFinancials && stockValue
-                ? EUR.format(stockValue.totalStockValue) + ' valor'
-                : `${totalPublicados} publicados`}
-            </span>
-          </div>
-        </div>
-
-        {/* 3 — Pipeline activo */}
-        <div className="flex flex-col gap-3.5 rounded-[14px] border border-[#e6e9ee] bg-white p-6">
-          <div className="flex items-start justify-between">
-            <span className="font-mono text-[10px] font-medium uppercase tracking-[0.14em] text-[#586173]">
-              Pipeline activo
-            </span>
-            <div className="grid h-8 w-8 place-items-center rounded-lg bg-violet-100 text-violet-700">
-              <svg
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="1.6"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                className="h-4 w-4"
-              >
-                <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
-                <circle cx="9" cy="7" r="4" />
-                <path d="M22 21v-2a4 4 0 0 0-3-3.87" />
-                <path d="M16 3.13a4 4 0 0 1 0 7.75" />
-              </svg>
-            </div>
-          </div>
-          <div className="text-[32px] font-bold tabular-nums leading-none tracking-[-0.025em]">
-            {totalSellerActive + totalBuyerActive}
-            <span className="ml-1 text-[18px] font-medium text-[#586173]">leads</span>
-          </div>
-          <div className="mt-auto flex gap-[14px] text-[12px]">
-            <div>
-              <div className="font-mono text-[10px] tracking-[0.06em] text-[#586173]">
-                VENDEDORES
-              </div>
-              <div className="mt-0.5 font-semibold">{totalSellerActive} activos</div>
-            </div>
-            <div>
-              <div className="font-mono text-[10px] tracking-[0.06em] text-[#586173]">
-                COMPRADORES
-              </div>
-              <div className="mt-0.5 font-semibold">{totalBuyerActive} activos</div>
-            </div>
-          </div>
-          <div className="flex items-center justify-between">
-            <span className="inline-flex items-center gap-1 rounded-full bg-violet-100 px-2 py-0.5 text-[11.5px] font-semibold text-violet-700">
-              {salesMoM.current} vendidos este mes
-            </span>
-          </div>
-        </div>
-
-        {/* 4 — Requieren acción */}
-        <div
-          className="flex flex-col gap-3.5 rounded-[14px] p-6"
-          style={{
-            border: requiresAction > 0 ? '1px solid #d64545' : '1px solid #e6e9ee',
-            background: requiresAction > 0 ? 'linear-gradient(180deg, #fff, #fef5f5)' : '#fff',
-          }}
-        >
-          <div className="flex items-start justify-between">
-            <span
-              className="font-mono text-[10px] font-medium uppercase tracking-[0.14em]"
-              style={{ color: requiresAction > 0 ? '#d64545' : '#586173' }}
-            >
-              Requieren acción
-            </span>
-            <div
-              className="grid h-8 w-8 place-items-center rounded-lg"
-              style={{
-                background: requiresAction > 0 ? '#fde8e8' : '#f4f6f8',
-                color: requiresAction > 0 ? '#d64545' : '#586173',
-              }}
-            >
-              <AlertTriangle className="h-4 w-4" />
-            </div>
-          </div>
-          <div
-            className="text-[32px] font-bold tabular-nums leading-none tracking-[-0.025em]"
-            style={{ color: requiresAction > 0 ? '#d64545' : '#141922' }}
-          >
-            {requiresAction}
-          </div>
-          <div className="mt-auto text-[12px] leading-relaxed text-[#141922]">
-            {incompleteExpedientes.length > 0 && (
-              <span>
-                {incompleteExpedientes.length} expediente
-                {incompleteExpedientes.length !== 1 ? 's' : ''}
-              </span>
-            )}
-            {stagnantVehicles.length > 0 && (
-              <>
-                {incompleteExpedientes.length > 0 ? ' · ' : ''}
-                {stagnantVehicles.length} estancado{stagnantVehicles.length !== 1 ? 's' : ''}
-              </>
-            )}
-            {openTickets > 0 && (
-              <>
-                {incompleteExpedientes.length > 0 || stagnantVehicles.length > 0 ? '\n' : ''}
-                {openTickets} ticket{openTickets !== 1 ? 's' : ''} abierto
-                {openTickets !== 1 ? 's' : ''}
-              </>
-            )}
-            {requiresAction === 0 && <span className="text-[#586173]">Todo en orden 🎉</span>}
-          </div>
-          {requiresAction > 0 && (
-            <div className="flex items-center justify-between">
-              <span className="inline-flex items-center gap-1 rounded-full bg-red-50 px-2 py-0.5 text-[11.5px] font-semibold text-red-600">
-                ↓ {Math.max(incompleteExpedientes.length, 1)} críticos
-              </span>
-              <Link href="/vendedores" className="text-[12px] font-semibold text-red-600">
-                Ver todo →
-              </Link>
+                  <span
+                    className={cn(
+                      'flex h-6 w-6 shrink-0 items-center justify-center rounded-[7px]',
+                      PRIORITY_STYLES[row.priority]
+                    )}
+                  >
+                    {row.priority === 'red' ? (
+                      <Clock size={13} strokeWidth={2.2} />
+                    ) : row.priority === 'amber' ? (
+                      <Flame size={13} strokeWidth={2.2} />
+                    ) : (
+                      <CalendarDays size={13} strokeWidth={2} />
+                    )}
+                  </span>
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate font-hanken text-[13px] font-semibold text-ink">
+                      {row.name}
+                    </span>
+                    <span className="mt-0.5 block truncate font-hanken text-[12px] font-medium text-ink3">
+                      {row.reason}
+                    </span>
+                  </span>
+                  <ButtonLink href={row.href} variant="primary" size="sm" className="shrink-0">
+                    Ver ficha
+                  </ButtonLink>
+                </div>
+              ))}
             </div>
           )}
-        </div>
-      </div>
-
-      {/* ── Resumen Operativo ──────────────────────────────────────────────── */}
-      <SectionEyebrow label="Resumen operativo" color="info" />
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
-        <MiniKPI
-          label="Vehículos publicados"
-          value={totalPublicados}
-          unit={`/ ${stockActiveCount} stock`}
-          sub={totalPublicados === 0 ? '↓ ninguno publicado' : `${totalPublicados} en portales`}
-          subColor={totalPublicados === 0 ? 'down' : 'default'}
-        />
-        <MiniKPI
-          label="Ventas este mes"
-          value={salesMoM.current}
-          unit="veh."
-          valueColor="ok"
-          sub={`${salesTrend === 'up' ? '↑' : salesTrend === 'down' ? '↓' : '→'} vs ${salesMoM.previous} mes anterior`}
-          subColor={salesTrend === 'up' ? 'up' : salesTrend === 'down' ? 'down' : 'default'}
-        />
-        <MiniKPI label="Garantías activas" value={activeWarranties} sub="no expiradas" />
-        <MiniKPI
-          label="+90 días en nave"
-          value={avgDaysInStock?.over90Count ?? 0}
-          unit="veh."
-          valueColor={avgDaysInStock && avgDaysInStock.over90Count > 0 ? 'warn' : 'default'}
-          sub="acción comercial"
-          variant={avgDaysInStock && avgDaysInStock.over90Count > 0 ? 'alert' : 'default'}
-        />
-        {isAdmin && (
-          <MiniKPI
-            label="Costes taller 30d"
-            value={workshopTotal > 0 ? EUR.format(workshopTotal) : '0 €'}
-            sub="órdenes cerradas"
-          />
-        )}
-        {!isAdmin && (
-          <MiniKPI
-            label="Follow-ups"
-            value={pendingFollowups}
-            valueColor={pendingFollowups > 0 ? 'info' : 'default'}
-            sub="día 7 y día 30 sin enviar"
-          />
-        )}
-      </div>
-
-      {/* ── Resumen Financiero (ADMIN + MARKETING) ──────────────────────────── */}
-      {showFinancials && stockValue && (
-        <>
-          <SectionEyebrow label="Resumen financiero" color="ok" />
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-            <MiniKPI
-              label="Capital comprometido"
-              value={EUR.format(stockValue.committedInvestment)}
-              sub={`precio compra · ${stockValue.vehicleCount} veh.`}
-            />
-            <MiniKPI
-              label="Margen potencial stock"
-              value={EUR.format(stockValue.potentialMargin)}
-              valueColor={stockValue.potentialMargin >= 0 ? 'ok' : 'bad'}
-              sub="venta − compra − costes"
-            />
-            {isAdmin && pubToSoldRate && (
-              <MiniKPI
-                label="Tasa publicado → vendido"
-                value={pubToSoldRate.rate !== null ? `${pubToSoldRate.rate.toFixed(1)}%` : '—'}
-                valueColor="ok"
-                sub={`${pubToSoldRate.sold} vendidos / ${pubToSoldRate.published} pub.`}
-              />
-            )}
-            {isAdmin && (
-              <MiniKPI
-                label="Margen promedio"
-                value={avgMargin !== null ? `${avgMargin.toFixed(1)}%` : '—'}
-                valueColor={avgMargin !== null && avgMargin >= 4 ? 'ok' : 'default'}
-                sub={`${vehiclesWithMargin.length} vehículos`}
-              />
-            )}
+          <div className="border-t border-line2 px-[18px] py-[11px] text-center">
+            <Link
+              href="/analytics/comercial"
+              className="font-hanken text-[12.5px] font-semibold text-brand hover:text-brand2"
+            >
+              Ver todas las tareas →
+            </Link>
           </div>
-        </>
-      )}
+        </Card>
 
-      {/* ── Hoy: Agenda + Pipeline ─────────────────────────────────────────── */}
-      {(isAdmin || isAgente) && (
-        <>
-          <SectionEyebrow label="Hoy" color="info" />
-          <div className="grid gap-[14px] lg:grid-cols-[1.15fr_1fr]">
-            {/* Action stack */}
-            <div className="overflow-hidden rounded-[14px] border border-[#e6e9ee] bg-white">
-              <div className="flex items-center justify-between border-b border-[#e6e9ee] px-6 py-[18px]">
-                <h3 className="text-[16px] font-semibold tracking-[-0.01em]">Tu agenda</h3>
-                {agendaSlice.length > 0 && (
-                  <span className="rounded-full bg-red-600 px-2.5 py-1 font-mono text-[10px] font-semibold uppercase tracking-[0.12em] text-white">
-                    {agendaSlice.length} pendientes
-                  </span>
-                )}
-              </div>
-              {agendaSlice.length === 0 ? (
-                <div className="px-6 py-8 text-center text-sm text-[#586173]">
-                  Todo en orden. No hay tareas pendientes 🎉
-                </div>
-              ) : (
-                agendaSlice.map((item, i) => (
-                  <Link
-                    key={i}
-                    href={item.href}
-                    className="grid items-center gap-[14px] border-b border-[#e6e9ee] px-6 py-4 transition-colors last:border-b-0 hover:bg-[#f8fafc]"
-                    style={{ gridTemplateColumns: '32px 1fr auto' }}
-                  >
-                    <div className="flex justify-center">
-                      <span
-                        className="h-2 w-2 rounded-full"
-                        style={{
-                          background: dotClass[item.dot].bg,
-                          boxShadow: dotClass[item.dot].shadow,
-                        }}
-                      />
-                    </div>
-                    <div>
-                      <div className="text-[14px] font-semibold leading-tight">{item.title}</div>
-                      <div className="mt-0.5 font-mono text-[12px] tracking-[0.02em] text-[#586173]">
-                        {item.meta}
-                      </div>
-                    </div>
-                    <span className="whitespace-nowrap text-[12px] font-semibold text-blue-600">
-                      {item.cta} →
-                    </span>
-                  </Link>
-                ))
-              )}
-            </div>
-
-            {/* Pipeline funnel */}
-            <div className="rounded-[14px] border border-[#e6e9ee] bg-white p-6">
-              <div className="mb-[22px] flex items-center justify-between">
-                <h3 className="text-[16px] font-semibold tracking-[-0.01em]">
-                  Funnel de conversión
-                </h3>
-                <span className="font-mono text-[10px] uppercase tracking-[0.12em] text-[#586173]">
-                  Acumulado
-                </span>
-              </div>
-              {/* Bars */}
-              <div
-                className="h-[220px]"
-                style={{
-                  display: 'grid',
-                  gridTemplateColumns: 'repeat(5, 1fr)',
-                  gap: '8px',
-                  alignItems: 'end',
-                }}
-              >
-                {funnelStages.map((stage) => (
-                  <div
-                    key={stage.label}
-                    className="flex flex-col items-center gap-2.5"
-                    style={{ height: '100%', justifyContent: 'flex-end' }}
-                  >
-                    <div
-                      className="relative w-full rounded-t-lg"
-                      style={{
-                        background: stage.grad,
-                        height: `${Math.max(stage.pct, 5)}%`,
-                        minHeight: '16px',
-                      }}
-                    >
-                      <span
-                        className="absolute text-[20px] font-bold leading-none tracking-[-0.02em] text-[#141922]"
-                        style={{
-                          top: '-28px',
-                          left: '50%',
-                          transform: 'translateX(-50%)',
-                        }}
-                      >
-                        {stage.value}
-                      </span>
-                    </div>
-                    <div className="text-center">
-                      <div className="text-[12px] font-semibold">{stage.label}</div>
-                      <div className="mt-0.5 font-mono text-[10px] tracking-[0.06em] text-[#586173]">
-                        {stage.pct > 0 ? `${Math.round(stage.pct)}%` : '0%'}
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-
-              {/* Canal PRO / CN */}
-              {isAdmin && (
-                <div
-                  className="mt-6 border-t border-[#e6e9ee] pt-5"
-                  style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}
-                >
-                  <div>
-                    <div className="font-mono text-[10px] font-semibold uppercase tracking-[0.12em] text-blue-600">
-                      Canal PRO
-                    </div>
-                    <div className="mt-1.5 flex items-baseline gap-2">
-                      <span className="text-[20px] font-bold tracking-[-0.02em]">
-                        {funnelComparison?.pro.total ?? proFunnel.leadsPro}
-                      </span>
-                      <span className="text-[12px] text-[#586173]">
-                        leads ·{' '}
-                        <span className="font-semibold text-[#1a9d5f]">
-                          {funnelComparison?.pro.soldRate != null
-                            ? `${funnelComparison.pro.soldRate.toFixed(0)}% conv`
-                            : proFunnel.totalRate != null
-                              ? `${proFunnel.totalRate.toFixed(0)}% conv`
-                              : '—'}
-                        </span>
-                      </span>
-                    </div>
-                    <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-blue-50">
-                      <div
-                        className="h-full rounded-full bg-blue-600"
-                        style={{
-                          width: `${Math.min(
-                            ((funnelComparison?.pro.soldRate ?? proFunnel.totalRate ?? 0) / 100) *
-                              100,
-                            100
-                          )}%`,
-                        }}
-                      />
-                    </div>
-                  </div>
-                  <div>
-                    <div className="font-mono text-[10px] font-semibold uppercase tracking-[0.12em] text-violet-700">
-                      Canal CN
-                    </div>
-                    <div className="mt-1.5 flex items-baseline gap-2">
-                      <span className="text-[20px] font-bold tracking-[-0.02em]">
-                        {funnelComparison?.cn.total ?? totalLeads - proFunnel.leadsPro}
-                      </span>
-                      <span className="text-[12px] text-[#586173]">
-                        leads ·{' '}
-                        <span
-                          className="font-semibold"
-                          style={{
-                            color: (funnelComparison?.cn.soldRate ?? 0) > 0 ? '#1a9d5f' : '#d64545',
-                          }}
-                        >
-                          {funnelComparison?.cn.soldRate != null
-                            ? `${funnelComparison.cn.soldRate.toFixed(0)}% conv`
-                            : '—'}
-                        </span>
-                      </span>
-                    </div>
-                    <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-violet-100">
-                      <div
-                        className="h-full rounded-full bg-violet-600"
-                        style={{
-                          width: `${Math.min(
-                            ((funnelComparison?.cn.soldRate ?? 0) / 100) * 100,
-                            100
-                          )}%`,
-                        }}
-                      />
-                    </div>
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
-        </>
-      )}
-
-      {/* ── Motivos de pérdida (CAM-61) ───────────────────────────────────── */}
-      {(isAdmin || isAgente) && lostReasonRows.length > 0 && (
-        <>
-          <SectionEyebrow label="Por qué perdemos leads" color="bad" />
-          <div className="rounded-[14px] border border-[#e6e9ee] bg-white p-6">
-            <div className="mb-4 flex items-center justify-between">
-              <h3 className="text-[16px] font-semibold tracking-[-0.01em]">
-                Motivos de pérdida · últimos 90 días
-              </h3>
-              <span className="font-mono text-[10px] uppercase tracking-[0.12em] text-[#586173]">
-                {lostReasonTotal} lead{lostReasonTotal !== 1 ? 's' : ''}
-              </span>
-            </div>
-            <div className="space-y-2.5">
-              {lostReasonRows.map((r) => {
-                const pct = lostReasonTotal > 0 ? Math.round((r.total / lostReasonTotal) * 100) : 0
-                return (
-                  <div
-                    key={r.reason}
-                    className="grid items-center gap-3"
-                    style={{ gridTemplateColumns: '140px 1fr auto' }}
-                  >
-                    <span className="truncate text-[13px] font-medium">
-                      {LOST_REASON_LABELS[r.reason as LostReason] ?? r.reason}
-                    </span>
-                    <div className="h-3 overflow-hidden rounded bg-[#f4f6f8]">
-                      <div
-                        className="h-full rounded"
-                        style={{
-                          width: `${Math.max(pct, 2)}%`,
-                          background: 'linear-gradient(90deg,#c9820a,#c9820a)',
-                        }}
-                      />
-                    </div>
-                    <span className="whitespace-nowrap font-mono text-[12px] text-[#586173]">
-                      {r.total} · {pct}%
-                      <span className="ml-1.5 text-[10px]">
-                        ({r.buyers}C/{r.sellers}V)
-                      </span>
-                    </span>
-                  </div>
-                )
-              })}
-            </div>
-          </div>
-        </>
-      )}
-
-      {/* ── Tendencias (ADMIN + MARKETING) ────────────────────────────────── */}
-      {showFinancials && stockHistory.length > 0 && (
-        <>
-          <SectionEyebrow label="Tendencias" color="info" />
-          <div className="rounded-[14px] border border-[#e6e9ee] bg-white p-6">
-            <div className="mb-5 flex items-center justify-between">
-              <div>
-                <h3 className="text-[16px] font-semibold tracking-[-0.01em]">
-                  Evolución del stock
-                </h3>
-                <p className="mt-1 text-[12px] text-[#586173]">
-                  Valor inmovilizado · últimos 12 meses
-                </p>
-              </div>
-            </div>
-            <div className="h-[220px]">
-              <StockEvolutionChart data={stockHistory} />
-            </div>
-            {stockValue && (
-              <div className="mt-4 flex gap-6 border-t border-[#e6e9ee] pt-4">
-                <div>
-                  <div className="font-mono text-[10px] uppercase tracking-[0.12em] text-[#586173]">
-                    Valor actual
-                  </div>
-                  <div className="mt-1 text-[20px] font-bold tracking-[-0.02em]">
-                    {EUR.format(stockValue.totalStockValue)}
-                    <span className="ml-1.5 rounded bg-[#e3f5ec] px-1 py-0.5 text-[11px] font-semibold text-[#1a9d5f]">
-                      ↑ activo
-                    </span>
-                  </div>
-                </div>
-                {avgDaysInStock && (
-                  <div>
-                    <div className="font-mono text-[10px] uppercase tracking-[0.12em] text-[#586173]">
-                      Días medios stock
-                    </div>
-                    <div className="mt-1 text-[20px] font-bold tracking-[-0.02em]">
-                      {avgDaysInStock.averageDays ?? '—'}d
-                    </div>
-                  </div>
-                )}
-                <div>
-                  <div className="font-mono text-[10px] uppercase tracking-[0.12em] text-[#586173]">
-                    Vehículos en nave
-                  </div>
-                  <div className="mt-1 text-[20px] font-bold tracking-[-0.02em]">
-                    {stockValue.vehicleCount}
-                  </div>
-                </div>
-              </div>
-            )}
-          </div>
-        </>
-      )}
-
-      {/* ── Demanda activa esperando (Block 19) — argumento de captación ───── */}
-      {(isAdmin || isAgente) && vehiclesWithDemand.length > 0 && (
-        <>
-          <SectionEyebrow label="Demanda activa esperando" color="ok" />
-          <div
-            className="rounded-[14px] p-[22px]"
-            style={{
-              border: '1px solid #10b981',
-              background: 'linear-gradient(180deg, #fff, #f2fbf6)',
-            }}
-          >
-            <p className="mb-4 text-[13px] text-[#586173]">
-              Vehículos en stock con compradores activos compatibles esperando. Úsalo como palanca
-              comercial (y para captar más stock parecido).
+        {/* Agenda de hoy */}
+        <Card className="self-start p-[18px]">
+          <h3 className="mb-3.5 font-hanken text-[15px] font-bold tracking-[-0.01em] text-ink">
+            Agenda de hoy
+          </h3>
+          {agendaItems.length === 0 ? (
+            <p className="py-4 font-hanken text-[13px] text-ink3">
+              Sin nada agendado para hoy. Las citas, entregas, taller y seguimientos del día
+              aparecerán aquí.{' '}
+              <Link href="/calendario" className="font-semibold text-brand hover:text-brand2">
+                Abrir calendario →
+              </Link>
             </p>
-            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
-              {vehiclesWithDemand.map((v) => (
-                <Link
-                  key={v.id}
-                  href={v.sellerLeadId ? `/vendedores/${v.sellerLeadId}?tab=compradores` : '#'}
-                  className="flex items-center justify-between gap-2 rounded-lg border border-emerald-200 bg-white p-3 transition-colors hover:bg-emerald-50"
-                >
-                  <span className="truncate text-[13px] font-medium text-[#141922]">{v.label}</span>
-                  <span className="flex shrink-0 items-center gap-1 rounded-full bg-emerald-100 px-2 py-0.5 text-[11px] font-semibold text-emerald-700">
-                    {v.demandCount} 👤
+          ) : (
+            <div className="flex flex-col gap-3">
+              {agendaItems.slice(0, 8).map((item) => (
+                <Link key={item.id} href={item.href} className="group flex items-start gap-3">
+                  <span className="w-[44px] shrink-0 pt-px font-mono text-[12px] font-semibold text-ink2">
+                    {item.allDay
+                      ? '—'
+                      : item.start.toLocaleTimeString('es-ES', {
+                          hour: '2-digit',
+                          minute: '2-digit',
+                          timeZone: TZ,
+                        })}
+                  </span>
+                  <span
+                    className="mt-[3px] h-[9px] w-[9px] shrink-0 rounded-full"
+                    style={{ backgroundColor: TONE_HEX[item.tone] }}
+                    aria-hidden
+                  />
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate font-hanken text-[12.5px] font-semibold text-ink group-hover:text-brand2">
+                      {item.kindLabel} — {item.title}
+                    </span>
+                    {item.contextLabel && (
+                      <span className="block truncate font-hanken text-[11.5px] font-medium text-ink3">
+                        {item.contextLabel}
+                      </span>
+                    )}
                   </span>
                 </Link>
               ))}
-            </div>
-          </div>
-        </>
-      )}
-
-      {/* ── Alertas legales (ADMIN + AGENTE) ──────────────────────────────── */}
-      {(isAdmin || isAgente) &&
-        (incompleteExpedientes.length > 0 ||
-          (vehiclesItvExpiring as typeof vehiclesItvExpiring).length > 0 ||
-          (vehiclesChargesPending as typeof vehiclesChargesPending).length > 0) && (
-          <>
-            <SectionEyebrow label="Alertas legales" color="bad" />
-            <div className="grid grid-cols-1 gap-[14px] lg:grid-cols-3">
-              {incompleteExpedientes.length > 0 && (
-                <div
-                  className="rounded-[14px] p-[22px]"
-                  style={{
-                    border: '1px solid #c9820a',
-                    background: 'linear-gradient(180deg, #fff, #ffffff)',
-                  }}
+              {agendaItems.length > 8 && (
+                <Link
+                  href="/calendario"
+                  className="pt-1 font-hanken text-[12.5px] font-semibold text-brand hover:text-brand2"
                 >
-                  <div className="mb-4 flex items-center gap-2 text-[14px] font-semibold text-amber-700">
-                    <FileWarning className="h-4 w-4" />
-                    Expedientes incompletos ({incompleteExpedientes.length})
-                  </div>
-                  <div className="space-y-2">
-                    {incompleteExpedientes.map((v) => (
-                      <div key={v.id} className="flex items-center justify-between gap-2">
-                        <Link
-                          href={v.sellerLeadId ? `/vendedores/${v.sellerLeadId}` : '#'}
-                          className="truncate text-[13px] text-[#141922] hover:underline"
-                        >
-                          {v.brand} {v.model} {v.year ?? ''}
-                        </Link>
-                        <span
-                          className={`shrink-0 rounded-full px-2 py-0.5 text-[11px] font-semibold ${v.completionPct >= 60 ? 'bg-amber-100 text-amber-700' : 'bg-red-100 text-red-700'}`}
-                        >
-                          {v.completionPct}%
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-              {(vehiclesItvExpiring as typeof vehiclesItvExpiring).length > 0 && (
-                <div
-                  className="rounded-[14px] p-[22px]"
-                  style={{
-                    border: '1px solid #f97316',
-                    background: 'linear-gradient(180deg, #fff, #ffffff)',
-                  }}
-                >
-                  <div className="mb-4 flex items-center gap-2 text-[14px] font-semibold text-orange-700">
-                    <AlertTriangle className="h-4 w-4" />
-                    ITV próxima a vencer (
-                    {(vehiclesItvExpiring as typeof vehiclesItvExpiring).length})
-                  </div>
-                  <div className="space-y-2">
-                    {(vehiclesItvExpiring as typeof vehiclesItvExpiring).map((v) => {
-                      const daysLeft = v.itvValidUntil
-                        ? Math.floor(
-                            (v.itvValidUntil.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)
-                          )
-                        : null
-                      return (
-                        <div key={v.id} className="flex items-center justify-between gap-2">
-                          <Link
-                            href={v.sellerLead?.id ? `/vendedores/${v.sellerLead.id}` : '#'}
-                            className="truncate text-[13px] text-[#141922] hover:underline"
-                          >
-                            {v.brand} {v.model} {v.year ?? ''}
-                          </Link>
-                          <span
-                            className={`shrink-0 rounded-full px-2 py-0.5 text-[11px] font-semibold ${daysLeft !== null && daysLeft < 15 ? 'bg-red-100 text-red-700' : 'bg-orange-100 text-orange-700'}`}
-                          >
-                            {daysLeft !== null ? (daysLeft < 0 ? 'Vencida' : `${daysLeft}d`) : '—'}
-                          </span>
-                        </div>
-                      )
-                    })}
-                  </div>
-                </div>
-              )}
-              {(vehiclesChargesPending as typeof vehiclesChargesPending).length > 0 && (
-                <div
-                  className="rounded-[14px] p-[22px]"
-                  style={{
-                    border: '1px solid #d64545',
-                    background: 'linear-gradient(180deg, #fff, #fef5f5)',
-                  }}
-                >
-                  <div className="mb-4 flex items-center gap-2 text-[14px] font-semibold text-red-700">
-                    <ShieldAlert className="h-4 w-4" />
-                    Cargas DGT pendientes (
-                    {(vehiclesChargesPending as typeof vehiclesChargesPending).length})
-                  </div>
-                  <div className="space-y-2">
-                    {(vehiclesChargesPending as typeof vehiclesChargesPending).map((v) => {
-                      const daysSince = Math.floor(
-                        (now.getTime() - v.createdAt.getTime()) / (1000 * 60 * 60 * 24)
-                      )
-                      return (
-                        <div key={v.id} className="flex items-center justify-between gap-2">
-                          <Link
-                            href={v.sellerLead?.id ? `/vendedores/${v.sellerLead.id}` : '#'}
-                            className="truncate text-[13px] text-[#141922] hover:underline"
-                          >
-                            {v.brand} {v.model} {v.year ?? ''}
-                          </Link>
-                          <span className="shrink-0 rounded-full bg-red-100 px-2 py-0.5 text-[11px] font-semibold text-red-700">
-                            {daysSince}d
-                          </span>
-                        </div>
-                      )
-                    })}
-                  </div>
-                </div>
+                  Ver los {agendaItems.length} eventos →
+                </Link>
               )}
             </div>
-          </>
-        )}
-
-      {/* ── Detalle por estado ─────────────────────────────────────────────── */}
-      <SectionEyebrow label="Detalle por estado" color="info" />
-      <div className="grid grid-cols-1 gap-[14px] sm:grid-cols-3">
-        {/* Vendedores */}
-        <div className="rounded-[14px] border border-[#e6e9ee] bg-white p-[22px]">
-          <div className="mb-4 flex items-baseline justify-between">
-            <h4 className="text-[14px] font-semibold tracking-[-0.005em]">Vendedores</h4>
-            <span className="font-mono text-[10px] tracking-[0.1em] text-[#586173]">
-              TOTAL {sellerTotal}
-            </span>
-          </div>
-          {(
-            [
-              'NUEVO',
-              'CONTACTADO',
-              'CUALIFICADO',
-              'EN_NEGOCIACION',
-              'CERRADO',
-              'DESCARTADO',
-            ] as SellerLeadStatus[]
-          ).map((status, i) => (
-            <div
-              key={status}
-              className="flex items-center gap-3 py-2 text-[13px]"
-              style={{ borderTop: i > 0 ? '1px solid #e6e9ee' : 'none' }}
-            >
-              <span
-                className="h-1.5 w-1.5 flex-shrink-0 rounded-full"
-                style={{ background: STATUS_DOTS[status] }}
-              />
-              <span className="flex-1 text-[#141922]">{SELLER_LEAD_STATUS_LABELS[status]}</span>
-              <span className="font-mono font-semibold text-[#141922]">
-                {sellerMap.get(status) ?? 0}
-              </span>
-            </div>
-          ))}
-        </div>
-
-        {/* Compradores */}
-        <div className="rounded-[14px] border border-[#e6e9ee] bg-white p-[22px]">
-          <div className="mb-4 flex items-baseline justify-between">
-            <h4 className="text-[14px] font-semibold tracking-[-0.005em]">Compradores</h4>
-            <span className="font-mono text-[10px] tracking-[0.1em] text-[#586173]">
-              TOTAL {buyerTotal}
-            </span>
-          </div>
-          {(
-            [
-              'NUEVO',
-              'CONTACTADO',
-              'CUALIFICADO',
-              'EN_NEGOCIACION',
-              'CERRADO',
-              'PERDIDO',
-            ] as BuyerLeadStatus[]
-          ).map((status, i) => (
-            <div
-              key={status}
-              className="flex items-center gap-3 py-2 text-[13px]"
-              style={{ borderTop: i > 0 ? '1px solid #e6e9ee' : 'none' }}
-            >
-              <span
-                className="h-1.5 w-1.5 flex-shrink-0 rounded-full"
-                style={{ background: STATUS_DOTS[status] }}
-              />
-              <span className="flex-1 text-[#141922]">{BUYER_LEAD_STATUS_LABELS[status]}</span>
-              <span className="font-mono font-semibold text-[#141922]">
-                {buyerMap.get(status) ?? 0}
-              </span>
-            </div>
-          ))}
-        </div>
-
-        {/* Vehículos */}
-        <div className="rounded-[14px] border border-[#e6e9ee] bg-white p-[22px]">
-          <div className="mb-4 flex items-baseline justify-between">
-            <h4 className="text-[14px] font-semibold tracking-[-0.005em]">Vehículos</h4>
-            <span className="font-mono text-[10px] tracking-[0.1em] text-[#586173]">
-              TOTAL {vehiclesTotal}
-            </span>
-          </div>
-          {(
-            [
-              'NUEVO',
-              'TASADO',
-              'PUBLICADO',
-              'RESERVADO',
-              'VENDIDO',
-              'DESCARTADO',
-            ] as VehicleStatus[]
-          ).map((status, i) => (
-            <div
-              key={status}
-              className="flex items-center gap-3 py-2 text-[13px]"
-              style={{ borderTop: i > 0 ? '1px solid #e6e9ee' : 'none' }}
-            >
-              <span
-                className="h-1.5 w-1.5 flex-shrink-0 rounded-full"
-                style={{ background: STATUS_DOTS[status] }}
-              />
-              <span className="flex-1 text-[#141922]">{VEHICLE_STATUS_LABELS[status]}</span>
-              <span className="font-mono font-semibold text-[#141922]">
-                {vehicleMap.get(status) ?? 0}
-              </span>
-            </div>
-          ))}
-        </div>
+          )}
+        </Card>
       </div>
-
-      {/* ── Análisis avanzado (ADMIN) ──────────────────────────────────────── */}
-      {isAdmin && (
-        <>
-          <SectionEyebrow label="Análisis avanzado" color="purple" />
-          <div className="grid gap-[14px] lg:grid-cols-[1.4fr_1fr]">
-            {/* Horizontal bar chart — vehículos por comercial */}
-            <div className="rounded-[14px] border border-[#e6e9ee] bg-white p-[22px]">
-              <h3 className="mb-[18px] text-[16px] font-semibold tracking-[-0.01em]">
-                Vehículos por comercial
-              </h3>
-              {vehiclesPerCommercial.length === 0 ? (
-                <p className="text-[13px] text-[#586173]">Sin datos.</p>
-              ) : (
-                <div className="flex flex-col gap-3">
-                  {vehiclesPerCommercial.map((row, i) => (
-                    <div
-                      key={row.agentId}
-                      className="grid items-center gap-3"
-                      style={{ gridTemplateColumns: '100px 1fr 36px' }}
-                    >
-                      <span className="truncate text-[13px] font-medium">
-                        {row.agentName.split(' ')[0]} {row.agentName.split(' ')[1]?.[0]}.
-                      </span>
-                      <div className="h-3.5 overflow-hidden rounded bg-[#f4f6f8]">
-                        <div
-                          className="h-full rounded"
-                          style={{
-                            width: `${(row.active / barMax) * 100}%`,
-                            background: barGrads[i % barGrads.length],
-                          }}
-                        />
-                      </div>
-                      <span className="text-right text-[14px] font-bold tabular-nums">
-                        {row.active}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            {/* Mini stat cards */}
-            <div className="flex flex-col gap-[14px]">
-              <div className="rounded-[14px] border border-[#e6e9ee] bg-white px-[22px] py-[18px]">
-                <div className="font-mono text-[10px] font-semibold uppercase tracking-[0.12em] text-[#586173]">
-                  Horas taller promedio / vehículo
-                </div>
-                <div className="mt-1.5 text-[26px] font-bold tabular-nums tracking-[-0.025em]">
-                  {avgWorkshopHours?.averageHours != null
-                    ? `${avgWorkshopHours.averageHours.toFixed(1)} h`
-                    : '—'}
-                </div>
-                <div className="mt-0.5 text-[11.5px] text-[#586173]">
-                  {avgWorkshopHours?.vehicleCount ?? 0} vehículos con órdenes completadas
-                </div>
-              </div>
-              <div className="rounded-[14px] border border-[#e6e9ee] bg-white px-[22px] py-[18px]">
-                <div className="font-mono text-[10px] font-semibold uppercase tracking-[0.12em] text-[#586173]">
-                  Coste postventa promedio / vehículo
-                </div>
-                <div
-                  className="mt-1.5 text-[26px] font-bold tabular-nums tracking-[-0.025em]"
-                  style={{
-                    color:
-                      avgPostventaCost?.averageCost != null && avgPostventaCost.averageCost > 200
-                        ? '#d64545'
-                        : '#141922',
-                  }}
-                >
-                  {avgPostventaCost?.averageCost != null
-                    ? EUR.format(avgPostventaCost.averageCost)
-                    : '—'}
-                </div>
-                <div className="mt-0.5 text-[11.5px] text-[#586173]">
-                  {avgPostventaCost?.vehicleCount ?? 0} vehículos con incidencias en garantía
-                </div>
-              </div>
-            </div>
-          </div>
-        </>
-      )}
-
-      {/* ── Tiempo medio por estado ────────────────────────────────────────── */}
-      <SectionEyebrow label="Tiempo medio por estado" color="teal" />
-      <div className="grid grid-cols-1 gap-[14px] sm:grid-cols-3">
-        <TimeCard title="Vendedores" rows={sellerStateMedians} labels={SELLER_LEAD_STATUS_LABELS} />
-        <TimeCard title="Compradores" rows={buyerStateMedians} labels={BUYER_LEAD_STATUS_LABELS} />
-        <TimeCard title="Vehículos" rows={vehicleStateMedians} labels={VEHICLE_STATUS_LABELS} />
-      </div>
-
-      {/* ── Top vehículos por margen (ADMIN) ──────────────────────────────── */}
-      {isAdmin && top5Rentabilidad.length > 0 && (
-        <>
-          <div className="mb-0 mt-9" />
-          <div className="rounded-[14px] border border-[#e6e9ee] bg-white p-6">
-            <h3 className="text-[16px] font-semibold tracking-[-0.01em]">
-              Top vehículos por margen neto
-            </h3>
-            <p className="mb-[18px] mt-1 text-[12px] text-[#586173]">
-              Ordenado por margen neto porcentual
-            </p>
-            {top5Rentabilidad.map((v, i) => {
-              const maxMargin = top5Rentabilidad[0]?.netMarginPct ?? 1
-              const barPct = maxMargin > 0 ? (v.netMarginPct / maxMargin) * 100 : 0
-              return (
-                <div
-                  key={v.id}
-                  className="grid grid-cols-[24px_1fr_auto_auto] items-center gap-3 py-3.5 md:grid-cols-[24px_1fr_140px_auto_auto] md:gap-[18px]"
-                  style={{
-                    borderBottom: i < top5Rentabilidad.length - 1 ? '1px solid #e6e9ee' : 'none',
-                  }}
-                >
-                  <span className="font-mono text-[11px] font-medium text-[#586173]">
-                    {String(i + 1).padStart(2, '0')}
-                  </span>
-                  <div>
-                    {v.sellerLeadId ? (
-                      <Link
-                        href={`/vendedores/${v.sellerLeadId}`}
-                        className="text-[14px] font-semibold hover:underline"
-                      >
-                        {v.brand} {v.model} {v.year ?? ''}
-                      </Link>
-                    ) : (
-                      <span className="text-[14px] font-semibold">
-                        {v.brand} {v.model} {v.year ?? ''}
-                      </span>
-                    )}
-                  </div>
-                  <div className="hidden h-1.5 overflow-hidden rounded-full bg-[#f4f6f8] md:block">
-                    <div
-                      className="h-full rounded-full"
-                      style={{
-                        width: `${Math.max(barPct, 2)}%`,
-                        background: 'linear-gradient(90deg, #1a9d5f, #16a34a)',
-                      }}
-                    />
-                  </div>
-                  <span
-                    className="text-[16px] font-bold tracking-[-0.02em]"
-                    style={{ color: v.netMargin < 0 ? '#d64545' : '#1a9d5f' }}
-                  >
-                    {v.netMargin >= 0 ? '+' : ''}
-                    {v.netMargin.toLocaleString('es-ES', {
-                      style: 'currency',
-                      currency: 'EUR',
-                      maximumFractionDigits: 0,
-                    })}
-                  </span>
-                  <span className="w-[44px] text-right font-mono text-[12px] text-[#586173]">
-                    {v.netMarginPct.toFixed(1)}%
-                  </span>
-                </div>
-              )
-            })}
-          </div>
-        </>
-      )}
-
-      {/* bottom spacer */}
-      <div className="h-16" />
-    </div>
-  )
-}
-
-// ── Helpers ───────────────────────────────────────────────────────────────────
-
-function sumWhere<T extends string>(counts: { status: T; count: number }[], statuses: T[]): number {
-  const set = new Set(statuses)
-  return counts.filter((c) => set.has(c.status)).reduce((a, c) => a + c.count, 0)
-}
-
-async function fetchSellerStateMedians(
-  filter: DashboardFilter
-): Promise<StateMedianRow<SellerLeadStatus>[]> {
-  const leads = await db.sellerLead.findMany({
-    where: filter.agentId ? { agentId: filter.agentId } : undefined,
-    select: {
-      createdAt: true,
-      activities: {
-        where: { type: 'CAMBIO_ESTADO' },
-        select: { createdAt: true, content: true },
-        orderBy: { createdAt: 'asc' },
-      },
-    },
-  })
-  const entities: EntityActivities<SellerLeadStatus>[] = leads.map((l) => ({
-    initialStatus: 'NUEVO' as SellerLeadStatus,
-    createdAt: l.createdAt,
-    activities: l.activities.filter((a) => !a.content?.startsWith('Vehículo:')),
-  }))
-  return aggregateMediansByState<SellerLeadStatus>(entities, SELLER_LEAD_STATUS_LABELS)
-}
-
-async function fetchBuyerStateMedians(
-  filter: DashboardFilter
-): Promise<StateMedianRow<BuyerLeadStatus>[]> {
-  const leads = await db.buyerLead.findMany({
-    where: filter.agentId ? { agentId: filter.agentId } : undefined,
-    select: {
-      createdAt: true,
-      activities: {
-        where: { type: 'CAMBIO_ESTADO' },
-        select: { createdAt: true, content: true },
-        orderBy: { createdAt: 'asc' },
-      },
-    },
-  })
-  const entities: EntityActivities<BuyerLeadStatus>[] = leads.map((l) => ({
-    initialStatus: 'NUEVO' as BuyerLeadStatus,
-    createdAt: l.createdAt,
-    activities: l.activities,
-  }))
-  return aggregateMediansByState<BuyerLeadStatus>(entities, BUYER_LEAD_STATUS_LABELS)
-}
-
-async function fetchVehicleStateMedians(
-  filter: DashboardFilter
-): Promise<StateMedianRow<VehicleStatus>[]> {
-  const vehicles = await db.vehicle.findMany({
-    where: filter.agentId ? { sellerLead: { agentId: filter.agentId } } : undefined,
-    select: {
-      createdAt: true,
-      sellerLead: {
-        select: {
-          activities: {
-            where: { type: 'CAMBIO_ESTADO', content: { startsWith: 'Vehículo:' } },
-            select: { createdAt: true, content: true },
-            orderBy: { createdAt: 'asc' },
-          },
-        },
-      },
-    },
-  })
-  const entities: EntityActivities<VehicleStatus>[] = vehicles.map((v) => ({
-    initialStatus: 'NUEVO' as VehicleStatus,
-    createdAt: v.createdAt,
-    activities: v.sellerLead.activities,
-  }))
-  return aggregateMediansByState<VehicleStatus>(entities, VEHICLE_STATUS_LABELS)
-}
-
-// ── Sub-components ────────────────────────────────────────────────────────────
-
-function SectionEyebrow({
-  label,
-  color = 'info',
-}: {
-  label: string
-  color?: 'info' | 'ok' | 'purple' | 'teal' | 'bad'
-}) {
-  const colorMap = {
-    info: '#3a6fd4',
-    ok: '#1a9d5f',
-    purple: '#7c3aed',
-    teal: '#0891b2',
-    bad: '#d64545',
-  }
-  const c = colorMap[color]
-  return (
-    <div
-      className="mb-4 mt-9 flex items-center gap-2.5 font-mono text-[10px] font-semibold uppercase tracking-[0.16em]"
-      style={{ color: c }}
-    >
-      <span className="inline-block h-[2px] w-3.5 rounded-sm" style={{ background: c }} />
-      {label}
-    </div>
-  )
-}
-
-function MiniKPI({
-  label,
-  value,
-  unit,
-  sub,
-  valueColor = 'default',
-  subColor = 'default',
-  variant = 'default',
-}: {
-  label: string
-  value: string | number
-  unit?: string
-  sub?: string
-  valueColor?: 'default' | 'ok' | 'bad' | 'warn' | 'info'
-  subColor?: 'default' | 'up' | 'down'
-  variant?: 'default' | 'alert' | 'danger'
-}) {
-  const borderStyle =
-    variant === 'alert'
-      ? { border: '1px solid #c9820a', background: 'linear-gradient(180deg, #fff, #ffffff)' }
-      : variant === 'danger'
-        ? { border: '1px solid #d64545', background: 'linear-gradient(180deg, #fff, #fef5f5)' }
-        : {}
-
-  const valueColorMap = {
-    default: '#141922',
-    ok: '#1a9d5f',
-    bad: '#d64545',
-    warn: '#c9820a',
-    info: '#3a6fd4',
-  }
-
-  const subColorMap = {
-    default: '#586173',
-    up: '#1a9d5f',
-    down: '#d64545',
-  }
-
-  return (
-    <div
-      className="flex flex-col gap-1 rounded-[12px] px-[18px] py-4"
-      style={
-        variant !== 'default' ? borderStyle : { border: '1px solid #e6e9ee', background: '#fff' }
-      }
-    >
-      <span
-        className={`font-mono text-[10px] font-semibold uppercase tracking-[0.12em]`}
-        style={{ color: variant === 'alert' ? '#c9820a' : '#586173' }}
-      >
-        {label}
-      </span>
-      <span
-        className="mt-1 text-[22px] font-bold tabular-nums leading-[1.05] tracking-[-0.025em]"
-        style={{ color: valueColorMap[valueColor] }}
-      >
-        {value}
-        {unit && <span className="ml-0.5 text-[14px] font-medium text-[#586173]"> {unit}</span>}
-      </span>
-      {sub && (
-        <span className="mt-0.5 text-[11.5px]" style={{ color: subColorMap[subColor] }}>
-          <span className="font-semibold">{sub}</span>
-        </span>
-      )}
-    </div>
-  )
-}
-
-function TimeCard<T extends string>({
-  title,
-  rows,
-  labels,
-}: {
-  title: string
-  rows: StateMedianRow<T>[]
-  labels: Record<T, string>
-}) {
-  return (
-    <div className="rounded-[14px] border border-[#e6e9ee] bg-white p-[22px]">
-      <h4 className="mb-3.5 text-[14px] font-semibold tracking-[-0.005em]">{title}</h4>
-      {/* Column header */}
-      <div
-        className="grid items-center gap-3 pb-2 font-mono text-[10px] font-semibold uppercase tracking-[0.1em] text-[#8b94a3]"
-        style={{ gridTemplateColumns: '12px 1fr 60px 30px' }}
-      >
-        <span />
-        <span>Estado</span>
-        <span className="text-right">Mediana</span>
-        <span className="text-right">n</span>
-      </div>
-      {rows.length === 0 ? (
-        <p className="py-3 text-[13px] text-[#586173]">Sin transiciones completadas.</p>
-      ) : (
-        rows.map((r, i) => (
-          <div
-            key={r.status}
-            className="grid items-center gap-3 py-[9px] text-[13px]"
-            style={{
-              gridTemplateColumns: '12px 1fr 60px 30px',
-              borderTop: '1px solid #e6e9ee',
-            }}
-          >
-            <span
-              className="h-1.5 w-1.5 rounded-full"
-              style={{ background: TIME_DOTS[i % TIME_DOTS.length] }}
-            />
-            <span className="text-[#141922]">{labels[r.status]}</span>
-            <span className="text-right font-bold tabular-nums">{formatDuration(r.medianMs)}</span>
-            <span className="text-right font-mono text-[11px] text-[#586173]">{r.sampleSize}</span>
-          </div>
-        ))
-      )}
     </div>
   )
 }
