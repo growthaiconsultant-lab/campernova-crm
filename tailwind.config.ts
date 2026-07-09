@@ -17,6 +17,9 @@ const config: Config = {
         sans: ['var(--font-inter)', 'system-ui', 'sans-serif'],
         display: ['var(--font-fraunces)', 'Georgia', 'serif'],
         mono: ['var(--font-jetbrains-mono)', 'ui-monospace', 'monospace'],
+        // UI del CRM (rediseño). Dentro de `.crm-theme`, --font-inter apunta a
+        // Hanken, así que `font-sans` ya rinde Hanken; `font-hanken` es explícito.
+        hanken: ['var(--font-crm)', 'system-ui', 'sans-serif'],
       },
       colors: {
         /* CN design system palette — matches docs/design-claude/styles.css */
@@ -96,6 +99,33 @@ const config: Config = {
           border: 'hsl(var(--sidebar-border))',
           ring: 'hsl(var(--sidebar-ring))',
         },
+        /* ── Tokens EXACTOS del mockup (rediseño CRM). Solo resuelven dentro
+           de `.crm-theme`, donde están definidos (globals.css). Nombres planos
+           1:1 con las CSS vars: bg-canvas, text-ink2, border-line, bg-brand,
+           hover:bg-brand2, bg-panel2, text-panel-ink, text-good, bg-bad-tint… */
+        canvas: 'var(--bg)',
+        line: 'var(--line)',
+        line2: 'var(--line2)',
+        track: 'var(--track)',
+        ink: 'var(--ink)',
+        ink2: 'var(--ink2)',
+        ink3: 'var(--ink3)',
+        brand: 'var(--brand)',
+        brand2: 'var(--brand2)',
+        'brand-tint': 'var(--brand-tint)',
+        panel: 'var(--panel)',
+        panel2: 'var(--panel2)',
+        'panel-line': 'var(--panel-line)',
+        'panel-ink': 'var(--panel-ink)',
+        'panel-ink2': 'var(--panel-ink2)',
+        good: 'var(--green)',
+        'good-tint': 'var(--green-t)',
+        warn: 'var(--amber)',
+        'warn-tint': 'var(--amber-t)',
+        bad: 'var(--red)',
+        'bad-tint': 'var(--red-t)',
+        info: 'var(--blue)',
+        'info-tint': 'var(--blue-t)',
       },
       borderRadius: {
         lg: 'var(--radius)',

@@ -7,6 +7,7 @@ import {
 } from '@/lib/captacion'
 import { QuickAddCapture } from './quick-add-capture'
 import { CaptureCard, type CaptureCardData } from './capture-card'
+import { Eyebrow } from '@/components/redesign'
 import type { CaptureStatus } from '@prisma/client'
 
 export default async function CaptacionesPage() {
@@ -50,73 +51,84 @@ export default async function CaptacionesPage() {
   const activeCount = cards.filter((c) => c.status !== 'RECHAZADO').length
 
   return (
-    <div className="-mx-6 -mt-6">
-      <header className="z-20 flex min-h-[64px] flex-wrap items-center justify-between gap-3 border-b border-[#e6e9ee] bg-white px-4 py-2 md:px-8 lg:sticky lg:top-0 lg:h-[73px] lg:py-0">
+    <div>
+      {/* Título de módulo (chrome global en el header 60px) */}
+      <div className="mb-4 flex items-end justify-between gap-3">
         <div>
-          <div className="font-mono text-[10px] uppercase tracking-[0.14em] text-[#586173]">
-            CRM · Captación
-          </div>
-          <h1 className="mt-0.5 text-[20px] font-bold tracking-tight text-[#141922]">
+          <Eyebrow>CRM · Captación</Eyebrow>
+          <h1 className="mt-1 font-hanken text-[23px] font-bold tracking-[-0.02em] text-ink">
             Captaciones
           </h1>
+          <p className="mt-1 font-hanken text-[13.5px] text-ink2">
+            Anuncios de portales que perseguimos para captar stock ·{' '}
+            <b className="text-ink">
+              {activeCount} activa{activeCount === 1 ? '' : 's'}
+            </b>
+          </p>
         </div>
-        <p className="text-[12px] text-[#586173]">
-          {activeCount} activa{activeCount === 1 ? '' : 's'}
-        </p>
-      </header>
-
-      <div className="space-y-4 px-4 pb-16 pt-4 md:px-8">
-        <QuickAddCapture />
-
-        {/* Tablero por estado */}
-        <div className="overflow-x-auto">
-          <div
-            className="grid min-w-[900px] gap-3"
-            style={{ gridTemplateColumns: 'repeat(5, 1fr)' }}
-          >
-            {CAPTURE_BOARD_COLUMNS.map((status) => {
-              const list = byStatus.get(status) ?? []
-              return (
-                <div key={status} className="rounded-xl border border-[#e6e9ee] bg-[#f8fafc]">
-                  <div className="flex items-center justify-between border-b border-[#e6e9ee] px-3 py-2">
-                    <span className="flex items-center gap-1.5 text-[12px] font-semibold text-[#141922]">
-                      <span
-                        className="h-2 w-2 rounded-full"
-                        style={{ background: CAPTURE_STATUS_COLORS[status] }}
-                      />
-                      {CAPTURE_STATUS_LABELS[status]}
-                    </span>
-                    <span className="rounded-full bg-white px-1.5 py-0.5 font-mono text-[11px] text-[#586173]">
-                      {list.length}
-                    </span>
-                  </div>
-                  <div className="space-y-2 p-2">
-                    {list.length === 0 ? (
-                      <p className="px-1 py-6 text-center text-[11px] text-[#8b94a3]">—</p>
-                    ) : (
-                      list.map((c) => <CaptureCard key={c.id} c={c} agents={agents} />)
-                    )}
-                  </div>
-                </div>
-              )
-            })}
-          </div>
-        </div>
-
-        {/* Rechazadas */}
         {rejected.length > 0 && (
-          <details className="rounded-xl border border-[#e6e9ee] bg-white">
-            <summary className="cursor-pointer px-4 py-3 text-[13px] font-medium text-[#586173]">
-              Rechazadas ({rejected.length})
-            </summary>
-            <div className="grid gap-2 p-3 sm:grid-cols-2 lg:grid-cols-3">
-              {rejected.map((c) => (
-                <CaptureCard key={c.id} c={c} agents={agents} />
-              ))}
-            </div>
-          </details>
+          <a
+            href="#rechazadas"
+            className="shrink-0 rounded-[9px] border border-line bg-card px-[13px] py-2 font-hanken text-[12px] font-semibold text-ink2 transition-colors hover:bg-canvas"
+          >
+            Rechazadas ({rejected.length})
+          </a>
         )}
       </div>
+
+      <div className="mb-4">
+        <QuickAddCapture />
+      </div>
+
+      {/* Tablero por estado (CAP1) */}
+      <div className="flex gap-3 overflow-x-auto pb-2">
+        {CAPTURE_BOARD_COLUMNS.map((status) => {
+          const list = byStatus.get(status) ?? []
+          return (
+            <div
+              key={status}
+              className="flex w-[288px] shrink-0 flex-col rounded-[13px] border border-line bg-canvas"
+            >
+              <div className="flex items-center gap-2 border-b border-line2 px-3 py-2.5">
+                <span
+                  className="h-2 w-2 shrink-0 rounded-full"
+                  style={{ background: CAPTURE_STATUS_COLORS[status] }}
+                  aria-hidden
+                />
+                <span className="font-hanken text-[12.5px] font-semibold text-ink">
+                  {CAPTURE_STATUS_LABELS[status]}
+                </span>
+                <span className="ml-auto rounded-full bg-track px-2 py-0.5 font-mono text-[11px] font-semibold text-ink2">
+                  {list.length}
+                </span>
+              </div>
+              <div className="flex flex-1 flex-col gap-2 p-2.5">
+                {list.length === 0 ? (
+                  <p className="rounded-[10px] border border-dashed border-line px-3 py-6 text-center font-hanken text-[12px] text-ink3">
+                    Sin tarjetas
+                  </p>
+                ) : (
+                  list.map((c) => <CaptureCard key={c.id} c={c} agents={agents} />)
+                )}
+              </div>
+            </div>
+          )
+        })}
+      </div>
+
+      {/* Rechazadas */}
+      {rejected.length > 0 && (
+        <details id="rechazadas" className="mt-4 rounded-[14px] border border-line bg-card">
+          <summary className="cursor-pointer px-4 py-3 font-hanken text-[13px] font-semibold text-ink2">
+            Rechazadas ({rejected.length})
+          </summary>
+          <div className="grid gap-2 p-3 sm:grid-cols-2 lg:grid-cols-3">
+            {rejected.map((c) => (
+              <CaptureCard key={c.id} c={c} agents={agents} />
+            ))}
+          </div>
+        </details>
+      )}
     </div>
   )
 }

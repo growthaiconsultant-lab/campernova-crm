@@ -140,11 +140,39 @@
     --sidebar-ring: 35 28% 60%;
   }
 
-  /* ── Rebrand del CRM (Block 22) — tema scopeado al backoffice ─────────
-     Identidad verde/carbón + Hanken Grotesk. Se aplica solo en el <div> raíz
-     de app/(backoffice)/layout.tsx (.crm-theme). La web pública NO se toca. */
+  /* ── Rediseño CRM (reproducción fiel del handoff) — tema scopeado ─────
+     Tokens EXACTOS del mockup (design_handoff_campersnova/ESPEC §2). Se aplica
+     solo en el <div> raíz de app/(backoffice)/layout.tsx (.crm-theme). La web
+     pública NO se toca (conserva Inter/Fraunces + identidad crema). */
   .crm-theme {
-    /* Superficie / neutros (handoff: --bg/--card/--line/--track) */
+    /* Tokens crudos del mockup — fuente de verdad de los componentes fieles */
+    --bg: #f4f6f8;
+    --card-hex: #ffffff;
+    --line: #e6e9ee;
+    --line2: #eef1f4;
+    --track: #eef1f5;
+    --ink: #141922;
+    --ink2: #586173;
+    --ink3: #8b94a3;
+    --panel: #12151c;
+    --panel2: #1d222c;
+    --panel-line: #262c37;
+    --panel-ink: #aab2c0;
+    --panel-ink2: #6b7382;
+    --brand: #0e7d6b;
+    --brand2: #0b5f52;
+    --brand-tint: rgba(14, 125, 107, 0.12);
+    --green: #1a9d5f;
+    --green-t: rgba(26, 157, 95, 0.12);
+    --amber: #c9820a;
+    --amber-t: rgba(201, 130, 10, 0.13);
+    --red: #d64545;
+    --red-t: rgba(214, 69, 69, 0.12);
+    --blue: #3a6fd4;
+    --blue-t: rgba(58, 111, 212, 0.12);
+
+    /* ── Puente a los tokens shadcn (hsl) para components/ui/* ── */
+    /* Superficie / neutros */
     --background: 210 20% 96%; /* #f4f6f8 */
     --foreground: 219 26% 11%; /* #141922 ink */
     --card: 0 0% 100%; /* #ffffff */

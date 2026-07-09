@@ -22,7 +22,8 @@ export default async function BackofficeLayout({ children }: { children: React.R
       <Sidebar userRole={user.role} userName={user.name} roleLabel={roleLabel} />
 
       <div className="flex flex-1 flex-col overflow-hidden">
-        {/* Barra global solo en móvil/tablet — en desktop el usuario vive en el sidebar */}
+        {/* Header del shell (mockup 60px): buscador ⌘K + Nuevo lead + campana.
+            En móvil, `leading` inyecta la hamburguesa del drawer. */}
         <Topbar
           userName={user.name}
           userEmail={user.email}
@@ -32,7 +33,7 @@ export default async function BackofficeLayout({ children }: { children: React.R
           }
         />
 
-        <main className="flex-1 overflow-y-auto bg-background p-6">{children}</main>
+        <main className="flex-1 overflow-y-auto bg-canvas p-6">{children}</main>
       </div>
       <Toaster richColors position="top-right" />
     </div>

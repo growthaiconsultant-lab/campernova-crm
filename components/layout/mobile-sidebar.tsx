@@ -52,7 +52,7 @@ export function MobileSidebar({ userRole, userName, roleLabel }: MobileSidebarPr
           />
 
           {/* Panel */}
-          <div className="absolute inset-y-0 left-0 flex w-64 max-w-[85vw] flex-col shadow-xl">
+          <div className="absolute inset-y-0 left-0 flex w-[246px] max-w-[85vw] flex-col shadow-xl">
             <SidebarContent
               userRole={userRole}
               userName={userName}
@@ -63,7 +63,7 @@ export function MobileSidebar({ userRole, userName, roleLabel }: MobileSidebarPr
               type="button"
               onClick={() => setOpen(false)}
               aria-label="Cerrar menú"
-              className="absolute right-3 top-4 flex h-8 w-8 items-center justify-center rounded-lg text-sidebar-foreground/60 transition-colors hover:bg-sidebar-accent hover:text-sidebar-foreground"
+              className="absolute right-3 top-4 flex h-8 w-8 items-center justify-center rounded-[9px] text-panel-ink2 transition-colors hover:bg-panel2 hover:text-white"
             >
               <X className="h-4 w-4" />
             </button>
