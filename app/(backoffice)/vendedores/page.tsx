@@ -410,7 +410,7 @@ export default async function VendedoresPage({ searchParams }: { searchParams: S
           <h1 className="mt-1 text-[22px] font-bold tracking-tight text-[#141922]">Vendedores</h1>
         </div>
         <div className="flex items-center gap-3">
-          <button className="hidden items-center gap-2 rounded-lg border border-[#e6e9ee] bg-white px-4 py-2 text-[13px] font-medium text-[#141922] transition-colors hover:border-[#141922] sm:inline-flex">
+          <button className="hidden items-center gap-2 rounded-lg border border-[#e6e9ee] bg-white px-4 py-2 text-[13px] font-medium text-[#141922] transition-colors hover:border-primary sm:inline-flex">
             <svg
               viewBox="0 0 24 24"
               className="h-4 w-4"
@@ -428,7 +428,7 @@ export default async function VendedoresPage({ searchParams }: { searchParams: S
           </button>
           <Link
             href="/vendedores/nuevo"
-            className="inline-flex items-center gap-2 rounded-lg bg-[#141922] px-4 py-2.5 text-[13px] font-semibold text-white transition-colors hover:bg-[#3a6fd4]"
+            className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-[13px] font-semibold text-white transition-colors hover:bg-primary/90"
           >
             <svg
               viewBox="0 0 24 24"
@@ -529,7 +529,7 @@ export default async function VendedoresPage({ searchParams }: { searchParams: S
                   href={viewUrl(key)}
                   className={`flex items-center gap-2 border-b-2 px-4 py-3 text-[13px] font-medium transition-colors ${
                     isActive
-                      ? 'border-[#141922] text-[#141922]'
+                      ? 'border-primary text-[#141922]'
                       : 'border-transparent text-[#586173] hover:text-[#141922]'
                   }`}
                   style={{ marginBottom: '-1px' }}

@@ -101,7 +101,7 @@ export function BuyerListFilters({ agents }: Props) {
   const chipBase =
     'inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-[#e6e9ee] bg-[#f8fafc] text-[12.5px] font-medium text-[#141922] cursor-pointer select-none whitespace-nowrap hover:bg-white transition-colors'
   const chipActive =
-    'inline-flex items-center gap-2 px-3 py-2 rounded-lg border bg-[#141922] border-[#141922] text-[12.5px] font-medium text-white cursor-pointer select-none whitespace-nowrap'
+    'inline-flex items-center gap-2 px-3 py-2 rounded-lg border bg-primary border-primary text-[12.5px] font-medium text-white cursor-pointer select-none whitespace-nowrap'
 
   return (
     <div className="mb-3 flex flex-wrap items-center gap-2 rounded-xl border border-[#e6e9ee] bg-white p-3">

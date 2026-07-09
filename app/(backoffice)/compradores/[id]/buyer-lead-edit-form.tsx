@@ -783,7 +783,7 @@ export function BuyerLeadEditForm({ leadId, defaultValues, agents, isAdmin }: Pr
               type="submit"
               size="sm"
               disabled={form.formState.isSubmitting}
-              className="h-8 bg-[#141922] px-4 text-[12.5px] text-white hover:bg-[#141922]"
+              className="h-8 bg-primary px-4 text-[12.5px] text-white hover:bg-primary/90"
             >
               {form.formState.isSubmitting ? 'Guardando…' : 'Guardar cambios'}
             </Button>

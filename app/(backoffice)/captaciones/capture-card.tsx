@@ -273,7 +273,7 @@ export function CaptureCard({ c, agents }: { c: CaptureCardData; agents: Agent[]
               type="button"
               onClick={saveEdit}
               disabled={pending}
-              className="inline-flex items-center gap-1 rounded bg-[#141922] px-2 py-1 text-[11px] font-semibold text-white disabled:opacity-50"
+              className="inline-flex items-center gap-1 rounded bg-primary px-2 py-1 text-[11px] font-semibold text-white disabled:opacity-50"
             >
               <Check className="h-3 w-3" /> Guardar
             </button>
