@@ -1,6 +1,9 @@
+import { SITE_URL } from '@/lib/seo'
+
 interface PostventaDay7Params {
   buyerName: string
   vehicleLabel: string
+  /** Se mantiene por compatibilidad; el enlace a /contacto usa el apex (SITE_URL). */
   appUrl: string
 }
 
@@ -14,7 +17,7 @@ export function postventaDay7Html(p: PostventaDay7Params): string {
   <p>Ya ha pasado una semana desde que te fuiste con tu camper. ¿Todo bien? ¿Alguna duda con el boiler, las placas o la calefacción?</p>
   <p>Estamos aquí para lo que necesites — responde a este email o llámanos al <a href="tel:+34645639185">645 63 91 85</a>.</p>
   <p style="margin-top:32px">
-    <a href="${p.appUrl}/contacto" style="background:#0a0a0a;color:#fff;padding:12px 24px;border-radius:6px;text-decoration:none;font-weight:600">Contactar con CampersNova →</a>
+    <a href="${SITE_URL}/contacto" style="background:#0a0a0a;color:#fff;padding:12px 24px;border-radius:6px;text-decoration:none;font-weight:600">Contactar con CampersNova →</a>
   </p>
   <hr style="border:none;border-top:1px solid #e5e7eb;margin:32px 0">
   <p style="font-size:12px;color:#9ca3af">CampersNova · Campers Nova S.L · B-22466874</p>

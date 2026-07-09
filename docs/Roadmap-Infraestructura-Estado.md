@@ -64,6 +64,7 @@ Ver también `docs/LAUNCH.md` y `docs/PRODUCTION-READINESS.md`. Principales vivo
 - `NEXT_PUBLIC_APP_URL` → dominio real (sitemap); Supabase Auth Site URL en el dominio.
 - Rotar tokens `.codex`; decidir compute de Supabase bajo carga (Micro→Small).
 - E2E autenticado contra staging (CAM-42) — handoff en `CLAUDE.md` (Fases 4+7).
+- **CRM en subdominio `crm.campersnova.com`** (ADR 0007): el código (routing por host, gated por `CRM_HOST`) ya está en `main` y es no-op hasta el cutover. Pendiente (dueño): añadir dominio en Vercel + `CNAME crm` en dinahosting + URLs en Supabase Auth + set `CRM_HOST` y `NEXT_PUBLIC_APP_URL=https://crm.campersnova.com`. Reversible quitando `CRM_HOST`.
 
 ## Principios de priorización (filtro del flywheel)
 

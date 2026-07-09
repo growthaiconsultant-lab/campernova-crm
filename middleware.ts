@@ -1,6 +1,7 @@
 import { type NextRequest, NextResponse } from 'next/server'
 import { updateSession } from '@/lib/supabase/middleware'
 import { resolveLegacyRedirect, isLegacyGone } from '@/lib/legacy-redirects'
+import { resolveHostRedirect, apexHostFromEnv } from '@/lib/host-routing'
 
 const PUBLIC_PATHS = [
   '/',
@@ -40,6 +41,20 @@ export async function middleware(request: NextRequest) {
   // (señal correcta a Google: "ya no existe", en vez de redirigir a /login).
   if (isLegacyGone(pathname)) {
     return new NextResponse('Gone', { status: 410 })
+  }
+
+  // Routing por host (subdominio del CRM). No-op salvo que CRM_HOST esté definido
+  // y el host sea un dominio real. Va antes del guard de auth para que el bounce
+  // apex→CRM ocurra en el host correcto.
+  const hostRedirect = resolveHostRedirect({
+    host: request.headers.get('host'),
+    pathname,
+    search: request.nextUrl.search,
+    crmHost: process.env.CRM_HOST,
+    apexHost: apexHostFromEnv(),
+  })
+  if (hostRedirect) {
+    return NextResponse.redirect(hostRedirect, 308)
   }
 
   const isPublic = PUBLIC_PATHS.some((p) => pathname === p || pathname.startsWith(`${p}/`))
