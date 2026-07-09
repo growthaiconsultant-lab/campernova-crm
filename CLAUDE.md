@@ -93,7 +93,21 @@ claude mcp add-json linear '{\"command\":\"npx\",\"args\":[\"-y\",\"mcp-linear@l
 
 `.claude/settings.json` y `.claude/settings.local.json` se mantienen como referencia de la estructura, pero la fuente de verdad funcional es el registro de la CLI.
 
-## Estado actual (Block 21 — Sistema de KPIs y Dashboards F0→F6 COMPLETO — MERGED A MAIN ✅)
+## Estado actual (Block 22 — Rebrand visual del CRM COMPLETO — MERGED A MAIN ✅)
+
+Rebrand del **backoffice** a partir del handoff de Claude Design: nueva identidad **verde `#0e7d6b` + carbón `#12151c` + fondo `#f4f6f8`**, tipografía **IBM Plex Sans** (UI) + JetBrains Mono (datos). **Reskin, no rebuild** — rutas/entidades/flujos/KPIs intactos. Scopeado **solo al CRM**; la web pública mantiene su identidad (crema + Inter/Fraunces). Plan en el plan file de la sesión; diseño en **ADR `docs/adr/0008-crm-rebrand-scoped-theme.md`**.
+
+- **Enfoque `.crm-theme`**: bloque en `app/globals.css` que sobreescribe los tokens semánticos de shadcn (verde/carbón, radio 10px) + fija la fuente; se aplica en el `<div>` raíz de `app/(backoffice)/layout.tsx`. Todo lo que usa tokens semánticos (shell, `components/ui/*`, los 7 dashboards de analytics, taller/entregas/postventa/calendario/vehículos/matches) se rebrandeó **de golpe**. La web pública comparte `app/layout.tsx` raíz **sin** la clase → intacta.
+- **Fuente tras var genérica `--font-crm`** (en `app/layout.tsx`): cambiar de tipografía en el CRM = 1 línea. Se remapea `--font-inter`→`--font-crm` dentro del scope para que las utilidades `font-sans` también cambien. (Se probó Hanken Grotesk primero; se cambió a IBM Plex Sans por legibilidad — feedback del dueño.)
+- **Reskin por módulo** (hex hardcodeado → nuevos neutros fríos + semáforo del handoff): F2 dashboard (PR #79), F3 compradores (#80), F4 vendedores (#81), F5-F6 captaciones+ofertas+usuarios+componentes compartidos (#82). El **teal de marca viejo `#294e4c` y el tan `#b59e7d` → verde `#0e7d6b`**; slate → tokens (`#e2e8f0`→`#e6e9ee`, `#64748b`→`#586173`, `#0a0a0a`/`#1e293b`→`#141922`); semáforo unificado (`#1a9d5f`/`#c9820a`/`#d64545`/`#3a6fd4`). **Las paletas categóricas de gráficos y el verde de WhatsApp `#25D366` se mantienen**. `cookie-banner.tsx` (público) se dejó intacto a propósito.
+- **Semáforo unificado** en `lib/kpi/thresholds.ts` (`SEMAPHORE_HEX`) y `lib/captacion.ts` (`CAPTURE_STATUS_COLORS`) a los hex del handoff.
+- **Cero hex de marca vieja** en el backoffice tras el cierre. Sin migración de BD en ninguna fase. **531 tests verdes** en todas.
+
+### Pendiente/diferido del rebrand (opcional)
+
+Header desktop global del prototipo (buscador ⌘K + "Nuevo lead" + campana) — **diferido**: cada página del CRM ya tiene su cabecera `sticky top-0`, una barra global rompería esos offsets; se aborda al ajustar layouts por módulo. Pipeline **kanban** dedicado (vista nueva). Reconvertir `/dashboard` a panel "Mi día" (solapa con `/analytics/comercial`). Semáforo de `lib/state-machine.ts` (`*_STATUS_CLASSES`) se dejó en paleta Tailwind (ya alineada). Validación en vivo del backoffice: la hace el dueño (auth-gated, no verificable en headless).
+
+## Estado previo (Block 21 — Sistema de KPIs y Dashboards F0→F6 COMPLETO — MERGED A MAIN ✅)
 
 Arranque del sistema de KPIs/dashboards a partir de los specs del dueño (`CampersNova_KPIs_Completos...` + `..._Dashboards_KPIs_UX...` + handoff de Claude Design). **Plan maestro en `docs/Dashboards-KPIs-Plan.md`** (fases F0→F6, hilado con lo ya existente). Umbrales del dueño: 7 ventas/mes, margen mín 4%, 1ª respuesta <24/48h, tiempo de venta <15/30d, aging >30/45d, Trust ≥70%, datos ≥80%.
 
