@@ -100,7 +100,7 @@ export function QuickAddCapture() {
           type="button"
           onClick={() => submit(false)}
           disabled={pending}
-          className="inline-flex items-center gap-1.5 rounded-lg bg-[#141922] px-4 py-2 text-[13px] font-semibold text-white transition-opacity hover:opacity-90 disabled:opacity-50"
+          className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-4 py-2 text-[13px] font-semibold text-white transition-opacity hover:opacity-90 disabled:opacity-50"
         >
           <Plus className="h-4 w-4" />
           Captar

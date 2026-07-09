@@ -359,7 +359,7 @@ export default async function CompradoresPage({ searchParams }: { searchParams: 
         <div className="flex items-center gap-3">
           <Link
             href="/compradores/nuevo"
-            className="inline-flex items-center gap-2 rounded-lg bg-[#141922] px-4 py-2.5 text-[13px] font-semibold text-white transition-colors hover:bg-[#3a6fd4]"
+            className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-[13px] font-semibold text-white transition-colors hover:bg-primary/90"
           >
             <svg
               viewBox="0 0 24 24"
@@ -455,7 +455,7 @@ export default async function CompradoresPage({ searchParams }: { searchParams: 
                 href={viewUrl(key)}
                 className={`flex items-center gap-2 border-b-2 px-4 py-3 text-[13px] font-medium transition-colors ${
                   isActive
-                    ? 'border-[#141922] text-[#141922]'
+                    ? 'border-primary text-[#141922]'
                     : 'border-transparent text-[#586173] hover:text-[#141922]'
                 }`}
                 style={{ marginBottom: '-1px' }}
