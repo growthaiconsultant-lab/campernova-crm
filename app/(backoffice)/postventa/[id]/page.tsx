@@ -39,17 +39,46 @@ export default async function PostventaDetailPage({ params }: { params: { id: st
   const daysLeft = Math.ceil((endDate.getTime() - Date.now()) / (1000 * 60 * 60 * 24))
   const isAdmin = currentUser.role === 'ADMIN'
 
+  // Progreso de vigencia de la garantía (mockup POST2)
+  const totalMs = endDate.getTime() - warranty.startDate.getTime()
+  const elapsedMs = Date.now() - warranty.startDate.getTime()
+  const progressPct =
+    totalMs > 0 ? Math.min(100, Math.max(0, Math.round((elapsedMs / totalMs) * 100))) : 100
+  const progressColor = isExpired ? '#8b94a3' : daysLeft <= 60 ? '#c9820a' : '#1a9d5f'
+
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div>
-        <Link href="/postventa" className="text-cn-ink-400 text-sm hover:text-cn-ink-700">
-          ← Postventa
+      {/* Breadcrumb */}
+      <nav className="flex items-center gap-2 font-mono text-[11px] uppercase tracking-[0.08em] text-ink2">
+        <Link
+          href="/postventa"
+          className="inline-flex items-center gap-1 transition-colors hover:text-ink"
+        >
+          <span aria-hidden>‹</span> Postventa
         </Link>
-        <h1 className="mt-1 text-2xl font-bold">
+        <span className="text-ink3">/</span>
+        <span className="normal-case tracking-normal text-ink3">
+          {warranty.vehicle.brand} {warranty.vehicle.model}
+        </span>
+      </nav>
+
+      {/* Cabecera con progreso de la garantía */}
+      <div>
+        <h1 className="font-hanken text-[21px] font-bold leading-[1.1] tracking-[-0.01em] text-ink">
           {warranty.vehicle.brand} {warranty.vehicle.model}
         </h1>
-        <p className="text-sm text-cn-ink-500">{warranty.buyerLead.name}</p>
+        <p className="mt-1 font-hanken text-[13px] text-ink2">{warranty.buyerLead.name}</p>
+        <div className="mt-2.5 flex items-center gap-2.5">
+          <div className="h-[6px] w-[220px] overflow-hidden rounded-[3px] bg-track">
+            <div
+              className="h-full"
+              style={{ width: `${progressPct}%`, backgroundColor: progressColor }}
+            />
+          </div>
+          <span className="font-hanken text-[11px] font-semibold" style={{ color: progressColor }}>
+            {isExpired ? 'Expirada' : `${daysLeft} días restantes`}
+          </span>
+        </div>
       </div>
 
       {/* Warranty info */}

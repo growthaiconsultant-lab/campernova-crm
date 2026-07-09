@@ -74,32 +74,70 @@ export default async function EntregaDetailPage({ params }: { params: { id: stri
     }))
   )
 
+  const checklistDone = delivery.checklist.length - pendingChecklist
+  const checklistTotal = delivery.checklist.length
+  const checklistPct = checklistTotal > 0 ? Math.round((checklistDone / checklistTotal) * 100) : 0
+  const checklistColor =
+    checklistTotal === 0 ? '#8b94a3' : pendingChecklist === 0 ? '#1a9d5f' : '#c9820a'
+
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-start justify-between gap-4">
-        <div>
-          <div className="flex items-center gap-3">
-            <Link href="/entregas" className="text-cn-ink-400 text-sm hover:text-cn-ink-700">
-              ← Entregas
-            </Link>
-          </div>
-          <h1 className="mt-1 text-2xl font-bold">
-            {delivery.vehicle.brand} {delivery.vehicle.model}
-          </h1>
-          <div className="mt-1 flex items-center gap-3">
+      {/* Breadcrumb */}
+      <nav className="flex items-center gap-2 font-mono text-[11px] uppercase tracking-[0.08em] text-ink2">
+        <Link
+          href="/entregas"
+          className="inline-flex items-center gap-1 transition-colors hover:text-ink"
+        >
+          <span aria-hidden>‹</span> Entregas
+        </Link>
+        <span className="text-ink3">/</span>
+        <span className="normal-case tracking-normal text-ink3">
+          {delivery.vehicle.brand} {delivery.vehicle.model}
+        </span>
+      </nav>
+
+      {/* Cabecera (mockup ENT2: fecha/hora + checklist con barra) */}
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-center gap-3">
+            <h1 className="font-hanken text-[21px] font-bold leading-[1.1] tracking-[-0.01em] text-ink">
+              {delivery.vehicle.brand} {delivery.vehicle.model}
+            </h1>
             <span
-              className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${STATUS_COLORS[delivery.status]}`}
+              className={`inline-flex items-center rounded-[6px] px-2 py-[3px] text-[10.5px] font-semibold ${STATUS_COLORS[delivery.status]}`}
             >
               {STATUS_LABELS[delivery.status]}
             </span>
-            <span className="text-cn-ink-400 text-sm">
-              {new Date(delivery.scheduledAt).toLocaleDateString('es-ES', {
-                weekday: 'long',
-                day: 'numeric',
-                month: 'long',
-                year: 'numeric',
-              })}
+          </div>
+          <p className="mt-1 font-hanken text-[13px] text-ink2 first-letter:uppercase">
+            {new Date(delivery.scheduledAt).toLocaleDateString('es-ES', {
+              weekday: 'long',
+              day: 'numeric',
+              month: 'long',
+              year: 'numeric',
+              timeZone: 'Europe/Madrid',
+            })}{' '}
+            ·{' '}
+            {new Date(delivery.scheduledAt).toLocaleTimeString('es-ES', {
+              hour: '2-digit',
+              minute: '2-digit',
+              timeZone: 'Europe/Madrid',
+            })}{' '}
+            · Nave
+          </p>
+          {/* Progreso del checklist */}
+          <div className="mt-2.5 flex items-center gap-2.5">
+            <div className="h-[6px] w-[180px] overflow-hidden rounded-[3px] bg-track">
+              <div
+                className="h-full"
+                style={{ width: `${checklistPct}%`, backgroundColor: checklistColor }}
+              />
+            </div>
+            <span
+              className="font-hanken text-[11px] font-semibold"
+              style={{ color: checklistColor }}
+            >
+              Checklist {checklistDone}/{checklistTotal}
             </span>
           </div>
         </div>
@@ -113,13 +151,26 @@ export default async function EntregaDetailPage({ params }: { params: { id: stri
           >
             <button
               type="submit"
-              className="inline-flex h-9 items-center rounded-lg bg-primary px-4 text-sm font-medium text-white hover:opacity-90"
+              className="inline-flex h-10 items-center rounded-[10px] bg-brand px-[15px] font-hanken text-[13px] font-semibold text-white transition-colors hover:bg-brand2"
             >
               Iniciar entrega
             </button>
           </form>
         )}
       </div>
+
+      {/* Panel «al completar» (mockup ENT2): la garantía se activa sola */}
+      {delivery.status !== 'COMPLETADA' && delivery.status !== 'CANCELADA' && (
+        <div className="rounded-[14px] border border-line bg-card p-4">
+          <div className="font-mono text-[10px] font-semibold uppercase tracking-[0.1em] text-brand2">
+            Al completar
+          </div>
+          <p className="mt-1.5 font-hanken text-[12px] leading-[1.5] text-ink2">
+            Se activa automáticamente la <b className="text-ink">garantía de 12 meses</b> y los
+            follow-ups de los días 7 y 30. Requiere checklist completo y firma del receptor.
+          </p>
+        </div>
+      )}
 
       {/* Tabs */}
       <DeliveryTabs>
