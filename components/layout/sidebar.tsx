@@ -21,6 +21,7 @@ import {
   Zap,
   TrendingUp,
   Target,
+  BadgeCheck,
   LogOut,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
@@ -148,6 +149,12 @@ const NAV_SECTIONS: NavSection[] = [
         label: 'Mercado',
         icon: TrendingUp,
         roles: ['ADMIN', 'AGENTE', 'MARKETING'],
+      },
+      {
+        href: '/analytics/calidad',
+        label: 'Calidad de datos',
+        icon: BadgeCheck,
+        roles: ['ADMIN', 'MARKETING'],
       },
     ],
   },
