@@ -407,7 +407,7 @@ export default async function FichaVendedorPage({
   return (
     <div className="-mx-6 -mt-6 flex min-h-full flex-col">
       {/* ── Topbar sticky ── */}
-      <header className="z-20 flex min-h-[56px] shrink-0 items-center justify-between gap-2 border-b border-border bg-card px-4 py-2 md:px-8 lg:sticky lg:top-0 lg:h-[73px] lg:py-0">
+      <header className="z-20 flex min-h-[56px] shrink-0 items-center justify-between gap-2 border-b border-border bg-card px-4 py-2 md:px-8 lg:sticky lg:top-0 lg:h-[60px] lg:py-0">
         <nav className="flex items-center gap-2 font-mono text-[11px] uppercase tracking-[0.12em] text-muted-foreground">
           <Link
             href="/vendedores"
@@ -642,7 +642,7 @@ export default async function FichaVendedorPage({
           </div>
         )}
 
-        {/* Tabs — sticky at top-[73px] via the wrapper div below */}
+        {/* Tabs */}
         <div className="-mx-4 md:-mx-10">
           <Suspense fallback={<div className="h-12 border-b border-border" />}>
             <LeadTabNav tabs={tabs} />
@@ -1242,7 +1242,7 @@ export default async function FichaVendedorPage({
 
         {/* ── Rail derecho persistente (320px) — orientación a la tarea ── */}
         <aside className="border-t border-border lg:border-l lg:border-t-0">
-          <div className="divide-y divide-border lg:sticky lg:top-[130px]">
+          <div className="divide-y divide-border lg:sticky lg:top-[118px]">
             {/* Próxima acción — persistente en todas las pestañas */}
             <div className="p-5">
               <ProximaAccionCard
