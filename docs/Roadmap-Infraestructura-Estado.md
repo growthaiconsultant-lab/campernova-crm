@@ -4,24 +4,26 @@ Mapa único del estado de construcción de "CampersNova OS" (de concesionario a 
 
 > El documento estratégico fundacional (visión completa, comparables, objetivos de valoración y financieros) es **privado**: NO está en el repo. Vive solo en la memoria local del asistente. Este doc es la vista **arquitectónica/operativa**, sin cifras confidenciales.
 
-_Última actualización: 2026-07-10 (tras B20)._
+_Última actualización: 2026-07-11 (tras B21 — sistema de KPIs/dashboards completo)._
 
 ## Estado de las 10 capas
 
-| #   | Capa                    | Estado     | Bloque(s)                                                                |
-| --- | ----------------------- | ---------- | ------------------------------------------------------------------------ |
-| 1   | Buyer Demand Graph      | 🟢 v1      | Ficha comprador (CAM-60→66) + financiación (B17)                         |
-| 2   | Seller Supply Graph     | 🟢 v1      | Captación (B16) + condiciones de operación (B17)                         |
-| 3   | Vehicle Identity Layer  | 🟢 v1      | Taxonomía RV (B11); falta base/camperizador + catálogo normalizado       |
-| 4   | Vehicle Trust Passport  | 🟢 v1      | Expediente legal (Block 4) + **Trust Passport unificado + sello (B20)**  |
-| 5   | Market Valuation Engine | 🟡 parcial | Tasación comparables/referencia; falta tiempo/probabilidad de venta      |
-| 6   | Buyer-Vehicle Matching  | 🟢 v1      | Matching RV + explicación (CAM-64) + alertas de demanda (B19)            |
-| 7   | Operational Workflow    | 🟢 v1      | Máquinas de estado + calendario (B15) + taller                           |
-| 8   | Transaction & Financing | 🟡 parcial | **Ofertas y Reservas (B18)**; faltan contratos/pagos/financiera/gestoría |
-| 9   | Distribution & API      | 🟡 parcial | Generación de anuncios + catálogo público; **API externa NO empezada**   |
-| 10  | Market Intelligence     | 🟡 parcial | Dashboard + scoring (B19); falta la 5ª entidad "Mercado" + predicción    |
+| #   | Capa                    | Estado     | Bloque(s)                                                                           |
+| --- | ----------------------- | ---------- | ----------------------------------------------------------------------------------- |
+| 1   | Buyer Demand Graph      | 🟢 v1      | Ficha comprador (CAM-60→66) + financiación (B17)                                    |
+| 2   | Seller Supply Graph     | 🟢 v1      | Captación (B16) + condiciones de operación (B17)                                    |
+| 3   | Vehicle Identity Layer  | 🟢 v1      | Taxonomía RV (B11); falta base/camperizador + catálogo normalizado                  |
+| 4   | Vehicle Trust Passport  | 🟢 v1      | Expediente legal (Block 4) + **Trust Passport unificado + sello (B20)**             |
+| 5   | Market Valuation Engine | 🟡 parcial | Tasación comparables/referencia; falta tiempo/probabilidad de venta                 |
+| 6   | Buyer-Vehicle Matching  | 🟢 v1      | Matching RV + explicación (CAM-64) + alertas de demanda (B19)                       |
+| 7   | Operational Workflow    | 🟢 v1      | Máquinas de estado + calendario (B15) + taller                                      |
+| 8   | Transaction & Financing | 🟡 parcial | **Ofertas y Reservas (B18)**; faltan contratos/pagos/financiera/gestoría            |
+| 9   | Distribution & API      | 🟡 parcial | Generación de anuncios + catálogo público; **API externa NO empezada**              |
+| 10  | Market Intelligence     | 🟢 v1      | **7 dashboards KPI (B21)** + scoring (B19); falta 5ª entidad "Mercado" + predicción |
 
 Leyenda: 🟢 v1 en producción · 🟡 parcial · 🔴 no empezado.
+
+**Capa transversal — Observabilidad/KPIs (Block 21, completo):** `kpi_events` + completitud + North Star, y **7 dashboards** (Dirección · CRM · Comercial · Operaciones · Matching · Mercado · Calidad) con umbrales del dueño, drill-down y export CSV. Plan y pendientes en `docs/Dashboards-KPIs-Plan.md`.
 
 ## Pendiente técnico por capa (lo que se puede hacer sin decisión externa)
 
@@ -32,6 +34,7 @@ Leyenda: 🟢 v1 en producción · 🟡 parcial · 🔴 no empezado.
 - **Capa 6 (matching)** — alertas push/email cuando entra un vehículo que satisface una demanda activa concreta (hoy es _pull_ desde dashboard/ficha).
 - **Capa 8 (transacción)** — contratos, pagos, señales formalizadas; "reserva vence" como recordatorio de calendario (patrón de agregación ya disponible); reporting de precios reales de cierre.
 - **Capa 10 (inteligencia)** — entidad "Mercado" (patrones: días de venta por modelo, elasticidad estacional, extras que dan margen), previsión de demanda.
+- **KPIs (B21) — mejoras opcionales** — enganchar los eventos que faltan (vehículo publicado/vendido/valorado, match, cita, entrega; hoy solo se emiten alta de lead/oferta/reserva/venta/sello y los dashboards ya funcionan leyendo de tablas); validaciones duras (bloquear cita sin outcome, venta sin margen); export PDF + endpoints `/api/kpis/*`; persistir scores/completitud.
 
 ## Pendiente de captación (B16) y calendario (B15)
 
