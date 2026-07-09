@@ -68,20 +68,20 @@ const ACTIVE_BUYER_STATUSES: BuyerLeadStatus[] = [
 
 // Dot colors per status (CSS color strings)
 const STATUS_DOTS: Record<string, string> = {
-  NUEVO: '#2563eb',
+  NUEVO: '#3a6fd4',
   CONTACTADO: '#7c3aed',
   CUALIFICADO: '#0891b2',
-  EN_NEGOCIACION: '#d97706',
-  CERRADO: '#1f8a5b',
-  DESCARTADO: '#b3aca0',
+  EN_NEGOCIACION: '#c9820a',
+  CERRADO: '#1a9d5f',
+  DESCARTADO: '#8b94a3',
   TASADO: '#7c3aed',
   PUBLICADO: '#0891b2',
-  RESERVADO: '#d97706',
-  VENDIDO: '#1f8a5b',
-  PERDIDO: '#b3aca0',
+  RESERVADO: '#c9820a',
+  VENDIDO: '#1a9d5f',
+  PERDIDO: '#8b94a3',
 }
 
-const TIME_DOTS = ['#2563eb', '#7c3aed', '#0891b2', '#d97706', '#1f8a5b', '#b3aca0']
+const TIME_DOTS = ['#3a6fd4', '#7c3aed', '#0891b2', '#c9820a', '#1a9d5f', '#8b94a3']
 
 // ── Métricas cacheadas (data cache, keyed por filtro de agente) ────────────────
 // Las funciones puras siguen recibiendo `db` (testeable); aquí las envolvemos con caché
@@ -532,7 +532,7 @@ export default async function DashboardPage({
       label: 'Reservados',
       value: resvPlus,
       pct: (resvPlus / funnelMax) * 100,
-      grad: 'linear-gradient(180deg, #f59e0b, #d97706)',
+      grad: 'linear-gradient(180deg, #c9820a, #c9820a)',
     },
     {
       label: 'Vendidos',
@@ -639,10 +639,10 @@ export default async function DashboardPage({
   const agendaSlice = agendaItems.slice(0, 6)
 
   const dotClass = {
-    bad: { bg: '#dc2626', shadow: '0 0 0 4px #fde8e8' },
-    warn: { bg: '#d97706', shadow: '0 0 0 4px #fef3e2' },
-    info: { bg: '#2563eb', shadow: '0 0 0 4px #e6efff' },
-    ok: { bg: '#1f8a5b', shadow: '0 0 0 4px #e3f5ec' },
+    bad: { bg: '#d64545', shadow: '0 0 0 4px #fde8e8' },
+    warn: { bg: '#c9820a', shadow: '0 0 0 4px #fef3e2' },
+    info: { bg: '#3a6fd4', shadow: '0 0 0 4px #e6efff' },
+    ok: { bg: '#1a9d5f', shadow: '0 0 0 4px #e3f5ec' },
   } as const
 
   // Seller counts map
@@ -666,11 +666,11 @@ export default async function DashboardPage({
       : 1
 
   const barGrads = [
-    'linear-gradient(90deg,#2563eb,#7c3aed)',
+    'linear-gradient(90deg,#3a6fd4,#7c3aed)',
     'linear-gradient(90deg,#0891b2,#14b8a6)',
-    'linear-gradient(90deg,#d97706,#f59e0b)',
+    'linear-gradient(90deg,#c9820a,#c9820a)',
     'linear-gradient(90deg,#db2777,#ec4899)',
-    'linear-gradient(90deg,#1f8a5b,#22c55e)',
+    'linear-gradient(90deg,#1a9d5f,#22c55e)',
   ]
 
   // Sales delta
@@ -684,7 +684,7 @@ export default async function DashboardPage({
       {/* ── Topbar ─────────────────────────────────────────────────────────── */}
       <div className="flex flex-wrap items-start justify-between gap-3 pb-0 pt-1">
         <div>
-          <p className="font-mono text-[11px] uppercase tracking-[0.14em] text-[#6b645c]">
+          <p className="font-mono text-[11px] uppercase tracking-[0.14em] text-[#586173]">
             Vista general ·{' '}
             {now.toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' })}
           </p>
@@ -706,7 +706,7 @@ export default async function DashboardPage({
         {showFinancials ? (
           <div
             className="flex flex-col gap-3.5 rounded-[14px] p-6"
-            style={{ background: 'linear-gradient(135deg, #1f8a5b, #0f5132)', color: '#fff' }}
+            style={{ background: 'linear-gradient(135deg, #1a9d5f, #0f5132)', color: '#fff' }}
           >
             <div className="flex items-start justify-between">
               <span
@@ -772,9 +772,9 @@ export default async function DashboardPage({
           </div>
         ) : (
           /* Non-financial roles: show stock value placeholder */
-          <div className="flex flex-col gap-3.5 rounded-[14px] border border-[#e6dfd0] bg-white p-6">
+          <div className="flex flex-col gap-3.5 rounded-[14px] border border-[#e6e9ee] bg-white p-6">
             <div className="flex items-start justify-between">
-              <span className="font-mono text-[10px] font-medium uppercase tracking-[0.14em] text-[#6b645c]">
+              <span className="font-mono text-[10px] font-medium uppercase tracking-[0.14em] text-[#586173]">
                 Stock activo
               </span>
               <div className="grid h-8 w-8 place-items-center rounded-lg bg-cyan-50 text-cyan-600">
@@ -795,13 +795,13 @@ export default async function DashboardPage({
             </div>
             <div className="text-[32px] font-bold tabular-nums leading-none tracking-[-0.025em]">
               {stockActiveCount}
-              <span className="ml-1 text-[18px] font-medium text-[#6b645c]">veh.</span>
+              <span className="ml-1 text-[18px] font-medium text-[#586173]">veh.</span>
             </div>
             <div className="mt-auto flex items-center justify-between">
-              <span className="inline-flex items-center gap-1 rounded-full bg-[#e3f5ec] px-2 py-0.5 text-[11.5px] font-semibold text-[#1f8a5b]">
+              <span className="inline-flex items-center gap-1 rounded-full bg-[#e3f5ec] px-2 py-0.5 text-[11.5px] font-semibold text-[#1a9d5f]">
                 ↑ en nave
               </span>
-              <span className="text-[11.5px] text-[#6b645c]">
+              <span className="text-[11.5px] text-[#586173]">
                 {avgDaysInStock?.averageDays != null
                   ? `${avgDaysInStock.averageDays}d medios`
                   : '—'}
@@ -811,9 +811,9 @@ export default async function DashboardPage({
         )}
 
         {/* 2 — Stock activo */}
-        <div className="flex flex-col gap-3.5 rounded-[14px] border border-[#e6dfd0] bg-white p-6">
+        <div className="flex flex-col gap-3.5 rounded-[14px] border border-[#e6e9ee] bg-white p-6">
           <div className="flex items-start justify-between">
-            <span className="font-mono text-[10px] font-medium uppercase tracking-[0.14em] text-[#6b645c]">
+            <span className="font-mono text-[10px] font-medium uppercase tracking-[0.14em] text-[#586173]">
               Stock activo
             </span>
             <div className="grid h-8 w-8 place-items-center rounded-lg bg-cyan-50 text-cyan-600">
@@ -834,7 +834,7 @@ export default async function DashboardPage({
           </div>
           <div className="text-[32px] font-bold tabular-nums leading-none tracking-[-0.025em]">
             {stockActiveCount}
-            <span className="ml-1 text-[18px] font-medium text-[#6b645c]">veh.</span>
+            <span className="ml-1 text-[18px] font-medium text-[#586173]">veh.</span>
           </div>
           <svg viewBox="0 0 200 40" preserveAspectRatio="none" className="-mx-1 mb-[-4px] mt-1 h-9">
             <path
@@ -851,7 +851,7 @@ export default async function DashboardPage({
                 ? `${avgDaysInStock.averageDays}d medios`
                 : 'en nave'}
             </span>
-            <span className="text-[11.5px] text-[#6b645c]">
+            <span className="text-[11.5px] text-[#586173]">
               {showFinancials && stockValue
                 ? EUR.format(stockValue.totalStockValue) + ' valor'
                 : `${totalPublicados} publicados`}
@@ -860,9 +860,9 @@ export default async function DashboardPage({
         </div>
 
         {/* 3 — Pipeline activo */}
-        <div className="flex flex-col gap-3.5 rounded-[14px] border border-[#e6dfd0] bg-white p-6">
+        <div className="flex flex-col gap-3.5 rounded-[14px] border border-[#e6e9ee] bg-white p-6">
           <div className="flex items-start justify-between">
-            <span className="font-mono text-[10px] font-medium uppercase tracking-[0.14em] text-[#6b645c]">
+            <span className="font-mono text-[10px] font-medium uppercase tracking-[0.14em] text-[#586173]">
               Pipeline activo
             </span>
             <div className="grid h-8 w-8 place-items-center rounded-lg bg-violet-100 text-violet-700">
@@ -884,17 +884,17 @@ export default async function DashboardPage({
           </div>
           <div className="text-[32px] font-bold tabular-nums leading-none tracking-[-0.025em]">
             {totalSellerActive + totalBuyerActive}
-            <span className="ml-1 text-[18px] font-medium text-[#6b645c]">leads</span>
+            <span className="ml-1 text-[18px] font-medium text-[#586173]">leads</span>
           </div>
           <div className="mt-auto flex gap-[14px] text-[12px]">
             <div>
-              <div className="font-mono text-[10px] tracking-[0.06em] text-[#6b645c]">
+              <div className="font-mono text-[10px] tracking-[0.06em] text-[#586173]">
                 VENDEDORES
               </div>
               <div className="mt-0.5 font-semibold">{totalSellerActive} activos</div>
             </div>
             <div>
-              <div className="font-mono text-[10px] tracking-[0.06em] text-[#6b645c]">
+              <div className="font-mono text-[10px] tracking-[0.06em] text-[#586173]">
                 COMPRADORES
               </div>
               <div className="mt-0.5 font-semibold">{totalBuyerActive} activos</div>
@@ -911,22 +911,22 @@ export default async function DashboardPage({
         <div
           className="flex flex-col gap-3.5 rounded-[14px] p-6"
           style={{
-            border: requiresAction > 0 ? '1px solid #dc2626' : '1px solid #e6dfd0',
+            border: requiresAction > 0 ? '1px solid #d64545' : '1px solid #e6e9ee',
             background: requiresAction > 0 ? 'linear-gradient(180deg, #fff, #fef5f5)' : '#fff',
           }}
         >
           <div className="flex items-start justify-between">
             <span
               className="font-mono text-[10px] font-medium uppercase tracking-[0.14em]"
-              style={{ color: requiresAction > 0 ? '#dc2626' : '#6b645c' }}
+              style={{ color: requiresAction > 0 ? '#d64545' : '#586173' }}
             >
               Requieren acción
             </span>
             <div
               className="grid h-8 w-8 place-items-center rounded-lg"
               style={{
-                background: requiresAction > 0 ? '#fde8e8' : '#f5f0e6',
-                color: requiresAction > 0 ? '#dc2626' : '#6b645c',
+                background: requiresAction > 0 ? '#fde8e8' : '#f4f6f8',
+                color: requiresAction > 0 ? '#d64545' : '#586173',
               }}
             >
               <AlertTriangle className="h-4 w-4" />
@@ -934,11 +934,11 @@ export default async function DashboardPage({
           </div>
           <div
             className="text-[32px] font-bold tabular-nums leading-none tracking-[-0.025em]"
-            style={{ color: requiresAction > 0 ? '#dc2626' : '#0a0a0a' }}
+            style={{ color: requiresAction > 0 ? '#d64545' : '#141922' }}
           >
             {requiresAction}
           </div>
-          <div className="mt-auto text-[12px] leading-relaxed text-[#2a2622]">
+          <div className="mt-auto text-[12px] leading-relaxed text-[#141922]">
             {incompleteExpedientes.length > 0 && (
               <span>
                 {incompleteExpedientes.length} expediente
@@ -958,7 +958,7 @@ export default async function DashboardPage({
                 {openTickets !== 1 ? 's' : ''}
               </>
             )}
-            {requiresAction === 0 && <span className="text-[#6b645c]">Todo en orden 🎉</span>}
+            {requiresAction === 0 && <span className="text-[#586173]">Todo en orden 🎉</span>}
           </div>
           {requiresAction > 0 && (
             <div className="flex items-center justify-between">
@@ -1059,8 +1059,8 @@ export default async function DashboardPage({
           <SectionEyebrow label="Hoy" color="info" />
           <div className="grid gap-[14px] lg:grid-cols-[1.15fr_1fr]">
             {/* Action stack */}
-            <div className="overflow-hidden rounded-[14px] border border-[#e6dfd0] bg-white">
-              <div className="flex items-center justify-between border-b border-[#e6dfd0] px-6 py-[18px]">
+            <div className="overflow-hidden rounded-[14px] border border-[#e6e9ee] bg-white">
+              <div className="flex items-center justify-between border-b border-[#e6e9ee] px-6 py-[18px]">
                 <h3 className="text-[16px] font-semibold tracking-[-0.01em]">Tu agenda</h3>
                 {agendaSlice.length > 0 && (
                   <span className="rounded-full bg-red-600 px-2.5 py-1 font-mono text-[10px] font-semibold uppercase tracking-[0.12em] text-white">
@@ -1069,7 +1069,7 @@ export default async function DashboardPage({
                 )}
               </div>
               {agendaSlice.length === 0 ? (
-                <div className="px-6 py-8 text-center text-sm text-[#6b645c]">
+                <div className="px-6 py-8 text-center text-sm text-[#586173]">
                   Todo en orden. No hay tareas pendientes 🎉
                 </div>
               ) : (
@@ -1077,7 +1077,7 @@ export default async function DashboardPage({
                   <Link
                     key={i}
                     href={item.href}
-                    className="grid items-center gap-[14px] border-b border-[#e6dfd0] px-6 py-4 transition-colors last:border-b-0 hover:bg-[#faf6ed]"
+                    className="grid items-center gap-[14px] border-b border-[#e6e9ee] px-6 py-4 transition-colors last:border-b-0 hover:bg-[#f8fafc]"
                     style={{ gridTemplateColumns: '32px 1fr auto' }}
                   >
                     <div className="flex justify-center">
@@ -1091,7 +1091,7 @@ export default async function DashboardPage({
                     </div>
                     <div>
                       <div className="text-[14px] font-semibold leading-tight">{item.title}</div>
-                      <div className="mt-0.5 font-mono text-[12px] tracking-[0.02em] text-[#6b645c]">
+                      <div className="mt-0.5 font-mono text-[12px] tracking-[0.02em] text-[#586173]">
                         {item.meta}
                       </div>
                     </div>
@@ -1104,12 +1104,12 @@ export default async function DashboardPage({
             </div>
 
             {/* Pipeline funnel */}
-            <div className="rounded-[14px] border border-[#e6dfd0] bg-white p-6">
+            <div className="rounded-[14px] border border-[#e6e9ee] bg-white p-6">
               <div className="mb-[22px] flex items-center justify-between">
                 <h3 className="text-[16px] font-semibold tracking-[-0.01em]">
                   Funnel de conversión
                 </h3>
-                <span className="font-mono text-[10px] uppercase tracking-[0.12em] text-[#6b645c]">
+                <span className="font-mono text-[10px] uppercase tracking-[0.12em] text-[#586173]">
                   Acumulado
                 </span>
               </div>
@@ -1138,7 +1138,7 @@ export default async function DashboardPage({
                       }}
                     >
                       <span
-                        className="absolute text-[20px] font-bold leading-none tracking-[-0.02em] text-[#0a0a0a]"
+                        className="absolute text-[20px] font-bold leading-none tracking-[-0.02em] text-[#141922]"
                         style={{
                           top: '-28px',
                           left: '50%',
@@ -1150,7 +1150,7 @@ export default async function DashboardPage({
                     </div>
                     <div className="text-center">
                       <div className="text-[12px] font-semibold">{stage.label}</div>
-                      <div className="mt-0.5 font-mono text-[10px] tracking-[0.06em] text-[#6b645c]">
+                      <div className="mt-0.5 font-mono text-[10px] tracking-[0.06em] text-[#586173]">
                         {stage.pct > 0 ? `${Math.round(stage.pct)}%` : '0%'}
                       </div>
                     </div>
@@ -1161,7 +1161,7 @@ export default async function DashboardPage({
               {/* Canal PRO / CN */}
               {isAdmin && (
                 <div
-                  className="mt-6 border-t border-[#e6dfd0] pt-5"
+                  className="mt-6 border-t border-[#e6e9ee] pt-5"
                   style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}
                 >
                   <div>
@@ -1172,9 +1172,9 @@ export default async function DashboardPage({
                       <span className="text-[20px] font-bold tracking-[-0.02em]">
                         {funnelComparison?.pro.total ?? proFunnel.leadsPro}
                       </span>
-                      <span className="text-[12px] text-[#6b645c]">
+                      <span className="text-[12px] text-[#586173]">
                         leads ·{' '}
-                        <span className="font-semibold text-[#1f8a5b]">
+                        <span className="font-semibold text-[#1a9d5f]">
                           {funnelComparison?.pro.soldRate != null
                             ? `${funnelComparison.pro.soldRate.toFixed(0)}% conv`
                             : proFunnel.totalRate != null
@@ -1204,12 +1204,12 @@ export default async function DashboardPage({
                       <span className="text-[20px] font-bold tracking-[-0.02em]">
                         {funnelComparison?.cn.total ?? totalLeads - proFunnel.leadsPro}
                       </span>
-                      <span className="text-[12px] text-[#6b645c]">
+                      <span className="text-[12px] text-[#586173]">
                         leads ·{' '}
                         <span
                           className="font-semibold"
                           style={{
-                            color: (funnelComparison?.cn.soldRate ?? 0) > 0 ? '#1f8a5b' : '#dc2626',
+                            color: (funnelComparison?.cn.soldRate ?? 0) > 0 ? '#1a9d5f' : '#d64545',
                           }}
                         >
                           {funnelComparison?.cn.soldRate != null
@@ -1241,12 +1241,12 @@ export default async function DashboardPage({
       {(isAdmin || isAgente) && lostReasonRows.length > 0 && (
         <>
           <SectionEyebrow label="Por qué perdemos leads" color="bad" />
-          <div className="rounded-[14px] border border-[#e6dfd0] bg-white p-6">
+          <div className="rounded-[14px] border border-[#e6e9ee] bg-white p-6">
             <div className="mb-4 flex items-center justify-between">
               <h3 className="text-[16px] font-semibold tracking-[-0.01em]">
                 Motivos de pérdida · últimos 90 días
               </h3>
-              <span className="font-mono text-[10px] uppercase tracking-[0.12em] text-[#6b645c]">
+              <span className="font-mono text-[10px] uppercase tracking-[0.12em] text-[#586173]">
                 {lostReasonTotal} lead{lostReasonTotal !== 1 ? 's' : ''}
               </span>
             </div>
@@ -1262,16 +1262,16 @@ export default async function DashboardPage({
                     <span className="truncate text-[13px] font-medium">
                       {LOST_REASON_LABELS[r.reason as LostReason] ?? r.reason}
                     </span>
-                    <div className="h-3 overflow-hidden rounded bg-[#f5f0e6]">
+                    <div className="h-3 overflow-hidden rounded bg-[#f4f6f8]">
                       <div
                         className="h-full rounded"
                         style={{
                           width: `${Math.max(pct, 2)}%`,
-                          background: 'linear-gradient(90deg,#d97706,#f59e0b)',
+                          background: 'linear-gradient(90deg,#c9820a,#c9820a)',
                         }}
                       />
                     </div>
-                    <span className="whitespace-nowrap font-mono text-[12px] text-[#6b645c]">
+                    <span className="whitespace-nowrap font-mono text-[12px] text-[#586173]">
                       {r.total} · {pct}%
                       <span className="ml-1.5 text-[10px]">
                         ({r.buyers}C/{r.sellers}V)
@@ -1289,13 +1289,13 @@ export default async function DashboardPage({
       {showFinancials && stockHistory.length > 0 && (
         <>
           <SectionEyebrow label="Tendencias" color="info" />
-          <div className="rounded-[14px] border border-[#e6dfd0] bg-white p-6">
+          <div className="rounded-[14px] border border-[#e6e9ee] bg-white p-6">
             <div className="mb-5 flex items-center justify-between">
               <div>
                 <h3 className="text-[16px] font-semibold tracking-[-0.01em]">
                   Evolución del stock
                 </h3>
-                <p className="mt-1 text-[12px] text-[#6b645c]">
+                <p className="mt-1 text-[12px] text-[#586173]">
                   Valor inmovilizado · últimos 12 meses
                 </p>
               </div>
@@ -1304,21 +1304,21 @@ export default async function DashboardPage({
               <StockEvolutionChart data={stockHistory} />
             </div>
             {stockValue && (
-              <div className="mt-4 flex gap-6 border-t border-[#e6dfd0] pt-4">
+              <div className="mt-4 flex gap-6 border-t border-[#e6e9ee] pt-4">
                 <div>
-                  <div className="font-mono text-[10px] uppercase tracking-[0.12em] text-[#6b645c]">
+                  <div className="font-mono text-[10px] uppercase tracking-[0.12em] text-[#586173]">
                     Valor actual
                   </div>
                   <div className="mt-1 text-[20px] font-bold tracking-[-0.02em]">
                     {EUR.format(stockValue.totalStockValue)}
-                    <span className="ml-1.5 rounded bg-[#e3f5ec] px-1 py-0.5 text-[11px] font-semibold text-[#1f8a5b]">
+                    <span className="ml-1.5 rounded bg-[#e3f5ec] px-1 py-0.5 text-[11px] font-semibold text-[#1a9d5f]">
                       ↑ activo
                     </span>
                   </div>
                 </div>
                 {avgDaysInStock && (
                   <div>
-                    <div className="font-mono text-[10px] uppercase tracking-[0.12em] text-[#6b645c]">
+                    <div className="font-mono text-[10px] uppercase tracking-[0.12em] text-[#586173]">
                       Días medios stock
                     </div>
                     <div className="mt-1 text-[20px] font-bold tracking-[-0.02em]">
@@ -1327,7 +1327,7 @@ export default async function DashboardPage({
                   </div>
                 )}
                 <div>
-                  <div className="font-mono text-[10px] uppercase tracking-[0.12em] text-[#6b645c]">
+                  <div className="font-mono text-[10px] uppercase tracking-[0.12em] text-[#586173]">
                     Vehículos en nave
                   </div>
                   <div className="mt-1 text-[20px] font-bold tracking-[-0.02em]">
@@ -1351,7 +1351,7 @@ export default async function DashboardPage({
               background: 'linear-gradient(180deg, #fff, #f2fbf6)',
             }}
           >
-            <p className="mb-4 text-[13px] text-[#5a6b62]">
+            <p className="mb-4 text-[13px] text-[#586173]">
               Vehículos en stock con compradores activos compatibles esperando. Úsalo como palanca
               comercial (y para captar más stock parecido).
             </p>
@@ -1362,7 +1362,7 @@ export default async function DashboardPage({
                   href={v.sellerLeadId ? `/vendedores/${v.sellerLeadId}?tab=compradores` : '#'}
                   className="flex items-center justify-between gap-2 rounded-lg border border-emerald-200 bg-white p-3 transition-colors hover:bg-emerald-50"
                 >
-                  <span className="truncate text-[13px] font-medium text-[#2a2622]">{v.label}</span>
+                  <span className="truncate text-[13px] font-medium text-[#141922]">{v.label}</span>
                   <span className="flex shrink-0 items-center gap-1 rounded-full bg-emerald-100 px-2 py-0.5 text-[11px] font-semibold text-emerald-700">
                     {v.demandCount} 👤
                   </span>
@@ -1385,8 +1385,8 @@ export default async function DashboardPage({
                 <div
                   className="rounded-[14px] p-[22px]"
                   style={{
-                    border: '1px solid #d97706',
-                    background: 'linear-gradient(180deg, #fff, #fffbf2)',
+                    border: '1px solid #c9820a',
+                    background: 'linear-gradient(180deg, #fff, #ffffff)',
                   }}
                 >
                   <div className="mb-4 flex items-center gap-2 text-[14px] font-semibold text-amber-700">
@@ -1398,7 +1398,7 @@ export default async function DashboardPage({
                       <div key={v.id} className="flex items-center justify-between gap-2">
                         <Link
                           href={v.sellerLeadId ? `/vendedores/${v.sellerLeadId}` : '#'}
-                          className="truncate text-[13px] text-[#2a2622] hover:underline"
+                          className="truncate text-[13px] text-[#141922] hover:underline"
                         >
                           {v.brand} {v.model} {v.year ?? ''}
                         </Link>
@@ -1417,7 +1417,7 @@ export default async function DashboardPage({
                   className="rounded-[14px] p-[22px]"
                   style={{
                     border: '1px solid #f97316',
-                    background: 'linear-gradient(180deg, #fff, #fff7f2)',
+                    background: 'linear-gradient(180deg, #fff, #ffffff)',
                   }}
                 >
                   <div className="mb-4 flex items-center gap-2 text-[14px] font-semibold text-orange-700">
@@ -1436,7 +1436,7 @@ export default async function DashboardPage({
                         <div key={v.id} className="flex items-center justify-between gap-2">
                           <Link
                             href={v.sellerLead?.id ? `/vendedores/${v.sellerLead.id}` : '#'}
-                            className="truncate text-[13px] text-[#2a2622] hover:underline"
+                            className="truncate text-[13px] text-[#141922] hover:underline"
                           >
                             {v.brand} {v.model} {v.year ?? ''}
                           </Link>
@@ -1455,7 +1455,7 @@ export default async function DashboardPage({
                 <div
                   className="rounded-[14px] p-[22px]"
                   style={{
-                    border: '1px solid #dc2626',
+                    border: '1px solid #d64545',
                     background: 'linear-gradient(180deg, #fff, #fef5f5)',
                   }}
                 >
@@ -1473,7 +1473,7 @@ export default async function DashboardPage({
                         <div key={v.id} className="flex items-center justify-between gap-2">
                           <Link
                             href={v.sellerLead?.id ? `/vendedores/${v.sellerLead.id}` : '#'}
-                            className="truncate text-[13px] text-[#2a2622] hover:underline"
+                            className="truncate text-[13px] text-[#141922] hover:underline"
                           >
                             {v.brand} {v.model} {v.year ?? ''}
                           </Link>
@@ -1494,10 +1494,10 @@ export default async function DashboardPage({
       <SectionEyebrow label="Detalle por estado" color="info" />
       <div className="grid grid-cols-1 gap-[14px] sm:grid-cols-3">
         {/* Vendedores */}
-        <div className="rounded-[14px] border border-[#e6dfd0] bg-white p-[22px]">
+        <div className="rounded-[14px] border border-[#e6e9ee] bg-white p-[22px]">
           <div className="mb-4 flex items-baseline justify-between">
             <h4 className="text-[14px] font-semibold tracking-[-0.005em]">Vendedores</h4>
-            <span className="font-mono text-[10px] tracking-[0.1em] text-[#6b645c]">
+            <span className="font-mono text-[10px] tracking-[0.1em] text-[#586173]">
               TOTAL {sellerTotal}
             </span>
           </div>
@@ -1514,14 +1514,14 @@ export default async function DashboardPage({
             <div
               key={status}
               className="flex items-center gap-3 py-2 text-[13px]"
-              style={{ borderTop: i > 0 ? '1px solid #e6dfd0' : 'none' }}
+              style={{ borderTop: i > 0 ? '1px solid #e6e9ee' : 'none' }}
             >
               <span
                 className="h-1.5 w-1.5 flex-shrink-0 rounded-full"
                 style={{ background: STATUS_DOTS[status] }}
               />
-              <span className="flex-1 text-[#2a2622]">{SELLER_LEAD_STATUS_LABELS[status]}</span>
-              <span className="font-mono font-semibold text-[#0a0a0a]">
+              <span className="flex-1 text-[#141922]">{SELLER_LEAD_STATUS_LABELS[status]}</span>
+              <span className="font-mono font-semibold text-[#141922]">
                 {sellerMap.get(status) ?? 0}
               </span>
             </div>
@@ -1529,10 +1529,10 @@ export default async function DashboardPage({
         </div>
 
         {/* Compradores */}
-        <div className="rounded-[14px] border border-[#e6dfd0] bg-white p-[22px]">
+        <div className="rounded-[14px] border border-[#e6e9ee] bg-white p-[22px]">
           <div className="mb-4 flex items-baseline justify-between">
             <h4 className="text-[14px] font-semibold tracking-[-0.005em]">Compradores</h4>
-            <span className="font-mono text-[10px] tracking-[0.1em] text-[#6b645c]">
+            <span className="font-mono text-[10px] tracking-[0.1em] text-[#586173]">
               TOTAL {buyerTotal}
             </span>
           </div>
@@ -1549,14 +1549,14 @@ export default async function DashboardPage({
             <div
               key={status}
               className="flex items-center gap-3 py-2 text-[13px]"
-              style={{ borderTop: i > 0 ? '1px solid #e6dfd0' : 'none' }}
+              style={{ borderTop: i > 0 ? '1px solid #e6e9ee' : 'none' }}
             >
               <span
                 className="h-1.5 w-1.5 flex-shrink-0 rounded-full"
                 style={{ background: STATUS_DOTS[status] }}
               />
-              <span className="flex-1 text-[#2a2622]">{BUYER_LEAD_STATUS_LABELS[status]}</span>
-              <span className="font-mono font-semibold text-[#0a0a0a]">
+              <span className="flex-1 text-[#141922]">{BUYER_LEAD_STATUS_LABELS[status]}</span>
+              <span className="font-mono font-semibold text-[#141922]">
                 {buyerMap.get(status) ?? 0}
               </span>
             </div>
@@ -1564,10 +1564,10 @@ export default async function DashboardPage({
         </div>
 
         {/* Vehículos */}
-        <div className="rounded-[14px] border border-[#e6dfd0] bg-white p-[22px]">
+        <div className="rounded-[14px] border border-[#e6e9ee] bg-white p-[22px]">
           <div className="mb-4 flex items-baseline justify-between">
             <h4 className="text-[14px] font-semibold tracking-[-0.005em]">Vehículos</h4>
-            <span className="font-mono text-[10px] tracking-[0.1em] text-[#6b645c]">
+            <span className="font-mono text-[10px] tracking-[0.1em] text-[#586173]">
               TOTAL {vehiclesTotal}
             </span>
           </div>
@@ -1584,14 +1584,14 @@ export default async function DashboardPage({
             <div
               key={status}
               className="flex items-center gap-3 py-2 text-[13px]"
-              style={{ borderTop: i > 0 ? '1px solid #e6dfd0' : 'none' }}
+              style={{ borderTop: i > 0 ? '1px solid #e6e9ee' : 'none' }}
             >
               <span
                 className="h-1.5 w-1.5 flex-shrink-0 rounded-full"
                 style={{ background: STATUS_DOTS[status] }}
               />
-              <span className="flex-1 text-[#2a2622]">{VEHICLE_STATUS_LABELS[status]}</span>
-              <span className="font-mono font-semibold text-[#0a0a0a]">
+              <span className="flex-1 text-[#141922]">{VEHICLE_STATUS_LABELS[status]}</span>
+              <span className="font-mono font-semibold text-[#141922]">
                 {vehicleMap.get(status) ?? 0}
               </span>
             </div>
@@ -1605,12 +1605,12 @@ export default async function DashboardPage({
           <SectionEyebrow label="Análisis avanzado" color="purple" />
           <div className="grid gap-[14px] lg:grid-cols-[1.4fr_1fr]">
             {/* Horizontal bar chart — vehículos por comercial */}
-            <div className="rounded-[14px] border border-[#e6dfd0] bg-white p-[22px]">
+            <div className="rounded-[14px] border border-[#e6e9ee] bg-white p-[22px]">
               <h3 className="mb-[18px] text-[16px] font-semibold tracking-[-0.01em]">
                 Vehículos por comercial
               </h3>
               {vehiclesPerCommercial.length === 0 ? (
-                <p className="text-[13px] text-[#6b645c]">Sin datos.</p>
+                <p className="text-[13px] text-[#586173]">Sin datos.</p>
               ) : (
                 <div className="flex flex-col gap-3">
                   {vehiclesPerCommercial.map((row, i) => (
@@ -1622,7 +1622,7 @@ export default async function DashboardPage({
                       <span className="truncate text-[13px] font-medium">
                         {row.agentName.split(' ')[0]} {row.agentName.split(' ')[1]?.[0]}.
                       </span>
-                      <div className="h-3.5 overflow-hidden rounded bg-[#f5f0e6]">
+                      <div className="h-3.5 overflow-hidden rounded bg-[#f4f6f8]">
                         <div
                           className="h-full rounded"
                           style={{
@@ -1642,8 +1642,8 @@ export default async function DashboardPage({
 
             {/* Mini stat cards */}
             <div className="flex flex-col gap-[14px]">
-              <div className="rounded-[14px] border border-[#e6dfd0] bg-white px-[22px] py-[18px]">
-                <div className="font-mono text-[10px] font-semibold uppercase tracking-[0.12em] text-[#6b645c]">
+              <div className="rounded-[14px] border border-[#e6e9ee] bg-white px-[22px] py-[18px]">
+                <div className="font-mono text-[10px] font-semibold uppercase tracking-[0.12em] text-[#586173]">
                   Horas taller promedio / vehículo
                 </div>
                 <div className="mt-1.5 text-[26px] font-bold tabular-nums tracking-[-0.025em]">
@@ -1651,12 +1651,12 @@ export default async function DashboardPage({
                     ? `${avgWorkshopHours.averageHours.toFixed(1)} h`
                     : '—'}
                 </div>
-                <div className="mt-0.5 text-[11.5px] text-[#6b645c]">
+                <div className="mt-0.5 text-[11.5px] text-[#586173]">
                   {avgWorkshopHours?.vehicleCount ?? 0} vehículos con órdenes completadas
                 </div>
               </div>
-              <div className="rounded-[14px] border border-[#e6dfd0] bg-white px-[22px] py-[18px]">
-                <div className="font-mono text-[10px] font-semibold uppercase tracking-[0.12em] text-[#6b645c]">
+              <div className="rounded-[14px] border border-[#e6e9ee] bg-white px-[22px] py-[18px]">
+                <div className="font-mono text-[10px] font-semibold uppercase tracking-[0.12em] text-[#586173]">
                   Coste postventa promedio / vehículo
                 </div>
                 <div
@@ -1664,15 +1664,15 @@ export default async function DashboardPage({
                   style={{
                     color:
                       avgPostventaCost?.averageCost != null && avgPostventaCost.averageCost > 200
-                        ? '#dc2626'
-                        : '#0a0a0a',
+                        ? '#d64545'
+                        : '#141922',
                   }}
                 >
                   {avgPostventaCost?.averageCost != null
                     ? EUR.format(avgPostventaCost.averageCost)
                     : '—'}
                 </div>
-                <div className="mt-0.5 text-[11.5px] text-[#6b645c]">
+                <div className="mt-0.5 text-[11.5px] text-[#586173]">
                   {avgPostventaCost?.vehicleCount ?? 0} vehículos con incidencias en garantía
                 </div>
               </div>
@@ -1693,11 +1693,11 @@ export default async function DashboardPage({
       {isAdmin && top5Rentabilidad.length > 0 && (
         <>
           <div className="mb-0 mt-9" />
-          <div className="rounded-[14px] border border-[#e6dfd0] bg-white p-6">
+          <div className="rounded-[14px] border border-[#e6e9ee] bg-white p-6">
             <h3 className="text-[16px] font-semibold tracking-[-0.01em]">
               Top vehículos por margen neto
             </h3>
-            <p className="mb-[18px] mt-1 text-[12px] text-[#6b645c]">
+            <p className="mb-[18px] mt-1 text-[12px] text-[#586173]">
               Ordenado por margen neto porcentual
             </p>
             {top5Rentabilidad.map((v, i) => {
@@ -1708,10 +1708,10 @@ export default async function DashboardPage({
                   key={v.id}
                   className="grid grid-cols-[24px_1fr_auto_auto] items-center gap-3 py-3.5 md:grid-cols-[24px_1fr_140px_auto_auto] md:gap-[18px]"
                   style={{
-                    borderBottom: i < top5Rentabilidad.length - 1 ? '1px solid #e6dfd0' : 'none',
+                    borderBottom: i < top5Rentabilidad.length - 1 ? '1px solid #e6e9ee' : 'none',
                   }}
                 >
-                  <span className="font-mono text-[11px] font-medium text-[#6b645c]">
+                  <span className="font-mono text-[11px] font-medium text-[#586173]">
                     {String(i + 1).padStart(2, '0')}
                   </span>
                   <div>
@@ -1728,18 +1728,18 @@ export default async function DashboardPage({
                       </span>
                     )}
                   </div>
-                  <div className="hidden h-1.5 overflow-hidden rounded-full bg-[#f5f0e6] md:block">
+                  <div className="hidden h-1.5 overflow-hidden rounded-full bg-[#f4f6f8] md:block">
                     <div
                       className="h-full rounded-full"
                       style={{
                         width: `${Math.max(barPct, 2)}%`,
-                        background: 'linear-gradient(90deg, #1f8a5b, #16a34a)',
+                        background: 'linear-gradient(90deg, #1a9d5f, #16a34a)',
                       }}
                     />
                   </div>
                   <span
                     className="text-[16px] font-bold tracking-[-0.02em]"
-                    style={{ color: v.netMargin < 0 ? '#dc2626' : '#1f8a5b' }}
+                    style={{ color: v.netMargin < 0 ? '#d64545' : '#1a9d5f' }}
                   >
                     {v.netMargin >= 0 ? '+' : ''}
                     {v.netMargin.toLocaleString('es-ES', {
@@ -1748,7 +1748,7 @@ export default async function DashboardPage({
                       maximumFractionDigits: 0,
                     })}
                   </span>
-                  <span className="w-[44px] text-right font-mono text-[12px] text-[#6b645c]">
+                  <span className="w-[44px] text-right font-mono text-[12px] text-[#586173]">
                     {v.netMarginPct.toFixed(1)}%
                   </span>
                 </div>
@@ -1851,11 +1851,11 @@ function SectionEyebrow({
   color?: 'info' | 'ok' | 'purple' | 'teal' | 'bad'
 }) {
   const colorMap = {
-    info: '#2563eb',
-    ok: '#1f8a5b',
+    info: '#3a6fd4',
+    ok: '#1a9d5f',
     purple: '#7c3aed',
     teal: '#0891b2',
-    bad: '#dc2626',
+    bad: '#d64545',
   }
   const c = colorMap[color]
   return (
@@ -1888,35 +1888,35 @@ function MiniKPI({
 }) {
   const borderStyle =
     variant === 'alert'
-      ? { border: '1px solid #d97706', background: 'linear-gradient(180deg, #fff, #fffbf2)' }
+      ? { border: '1px solid #c9820a', background: 'linear-gradient(180deg, #fff, #ffffff)' }
       : variant === 'danger'
-        ? { border: '1px solid #dc2626', background: 'linear-gradient(180deg, #fff, #fef5f5)' }
+        ? { border: '1px solid #d64545', background: 'linear-gradient(180deg, #fff, #fef5f5)' }
         : {}
 
   const valueColorMap = {
-    default: '#0a0a0a',
-    ok: '#1f8a5b',
-    bad: '#dc2626',
-    warn: '#d97706',
-    info: '#2563eb',
+    default: '#141922',
+    ok: '#1a9d5f',
+    bad: '#d64545',
+    warn: '#c9820a',
+    info: '#3a6fd4',
   }
 
   const subColorMap = {
-    default: '#6b645c',
-    up: '#1f8a5b',
-    down: '#dc2626',
+    default: '#586173',
+    up: '#1a9d5f',
+    down: '#d64545',
   }
 
   return (
     <div
       className="flex flex-col gap-1 rounded-[12px] px-[18px] py-4"
       style={
-        variant !== 'default' ? borderStyle : { border: '1px solid #e6dfd0', background: '#fff' }
+        variant !== 'default' ? borderStyle : { border: '1px solid #e6e9ee', background: '#fff' }
       }
     >
       <span
         className={`font-mono text-[10px] font-semibold uppercase tracking-[0.12em]`}
-        style={{ color: variant === 'alert' ? '#d97706' : '#6b645c' }}
+        style={{ color: variant === 'alert' ? '#c9820a' : '#586173' }}
       >
         {label}
       </span>
@@ -1925,7 +1925,7 @@ function MiniKPI({
         style={{ color: valueColorMap[valueColor] }}
       >
         {value}
-        {unit && <span className="ml-0.5 text-[14px] font-medium text-[#6b645c]"> {unit}</span>}
+        {unit && <span className="ml-0.5 text-[14px] font-medium text-[#586173]"> {unit}</span>}
       </span>
       {sub && (
         <span className="mt-0.5 text-[11.5px]" style={{ color: subColorMap[subColor] }}>
@@ -1946,11 +1946,11 @@ function TimeCard<T extends string>({
   labels: Record<T, string>
 }) {
   return (
-    <div className="rounded-[14px] border border-[#e6dfd0] bg-white p-[22px]">
+    <div className="rounded-[14px] border border-[#e6e9ee] bg-white p-[22px]">
       <h4 className="mb-3.5 text-[14px] font-semibold tracking-[-0.005em]">{title}</h4>
       {/* Column header */}
       <div
-        className="grid items-center gap-3 pb-2 font-mono text-[10px] font-semibold uppercase tracking-[0.1em] text-[#b3aca0]"
+        className="grid items-center gap-3 pb-2 font-mono text-[10px] font-semibold uppercase tracking-[0.1em] text-[#8b94a3]"
         style={{ gridTemplateColumns: '12px 1fr 60px 30px' }}
       >
         <span />
@@ -1959,7 +1959,7 @@ function TimeCard<T extends string>({
         <span className="text-right">n</span>
       </div>
       {rows.length === 0 ? (
-        <p className="py-3 text-[13px] text-[#6b645c]">Sin transiciones completadas.</p>
+        <p className="py-3 text-[13px] text-[#586173]">Sin transiciones completadas.</p>
       ) : (
         rows.map((r, i) => (
           <div
@@ -1967,16 +1967,16 @@ function TimeCard<T extends string>({
             className="grid items-center gap-3 py-[9px] text-[13px]"
             style={{
               gridTemplateColumns: '12px 1fr 60px 30px',
-              borderTop: '1px solid #e6dfd0',
+              borderTop: '1px solid #e6e9ee',
             }}
           >
             <span
               className="h-1.5 w-1.5 rounded-full"
               style={{ background: TIME_DOTS[i % TIME_DOTS.length] }}
             />
-            <span className="text-[#2a2622]">{labels[r.status]}</span>
+            <span className="text-[#141922]">{labels[r.status]}</span>
             <span className="text-right font-bold tabular-nums">{formatDuration(r.medianMs)}</span>
-            <span className="text-right font-mono text-[11px] text-[#6b645c]">{r.sampleSize}</span>
+            <span className="text-right font-mono text-[11px] text-[#586173]">{r.sampleSize}</span>
           </div>
         ))
       )}
