@@ -4,7 +4,7 @@ import {
   Fraunces,
   JetBrains_Mono,
   Cormorant_Garamond,
-  IBM_Plex_Sans,
+  Hanken_Grotesk,
 } from 'next/font/google'
 import './globals.css'
 import { CookieBanner } from '@/components/cookie-banner'
@@ -38,13 +38,12 @@ const cormorant = Cormorant_Garamond({
   display: 'swap',
 })
 
-// Rebrand del CRM (Block 22): fuente de la UI del backoffice, expuesta tras la
-// variable genérica `--font-crm` para que cambiar de tipografía sea un swap de
-// una línea. Solo se aplica dentro de `.crm-theme` (globals.css) — la web
-// pública sigue con Inter. Elegida IBM Plex Sans por legibilidad en interfaz.
-const crmFont = IBM_Plex_Sans({
+// Rediseño CRM (reproducción fiel del handoff): Hanken Grotesk es la fuente
+// de toda la UI del backoffice. Expuesta tras `--font-crm` y aplicada solo
+// dentro de `.crm-theme` (globals.css) — la web pública conserva Inter/Fraunces.
+const crmFont = Hanken_Grotesk({
   subsets: ['latin'],
-  weight: ['400', '500', '600', '700'],
+  weight: ['400', '500', '600', '700', '800'],
   variable: '--font-crm',
   display: 'swap',
 })

@@ -2,26 +2,25 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { LogoCampersNova } from '@/components/logo-campers-nova'
 import {
   LayoutDashboard,
-  Users,
+  Package,
+  ScanSearch,
+  UserRound,
   ShoppingCart,
-  Truck,
-  UserCog,
+  Handshake,
+  Calendar,
   Wrench,
-  CalendarCheck,
-  CalendarDays,
+  Truck,
   ShieldCheck,
-  Radar,
-  HandCoins,
+  LineChart,
   BarChart3,
-  Building2,
+  Target,
   Boxes,
   Zap,
   TrendingUp,
-  Target,
   BadgeCheck,
+  UserCog,
   LogOut,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
@@ -36,10 +35,11 @@ interface NavItem {
 }
 
 interface NavSection {
-  title?: string
+  title: string
   items: NavItem[]
 }
 
+// Iconos según el mapeo del ESPEC §3 (Lucide, trazo 1.9, currentColor).
 const NAV_SECTIONS: NavSection[] = [
   {
     title: 'Pipeline',
@@ -53,33 +53,18 @@ const NAV_SECTIONS: NavSection[] = [
       {
         href: '/vehiculos',
         label: 'Vehículos',
-        icon: Truck,
+        icon: Package,
         roles: ['ADMIN', 'AGENTE', 'TALLER', 'MARKETING'],
       },
-      {
-        href: '/captaciones',
-        label: 'Captaciones',
-        icon: Radar,
-        roles: ['ADMIN', 'AGENTE'],
-      },
-      {
-        href: '/vendedores',
-        label: 'Vendedores',
-        icon: Users,
-        roles: ['ADMIN', 'AGENTE'],
-      },
+      { href: '/captaciones', label: 'Captaciones', icon: ScanSearch, roles: ['ADMIN', 'AGENTE'] },
+      { href: '/vendedores', label: 'Vendedores', icon: UserRound, roles: ['ADMIN', 'AGENTE'] },
       {
         href: '/compradores',
         label: 'Compradores',
         icon: ShoppingCart,
         roles: ['ADMIN', 'AGENTE'],
       },
-      {
-        href: '/ofertas',
-        label: 'Ofertas',
-        icon: HandCoins,
-        roles: ['ADMIN', 'AGENTE'],
-      },
+      { href: '/ofertas', label: 'Ofertas', icon: Handshake, roles: ['ADMIN', 'AGENTE'] },
     ],
   },
   {
@@ -88,19 +73,14 @@ const NAV_SECTIONS: NavSection[] = [
       {
         href: '/calendario',
         label: 'Calendario',
-        icon: CalendarDays,
+        icon: Calendar,
         roles: ['ADMIN', 'AGENTE', 'TALLER', 'ENTREGAS'],
       },
-      {
-        href: '/taller',
-        label: 'Taller',
-        icon: Wrench,
-        roles: ['ADMIN', 'AGENTE', 'TALLER'],
-      },
+      { href: '/taller', label: 'Taller', icon: Wrench, roles: ['ADMIN', 'AGENTE', 'TALLER'] },
       {
         href: '/entregas',
         label: 'Entregas',
-        icon: CalendarCheck,
+        icon: Truck,
         roles: ['ADMIN', 'AGENTE', 'ENTREGAS'],
       },
       {
@@ -117,7 +97,7 @@ const NAV_SECTIONS: NavSection[] = [
       {
         href: '/analytics/direccion',
         label: 'Dirección',
-        icon: Building2,
+        icon: LineChart,
         roles: ['ADMIN', 'MARKETING'],
       },
       {
@@ -178,90 +158,117 @@ function getInitials(name: string) {
 
 export function SidebarContent({ userRole, userName, roleLabel, onNavigate }: SidebarProps) {
   const pathname = usePathname()
-
   const isActive = (href: string) => pathname === href || pathname.startsWith(`${href}/`)
 
-  const navLinkClass = (href: string) =>
-    cn(
-      'flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors',
-      isActive(href)
-        ? 'bg-sidebar-primary text-sidebar-primary-foreground font-medium'
-        : 'text-sidebar-foreground/75 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'
-    )
+  const sections = NAV_SECTIONS.map((section) => ({
+    ...section,
+    items: section.items.filter((item) => item.roles.includes(userRole)),
+  })).filter((section) => section.items.length > 0)
 
   return (
-    <div className="flex h-full flex-col bg-sidebar text-sidebar-foreground">
-      {/* Logo */}
-      <div className="flex h-16 shrink-0 items-center gap-2.5 border-b border-sidebar-border px-4">
+    <div className="flex h-full flex-col bg-panel">
+      {/* Logo (mockup: 60px, CN cuadrado verde + CampersNova + badge CRM) */}
+      <div className="flex h-[60px] shrink-0 items-center gap-2.5 border-b border-panel-line px-[18px]">
         <span
-          className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-sidebar-primary text-[11px] font-bold tracking-tight text-sidebar-primary-foreground"
+          className="flex h-8 w-8 shrink-0 items-center justify-center rounded-[9px] bg-brand font-hanken text-[14px] font-extrabold leading-none tracking-[-0.03em] text-white"
+          style={{ boxShadow: '0 2px 8px rgba(14,125,107,0.4)' }}
           aria-hidden
         >
           CN
         </span>
-        <LogoCampersNova variant="cream" className="[--logo-campers:9px] [--logo-nova:24px]" />
-        <span className="rounded border border-sidebar-border px-1.5 py-0.5 text-[8px] font-semibold uppercase tracking-[0.20em] text-sidebar-foreground/50">
+        <span className="font-hanken text-[15px] font-bold leading-none tracking-[-0.01em] text-white">
+          CampersNova
+        </span>
+        <span className="rounded-[4px] border border-panel-line px-[5px] py-[3px] font-mono text-[8px] font-bold leading-none tracking-[0.2em] text-panel-ink2">
           CRM
         </span>
       </div>
 
       {/* Nav */}
-      <nav className="flex flex-1 flex-col gap-4 overflow-y-auto px-3 py-4">
-        {NAV_SECTIONS.map((section, i) => {
-          const visibleItems = section.items.filter((item) => item.roles.includes(userRole))
-          if (visibleItems.length === 0) return null
-          return (
-            <div key={i} className="flex flex-col gap-0.5">
-              {section.title && (
-                <p className="mb-1 px-3 text-[10px] font-semibold uppercase tracking-[0.16em] text-sidebar-foreground/30">
-                  {section.title}
-                </p>
-              )}
-              {visibleItems.map(({ href, label, icon: Icon }) => (
-                <Link key={href} href={href} className={navLinkClass(href)} onClick={onNavigate}>
-                  <Icon className="h-[17px] w-[17px] shrink-0" />
+      <nav className="flex flex-1 flex-col gap-[3px] overflow-y-auto px-3 py-3.5">
+        {sections.map((section) => (
+          <div key={section.title} className="flex flex-col gap-[3px]">
+            <span className="px-2.5 pb-1.5 pt-2 font-mono text-[9.5px] font-semibold uppercase leading-none tracking-[0.14em] text-panel-ink2">
+              {section.title}
+            </span>
+            {section.items.map(({ href, label, icon: Icon }) => {
+              const active = isActive(href)
+              return (
+                <Link
+                  key={href}
+                  href={href}
+                  onClick={onNavigate}
+                  className={cn(
+                    'relative flex items-center gap-[11px] rounded-[9px] px-[11px] py-[9px] font-hanken text-[13.5px] transition-colors',
+                    active
+                      ? 'bg-brand-tint font-semibold text-white'
+                      : 'font-medium text-panel-ink hover:bg-panel2 hover:text-white'
+                  )}
+                >
+                  {active && (
+                    <span
+                      className="absolute bottom-[7px] left-[-12px] top-[7px] w-[3px] rounded-r-[3px] bg-brand"
+                      aria-hidden
+                    />
+                  )}
+                  <Icon size={17} strokeWidth={1.9} className="shrink-0" />
                   {label}
                 </Link>
-              ))}
-            </div>
-          )
-        })}
+              )
+            })}
+          </div>
+        ))}
 
         {userRole === 'ADMIN' && (
-          <div className="flex flex-col gap-0.5">
-            <p className="mb-1 px-3 text-[10px] font-semibold uppercase tracking-[0.16em] text-sidebar-foreground/30">
+          <div className="flex flex-col gap-[3px]">
+            <span className="px-2.5 pb-1.5 pt-3.5 font-mono text-[9.5px] font-semibold uppercase leading-none tracking-[0.14em] text-panel-ink2">
               Sistema
-            </p>
-            <Link href="/usuarios" className={navLinkClass('/usuarios')} onClick={onNavigate}>
-              <UserCog className="h-[17px] w-[17px] shrink-0" />
+            </span>
+            <Link
+              href="/usuarios"
+              onClick={onNavigate}
+              className={cn(
+                'relative flex items-center gap-[11px] rounded-[9px] px-[11px] py-[9px] font-hanken text-[13.5px] transition-colors',
+                isActive('/usuarios')
+                  ? 'bg-brand-tint font-semibold text-white'
+                  : 'font-medium text-panel-ink hover:bg-panel2 hover:text-white'
+              )}
+            >
+              {isActive('/usuarios') && (
+                <span
+                  className="absolute bottom-[7px] left-[-12px] top-[7px] w-[3px] rounded-r-[3px] bg-brand"
+                  aria-hidden
+                />
+              )}
+              <UserCog size={17} strokeWidth={1.9} className="shrink-0" />
               Usuarios
             </Link>
           </div>
         )}
       </nav>
 
-      {/* Footer — usuario + logout */}
-      <div className="shrink-0 border-t border-sidebar-border px-3 py-3">
-        <div className="flex items-center gap-2.5">
-          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-sidebar-primary text-[11px] font-semibold text-sidebar-primary-foreground">
-            {getInitials(userName)}
-          </div>
-          <div className="min-w-0 flex-1">
-            <p className="truncate text-[13px] font-medium leading-tight text-sidebar-foreground">
-              {userName}
-            </p>
-            <p className="text-[10px] text-sidebar-foreground/50">{roleLabel}</p>
-          </div>
-          <button
-            type="button"
-            onClick={() => logout()}
-            aria-label="Cerrar sesión"
-            title="Cerrar sesión"
-            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-sidebar-foreground/50 transition-colors hover:bg-sidebar-accent hover:text-sidebar-foreground"
-          >
-            <LogOut className="h-4 w-4" />
-          </button>
-        </div>
+      {/* Footer — avatar + nombre + rol + logout */}
+      <div className="flex shrink-0 items-center gap-2.5 border-t border-panel-line p-3">
+        <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#2c3340] font-hanken text-[12px] font-semibold text-white">
+          {getInitials(userName)}
+        </span>
+        <span className="min-w-0 flex-1">
+          <span className="block truncate font-hanken text-[12.5px] font-semibold leading-tight text-[#e7eaef]">
+            {userName}
+          </span>
+          <span className="block font-hanken text-[10.5px] font-medium text-panel-ink2">
+            {roleLabel}
+          </span>
+        </span>
+        <button
+          type="button"
+          onClick={() => logout()}
+          aria-label="Cerrar sesión"
+          title="Cerrar sesión"
+          className="flex h-8 w-8 shrink-0 items-center justify-center rounded-[9px] text-panel-ink2 transition-colors hover:bg-panel2 hover:text-white"
+        >
+          <LogOut size={15} strokeWidth={2} />
+        </button>
       </div>
     </div>
   )
@@ -277,7 +284,7 @@ export function Sidebar({
   roleLabel: string
 }) {
   return (
-    <aside className="hidden h-screen w-[230px] shrink-0 lg:flex">
+    <aside className="hidden h-screen w-[246px] shrink-0 border-r border-panel-line lg:flex">
       <SidebarContent userRole={userRole} userName={userName} roleLabel={roleLabel} />
     </aside>
   )
