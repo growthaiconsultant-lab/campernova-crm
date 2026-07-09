@@ -91,8 +91,9 @@ export default async function DashboardPage({
     timeZone: TZ,
   })
 
+  // Solo citas reales (no próximas acciones ni resto de orígenes del calendario)
   const appointmentTimes = agendaItems
-    .filter((i) => !i.allDay)
+    .filter((i) => i.kindLabel === 'Cita' && !i.allDay)
     .slice(0, 3)
     .map((i) =>
       i.start.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit', timeZone: TZ })
