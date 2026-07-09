@@ -42,10 +42,11 @@ export function MobileTabBar({ tabs }: { tabs: MobileTab[] }) {
   )
 }
 
-/** Barra de acción fija inferior de fichas móviles (Llamar / WhatsApp…). */
+/** Barra de acción fija inferior de fichas móviles (Llamar / WhatsApp…).
+ *  z-50: en fichas sustituye visualmente a la tab bar (z-40), como el mockup. */
 export function MobileActionBar({ children }: { children: React.ReactNode }) {
   return (
-    <div className="fixed inset-x-0 bottom-0 z-40 flex items-center gap-2 border-t border-line bg-card px-4 pb-[22px] pt-3 lg:hidden">
+    <div className="fixed inset-x-0 bottom-0 z-50 flex items-center gap-2 border-t border-line bg-card px-4 pb-[22px] pt-3 lg:hidden">
       {children}
     </div>
   )

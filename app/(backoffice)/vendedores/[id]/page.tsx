@@ -20,6 +20,7 @@ import { NoteForm } from '@/components/note-form'
 import { addSellerLeadNote } from './actions'
 import { WhatsAppButton } from '@/components/whatsapp-button'
 import { sellerWhatsAppMessage } from '@/lib/whatsapp'
+import { MobileFichaActions } from '@/components/mobile-ficha-actions'
 import { SELLER_LEAD_TRANSITIONS, SELLER_LEAD_STATUS_LABELS } from '@/lib/state-machine'
 import type { SellerLeadStatus } from '@prisma/client'
 import { PublicNotesEditor } from '@/components/vehicle-ads/public-notes-editor'
@@ -1437,6 +1438,19 @@ export default async function FichaVendedorPage({
           </div>
         </aside>
       </div>
+
+      {/* Barra de acción móvil (mockup MVEN2): Llamar / WhatsApp fijos abajo */}
+      {lead.phone && (
+        <MobileFichaActions
+          phone={lead.phone}
+          message={sellerWhatsAppMessage(
+            lead.name,
+            v ? { type: v.type, brand: v.brand, model: v.model } : undefined
+          )}
+          leadId={lead.id}
+          leadType="seller"
+        />
+      )}
     </div>
   )
 }

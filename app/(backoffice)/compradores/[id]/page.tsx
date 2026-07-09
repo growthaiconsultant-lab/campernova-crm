@@ -23,6 +23,7 @@ import type { ChatMessage } from '@/components/chat-transcript'
 import { addBuyerLeadNote } from './actions'
 import { WhatsAppButton } from '@/components/whatsapp-button'
 import { buyerWhatsAppMessage } from '@/lib/whatsapp'
+import { MobileFichaActions } from '@/components/mobile-ficha-actions'
 import { LeadTabNav } from '@/app/(backoffice)/vendedores/[id]/lead-tab-nav'
 import type { LeadTab } from '@/app/(backoffice)/vendedores/[id]/lead-tab-nav'
 import { StatusPill } from '@/components/status-pill'
@@ -1125,6 +1126,16 @@ export default async function FichaCompradorPage({
           </div>
         </aside>
       </div>
+
+      {/* Barra de acción móvil (mockup MC2): Llamar / WhatsApp fijos abajo */}
+      {lead.phone && (
+        <MobileFichaActions
+          phone={lead.phone}
+          message={buyerWhatsAppMessage(lead.name)}
+          leadId={lead.id}
+          leadType="buyer"
+        />
+      )}
     </div>
   )
 }
