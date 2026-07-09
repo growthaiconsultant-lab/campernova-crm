@@ -44,7 +44,7 @@ export function ProximaAccionCard({
   return (
     <div
       className="relative overflow-hidden rounded-[14px] p-5"
-      style={{ background: 'linear-gradient(135deg, #0a0a0a 0%, #2a221c 100%)' }}
+      style={{ background: 'linear-gradient(135deg, #141922 0%, #1d222c 100%)' }}
     >
       {/* Glow blob */}
       <div
@@ -55,7 +55,7 @@ export function ProximaAccionCard({
         <div className="mb-3 flex items-center gap-2">
           <p
             className="font-mono text-[10px] uppercase tracking-[0.12em]"
-            style={{ color: '#b59e7d' }}
+            style={{ color: '#0e7d6b' }}
           >
             Próxima acción
           </p>
@@ -86,7 +86,7 @@ export function ProximaAccionCard({
             <a
               href={`tel:${phone}`}
               className="flex flex-1 items-center justify-center gap-1.5 rounded-lg py-2 text-xs font-semibold text-black"
-              style={{ background: '#b59e7d' }}
+              style={{ background: '#0e7d6b' }}
             >
               <Phone className="h-3.5 w-3.5" />
               Llamar

@@ -23,12 +23,12 @@ const STATUS_OPTIONS = [
 ]
 
 const STATUS_COLORS: Record<string, string> = {
-  NUEVO: '#2563eb',
+  NUEVO: '#3a6fd4',
   CONTACTADO: '#7c3aed',
   CUALIFICADO: '#0891b2',
-  EN_NEGOCIACION: '#d97706',
-  CERRADO: '#1f8a5b',
-  DESCARTADO: '#94a3b8',
+  EN_NEGOCIACION: '#c9820a',
+  CERRADO: '#1a9d5f',
+  DESCARTADO: '#8b94a3',
 }
 
 const BRAND_OPTIONS = [
@@ -99,20 +99,20 @@ export function LeadsFilters({ agents }: Props) {
   }
 
   const chipBase =
-    'inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-[#e2e8f0] bg-[#f8fafc] text-[12.5px] font-medium text-[#1e293b] cursor-pointer select-none whitespace-nowrap hover:bg-white transition-colors'
+    'inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-[#e6e9ee] bg-[#f8fafc] text-[12.5px] font-medium text-[#141922] cursor-pointer select-none whitespace-nowrap hover:bg-white transition-colors'
   const chipActive =
-    'inline-flex items-center gap-2 px-3 py-2 rounded-lg border bg-[#0a0a0a] border-[#0a0a0a] text-[12.5px] font-medium text-white cursor-pointer select-none whitespace-nowrap'
+    'inline-flex items-center gap-2 px-3 py-2 rounded-lg border bg-[#141922] border-[#141922] text-[12.5px] font-medium text-white cursor-pointer select-none whitespace-nowrap'
 
   return (
-    <div className="mb-3 flex flex-wrap items-center gap-2 rounded-xl border border-[#e2e8f0] bg-white p-3">
+    <div className="mb-3 flex flex-wrap items-center gap-2 rounded-xl border border-[#e6e9ee] bg-white p-3">
       {/* Search */}
       <form
         onSubmit={handleSearchSubmit}
-        className="flex min-w-[200px] flex-1 items-center gap-2 rounded-lg border border-transparent bg-[#f8fafc] px-3 focus-within:border-[#2563eb] focus-within:bg-white focus-within:shadow-[0_0_0_3px_rgba(37,99,235,0.12)]"
+        className="flex min-w-[200px] flex-1 items-center gap-2 rounded-lg border border-transparent bg-[#f8fafc] px-3 focus-within:border-[#3a6fd4] focus-within:bg-white focus-within:shadow-[0_0_0_3px_rgba(37,99,235,0.12)]"
       >
         <svg
           viewBox="0 0 24 24"
-          className="h-4 w-4 shrink-0 text-[#64748b]"
+          className="h-4 w-4 shrink-0 text-[#586173]"
           fill="none"
           stroke="currentColor"
           strokeWidth={1.6}
@@ -126,7 +126,7 @@ export function LeadsFilters({ agents }: Props) {
           ref={searchRef}
           defaultValue={currentQ}
           placeholder="Buscar por nombre, email, teléfono o marca…"
-          className="flex-1 border-none bg-transparent py-2 text-[13.5px] text-[#0a0a0a] placeholder-[#64748b] outline-none"
+          className="flex-1 border-none bg-transparent py-2 text-[13.5px] text-[#141922] placeholder-[#586173] outline-none"
         />
         <button type="submit" className="sr-only">
           Buscar
@@ -140,13 +140,13 @@ export function LeadsFilters({ agents }: Props) {
             <>
               <span
                 className="h-1.5 w-1.5 rounded-full"
-                style={{ background: STATUS_COLORS[currentStatus] ?? '#64748b' }}
+                style={{ background: STATUS_COLORS[currentStatus] ?? '#586173' }}
               />
               {STATUS_OPTIONS.find((o) => o.value === currentStatus)?.label ?? 'Estado'}
             </>
           ) : (
             <>
-              <span className="h-1.5 w-1.5 rounded-full bg-[#2563eb]" />
+              <span className="h-1.5 w-1.5 rounded-full bg-[#3a6fd4]" />
               Estado
             </>
           )}
@@ -280,7 +280,7 @@ export function LeadsFilters({ agents }: Props) {
             const view = params.get('view')
             router.push(view && view !== 'todos' ? `/vendedores?view=${view}` : '/vendedores')
           }}
-          className="px-2 py-2 text-[12px] text-[#64748b] hover:text-[#0a0a0a]"
+          className="px-2 py-2 text-[12px] text-[#586173] hover:text-[#141922]"
         >
           Limpiar
         </button>
