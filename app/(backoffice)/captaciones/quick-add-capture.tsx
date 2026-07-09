@@ -53,10 +53,10 @@ export function QuickAddCapture() {
   }
 
   const inputCls =
-    'rounded-lg border border-[#e2e8f0] bg-white px-3 py-2 text-[13px] outline-none focus:ring-2 focus:ring-ring'
+    'rounded-lg border border-[#e6e9ee] bg-white px-3 py-2 text-[13px] outline-none focus:ring-2 focus:ring-ring'
 
   return (
-    <div className="rounded-xl border border-[#e2e8f0] bg-white p-3">
+    <div className="rounded-xl border border-[#e6e9ee] bg-white p-3">
       <div className="flex flex-wrap items-center gap-2">
         <input
           value={url}
@@ -100,7 +100,7 @@ export function QuickAddCapture() {
           type="button"
           onClick={() => submit(false)}
           disabled={pending}
-          className="inline-flex items-center gap-1.5 rounded-lg bg-[#0a0a0a] px-4 py-2 text-[13px] font-semibold text-white transition-opacity hover:opacity-90 disabled:opacity-50"
+          className="inline-flex items-center gap-1.5 rounded-lg bg-[#141922] px-4 py-2 text-[13px] font-semibold text-white transition-opacity hover:opacity-90 disabled:opacity-50"
         >
           <Plus className="h-4 w-4" />
           Captar

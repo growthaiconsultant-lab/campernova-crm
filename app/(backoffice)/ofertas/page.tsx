@@ -49,12 +49,12 @@ export default async function OfertasPage() {
 
   return (
     <div className="-mx-6 -mt-6">
-      <header className="z-20 flex min-h-[64px] flex-wrap items-center justify-between gap-3 border-b border-[#e2e8f0] bg-white px-4 py-2 md:px-8 lg:sticky lg:top-0 lg:h-[73px] lg:py-0">
+      <header className="z-20 flex min-h-[64px] flex-wrap items-center justify-between gap-3 border-b border-[#e6e9ee] bg-white px-4 py-2 md:px-8 lg:sticky lg:top-0 lg:h-[73px] lg:py-0">
         <div>
-          <div className="font-mono text-[10px] uppercase tracking-[0.14em] text-[#64748b]">
+          <div className="font-mono text-[10px] uppercase tracking-[0.14em] text-[#586173]">
             CRM · Transacción
           </div>
-          <h1 className="mt-0.5 text-[20px] font-bold tracking-tight text-[#0a0a0a]">
+          <h1 className="mt-0.5 text-[20px] font-bold tracking-tight text-[#141922]">
             Ofertas y reservas
           </h1>
         </div>
@@ -69,11 +69,11 @@ export default async function OfertasPage() {
             { label: 'Valor en negociación', value: EUR(pipelineValue) },
             { label: 'Señales retenidas', value: EUR(depositsHeld) },
           ].map((k) => (
-            <div key={k.label} className="rounded-xl border border-[#e2e8f0] bg-white px-4 py-3">
-              <p className="font-mono text-[10px] uppercase tracking-[0.12em] text-[#64748b]">
+            <div key={k.label} className="rounded-xl border border-[#e6e9ee] bg-white px-4 py-3">
+              <p className="font-mono text-[10px] uppercase tracking-[0.12em] text-[#586173]">
                 {k.label}
               </p>
-              <p className="mt-1 text-xl font-bold tracking-[-0.02em] text-[#0a0a0a]">{k.value}</p>
+              <p className="mt-1 text-xl font-bold tracking-[-0.02em] text-[#141922]">{k.value}</p>
             </div>
           ))}
         </div>
@@ -87,22 +87,22 @@ export default async function OfertasPage() {
             {BOARD_COLUMNS.map((status) => {
               const list = byStatus.get(status) ?? []
               return (
-                <div key={status} className="rounded-xl border border-[#e2e8f0] bg-[#f8fafc]">
-                  <div className="flex items-center justify-between border-b border-[#e2e8f0] px-3 py-2">
-                    <span className="flex items-center gap-1.5 text-[12px] font-semibold text-[#0a0a0a]">
+                <div key={status} className="rounded-xl border border-[#e6e9ee] bg-[#f8fafc]">
+                  <div className="flex items-center justify-between border-b border-[#e6e9ee] px-3 py-2">
+                    <span className="flex items-center gap-1.5 text-[12px] font-semibold text-[#141922]">
                       <span
                         className="h-2 w-2 rounded-full"
                         style={{ background: OFFER_STATUS_COLORS[status] }}
                       />
                       {OFFER_STATUS_LABELS[status]}
                     </span>
-                    <span className="rounded-full bg-white px-1.5 py-0.5 font-mono text-[11px] text-[#64748b]">
+                    <span className="rounded-full bg-white px-1.5 py-0.5 font-mono text-[11px] text-[#586173]">
                       {list.length}
                     </span>
                   </div>
                   <div className="space-y-2 p-2">
                     {list.length === 0 ? (
-                      <p className="px-1 py-6 text-center text-[11px] text-[#94a3b8]">—</p>
+                      <p className="px-1 py-6 text-center text-[11px] text-[#8b94a3]">—</p>
                     ) : (
                       list.map((r) => <OfferMini key={r.id} r={r} />)
                     )}
@@ -115,8 +115,8 @@ export default async function OfertasPage() {
 
         {/* Cerradas */}
         {closedRows.length > 0 && (
-          <details className="rounded-xl border border-[#e2e8f0] bg-white">
-            <summary className="cursor-pointer px-4 py-3 text-[13px] font-medium text-[#64748b]">
+          <details className="rounded-xl border border-[#e6e9ee] bg-white">
+            <summary className="cursor-pointer px-4 py-3 text-[13px] font-medium text-[#586173]">
               Cerradas ({closedRows.length})
             </summary>
             <div className="grid gap-2 p-3 sm:grid-cols-2 lg:grid-cols-3">
@@ -147,9 +147,9 @@ function OfferMini({
   }
 }) {
   return (
-    <div className="rounded-lg border border-[#e2e8f0] bg-white p-3 text-[13px]">
+    <div className="rounded-lg border border-[#e6e9ee] bg-white p-3 text-[13px]">
       <div className="flex items-center justify-between">
-        <span className="text-[14px] font-bold text-[#0a0a0a]">{EUR(r.amount)}</span>
+        <span className="text-[14px] font-bold text-[#141922]">{EUR(r.amount)}</span>
         <span
           className="rounded-full px-2 py-0.5 text-[10px] font-semibold"
           style={{
@@ -162,13 +162,13 @@ function OfferMini({
       </div>
       <Link
         href={`/compradores/${r.buyerId}`}
-        className="mt-1 block truncate font-medium text-[#0a0a0a] hover:underline"
+        className="mt-1 block truncate font-medium text-[#141922] hover:underline"
       >
         {r.buyerName}
       </Link>
       <Link
         href={`/vendedores/${r.sellerLeadId}`}
-        className="block truncate text-[12px] text-[#64748b] hover:underline"
+        className="block truncate text-[12px] text-[#586173] hover:underline"
       >
         {r.vehicleLabel}
       </Link>

@@ -51,16 +51,16 @@ export default async function CaptacionesPage() {
 
   return (
     <div className="-mx-6 -mt-6">
-      <header className="z-20 flex min-h-[64px] flex-wrap items-center justify-between gap-3 border-b border-[#e2e8f0] bg-white px-4 py-2 md:px-8 lg:sticky lg:top-0 lg:h-[73px] lg:py-0">
+      <header className="z-20 flex min-h-[64px] flex-wrap items-center justify-between gap-3 border-b border-[#e6e9ee] bg-white px-4 py-2 md:px-8 lg:sticky lg:top-0 lg:h-[73px] lg:py-0">
         <div>
-          <div className="font-mono text-[10px] uppercase tracking-[0.14em] text-[#64748b]">
+          <div className="font-mono text-[10px] uppercase tracking-[0.14em] text-[#586173]">
             CRM · Captación
           </div>
-          <h1 className="mt-0.5 text-[20px] font-bold tracking-tight text-[#0a0a0a]">
+          <h1 className="mt-0.5 text-[20px] font-bold tracking-tight text-[#141922]">
             Captaciones
           </h1>
         </div>
-        <p className="text-[12px] text-[#64748b]">
+        <p className="text-[12px] text-[#586173]">
           {activeCount} activa{activeCount === 1 ? '' : 's'}
         </p>
       </header>
@@ -77,22 +77,22 @@ export default async function CaptacionesPage() {
             {CAPTURE_BOARD_COLUMNS.map((status) => {
               const list = byStatus.get(status) ?? []
               return (
-                <div key={status} className="rounded-xl border border-[#e2e8f0] bg-[#f8fafc]">
-                  <div className="flex items-center justify-between border-b border-[#e2e8f0] px-3 py-2">
-                    <span className="flex items-center gap-1.5 text-[12px] font-semibold text-[#0a0a0a]">
+                <div key={status} className="rounded-xl border border-[#e6e9ee] bg-[#f8fafc]">
+                  <div className="flex items-center justify-between border-b border-[#e6e9ee] px-3 py-2">
+                    <span className="flex items-center gap-1.5 text-[12px] font-semibold text-[#141922]">
                       <span
                         className="h-2 w-2 rounded-full"
                         style={{ background: CAPTURE_STATUS_COLORS[status] }}
                       />
                       {CAPTURE_STATUS_LABELS[status]}
                     </span>
-                    <span className="rounded-full bg-white px-1.5 py-0.5 font-mono text-[11px] text-[#64748b]">
+                    <span className="rounded-full bg-white px-1.5 py-0.5 font-mono text-[11px] text-[#586173]">
                       {list.length}
                     </span>
                   </div>
                   <div className="space-y-2 p-2">
                     {list.length === 0 ? (
-                      <p className="px-1 py-6 text-center text-[11px] text-[#94a3b8]">—</p>
+                      <p className="px-1 py-6 text-center text-[11px] text-[#8b94a3]">—</p>
                     ) : (
                       list.map((c) => <CaptureCard key={c.id} c={c} agents={agents} />)
                     )}
@@ -105,8 +105,8 @@ export default async function CaptacionesPage() {
 
         {/* Rechazadas */}
         {rejected.length > 0 && (
-          <details className="rounded-xl border border-[#e2e8f0] bg-white">
-            <summary className="cursor-pointer px-4 py-3 text-[13px] font-medium text-[#64748b]">
+          <details className="rounded-xl border border-[#e6e9ee] bg-white">
+            <summary className="cursor-pointer px-4 py-3 text-[13px] font-medium text-[#586173]">
               Rechazadas ({rejected.length})
             </summary>
             <div className="grid gap-2 p-3 sm:grid-cols-2 lg:grid-cols-3">
