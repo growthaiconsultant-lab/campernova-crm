@@ -29,6 +29,9 @@ export interface ActionableTableProps<T> {
   onRowClick?: (row: T) => void
   empty?: React.ReactNode
   className?: string
+  /** Móvil (ESPEC §6): si se pasa, en <lg la tabla se convierte en una lista
+   *  de tarjetas con los campos críticos; la tabla solo se muestra en ≥lg. */
+  mobileCard?: (row: T) => React.ReactNode
 }
 
 const ALIGN = {
@@ -45,6 +48,7 @@ export function ActionableTable<T>({
   onRowClick,
   empty,
   className,
+  mobileCard,
 }: ActionableTableProps<T>) {
   if (rows.length === 0) {
     return (
@@ -57,68 +61,95 @@ export function ActionableTable<T>({
     )
   }
 
-  return (
-    <div className={cn('overflow-x-auto', className)}>
-      <table className="w-full border-collapse">
-        <thead>
-          <tr className="border-y border-line2">
-            {columns.map((c) => (
-              <th
-                key={c.key}
-                className={cn(
-                  'whitespace-nowrap px-[18px] py-2.5 font-mono text-[10.5px] font-semibold uppercase tracking-[0.04em] text-ink3',
-                  ALIGN[c.align ?? 'left'],
-                  c.headerClassName
-                )}
-              >
-                {c.header}
-              </th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map((row) => {
-            const href = rowHref?.(row)
-            const interactive = Boolean(href || onRowClick)
-            return (
-              <tr
-                key={rowKey(row)}
-                onClick={onRowClick ? () => onRowClick(row) : undefined}
-                className={cn(
-                  'group border-b border-line2 transition-colors last:border-0',
-                  interactive && 'cursor-pointer hover:bg-line2',
-                  href && 'relative'
-                )}
-              >
-                {columns.map((c, ci) => (
-                  <td
-                    key={c.key}
-                    className={cn(
-                      'px-[18px] py-3 align-middle font-hanken text-[13px] font-semibold text-ink',
-                      c.mono && 'font-mono',
-                      ALIGN[c.align ?? 'left'],
-                      // La columna CTA queda por encima del overlay de fila.
-                      c.key === '__cta' && 'relative z-[1]',
-                      c.className
-                    )}
-                  >
-                    {/* Drill-down: la 1ª celda lleva el enlace estirado que hace
-                        clicable toda la fila (stretched-link) sin anidar <a> en <tr>. */}
-                    {href && ci === 0 ? (
-                      <Link href={href} className="after:absolute after:inset-0 after:content-['']">
-                        {c.cell(row)}
-                      </Link>
-                    ) : (
-                      c.cell(row)
-                    )}
-                  </td>
-                ))}
-              </tr>
-            )
-          })}
-        </tbody>
-      </table>
+  // Móvil: lista de tarjetas con los campos críticos (la tabla queda ≥lg)
+  const mobileList = mobileCard && (
+    <div className="flex flex-col gap-2.5 p-3 lg:hidden">
+      {rows.map((row) => {
+        const href = rowHref?.(row)
+        const card = (
+          <div className="rounded-[11px] border border-line bg-card p-3 shadow-[0_1px_2px_rgba(20,25,34,0.04)]">
+            {mobileCard(row)}
+          </div>
+        )
+        return href ? (
+          <Link key={rowKey(row)} href={href} className="block">
+            {card}
+          </Link>
+        ) : (
+          <div key={rowKey(row)}>{card}</div>
+        )
+      })}
     </div>
+  )
+
+  return (
+    <>
+      {mobileList}
+      <div className={cn('overflow-x-auto', mobileCard && 'hidden lg:block', className)}>
+        <table className="w-full border-collapse">
+          <thead>
+            <tr className="border-y border-line2">
+              {columns.map((c) => (
+                <th
+                  key={c.key}
+                  className={cn(
+                    'whitespace-nowrap px-[18px] py-2.5 font-mono text-[10.5px] font-semibold uppercase tracking-[0.04em] text-ink3',
+                    ALIGN[c.align ?? 'left'],
+                    c.headerClassName
+                  )}
+                >
+                  {c.header}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((row) => {
+              const href = rowHref?.(row)
+              const interactive = Boolean(href || onRowClick)
+              return (
+                <tr
+                  key={rowKey(row)}
+                  onClick={onRowClick ? () => onRowClick(row) : undefined}
+                  className={cn(
+                    'group border-b border-line2 transition-colors last:border-0',
+                    interactive && 'cursor-pointer hover:bg-line2',
+                    href && 'relative'
+                  )}
+                >
+                  {columns.map((c, ci) => (
+                    <td
+                      key={c.key}
+                      className={cn(
+                        'px-[18px] py-3 align-middle font-hanken text-[13px] font-semibold text-ink',
+                        c.mono && 'font-mono',
+                        ALIGN[c.align ?? 'left'],
+                        // La columna CTA queda por encima del overlay de fila.
+                        c.key === '__cta' && 'relative z-[1]',
+                        c.className
+                      )}
+                    >
+                      {/* Drill-down: la 1ª celda lleva el enlace estirado que hace
+                        clicable toda la fila (stretched-link) sin anidar <a> en <tr>. */}
+                      {href && ci === 0 ? (
+                        <Link
+                          href={href}
+                          className="after:absolute after:inset-0 after:content-['']"
+                        >
+                          {c.cell(row)}
+                        </Link>
+                      ) : (
+                        c.cell(row)
+                      )}
+                    </td>
+                  ))}
+                </tr>
+              )
+            })}
+          </tbody>
+        </table>
+      </div>
+    </>
   )
 }
 
