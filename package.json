@@ -19,6 +19,7 @@
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
     "test:e2e": "playwright test",
+    "check:rls": "tsx scripts/check-rls.ts",
     "prepare": "husky",
     "seed": "tsx prisma/seed.ts"
   },
