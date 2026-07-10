@@ -198,7 +198,7 @@ export default async function CalendarioPage({
           <div className="flex flex-wrap items-center gap-2">
             <Link
               href="/calendario/nuevo"
-              className="inline-flex items-center gap-1.5 rounded-lg bg-foreground px-3 py-2 text-[12.5px] font-semibold text-background transition-opacity hover:opacity-90"
+              className="inline-flex items-center gap-1.5 rounded-[10px] bg-brand px-3 py-2 text-[12.5px] font-semibold text-white transition-colors hover:bg-brand2"
             >
               + Nuevo evento
             </Link>
@@ -206,19 +206,19 @@ export default async function CalendarioPage({
             <div className="flex overflow-hidden rounded-lg border border-border">
               <Link
                 href={navBase({ view: 'week', week: String(offset) })}
-                className={`px-3 py-1.5 text-[12.5px] font-medium ${view === 'week' ? 'bg-foreground text-background' : 'text-muted-foreground hover:bg-muted'}`}
+                className={`px-3 py-1.5 text-[12.5px] font-medium ${view === 'week' ? 'bg-brand-tint font-semibold text-brand' : 'text-muted-foreground hover:bg-muted'}`}
               >
                 Semana
               </Link>
               <Link
                 href={navBase({ view: 'day' })}
-                className={`px-3 py-1.5 text-[12.5px] font-medium ${view === 'day' ? 'bg-foreground text-background' : 'text-muted-foreground hover:bg-muted'}`}
+                className={`px-3 py-1.5 text-[12.5px] font-medium ${view === 'day' ? 'bg-brand-tint font-semibold text-brand' : 'text-muted-foreground hover:bg-muted'}`}
               >
                 Día
               </Link>
               <Link
                 href={navBase({ view: 'month', month: String(monthOffset) })}
-                className={`px-3 py-1.5 text-[12.5px] font-medium ${view === 'month' ? 'bg-foreground text-background' : 'text-muted-foreground hover:bg-muted'}`}
+                className={`px-3 py-1.5 text-[12.5px] font-medium ${view === 'month' ? 'bg-brand-tint font-semibold text-brand' : 'text-muted-foreground hover:bg-muted'}`}
               >
                 Mes
               </Link>
@@ -329,7 +329,7 @@ export default async function CalendarioPage({
                           <span
                             className={
                               isToday
-                                ? 'inline-flex h-5 w-5 items-center justify-center rounded-full bg-foreground text-background'
+                                ? 'inline-flex h-5 w-5 items-center justify-center rounded-full bg-brand text-white'
                                 : ''
                             }
                           >
