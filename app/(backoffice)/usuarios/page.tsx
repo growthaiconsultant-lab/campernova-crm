@@ -1,4 +1,5 @@
 import Link from 'next/link'
+import { Eyebrow } from '@/components/redesign'
 import { requireAdmin } from '@/lib/auth'
 import { db } from '@/lib/db'
 import { UserPlus } from 'lucide-react'
@@ -14,40 +15,57 @@ export default async function UsuariosPage() {
   })
 
   return (
-    <div className="p-6 lg:p-8">
-      <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
+    <div>
+      <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold text-cn-teal-900">Usuarios</h1>
-          <p className="mt-1 text-sm text-cn-ink-500">Gestiona el equipo que accede al CRM.</p>
+          <Eyebrow>CRM · Sistema</Eyebrow>
+          <h1 className="mt-1 font-hanken text-[23px] font-bold tracking-[-0.02em] text-ink">
+            Usuarios
+          </h1>
+          <p className="mt-1 font-hanken text-[13.5px] text-ink2">
+            Gestiona el equipo que accede al CRM.
+          </p>
         </div>
         <Link
           href="/usuarios/nuevo"
-          className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-sm font-medium text-white transition hover:opacity-90"
+          className="inline-flex items-center gap-[7px] rounded-[10px] bg-brand px-[15px] py-[10px] font-hanken text-[13px] font-semibold text-white transition-colors hover:bg-brand2"
         >
-          <UserPlus className="h-4 w-4" />
+          <UserPlus size={15} strokeWidth={2.2} />
           Nuevo usuario
         </Link>
       </div>
 
-      <div className="overflow-x-auto rounded-xl border border-cn-line bg-white">
+      <div className="overflow-x-auto rounded-[14px] border border-line bg-card">
         <table className="w-full min-w-[640px] text-sm">
           <thead>
-            <tr className="border-b border-cn-line bg-cn-cream-50">
-              <th className="px-5 py-3 text-left font-medium text-cn-ink-500">Nombre</th>
-              <th className="px-5 py-3 text-left font-medium text-cn-ink-500">Email</th>
-              <th className="px-5 py-3 text-left font-medium text-cn-ink-500">Rol</th>
-              <th className="px-5 py-3 text-center font-medium text-cn-ink-500">Activo</th>
-              <th className="px-5 py-3 text-center font-medium text-cn-ink-500">Notif. leads</th>
-              <th className="px-5 py-3 text-right font-medium text-cn-ink-500">Acciones</th>
+            <tr className="border-y border-line2">
+              <th className="px-5 py-2.5 text-left font-mono text-[10.5px] font-semibold uppercase tracking-[0.04em] text-ink3">
+                Nombre
+              </th>
+              <th className="px-5 py-2.5 text-left font-mono text-[10.5px] font-semibold uppercase tracking-[0.04em] text-ink3">
+                Email
+              </th>
+              <th className="px-5 py-2.5 text-left font-mono text-[10.5px] font-semibold uppercase tracking-[0.04em] text-ink3">
+                Rol
+              </th>
+              <th className="px-5 py-2.5 text-center font-mono text-[10.5px] font-semibold uppercase tracking-[0.04em] text-ink3">
+                Activo
+              </th>
+              <th className="px-5 py-2.5 text-center font-mono text-[10.5px] font-semibold uppercase tracking-[0.04em] text-ink3">
+                Notif. leads
+              </th>
+              <th className="px-5 py-2.5 text-right font-mono text-[10.5px] font-semibold uppercase tracking-[0.04em] text-ink3">
+                Acciones
+              </th>
             </tr>
           </thead>
           <tbody>
             {users.map((user) => (
-              <tr key={user.id} className="border-b border-cn-line last:border-0">
-                <td className="px-5 py-3.5 font-medium text-cn-teal-900">
+              <tr key={user.id} className="border-b border-line2 last:border-0">
+                <td className="px-5 py-3.5 font-medium text-ink">
                   <span className={user.active ? '' : 'opacity-50'}>{user.name}</span>
                 </td>
-                <td className="px-5 py-3.5 text-cn-ink-700">{user.email}</td>
+                <td className="px-5 py-3.5 text-ink2">{user.email}</td>
                 <td className="px-5 py-3.5">
                   <RoleBadge role={user.role} />
                 </td>
@@ -62,7 +80,7 @@ export default async function UsuariosPage() {
                   />
                 </td>
                 <td className="px-5 py-3.5 text-right">
-                  <Link href={`/usuarios/${user.id}`} className="text-cn-teal-700 hover:underline">
+                  <Link href={`/usuarios/${user.id}`} className="text-brand hover:underline">
                     Editar
                   </Link>
                 </td>

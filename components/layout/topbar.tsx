@@ -1,7 +1,7 @@
 'use client'
 
-import Link from 'next/link'
-import { Search, Plus, Bell } from 'lucide-react'
+import { Search, Bell } from 'lucide-react'
+import { NewLeadButton } from './new-lead-button'
 
 interface TopbarProps {
   userName: string
@@ -35,14 +35,8 @@ export function Topbar({ leading }: TopbarProps) {
         </kbd>
       </button>
 
-      {/* Nuevo lead — acción primaria */}
-      <Link
-        href="/compradores/nuevo"
-        className="ml-auto inline-flex items-center gap-[7px] rounded-[10px] bg-brand px-[15px] py-[10px] font-hanken text-[13px] font-semibold text-white transition-colors hover:bg-brand2"
-      >
-        <Plus size={15} strokeWidth={2.2} className="shrink-0" />
-        <span className="hidden sm:inline">Nuevo lead</span>
-      </Link>
+      {/* Nuevo lead — acción primaria (modal centrado: comprador/vendedor/captación) */}
+      <NewLeadButton />
 
       {/* Campana */}
       <button
