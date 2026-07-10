@@ -114,9 +114,15 @@ claude mcp add-json linear '{\"command\":\"npx\",\"args\":[\"-y\",\"mcp-linear@l
   - **Móvil**: tab bar inferior (Inicio·Compradores·Vehículos·Agenda, por rol; TALLER/ENTREGAS ven sus módulos) + **MobileFichaActions** (Llamar/WhatsApp fijos, con `logWhatsApp`) en fichas C2/VEN2 (z-50 sobre la tab bar).
   - Fichas C2/VEN2: cabecera breadcrumb a 60px + offsets sticky 118px (mantienen su arquitectura hero+tabs+rail, ya token-coherente). Calendario: colores de origen al semáforo.
 
-### Pendiente del rediseño (pulido menor)
+### Pulido posterior del rediseño (PRs #95–#97, validado en vivo ✅)
 
-Validación visual de TAL2/ENT2/POST2 **con datos** (prod aún sin órdenes/entregas/garantías; verificadas rutas, compilación y estados vacíos). Filtros globales de Analytics con rango de fechas (requiere extender `lib/kpi/*` con parámetros de rango — feature aparte con tests). Detalle fino de la rejilla del calendario (CA1) y de `/usuarios`. Buscador ⌘K y campana del header son visuales (cablear en fase posterior).
+- **Buscador global ⌘K cableado** (PR #97): `search-actions.ts` (`globalSearch`, RBAC del sidebar: leads/captaciones ADMIN+AGENTE, vehículos también TALLER/MARKETING; busca nombre/email/teléfono/marca/modelo/**matrícula**) + `components/layout/global-search.tsx` (overlay con grupos por entidad, debounce 250ms, Cmd/Ctrl+K, Escape). Validado en prod con datos reales (drill-down a ficha).
+- **Tablas → tarjetas en móvil** (PR #96, ESPEC §6): `ActionableTable` acepta `mobileCard` (lista de tarjetas en `<lg`, tabla en `≥lg`). Aplicado a Compradores/Vendedores/Taller/Ofertas+Reservas.
+- **Drag & drop en Captaciones** (PR #95): `capture-board.tsx` — soltar cambia el `CaptureStatus`; drop en "Entrada agendada" abre diálogo de fecha (`scheduleEntrada`); "Convertido" no acepta drop (aviso). Calendario: CTA/toggles/badge de hoy al verde de marca. `/usuarios` al patrón del kit. **Modal "Nuevo lead"** centrado (scrim ESPEC §5) con Comprador/Vendedor/Captación (`new-lead-button.tsx`).
+
+### Pendiente del rediseño
+
+**Filtros globales de Analytics con rango de fechas + comparativa vs periodo anterior + export PDF** — única pieza restante del handoff; requiere extender `lib/kpi/*` con parámetros de rango (feature de capa de datos con tests propios; ojo: KPIs de "estado actual" como stock no son parametrizables por rango). La **campana** del header sigue visual (no hay sistema de notificaciones in-app). Validación visual de TAL2/ENT2/POST2 **con datos** cuando el equipo cree órdenes/entregas/garantías.
 
 ## Estado previo (Block 22 — Rebrand visual del CRM COMPLETO — MERGED A MAIN ✅)
 
