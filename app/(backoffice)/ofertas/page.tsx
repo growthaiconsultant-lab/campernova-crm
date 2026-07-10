@@ -202,6 +202,24 @@ export default async function OfertasPage() {
           rows={active}
           rowKey={(r) => r.id}
           rowHref={buyerHref}
+          mobileCard={(r) => (
+            <>
+              <div className="flex items-center justify-between gap-2">
+                <span className="truncate font-hanken text-[13.5px] font-semibold text-ink">
+                  {r.buyerName}
+                </span>
+                <HexPill hex={OFFER_STATUS_COLORS[r.status]} className="shrink-0">
+                  {OFFER_STATUS_LABELS[r.status]}
+                </HexPill>
+              </div>
+              <div className="mt-0.5 truncate font-hanken text-[11.5px] font-medium text-ink3">
+                {r.vehicleLabel}
+              </div>
+              <div className="mt-2 font-mono text-[13px] font-semibold text-ink">
+                {EUR(r.amount)}
+              </div>
+            </>
+          )}
           empty={
             <div className="px-[18px] pb-6 pt-2 font-hanken text-[13px] text-ink3">
               No hay ofertas activas. Registra una oferta desde la ficha de un comprador.
@@ -216,6 +234,30 @@ export default async function OfertasPage() {
           rows={reservations}
           rowKey={(r) => r.id}
           rowHref={buyerHref}
+          mobileCard={(r) => (
+            <>
+              <div className="flex items-center justify-between gap-2">
+                <span className="truncate font-mono text-[12.5px] font-semibold text-ink">
+                  {r.ref} · {r.buyerName}
+                </span>
+                {stalledIds.has(r.id) ? (
+                  <HexPill hex="#d64545" className="shrink-0">
+                    En riesgo
+                  </HexPill>
+                ) : (
+                  <HexPill hex={OFFER_STATUS_COLORS[r.status]} className="shrink-0">
+                    {OFFER_STATUS_LABELS[r.status]}
+                  </HexPill>
+                )}
+              </div>
+              <div className="mt-0.5 truncate font-hanken text-[11.5px] font-medium text-ink3">
+                {r.vehicleLabel}
+              </div>
+              <div className="mt-2 font-mono text-[13px] font-semibold text-ink">
+                {r.depositAmount ? `Señal ${EUR(r.depositAmount)}` : 'Sin señal'}
+              </div>
+            </>
+          )}
           empty={
             <div className="px-[18px] pb-6 pt-2 font-hanken text-[13px] text-ink3">
               No hay reservas en curso. Una oferta aceptada con señal se convierte en reserva.

@@ -380,6 +380,42 @@ export default async function CompradoresPage({ searchParams }: { searchParams: 
           rows={leads}
           rowKey={(l) => l.id}
           rowHref={(l) => `/compradores/${l.id}`}
+          mobileCard={(l) => (
+            <>
+              <div className="flex items-center justify-between gap-2">
+                <span className="truncate font-hanken text-[13.5px] font-semibold text-ink">
+                  {l.name}
+                </span>
+                {l.temperature && (
+                  <Pill tone={TEMP_TONE[l.temperature]} dot className="shrink-0">
+                    {TEMPERATURE_LABELS[l.temperature]}
+                  </Pill>
+                )}
+              </div>
+              <div className="mt-0.5 font-hanken text-[11.5px] font-medium text-ink3">
+                {prefs(l)} · {STATUS_LABELS[l.status]}
+              </div>
+              <div className="mt-2 flex items-center justify-between gap-2">
+                {l.nextActionType && l.nextActionDueAt ? (
+                  <span
+                    className={cn(
+                      'inline-flex items-center gap-1.5 font-hanken text-[12px] font-medium',
+                      isNextActionOverdue(l.nextActionDueAt) ? 'text-bad' : 'text-ink2'
+                    )}
+                  >
+                    <Clock size={12} strokeWidth={2} className="shrink-0" />
+                    {NEXT_ACTION_LABELS[l.nextActionType]} ·{' '}
+                    {formatNextActionDue(l.nextActionDueAt)}
+                  </span>
+                ) : (
+                  <span className="font-hanken text-[12px] text-ink3">Sin próxima acción</span>
+                )}
+                <span className="shrink-0 font-mono text-[12px] font-semibold text-ink">
+                  {l.maxBudget ? EUR(Number(l.maxBudget)) : '—'}
+                </span>
+              </div>
+            </>
+          )}
           empty={
             <EmptyState
               title="Sin compradores que mostrar"

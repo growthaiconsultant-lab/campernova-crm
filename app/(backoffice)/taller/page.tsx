@@ -282,6 +282,44 @@ export default async function TallerPage({
           rows={workOrders}
           rowKey={(wo) => wo.id}
           rowHref={(wo) => `/taller/${wo.id}`}
+          mobileCard={(wo) => {
+            const real = wo.timeEntries.reduce((s, t) => s + Number(t.hours), 0)
+            const planned = wo.estimatedHours ? Number(wo.estimatedHours) : null
+            const dev = computeHoursDeviation(planned, real)
+            return (
+              <>
+                <div className="flex items-center justify-between gap-2">
+                  <span className="truncate font-hanken text-[13.5px] font-semibold text-ink">
+                    {wo.vehicle.brand} {wo.vehicle.model}
+                  </span>
+                  <HexPill hex={STATUS_HEX[wo.status]} className="shrink-0">
+                    {STATUS_LABELS[wo.status]}
+                  </HexPill>
+                </div>
+                <div className="mt-0.5 truncate font-hanken text-[11.5px] font-medium text-ink3">
+                  {wo.description}
+                </div>
+                <div className="mt-2 flex items-center justify-between gap-2">
+                  <span
+                    className={cn(
+                      'font-mono text-[11.5px] font-semibold',
+                      dev.status === 'desviado_arriba'
+                        ? 'text-bad'
+                        : dev.real > 0
+                          ? 'text-good'
+                          : 'text-ink3'
+                    )}
+                  >
+                    {dev.planned != null ? fmtH(dev.planned) : '—'} →{' '}
+                    {dev.real > 0 ? fmtH(dev.real) : '—'} h
+                  </span>
+                  <span className="shrink-0 font-hanken text-[12px] font-medium text-ink2">
+                    {wo.assignedTo?.name ?? 'Sin asignar'}
+                  </span>
+                </div>
+              </>
+            )
+          }}
           empty={
             <EmptyState
               icon={<Wrench size={20} strokeWidth={1.9} />}
