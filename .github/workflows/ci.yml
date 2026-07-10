@@ -105,3 +105,104 @@ jobs:
       # Tests de integración con Prisma real contra la base migrada.
       - name: Integration tests
         run: pnpm test:integration
+
+  migration-replay:
+    name: migration-replay
+    runs-on: ubuntu-latest
+    # Reconstruye el esquema desde una base PostgreSQL 17 VACÍA aplicando la baseline,
+    # y valida RLS, paridad de esquema, conteos de catálogo e idempotencia. Base efímera
+    # local al runner; sin secretos ni conexión a staging/producción.
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: campernova_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/campernova_test?schema=public
+      DIRECT_URL: postgresql://postgres:postgres@localhost:5432/campernova_test?schema=public
+      CHECK_RLS_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/campernova_test?schema=public
+      PSQL_URL: postgresql://postgres:postgres@localhost:5432/campernova_test
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Generate Prisma client
+        run: pnpm prisma generate
+
+      - name: Validate migration history invariant
+        run: pnpm check:migration-history
+
+      - name: Apply baseline on empty PostgreSQL 17
+        run: pnpm prisma migrate deploy
+
+      - name: Confirm exactly the baseline was applied
+        run: |
+          set -euo pipefail
+          count=$(psql "$PSQL_URL" -tAc "SELECT count(*) FROM _prisma_migrations WHERE finished_at IS NOT NULL")
+          name=$(psql "$PSQL_URL" -tAc "SELECT string_agg(migration_name, ',') FROM _prisma_migrations")
+          echo "migraciones aplicadas: $count · nombres: $name"
+          test "$count" = "1" || { echo "esperado 1 migración aplicada"; exit 1; }
+          test "$name" = "000000000000_squashed_migrations" || { echo "baseline inesperada"; exit 1; }
+
+      - name: Prisma migrate status (must be up to date)
+        run: pnpm prisma migrate status
+
+      - name: RLS invariant (check:rls)
+        run: pnpm check:rls
+
+      - name: Schema parity vs schema.prisma (no Prisma-managed diff)
+        run: pnpm prisma migrate diff --from-url "$DATABASE_URL" --to-schema-datamodel prisma/schema.prisma --exit-code
+
+      - name: Catalog verifications
+        run: |
+          set -euo pipefail
+          assert() { # $1=label $2=actual $3=expected
+            echo "$1: $2 (esperado $3)"
+            test "$2" = "$3" || { echo "MISMATCH en $1"; exit 1; }
+          }
+          tables=$(psql "$PSQL_URL" -tAc "SELECT count(*) FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace WHERE n.nspname='public' AND c.relkind='r'")
+          columns=$(psql "$PSQL_URL" -tAc "SELECT count(*) FROM information_schema.columns WHERE table_schema='public'")
+          enums=$(psql "$PSQL_URL" -tAc "SELECT count(*) FROM pg_type t JOIN pg_namespace n ON n.oid=t.typnamespace WHERE n.nspname='public' AND t.typtype='e'")
+          enum_values=$(psql "$PSQL_URL" -tAc "SELECT count(*) FROM pg_enum e JOIN pg_type t ON t.oid=e.enumtypid JOIN pg_namespace n ON n.oid=t.typnamespace WHERE n.nspname='public'")
+          fks=$(psql "$PSQL_URL" -tAc "SELECT count(*) FROM pg_constraint con JOIN pg_namespace n ON n.oid=con.connamespace WHERE n.nspname='public' AND con.contype='f'")
+          indexes=$(psql "$PSQL_URL" -tAc "SELECT count(*) FROM pg_indexes WHERE schemaname='public'")
+          without_rls=$(psql "$PSQL_URL" -tAc "SELECT count(*) FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace WHERE n.nspname='public' AND c.relkind='r' AND c.relrowsecurity=false")
+          forced=$(psql "$PSQL_URL" -tAc "SELECT count(*) FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace WHERE n.nspname='public' AND c.relkind='r' AND c.relforcerowsecurity=true")
+          policies=$(psql "$PSQL_URL" -tAc "SELECT count(*) FROM pg_policies WHERE schemaname='public'")
+          assert tables "$tables" 30
+          assert columns "$columns" 412
+          assert enums "$enums" 48
+          assert enum_values "$enum_values" 255
+          assert foreign_keys "$fks" 60
+          assert indexes "$indexes" 101
+          assert tables_without_rls "$without_rls" 0
+          assert tables_forced_rls "$forced" 0
+          assert policies "$policies" 0
+
+      - name: Second migrate deploy is idempotent
+        run: |
+          set -euo pipefail
+          out=$(pnpm prisma migrate deploy 2>&1)
+          echo "$out"
+          echo "$out" | grep -qi "No pending migrations to apply" || { echo "el segundo deploy no fue idempotente"; exit 1; }
