@@ -120,9 +120,13 @@ claude mcp add-json linear '{\"command\":\"npx\",\"args\":[\"-y\",\"mcp-linear@l
 - **Tablas → tarjetas en móvil** (PR #96, ESPEC §6): `ActionableTable` acepta `mobileCard` (lista de tarjetas en `<lg`, tabla en `≥lg`). Aplicado a Compradores/Vendedores/Taller/Ofertas+Reservas.
 - **Drag & drop en Captaciones** (PR #95): `capture-board.tsx` — soltar cambia el `CaptureStatus`; drop en "Entrada agendada" abre diálogo de fecha (`scheduleEntrada`); "Convertido" no acepta drop (aviso). Calendario: CTA/toggles/badge de hoy al verde de marca. `/usuarios` al patrón del kit. **Modal "Nuevo lead"** centrado (scrim ESPEC §5) con Comprador/Vendedor/Captación (`new-lead-button.tsx`).
 
-### Pendiente del rediseño
+### Filtros globales de Analytics — rango + comparativa (PR #98, validado en vivo ✅)
 
-**Filtros globales de Analytics con rango de fechas + comparativa vs periodo anterior + export PDF** — única pieza restante del handoff; requiere extender `lib/kpi/*` con parámetros de rango (feature de capa de datos con tests propios; ojo: KPIs de "estado actual" como stock no son parametrizables por rango). La **campana** del header sigue visual (no hay sistema de notificaciones in-app). Validación visual de TAL2/ENT2/POST2 **con datos** cuando el equipo cree órdenes/entregas/garantías.
+Última pieza funcional del handoff (spec §3): **`lib/kpi/range.ts`** (puro, 10 tests — rangos 7d/30d/90d/mes/mes-anterior/trimestre/año; comparativa = periodo de **igual duración** inmediatamente anterior) + **`lib/kpi/flow.ts`** (`getFlowKpis` — KPIs de **flujo** por periodo: leads nuevos, vehículos captados, ofertas creadas, reservas con señal decidedAt en rango, ventas vía activity "→ Vendido"; respeta filtro de agente; `computeDelta` testeado). UI: **chips de rango** en el layout de Analytics (`?range=`, **preservado entre tabs** vía useSearchParams+Suspense); **Dirección** gana sección "Flujo del periodo" (6 cards con delta y "antes: N"); **CRM** pasa "Leads nuevos" al rango global. Los KPIs de **estado** (stock, activos, trust) siguen siendo snapshot y sus secciones lo indican. Validado en prod: cambio de rango recalcula (30d: compradores 62 ↗288% → 7d: 17 ↗113%) y el rango persiste al cambiar de dashboard. Suite: **543 tests**.
+
+### Pendiente del rediseño (fuera del handoff funcional)
+
+La **campana** del header sigue visual (cablearla = sistema de notificaciones in-app, feature nueva). **Export PDF** de dashboards (CSV ya existe en Calidad). Validación visual de TAL2/ENT2/POST2 **con datos** cuando el equipo cree órdenes/entregas/garantías.
 
 ## Estado previo (Block 22 — Rebrand visual del CRM COMPLETO — MERGED A MAIN ✅)
 
