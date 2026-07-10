@@ -46,3 +46,62 @@ jobs:
 
       - name: Unit tests
         run: pnpm test
+
+  integration:
+    name: integration
+    runs-on: ubuntu-latest
+    # Base de datos PostgreSQL 17 REAL y efímera, local al runner. No usa secretos ni
+    # se conecta a staging/producción. Aplica las migraciones reales del proyecto.
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: campernova_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      NODE_ENV: test
+      ALLOW_INTEGRATION_DB_RESET: 'true'
+      # Credenciales locales al runner (no secretas, base efímera). El guard valida que
+      # la URL no apunte a staging/producción antes de migrar o escribir.
+      TEST_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/campernova_test?schema=public
+      CHECK_RLS_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/campernova_test?schema=public
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/campernova_test?schema=public
+      DIRECT_URL: postgresql://postgres:postgres@localhost:5432/campernova_test?schema=public
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Generate Prisma client
+        run: pnpm prisma generate
+
+      # Aplica TODAS las migraciones reales sobre la base de test (guard + migrate deploy).
+      - name: Prepare integration database (migrations)
+        run: pnpm test:integration:prepare
+
+      # Invariante de seguridad: falla si alguna tabla de `public` no tiene RLS.
+      - name: RLS invariant (check:rls)
+        run: pnpm check:rls
+
+      # Tests de integración con Prisma real contra la base migrada.
+      - name: Integration tests
+        run: pnpm test:integration
