@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { usePathname } from 'next/navigation'
+import { usePathname, useSearchParams } from 'next/navigation'
 import { cn } from '@/lib/utils'
 import type { UserRole } from '@prisma/client'
 
@@ -26,8 +26,13 @@ const TABS: { href: string; label: string; roles: UserRole[] }[] = [
 
 export function AnalyticsTabs({ userRole }: { userRole: UserRole }) {
   const pathname = usePathname()
+  const searchParams = useSearchParams()
   const tabs = TABS.filter((t) => t.roles.includes(userRole))
   if (tabs.length === 0) return null
+
+  // El rango global (?range=) se preserva al cambiar de dashboard.
+  const range = searchParams.get('range')
+  const withRange = (href: string) => (range ? `${href}?range=${range}` : href)
 
   return (
     <nav
@@ -39,7 +44,7 @@ export function AnalyticsTabs({ userRole }: { userRole: UserRole }) {
         return (
           <Link
             key={t.href}
-            href={t.href}
+            href={withRange(t.href)}
             aria-current={active ? 'page' : undefined}
             className={cn(
               'whitespace-nowrap rounded-[8px] px-3.5 py-2 font-hanken text-[12.5px] font-semibold transition-colors',
