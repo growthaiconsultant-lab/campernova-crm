@@ -2,6 +2,8 @@ import { redirect } from 'next/navigation'
 import { db } from '@/lib/db'
 import { requireAuth } from '@/lib/auth'
 import { getCrmKpis, type LostReasonRow } from '@/lib/kpi/crm'
+import { getFlowKpis } from '@/lib/kpi/flow'
+import { resolveRange } from '@/lib/kpi/range'
 import { getDireccionKpis } from '@/lib/kpi/direccion'
 import { KpiCard } from '@/components/analytics/kpi-card'
 import { FunnelChart } from '@/components/analytics/funnel-chart'
@@ -40,7 +42,7 @@ function LostBars({ rows }: { rows: LostReasonRow[] }) {
 export default async function CrmDashboardPage({
   searchParams,
 }: {
-  searchParams: { agent?: string }
+  searchParams: { agent?: string; range?: string }
 }) {
   const currentUser = await requireAuth()
   const isAdmin = currentUser.role === 'ADMIN'
@@ -53,8 +55,11 @@ export default async function CrmDashboardPage({
     agentId: isAgente ? currentUser.id : (searchParams.agent ?? null),
   }
 
-  const [crm, funnels, agents] = await Promise.all([
+  const range = resolveRange(searchParams.range)
+
+  const [crm, flow, funnels, agents] = await Promise.all([
     getCrmKpis(db, filter),
+    getFlowKpis(db, filter, range),
     getDireccionKpis(db, filter),
     isAdmin
       ? db.user.findMany({
@@ -87,10 +92,22 @@ export default async function CrmDashboardPage({
           </p>
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
             <KpiCard
-              label="Leads nuevos (30d)"
-              value={String(crm.newBuyers30d + crm.newSellers30d)}
-              sub={`${crm.newBuyers30d} compra · ${crm.newSellers30d} venta`}
-              tooltip="Compradores + vendedores creados en los últimos 30 días."
+              label={`Leads nuevos (${flow.range.label.toLowerCase()})`}
+              value={String(flow.newBuyers.current + flow.newSellers.current)}
+              deltaPct={
+                flow.newBuyers.previous + flow.newSellers.previous > 0
+                  ? Math.round(
+                      ((flow.newBuyers.current +
+                        flow.newSellers.current -
+                        flow.newBuyers.previous -
+                        flow.newSellers.previous) /
+                        (flow.newBuyers.previous + flow.newSellers.previous)) *
+                        100
+                    )
+                  : null
+              }
+              sub={`${flow.newBuyers.current} compra · ${flow.newSellers.current} venta`}
+              tooltip="Compradores + vendedores creados en el periodo seleccionado, comparados con el periodo anterior de igual duración."
             />
             <KpiCard
               label="Leads sin dueño"

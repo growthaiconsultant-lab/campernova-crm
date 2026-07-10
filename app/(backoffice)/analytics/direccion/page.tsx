@@ -4,6 +4,8 @@ import { requireAuth } from '@/lib/auth'
 import { getSalesMonthOverMonth } from '@/lib/dashboard/queries'
 import { getMonthlyNetMargin, getAverageDaysInStock } from '@/lib/dashboard/metrics'
 import { getDireccionKpis } from '@/lib/kpi/direccion'
+import { getFlowKpis } from '@/lib/kpi/flow'
+import { resolveRange } from '@/lib/kpi/range'
 import { KpiCard } from '@/components/analytics/kpi-card'
 import { FunnelChart } from '@/components/analytics/funnel-chart'
 import { DashboardFilters } from '@/app/(backoffice)/dashboard/dashboard-filters'
@@ -15,7 +17,7 @@ const EUR = (n: number) =>
 export default async function DireccionDashboardPage({
   searchParams,
 }: {
-  searchParams: { agent?: string }
+  searchParams: { agent?: string; range?: string }
 }) {
   const currentUser = await requireAuth()
   const isAdmin = currentUser.role === 'ADMIN'
@@ -23,9 +25,11 @@ export default async function DireccionDashboardPage({
   if (!isAdmin && !isMarketing) redirect('/dashboard?error=forbidden')
 
   const filter = { agentId: isAdmin ? (searchParams.agent ?? null) : null }
+  const range = resolveRange(searchParams.range)
 
-  const [kpis, sales, margin, daysStock, agents] = await Promise.all([
+  const [kpis, flow, sales, margin, daysStock, agents] = await Promise.all([
     getDireccionKpis(db, filter),
+    getFlowKpis(db, filter, range),
     getSalesMonthOverMonth(db, filter),
     getMonthlyNetMargin(db, filter),
     getAverageDaysInStock(db, filter),
@@ -57,7 +61,58 @@ export default async function DireccionDashboardPage({
       </header>
 
       <div className="space-y-8 px-4 pb-16 pt-6 md:px-8">
-        {/* North Star + KPIs ejecutivos */}
+        {/* Flujo del periodo (responde al filtro global de rango) */}
+        <section>
+          <p className="mb-3 font-mono text-[10px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+            Flujo del periodo · {flow.range.label} · vs periodo anterior de igual duración
+          </p>
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
+            <KpiCard
+              label="Ventas"
+              value={String(flow.sales.current)}
+              deltaPct={flow.sales.deltaPct}
+              sub={`antes: ${flow.sales.previous}`}
+              tooltip="Vehículos vendidos en el periodo seleccionado, comparados con el periodo anterior de igual duración."
+            />
+            <KpiCard
+              label="Reservas nuevas"
+              value={String(flow.newReservations.current)}
+              deltaPct={flow.newReservations.deltaPct}
+              sub={`antes: ${flow.newReservations.previous}`}
+              tooltip="Ofertas aceptadas con señal en el periodo."
+            />
+            <KpiCard
+              label="Ofertas creadas"
+              value={String(flow.offersCreated.current)}
+              deltaPct={flow.offersCreated.deltaPct}
+              sub={`antes: ${flow.offersCreated.previous}`}
+              href="/ofertas"
+            />
+            <KpiCard
+              label="Compradores nuevos"
+              value={String(flow.newBuyers.current)}
+              deltaPct={flow.newBuyers.deltaPct}
+              sub={`antes: ${flow.newBuyers.previous}`}
+              href="/compradores"
+            />
+            <KpiCard
+              label="Vendedores nuevos"
+              value={String(flow.newSellers.current)}
+              deltaPct={flow.newSellers.deltaPct}
+              sub={`antes: ${flow.newSellers.previous}`}
+              href="/vendedores"
+            />
+            <KpiCard
+              label="Vehículos captados"
+              value={String(flow.capturedVehicles.current)}
+              deltaPct={flow.capturedVehicles.deltaPct}
+              sub={`antes: ${flow.capturedVehicles.previous}`}
+              href="/vehiculos"
+            />
+          </div>
+        </section>
+
+        {/* North Star + KPIs ejecutivos (estado actual — no dependen del rango) */}
         <section>
           <p className="mb-3 font-mono text-[10px] font-semibold uppercase tracking-[0.16em] text-sidebar-primary">
             North Star · operaciones estructuradas
