@@ -4,7 +4,7 @@ Mapa único del estado de construcción de "CampersNova OS" (de concesionario a 
 
 > El documento estratégico fundacional (visión completa, comparables, objetivos de valoración y financieros) es **privado**: NO está en el repo. Vive solo en la memoria local del asistente. Este doc es la vista **arquitectónica/operativa**, sin cifras confidenciales.
 
-_Última actualización: 2026-07-11 (tras B21 — sistema de KPIs/dashboards completo)._
+_Última actualización: 2026-07-10 (tras Block 23 — rediseño fiel del CRM completo)._
 
 ## Estado de las 10 capas
 
@@ -64,7 +64,15 @@ Ver también `docs/LAUNCH.md` y `docs/PRODUCTION-READINESS.md`. Principales vivo
 - `NEXT_PUBLIC_APP_URL` → dominio real (sitemap); Supabase Auth Site URL en el dominio.
 - Rotar tokens `.codex`; decidir compute de Supabase bajo carga (Micro→Small).
 - E2E autenticado contra staging (CAM-42) — handoff en `CLAUDE.md` (Fases 4+7).
-- **CRM en subdominio `crm.campersnova.com`** (ADR 0007): el código (routing por host, gated por `CRM_HOST`) ya está en `main` y es no-op hasta el cutover. Pendiente (dueño): añadir dominio en Vercel + `CNAME crm` en dinahosting + URLs en Supabase Auth + set `CRM_HOST` y `NEXT_PUBLIC_APP_URL=https://crm.campersnova.com`. Reversible quitando `CRM_HOST`.
+- **CRM en subdominio `crm.campersnova.com`** (ADR 0007): el código (routing por host, gated por `CRM_HOST`) ya está en `main` y es no-op hasta el cutover. Pendiente (dueño): añadir dominio en Vercel + `CNAME crm` en dinahosting + URLs en Supabase Auth + set `CRM_HOST` y `NEXT_PUBLIC_APP_URL=https://crm.campersnova.com`. Reversible quitando `CRM_HOST`. (El rediseño que lo pausó ya está cerrado → retomable.)
+
+## Pendientes del rediseño (Block 23) — revisar con el dueño
+
+Apuntados al cierre del rediseño fiel (2026-07-10, PRs #85–#98). Son **features nuevas**, no restos del handoff (que quedó completo y validado en vivo):
+
+1. **Campana de notificaciones del header** — hoy es visual (icono con badge, sin clic). Cablearla implica un sistema de notificaciones in-app: decidir qué eventos notifican (lead nuevo, tarea vencida, reserva en riesgo, ticket escalado…), persistencia de leído/no leído, y su relación con los emails que ya se envían.
+2. **Export PDF de dashboards de Analytics** — el CSV ya existe (Calidad → `/api/analytics/incompletos.csv`). Decidir formato (snapshot visual del dashboard vs informe tabular) y librería (no hay ninguna de PDF en el repo; regla del proyecto: justificar librerías nuevas).
+3. **Validar fichas TAL2/ENT2/POST2 con datos reales** — desplegadas y verificadas en código y estados vacíos; revisarlas en cuanto el equipo cree las primeras órdenes/entregas/garantías (o sembrando staging).
 
 ## Principios de priorización (filtro del flywheel)
 
