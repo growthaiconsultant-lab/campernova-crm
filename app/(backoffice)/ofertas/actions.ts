@@ -4,7 +4,12 @@ import { revalidatePath } from 'next/cache'
 import { db } from '@/lib/db'
 import { requireAgente } from '@/lib/auth'
 import { isValidOfferStatus, isValidOfferTransition, OFFER_STATUS_LABELS } from '@/lib/offers'
-import { isValidTransition, VEHICLE_TRANSITIONS } from '@/lib/state-machine'
+import {
+  applyOfferStatusChangeTx,
+  OfferConflictError,
+  shouldReserveVehicle,
+  shouldReleaseVehicle,
+} from '@/lib/offers-reservation'
 import { isValidLostReason } from '@/lib/lost-reason'
 import { emitKpiEvent } from '@/lib/kpi/emit'
 import { KPI_EVENTS } from '@/lib/kpi/events'
@@ -121,7 +126,7 @@ export async function updateOfferStatus(
       status: true,
       amount: true,
       buyerLeadId: true,
-      vehicle: { select: { id: true, status: true, sellerLeadId: true, brand: true, model: true } },
+      vehicle: { select: { id: true, sellerLeadId: true, brand: true, model: true } },
     },
   })
   if (!offer) return { error: 'Oferta no encontrada' }
@@ -146,18 +151,9 @@ export async function updateOfferStatus(
     return { error: 'Fecha de reserva no válida' }
   }
 
-  // Efecto sobre el vehículo
   const veh = offer.vehicle
-  let vehicleStatusChange: 'RESERVADO' | 'PUBLICADO' | null = null
-  if (next === 'ACEPTADA' && isValidTransition(VEHICLE_TRANSITIONS, veh.status, 'RESERVADO')) {
-    vehicleStatusChange = 'RESERVADO'
-  } else if (
-    (next === 'CANCELADA' || next === 'RETIRADA' || next === 'EXPIRADA') &&
-    wasReservation &&
-    isValidTransition(VEHICLE_TRANSITIONS, veh.status, 'PUBLICADO')
-  ) {
-    vehicleStatusChange = 'PUBLICADO'
-  }
+  const reserve = shouldReserveVehicle(next)
+  const release = shouldReleaseVehicle(offer.status, next)
 
   const label = `Oferta ${OFFER_STATUS_LABELS[next].toLowerCase()}`
   const detail =
@@ -166,44 +162,37 @@ export async function updateOfferStatus(
       : next === 'RECHAZADA' && rejection
         ? `${label} (${rejection})`
         : label
+  const content = `${detail} — ${veh.brand} ${veh.model}`
 
-  await db.$transaction(async (tx) => {
-    await tx.offer.update({
-      where: { id },
-      data: {
-        status: next,
-        rejectionReason: next === 'RECHAZADA' ? rejection : undefined,
-        depositAmount: next === 'ACEPTADA' ? (extra.depositAmount ?? undefined) : undefined,
-        reservedUntil: next === 'ACEPTADA' ? reservedUntil : undefined,
-        amount: extra.finalAmount ?? undefined,
-        decidedAt: new Date(),
-      },
-    })
-
-    if (vehicleStatusChange) {
-      await tx.vehicle.update({ where: { id: veh.id }, data: { status: vehicleStatusChange } })
-    }
-
-    const content = `${detail} — ${veh.brand} ${veh.model}`
-    await tx.activity.create({
-      data: {
-        type: 'OFERTA_ACTUALIZADA',
-        content,
-        agentId: actor.id,
-        buyerLeadId: offer.buyerLeadId,
-      },
-    })
-    if (veh.sellerLeadId) {
-      await tx.activity.create({
-        data: {
-          type: 'OFERTA_ACTUALIZADA',
-          content,
-          agentId: actor.id,
-          sellerLeadId: veh.sellerLeadId,
+  // Aceptación/liberación atómica: la disponibilidad se decide con compare-and-swap
+  // dentro de la transacción, no con una lectura previa (evita la carrera de doble reserva).
+  try {
+    await db.$transaction((tx) =>
+      applyOfferStatusChangeTx(tx, {
+        offerId: id,
+        fromStatus: offer.status,
+        toStatus: next,
+        offerData: {
+          rejectionReason: next === 'RECHAZADA' ? (rejection ?? undefined) : undefined,
+          depositAmount: next === 'ACEPTADA' ? (extra.depositAmount ?? undefined) : undefined,
+          reservedUntil: next === 'ACEPTADA' ? reservedUntil : undefined,
+          amount: extra.finalAmount ?? undefined,
         },
+        vehicleId: veh.id,
+        reserve,
+        release,
+        activityContent: content,
+        actorId: actor.id,
+        buyerLeadId: offer.buyerLeadId,
+        sellerLeadId: veh.sellerLeadId,
       })
-    }
-  })
+    )
+  } catch (err) {
+    // Conflicto de negocio esperado por concurrencia → mensaje claro al usuario.
+    if (err instanceof OfferConflictError) return { error: err.message }
+    // Error técnico inesperado → propágalo (no ocultarlo como "no disponible").
+    throw err
+  }
 
   // Eventos KPI de la transición transaccional
   const kpiEvent =
