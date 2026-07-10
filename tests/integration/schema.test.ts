@@ -36,8 +36,9 @@ describe('integración · conectividad Prisma (sin mocks)', () => {
 describe('integración · estado de migraciones', () => {
   it('8.2 · _prisma_migrations contiene las migraciones aplicadas', async () => {
     const applied = await countAppliedMigrations(prisma)
-    // El proyecto tiene 26 migraciones versionadas (incluida la RLS de PR1).
-    expect(applied).toBeGreaterThanOrEqual(26)
+    // Tras el squash del historial, una base nueva aplica la baseline única
+    // (000000000000_squashed_migrations); futuras migraciones sumarían más.
+    expect(applied).toBeGreaterThanOrEqual(1)
   })
 
   it('8.2 · existen tablas núcleo esperadas del esquema migrado', async () => {
