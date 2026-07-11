@@ -4,7 +4,7 @@ import { revalidatePath } from 'next/cache'
 import { z } from 'zod'
 import { db } from '@/lib/db'
 import { requireAdmin, requireCanViewEntregas, requireCanEditEntregas } from '@/lib/auth'
-import { createWarrantyForDelivery } from '@/lib/postventa'
+import { completeDeliveryTx, DeliveryConflictError } from '@/lib/delivery-completion'
 import { sendDeliveryConfirmation } from '@/lib/email/send'
 import type { DeliveryStatus } from '@prisma/client'
 
@@ -141,88 +141,49 @@ export async function updateDeliveryStatus(
 
   const now = new Date()
 
-  await db.$transaction(async (tx) => {
-    await tx.delivery.update({
-      where: { id: deliveryId },
-      data: {
-        status: newStatus,
-        ...(newStatus === 'EN_CURSO' && { startedAt: now }),
-        ...(newStatus === 'COMPLETADA' && { completedAt: now }),
-      },
-    })
-
-    if (newStatus === 'COMPLETADA') {
-      // Vehicle → VENDIDO
-      await tx.vehicle.update({
-        where: { id: delivery.vehicleId },
-        data: { status: 'VENDIDO', soldAt: now },
-      })
-      // Matching match → CERRADO (the one in OFERTA state for this vehicle/buyer pair)
-      await tx.match.updateMany({
-        where: {
+  if (newStatus === 'COMPLETADA') {
+    // Finalización ATÓMICA: entrega + vehículo + comprador + match + garantía + seguimientos
+    // + trazas en una única transacción. La disponibilidad se decide con compare-and-swap
+    // dentro de la transacción (no con la lectura previa), evitando estados parciales.
+    try {
+      await db.$transaction((tx) =>
+        completeDeliveryTx(tx, {
+          deliveryId,
           vehicleId: delivery.vehicleId,
           buyerLeadId: delivery.buyerLeadId,
-          status: 'OFERTA',
-        },
-        data: { status: 'CERRADO' },
-      })
-      // BuyerLead → CERRADO
-      await tx.buyerLead.update({
-        where: { id: delivery.buyerLeadId },
-        data: { status: 'CERRADO' },
-      })
-
-      await tx.activity.create({
-        data: {
-          type: 'CAMBIO_ESTADO',
-          content: 'Vehículo marcado como VENDIDO automáticamente al completar la entrega.',
-          agentId: actor.id,
           sellerLeadId: delivery.vehicle.sellerLeadId,
-        },
-      })
-      await tx.activity.create({
-        data: {
-          type: 'ENTREGA_COMPLETADA',
-          content: 'Entrega completada y firmada.',
-          agentId: actor.id,
-          sellerLeadId: delivery.vehicle.sellerLeadId,
-          buyerLeadId: delivery.buyerLeadId,
-        },
-      })
+          actorId: actor.id,
+          now,
+        })
+      )
+    } catch (err) {
+      // Conflicto de negocio esperado (concurrencia / estado incompatible) → mensaje claro.
+      if (err instanceof DeliveryConflictError) return { ok: false, error: err.message }
+      // Error técnico inesperado → propágalo (no ocultarlo como conflicto).
+      throw err
     }
-
-    if (newStatus === 'CANCELADA') {
-      await tx.activity.create({
+  } else {
+    // EN_CURSO / CANCELADA: transiciones sin garantía asociada.
+    await db.$transaction(async (tx) => {
+      await tx.delivery.update({
+        where: { id: deliveryId },
         data: {
-          type: 'ENTREGA_CANCELADA',
-          content: 'Entrega cancelada.',
-          agentId: actor.id,
-          sellerLeadId: delivery.vehicle.sellerLeadId,
-          buyerLeadId: delivery.buyerLeadId,
+          status: newStatus,
+          ...(newStatus === 'EN_CURSO' && { startedAt: now }),
         },
       })
-    }
-  })
-
-  // Create warranty + followups outside the transaction (uses deliveryId, not inside tx)
-  if (newStatus === 'COMPLETADA') {
-    await createWarrantyForDelivery(deliveryId, db)
-
-    const warranty = await db.warranty.findUnique({
-      where: { deliveryId },
-      select: { id: true },
+      if (newStatus === 'CANCELADA') {
+        await tx.activity.create({
+          data: {
+            type: 'ENTREGA_CANCELADA',
+            content: 'Entrega cancelada.',
+            agentId: actor.id,
+            sellerLeadId: delivery.vehicle.sellerLeadId,
+            buyerLeadId: delivery.buyerLeadId,
+          },
+        })
+      }
     })
-    if (warranty) {
-      await db.activity.create({
-        data: {
-          type: 'GARANTIA_ACTIVADA',
-          content: 'Garantía de 12 meses activada automáticamente.',
-          agentId: actor.id,
-          sellerLeadId: delivery.vehicle.sellerLeadId,
-          buyerLeadId: delivery.buyerLeadId,
-        },
-      })
-    }
   }
 
   revalidatePath('/entregas')

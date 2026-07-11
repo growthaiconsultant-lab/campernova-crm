@@ -8,16 +8,18 @@ vi.mock('@/lib/auth', () => ({
   requireCanViewEntregas: vi.fn(),
   requireCanEditEntregas: vi.fn(),
 }))
-vi.mock('@/lib/postventa', () => ({ createWarrantyForDelivery: vi.fn() }))
 vi.mock('@/lib/email/send', () => ({ sendDeliveryConfirmation: vi.fn(() => Promise.resolve()) }))
+
+// El servicio transaccional se mockea para controlar éxito/conflicto/error inesperado.
+// DeliveryConflictError se mantiene REAL (importOriginal) para que instanceof funcione.
+vi.mock('@/lib/delivery-completion', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/lib/delivery-completion')>()
+  return { ...actual, completeDeliveryTx: vi.fn() }
+})
 
 const { mockDb } = vi.hoisted(() => {
   const mockDb = {
     delivery: { create: vi.fn(), findUnique: vi.fn(), update: vi.fn() },
-    vehicle: { findUnique: vi.fn(), update: vi.fn() },
-    buyerLead: { update: vi.fn() },
-    match: { updateMany: vi.fn() },
-    warranty: { findUnique: vi.fn() },
     activity: { create: vi.fn() },
     $transaction: vi.fn(),
   }
@@ -27,7 +29,8 @@ vi.mock('@/lib/db', () => ({ db: mockDb }))
 
 import type { User } from '@prisma/client'
 import { requireCanEditEntregas } from '@/lib/auth'
-import { createWarrantyForDelivery } from '@/lib/postventa'
+import { revalidatePath } from 'next/cache'
+import { completeDeliveryTx, DeliveryConflictError } from '@/lib/delivery-completion'
 import { updateDeliveryStatus, signDelivery } from './actions'
 
 const editor = { id: 'user-1', role: 'ENTREGAS' } as User
@@ -48,20 +51,19 @@ beforeEach(() => {
   vi.clearAllMocks()
   vi.mocked(requireCanEditEntregas).mockResolvedValue(editor)
   mockDb.delivery.update.mockResolvedValue({})
-  mockDb.vehicle.update.mockResolvedValue({})
-  mockDb.buyerLead.update.mockResolvedValue({})
-  mockDb.match.updateMany.mockResolvedValue({})
   mockDb.activity.create.mockResolvedValue({})
   mockDb.$transaction.mockImplementation(async (fn: (tx: typeof mockDb) => Promise<unknown>) =>
     fn(mockDb)
   )
+  vi.mocked(completeDeliveryTx).mockResolvedValue({ warrantyId: 'war-1' })
 })
 
-describe('updateDeliveryStatus', () => {
+describe('updateDeliveryStatus · validaciones previas', () => {
   it('error si la entrega no existe', async () => {
     mockDb.delivery.findUnique.mockResolvedValue(null)
     const res = await updateDeliveryStatus('x', 'EN_CURSO')
     expect(res).toEqual({ ok: false, error: 'Entrega no encontrada' })
+    expect(completeDeliveryTx).not.toHaveBeenCalled()
   })
 
   it('rechaza transición inválida (PROGRAMADA → COMPLETADA)', async () => {
@@ -69,6 +71,7 @@ describe('updateDeliveryStatus', () => {
     const res = await updateDeliveryStatus('d1', 'COMPLETADA')
     expect(res.ok).toBe(false)
     if (!res.ok) expect(res.error).toContain('no permitida')
+    expect(completeDeliveryTx).not.toHaveBeenCalled()
   })
 
   it('bloquea COMPLETADA si hay ítems de checklist pendientes', async () => {
@@ -79,7 +82,7 @@ describe('updateDeliveryStatus', () => {
     const res = await updateDeliveryStatus('d1', 'COMPLETADA')
     expect(res.ok).toBe(false)
     if (!res.ok) expect(res.error).toContain('pendientes')
-    expect(createWarrantyForDelivery).not.toHaveBeenCalled()
+    expect(completeDeliveryTx).not.toHaveBeenCalled()
   })
 
   it('bloquea COMPLETADA si falta la firma', async () => {
@@ -87,20 +90,77 @@ describe('updateDeliveryStatus', () => {
     const res = await updateDeliveryStatus('d1', 'COMPLETADA')
     expect(res.ok).toBe(false)
     if (!res.ok) expect(res.error).toContain('firma')
+    expect(completeDeliveryTx).not.toHaveBeenCalled()
   })
+})
 
-  it('completa la entrega: marca vehículo VENDIDO, cierra buyer y crea garantía', async () => {
+describe('updateDeliveryStatus · finalización atómica (COMPLETADA)', () => {
+  it('invoca el servicio transaccional con el contexto correcto y revalida tras el commit', async () => {
     mockDb.delivery.findUnique.mockResolvedValue({ ...signedComplete })
-    mockDb.warranty.findUnique.mockResolvedValue({ id: 'war-1' })
     const res = await updateDeliveryStatus('d1', 'COMPLETADA')
     expect(res).toEqual({ ok: true })
-    expect(mockDb.vehicle.update).toHaveBeenCalledWith(
-      expect.objectContaining({ data: expect.objectContaining({ status: 'VENDIDO' }) })
+
+    expect(completeDeliveryTx).toHaveBeenCalledOnce()
+    const [, params] = vi.mocked(completeDeliveryTx).mock.calls[0]
+    expect(params).toMatchObject({
+      deliveryId: 'd1',
+      vehicleId: 'veh-1',
+      buyerLeadId: 'buyer-1',
+      sellerLeadId: 'seller-1',
+      actorId: 'user-1',
+    })
+    expect(params.now).toBeInstanceOf(Date)
+    expect(revalidatePath).toHaveBeenCalledWith('/entregas')
+    expect(revalidatePath).toHaveBeenCalledWith('/entregas/d1')
+  })
+
+  it('traduce DeliveryConflictError a { ok:false, error } y NO revalida', async () => {
+    mockDb.delivery.findUnique.mockResolvedValue({ ...signedComplete })
+    vi.mocked(completeDeliveryTx).mockRejectedValue(new DeliveryConflictError('delivery'))
+
+    const res = await updateDeliveryStatus('d1', 'COMPLETADA')
+    expect(res.ok).toBe(false)
+    if (!res.ok) expect(res.error).toContain('ya no está disponible')
+    expect(revalidatePath).not.toHaveBeenCalled()
+  })
+
+  it('traduce un conflicto de vehículo incompatible a { ok:false, error }', async () => {
+    mockDb.delivery.findUnique.mockResolvedValue({ ...signedComplete })
+    vi.mocked(completeDeliveryTx).mockRejectedValue(new DeliveryConflictError('vehicle'))
+
+    const res = await updateDeliveryStatus('d1', 'COMPLETADA')
+    expect(res.ok).toBe(false)
+    if (!res.ok) expect(res.error).toContain('vehículo ya no está disponible')
+    expect(revalidatePath).not.toHaveBeenCalled()
+  })
+
+  it('propaga un error técnico inesperado (no lo oculta como conflicto) y NO revalida', async () => {
+    mockDb.delivery.findUnique.mockResolvedValue({ ...signedComplete })
+    vi.mocked(completeDeliveryTx).mockRejectedValue(new Error('DB caída'))
+
+    await expect(updateDeliveryStatus('d1', 'COMPLETADA')).rejects.toThrow('DB caída')
+    expect(revalidatePath).not.toHaveBeenCalled()
+  })
+})
+
+describe('updateDeliveryStatus · transiciones sin garantía (EN_CURSO / CANCELADA)', () => {
+  it('EN_CURSO actualiza la entrega y no invoca el servicio de finalización', async () => {
+    mockDb.delivery.findUnique.mockResolvedValue({ ...signedComplete, status: 'PROGRAMADA' })
+    const res = await updateDeliveryStatus('d1', 'EN_CURSO')
+    expect(res).toEqual({ ok: true })
+    expect(completeDeliveryTx).not.toHaveBeenCalled()
+    expect(mockDb.delivery.update).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { id: 'd1' } })
     )
-    expect(mockDb.buyerLead.update).toHaveBeenCalledWith(
-      expect.objectContaining({ data: { status: 'CERRADO' } })
-    )
-    expect(createWarrantyForDelivery).toHaveBeenCalledWith('d1', mockDb)
+  })
+
+  it('CANCELADA registra la actividad de cancelación sin garantía', async () => {
+    mockDb.delivery.findUnique.mockResolvedValue({ ...signedComplete })
+    const res = await updateDeliveryStatus('d1', 'CANCELADA')
+    expect(res).toEqual({ ok: true })
+    expect(completeDeliveryTx).not.toHaveBeenCalled()
+    const types = mockDb.activity.create.mock.calls.map((c) => c[0].data.type)
+    expect(types).toContain('ENTREGA_CANCELADA')
   })
 })
 
