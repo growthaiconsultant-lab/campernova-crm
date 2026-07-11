@@ -6,6 +6,7 @@ import { requireAgente } from '@/lib/auth'
 import { defaultNextActionData } from '@/lib/next-action'
 import { runAndSaveAutoValuation } from '@/lib/valuation/save'
 import { recalculateMatchesForVehicle } from '@/lib/matching'
+import { convertTradeInTx, ConversionConflictError } from '@/lib/capture-conversion'
 import {
   isStockEligibleTradeIn,
   isValidTradeInType,
@@ -117,66 +118,72 @@ export async function createSellerLeadFromTradeIn(
     return { error: 'Completa marca, modelo, año y km del vehículo antes de crear el lead' }
   }
 
+  // Valores ya validados (no nulos) extraídos a consts: el narrowing de `buyer.tradeIn*`
+  // no se conserva dentro del closure de `db.$transaction`, pero sí en estas consts.
+  const brand = buyer.tradeInBrand
+  const model = buyer.tradeInModel
+  const year = buyer.tradeInYear
+  const km = buyer.tradeInKm
+  const tradeInLabel = TRADE_IN_TYPE_LABELS[buyer.tradeInType]
+
   const originNote = `Origen: parte de pago del comprador ${buyer.name} (ficha /compradores/${buyer.id}).${
     buyer.tradeInNotes ? ` Notas: ${buyer.tradeInNotes}` : ''
   }`
 
-  const seller = await db.sellerLead.create({
-    data: {
-      name: buyer.name,
-      email: buyer.email,
-      phone: buyer.phone,
-      canal: 'CN',
-      status: 'NUEVO',
-      ...defaultNextActionData(),
-      vehicle: {
-        create: {
-          type: vehicleType,
-          brand: buyer.tradeInBrand,
-          model: buyer.tradeInModel,
-          year: buyer.tradeInYear,
-          km: buyer.tradeInKm,
-          seats: 4, // valor por defecto — el agente lo ajusta en la ficha
-          conservationState: 'NORMAL',
-          equipment: {},
-          status: 'NUEVO',
-        },
-      },
-      activities: {
-        create: { type: 'NOTA', content: originNote },
-      },
-    },
-    include: { vehicle: true },
-  })
-
-  await db.$transaction([
-    db.buyerLead.update({
-      where: { id: leadId },
-      data: { tradeInSellerLeadId: seller.id },
-    }),
-    db.activity.create({
-      data: {
-        type: 'NOTA',
-        content: `Creado lead de vendedor desde el vehículo de parte de pago (${TRADE_IN_TYPE_LABELS[buyer.tradeInType]} ${buyer.tradeInBrand} ${buyer.tradeInModel}). Ficha: /vendedores/${seller.id}`,
+  // Conversión ATÓMICA: vendedor + vehículo + CAS-vínculo del comprador + trazas en una
+  // única transacción. El CAS sobre `tradeInSellerLeadId` (único) impide doble procesamiento.
+  let result: { sellerLeadId: string; vehicleId: string }
+  try {
+    result = await db.$transaction((tx) =>
+      convertTradeInTx(tx, {
         buyerLeadId: leadId,
-      },
-    }),
-  ])
+        sellerData: {
+          name: buyer.name,
+          email: buyer.email,
+          phone: buyer.phone,
+          canal: 'CN',
+          status: 'NUEVO',
+          ...defaultNextActionData(),
+          vehicle: {
+            create: {
+              type: vehicleType,
+              brand,
+              model,
+              year,
+              km,
+              seats: 4, // valor por defecto — el agente lo ajusta en la ficha
+              conservationState: 'NORMAL',
+              equipment: {},
+              status: 'NUEVO',
+            },
+          },
+          activities: {
+            create: { type: 'NOTA', content: originNote },
+          },
+        },
+        linkingNotePrefix: `Creado lead de vendedor desde el vehículo de parte de pago (${tradeInLabel} ${brand} ${model}).`,
+      })
+    )
+  } catch (err) {
+    // Conflicto de negocio esperado (ya procesado / carrera) → mensaje claro.
+    if (err instanceof ConversionConflictError) return { error: err.message }
+    // Error técnico inesperado → propágalo (no ocultarlo como conflicto).
+    throw err
+  }
 
-  // Tasación + matching del nuevo vehículo (no bloqueantes)
-  const vehicleId = seller.vehicle!.id
-  await runAndSaveAutoValuation(vehicleId, {
-    brand: buyer.tradeInBrand,
-    model: buyer.tradeInModel,
+  // Enriquecimiento derivado, tras el commit (no bloqueante, recomputable).
+  await runAndSaveAutoValuation(result.vehicleId, {
+    brand,
+    model,
     type: vehicleType,
-    year: buyer.tradeInYear,
-    km: buyer.tradeInKm,
+    year,
+    km,
     conservationState: 'NORMAL',
     equipment: {},
   })
-  await recalculateMatchesForVehicle(vehicleId, db)
+  await recalculateMatchesForVehicle(result.vehicleId, db)
 
   revalidatePath(`/compradores/${leadId}`)
   revalidatePath('/vendedores')
-  return { sellerLeadId: seller.id }
+  return { sellerLeadId: result.sellerLeadId }
 }
