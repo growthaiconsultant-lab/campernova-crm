@@ -15,6 +15,7 @@ import { isValidLostReason } from '@/lib/lost-reason'
 import { defaultNextActionData } from '@/lib/next-action'
 import { runAndSaveAutoValuation } from '@/lib/valuation/save'
 import { recalculateMatchesForVehicle } from '@/lib/matching'
+import { convertCaptureTx, ConversionConflictError } from '@/lib/capture-conversion'
 import type { CaptureStatus, LostReason } from '@prisma/client'
 
 type Duplicate = { kind: 'capture'; id: string } | { kind: 'seller'; id: string; name: string }
@@ -158,6 +159,7 @@ export async function convertCaptureToSellerLead(
   }
 
   const { brand, model } = splitCaptureTitle(capture.title)
+  const currentYear = new Date().getFullYear()
   const originParts = [
     `Origen: captación de ${PORTAL_LABELS[capture.portal]} (${capture.listingUrl ?? ''}).`.trim(),
     capture.askingPrice ? `Pide ${Number(capture.askingPrice).toLocaleString('es-ES')} €.` : '',
@@ -165,66 +167,64 @@ export async function convertCaptureToSellerLead(
   ].filter(Boolean)
   const originNote = originParts.join(' ')
 
-  const seller = await db.sellerLead.create({
-    data: {
-      name: capture.title?.trim() || `Vendedor ${PORTAL_LABELS[capture.portal]}`,
-      email: '', // la captación no trae email; el comercial lo completa
-      phone: capture.phone,
-      canal: 'CN',
-      status: 'NUEVO',
-      agentId: capture.assignedToId ?? actor.id,
-      ...defaultNextActionData(),
-      vehicle: {
-        create: {
-          type: 'AUTOCARAVANA', // el comercial ajusta tipo/año/km/plazas en la ficha
-          brand,
-          model,
-          year: new Date().getFullYear(),
-          km: 0,
-          seats: 4,
-          conservationState: 'NORMAL',
-          equipment: {},
-          desiredPrice: capture.askingPrice ?? null,
+  // Conversión ATÓMICA: reclamo de la captación (CAS) + vendedor + vehículo + vínculo +
+  // trazas en una única transacción. Evita vendedores/vehículos huérfanos y dobles conversiones.
+  let result: { sellerLeadId: string; vehicleId: string }
+  try {
+    result = await db.$transaction((tx) =>
+      convertCaptureTx(tx, {
+        captureId: id,
+        sellerData: {
+          name: capture.title?.trim() || `Vendedor ${PORTAL_LABELS[capture.portal]}`,
+          email: '', // la captación no trae email; el comercial lo completa
+          phone: capture.phone,
+          canal: 'CN',
           status: 'NUEVO',
+          agentId: capture.assignedToId ?? actor.id,
+          ...defaultNextActionData(),
+          vehicle: {
+            create: {
+              type: 'AUTOCARAVANA', // el comercial ajusta tipo/año/km/plazas en la ficha
+              brand,
+              model,
+              year: currentYear,
+              km: 0,
+              seats: 4,
+              conservationState: 'NORMAL',
+              equipment: {},
+              desiredPrice: capture.askingPrice ?? null,
+              status: 'NUEVO',
+            },
+          },
+          activities: {
+            create: { type: 'NOTA', content: originNote },
+          },
         },
-      },
-      activities: {
-        create: { type: 'NOTA', content: originNote },
-      },
-    },
-    include: { vehicle: true },
-  })
+        linkingNotePrefix: `Convertida a lead de vendedor desde captación (${PORTAL_LABELS[capture.portal]}).`,
+      })
+    )
+  } catch (err) {
+    // Conflicto de negocio esperado (ya convertida / carrera) → mensaje claro.
+    if (err instanceof ConversionConflictError) return { error: err.message }
+    // Error técnico inesperado → propágalo (no ocultarlo como conflicto).
+    throw err
+  }
 
-  await db.$transaction([
-    db.vehicleCapture.update({
-      where: { id },
-      data: { status: 'CONVERTIDO', sellerLeadId: seller.id },
-    }),
-    db.activity.create({
-      data: {
-        type: 'NOTA',
-        content: `Convertida a lead de vendedor desde captación (${PORTAL_LABELS[capture.portal]}). Ficha: /vendedores/${seller.id}`,
-        sellerLeadId: seller.id,
-      },
-    }),
-  ])
-
-  // Tasación + matching del nuevo vehículo (no bloqueantes)
-  const vehicleId = seller.vehicle!.id
-  await runAndSaveAutoValuation(vehicleId, {
+  // Enriquecimiento derivado, tras el commit (no bloqueante, recomputable).
+  await runAndSaveAutoValuation(result.vehicleId, {
     brand,
     model,
     type: 'AUTOCARAVANA',
-    year: new Date().getFullYear(),
+    year: currentYear,
     km: 0,
     conservationState: 'NORMAL',
     equipment: {},
   })
-  await recalculateMatchesForVehicle(vehicleId, db)
+  await recalculateMatchesForVehicle(result.vehicleId, db)
 
   revalidatePath('/captaciones')
   revalidatePath('/vendedores')
-  return { sellerLeadId: seller.id }
+  return { sellerLeadId: result.sellerLeadId }
 }
 
 type EditInput = {
