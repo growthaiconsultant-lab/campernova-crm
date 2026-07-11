@@ -91,6 +91,39 @@ export function vehicleDocumentPath(vehicleId: string, fileName: string) {
   return `docs/${vehicleId}/${fileName}`
 }
 
+/** Path interno seguro: no vacío, sin barra inicial, sin traversal ni control chars. */
+function isSafeObjectPath(p: string): boolean {
+  // eslint-disable-next-line no-control-regex
+  return !!p && !p.startsWith('/') && !p.includes('..') && !/[\x00-\x1f]/.test(p)
+}
+
+/**
+ * Resuelve el object path de un valor almacenado en `VehicleDocument.url`, o `null` si no se
+ * puede resolver de forma segura. Los documentos nuevos guardan el path directamente; los
+ * legacy guardaban una URL firmada de larga duración de la que se extrae el path para volver
+ * a firmar en corto y borrar el objeto correcto.
+ *
+ * Endurecido (PR5A): una URL http debe ser un endpoint de Supabase Storage (`/storage/v1/
+ * object/`) PARA ESTE bucket (`/vehicle-documents/`), con el bucket tras el marcador de
+ * objeto; se descarta la query string. Devuelve `null` ante dominios externos, otro bucket,
+ * URL malformada, path vacío o con traversal — así el llamador NO firma ni borra a ciegas.
+ */
+export function extractVehicleDocumentPath(stored: string): string | null {
+  if (!stored) return null
+  if (!stored.startsWith('http')) return isSafeObjectPath(stored) ? stored : null
+
+  const objMarker = '/storage/v1/object/'
+  const bucketMarker = `/${VEHICLE_DOCUMENTS_BUCKET}/`
+  const oi = stored.indexOf(objMarker)
+  const bi = stored.indexOf(bucketMarker)
+  if (oi === -1 || bi === -1 || bi < oi) return null
+
+  let path = stored.slice(bi + bucketMarker.length)
+  const q = path.indexOf('?')
+  if (q !== -1) path = path.slice(0, q)
+  return isSafeObjectPath(path) ? path : null
+}
+
 export async function vehicleDocumentSignedUrl(
   supabase: SupabaseStorageClient,
   path: string,

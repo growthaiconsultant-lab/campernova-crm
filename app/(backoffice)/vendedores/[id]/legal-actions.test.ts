@@ -14,11 +14,22 @@ vi.mock('@/lib/supabase/server', () => ({
 }))
 
 vi.mock('@/lib/supabase/storage', () => ({
-  vehicleDocumentPath: vi.fn(
-    (vehicleId: string, fileName: string) => `docs/${vehicleId}/${fileName}`
-  ),
+  VEHICLE_DOCUMENTS_BUCKET: 'vehicle-documents',
   vehicleDocumentSignedUrl: vi.fn(),
   deleteVehicleDocumentFile: vi.fn(),
+  // Extrae el path de una URL firmada legacy o devuelve el path (null si no resoluble).
+  extractVehicleDocumentPath: vi.fn((stored: string) => {
+    if (!stored) return null
+    const safe = (p: string) => (p && !p.startsWith('/') && !p.includes('..') ? p : null)
+    if (!stored.startsWith('http')) return safe(stored)
+    const oi = stored.indexOf('/storage/v1/object/')
+    const bi = stored.indexOf('/vehicle-documents/')
+    if (oi === -1 || bi === -1 || bi < oi) return null
+    let p = stored.slice(bi + '/vehicle-documents/'.length)
+    const q = p.indexOf('?')
+    if (q !== -1) p = p.slice(0, q)
+    return safe(p)
+  }),
 }))
 
 const { mockDb } = vi.hoisted(() => {
@@ -75,10 +86,9 @@ beforeEach(() => {
 // ─── uploadVehicleDocument ────────────────────────────────────────────────────
 
 describe('uploadVehicleDocument', () => {
-  it('permite a AGENTE subir un documento', async () => {
+  it('permite a AGENTE subir un documento y guarda el PATH (no una URL firmada)', async () => {
     vi.mocked(requireAgente).mockResolvedValue(mockAgent)
     mockDb.vehicle.findUnique.mockResolvedValue({ sellerLeadId: 'sl-1' })
-    vi.mocked(vehicleDocumentSignedUrl).mockResolvedValue('https://signed.url/doc.pdf')
     mockDb.vehicleDocument.create.mockResolvedValue({ id: 'doc-1' })
     mockDb.activity.create.mockResolvedValue({})
 
@@ -90,6 +100,13 @@ describe('uploadVehicleDocument', () => {
 
     const result = await uploadVehicleDocument('v-1', fd)
     expect(result.ok).toBe(true)
+
+    // Se persiste el object PATH interno docs/<vehicleId>/<uuid>.pdf, nunca una URL http, y
+    // el segmento medio es un UUID de servidor (no el nombre de fichero del usuario).
+    const stored = mockDb.vehicleDocument.create.mock.calls[0][0].data.url as string
+    expect(stored).toMatch(/^docs\/v-1\/[0-9a-f-]{36}\.pdf$/)
+    expect(stored.startsWith('http')).toBe(false)
+    expect(stored).not.toContain('contrato')
   })
 
   it('rechaza si no hay archivo', async () => {
@@ -101,6 +118,34 @@ describe('uploadVehicleDocument', () => {
     const result = await uploadVehicleDocument('v-1', fd)
     expect(result.ok).toBe(false)
     expect(result.error).toMatch(/archivo/i)
+    expect(mockDb.vehicleDocument.create).not.toHaveBeenCalled()
+  })
+
+  it('rechaza un tipo de archivo no permitido (validación server-side)', async () => {
+    vi.mocked(requireAgente).mockResolvedValue(mockAgent)
+
+    const fd = new FormData()
+    const file = new File(['<svg/>'], 'x.svg', { type: 'image/svg+xml' })
+    fd.set('file', file)
+    fd.set('category', 'DNI_VENDEDOR')
+
+    const result = await uploadVehicleDocument('v-1', fd)
+    expect(result.ok).toBe(false)
+    expect(result.error).toMatch(/no permitido/i)
+    expect(mockDb.vehicleDocument.create).not.toHaveBeenCalled()
+  })
+
+  it('rechaza una discordancia MIME↔extensión (doble extensión engañosa)', async () => {
+    vi.mocked(requireAgente).mockResolvedValue(mockAgent)
+
+    const fd = new FormData()
+    const file = new File(['x'], 'contrato.pdf.html', { type: 'application/pdf' })
+    fd.set('file', file)
+    fd.set('category', 'DNI_VENDEDOR')
+
+    const result = await uploadVehicleDocument('v-1', fd)
+    expect(result.ok).toBe(false)
+    expect(mockDb.vehicleDocument.create).not.toHaveBeenCalled()
   })
 
   it('rechaza archivo > 10 MB', async () => {
@@ -135,23 +180,50 @@ describe('uploadVehicleDocument', () => {
 // ─── deleteVehicleDocument ────────────────────────────────────────────────────
 
 describe('deleteVehicleDocument', () => {
-  it('permite solo a ADMIN eliminar un documento', async () => {
+  const docRow = {
+    id: 'doc-1',
+    vehicleId: 'v-1',
+    name: 'Contrato',
+    category: 'CONTRATO_COMPRAVENTA',
+    url: 'docs/v-1/doc.pdf',
+    vehicle: { sellerLeadId: 'sl-1' },
+  }
+
+  it('elimina el objeto y luego el registro (Storage confirma primero)', async () => {
     vi.mocked(requireAdmin).mockResolvedValue(mockAdmin)
-    mockDb.vehicleDocument.findUnique.mockResolvedValue({
-      id: 'doc-1',
-      vehicleId: 'v-1',
-      name: 'Contrato',
-      category: 'CONTRATO_COMPRAVENTA',
-      url: 'https://example.com/doc.pdf',
-      vehicle: { sellerLeadId: 'sl-1' },
-    })
+    mockDb.vehicleDocument.findUnique.mockResolvedValue({ ...docRow })
     vi.mocked(deleteVehicleDocumentFile).mockResolvedValue(true)
     mockDb.vehicleDocument.delete.mockResolvedValue({})
     mockDb.activity.create.mockResolvedValue({})
 
     const result = await deleteVehicleDocument('doc-1')
     expect(result.ok).toBe(true)
+    // El objeto se borra con el path resuelto, ANTES del registro.
+    expect(deleteVehicleDocumentFile).toHaveBeenCalledWith(expect.anything(), 'docs/v-1/doc.pdf')
     expect(mockDb.vehicleDocument.delete).toHaveBeenCalledWith({ where: { id: 'doc-1' } })
+  })
+
+  it('NO elimina el registro si el borrado en Storage falla (sin éxito con estado incierto)', async () => {
+    vi.mocked(requireAdmin).mockResolvedValue(mockAdmin)
+    mockDb.vehicleDocument.findUnique.mockResolvedValue({ ...docRow })
+    vi.mocked(deleteVehicleDocumentFile).mockResolvedValue(false) // Storage falla
+
+    const result = await deleteVehicleDocument('doc-1')
+    expect(result.ok).toBe(false)
+    expect(mockDb.vehicleDocument.delete).not.toHaveBeenCalled()
+  })
+
+  it('rechaza si el path no se puede resolver (URL externa/otro bucket) sin borrar nada', async () => {
+    vi.mocked(requireAdmin).mockResolvedValue(mockAdmin)
+    mockDb.vehicleDocument.findUnique.mockResolvedValue({
+      ...docRow,
+      url: 'https://evil.com/vehicle-documents/x.pdf',
+    })
+
+    const result = await deleteVehicleDocument('doc-1')
+    expect(result.ok).toBe(false)
+    expect(deleteVehicleDocumentFile).not.toHaveBeenCalled()
+    expect(mockDb.vehicleDocument.delete).not.toHaveBeenCalled()
   })
 
   it('devuelve error si el documento no existe', async () => {
@@ -262,18 +334,7 @@ describe('markChargesChecked', () => {
 // ─── getVehicleDocumentSignedUrl ──────────────────────────────────────────────
 
 describe('getVehicleDocumentSignedUrl', () => {
-  it('devuelve la URL tal cual si ya es una URL completa', async () => {
-    vi.mocked(requireAgente).mockResolvedValue(mockAgent)
-    mockDb.vehicleDocument.findUnique.mockResolvedValue({
-      url: 'https://signed.supabase.co/path/to/doc.pdf',
-    })
-
-    const result = await getVehicleDocumentSignedUrl('doc-1')
-    expect(result.ok).toBe(true)
-    if (result.ok) expect(result.url).toBe('https://signed.supabase.co/path/to/doc.pdf')
-  })
-
-  it('regenera URL firmada si el valor es un path', async () => {
+  it('SIEMPRE genera una URL firmada nueva y corta desde el path (no re-sirve la almacenada)', async () => {
     vi.mocked(requireAgente).mockResolvedValue(mockAgent)
     mockDb.vehicleDocument.findUnique.mockResolvedValue({ url: 'docs/v-1/doc.pdf' })
     vi.mocked(vehicleDocumentSignedUrl).mockResolvedValue('https://freshly.signed/url')
@@ -281,6 +342,24 @@ describe('getVehicleDocumentSignedUrl', () => {
     const result = await getVehicleDocumentSignedUrl('doc-1')
     expect(result.ok).toBe(true)
     if (result.ok) expect(result.url).toBe('https://freshly.signed/url')
+    // Firma (supabase, path, ttl) → se firma en corto (TTL ≤ 300s), no re-usando ningún http.
+    const ttl = vi.mocked(vehicleDocumentSignedUrl).mock.calls[0][2]
+    expect(ttl).toBeLessThanOrEqual(300)
+  })
+
+  it('para una fila legacy con URL firmada de larga duración, extrae el path y re-firma en corto', async () => {
+    vi.mocked(requireAgente).mockResolvedValue(mockAgent)
+    mockDb.vehicleDocument.findUnique.mockResolvedValue({
+      url: 'https://x.supabase.co/storage/v1/object/sign/vehicle-documents/docs/v-1/doc.pdf?token=OLD_1YEAR',
+    })
+    vi.mocked(vehicleDocumentSignedUrl).mockResolvedValue('https://freshly.signed/short')
+
+    const result = await getVehicleDocumentSignedUrl('doc-1')
+    expect(result.ok).toBe(true)
+    if (result.ok) expect(result.url).toBe('https://freshly.signed/short')
+    // No devuelve la URL de 1 año almacenada; firma desde el path extraído (arg 1).
+    const path = vi.mocked(vehicleDocumentSignedUrl).mock.calls[0][1]
+    expect(path).toBe('docs/v-1/doc.pdf')
   })
 
   it('devuelve error si el documento no existe', async () => {

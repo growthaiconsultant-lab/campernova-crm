@@ -1,15 +1,28 @@
 'use server'
 
+import { randomUUID } from 'node:crypto'
 import { revalidatePath } from 'next/cache'
 import { z } from 'zod'
 import { db } from '@/lib/db'
 import { requireAdmin, requireAgente } from '@/lib/auth'
 import { createClient as createServerClient } from '@/lib/supabase/server'
 import {
-  vehicleDocumentPath,
+  VEHICLE_DOCUMENTS_BUCKET,
   vehicleDocumentSignedUrl,
   deleteVehicleDocumentFile,
+  extractVehicleDocumentPath,
 } from '@/lib/supabase/storage'
+import {
+  validateDocumentFile,
+  safeDocumentObjectPath,
+  normalizeDisplayName,
+  DocumentValidationError,
+  PRIVATE_DOC_SIGNED_URL_TTL_SECONDS,
+} from '@/lib/storage/private-documents'
+import {
+  uploadPrivateDocumentWithCompensation,
+  StorageOperationError,
+} from '@/lib/storage/store-document'
 import type { VehicleDocumentCategory } from '@prisma/client'
 
 // ── Upload document ───────────────────────────────────────────────────────────
@@ -24,8 +37,16 @@ export async function uploadVehicleDocument(vehicleId: string, formData: FormDat
   const actor = await requireAgente()
 
   const file = formData.get('file') as File | null
-  if (!file || file.size === 0) return { ok: false as const, error: 'Archivo requerido' }
-  if (file.size > 10 * 1024 * 1024) return { ok: false as const, error: 'El archivo supera 10 MB' }
+  if (!file) return { ok: false as const, error: 'Archivo requerido' }
+
+  // Validación server-side (MIME/extensión/tamaño/nombre): no se confía en el navegador.
+  let ext: string
+  try {
+    ext = validateDocumentFile({ mimeType: file.type, fileName: file.name, size: file.size }).ext
+  } catch (err) {
+    if (err instanceof DocumentValidationError) return { ok: false as const, error: err.message }
+    throw err
+  }
 
   const parsed = uploadDocSchema.safeParse({
     category: formData.get('category'),
@@ -40,46 +61,52 @@ export async function uploadVehicleDocument(vehicleId: string, formData: FormDat
   })
   if (!vehicle) return { ok: false as const, error: 'Vehículo no encontrado' }
 
-  const ext = file.name.split('.').pop() ?? 'bin'
-  const fileName = `${parsed.data.category}_${Date.now()}.${ext}`
-  const path = vehicleDocumentPath(vehicleId, fileName)
-
-  const supabase = createServerClient()
+  // Object path interno seguro (server-side): sin nombre del usuario, sin PII, sin traversal.
+  const documentId = randomUUID()
+  const path = safeDocumentObjectPath({ prefix: 'docs', entityId: vehicleId, documentId, ext })
+  const displayName = normalizeDisplayName(parsed.data.name)
   const bytes = await file.arrayBuffer()
-  const { error: uploadError } = await supabase.storage
-    .from('vehicle-documents')
-    .upload(path, bytes, { contentType: file.type, upsert: false })
+  const supabase = createServerClient()
 
-  if (uploadError) {
-    console.error('Storage upload error:', uploadError)
-    return { ok: false as const, error: 'Error al subir el archivo' }
+  try {
+    // Sube al bucket privado y persiste metadatos con compensación (sin objetos huérfanos).
+    // Se guarda el PATH del objeto, nunca una URL firmada persistida.
+    await uploadPrivateDocumentWithCompensation({
+      storage: supabase.storage.from(VEHICLE_DOCUMENTS_BUCKET),
+      path,
+      bytes,
+      contentType: file.type,
+      persist: async () => {
+        await db.$transaction([
+          db.vehicleDocument.create({
+            data: {
+              vehicleId,
+              category: parsed.data.category as VehicleDocumentCategory,
+              name: displayName,
+              url: path,
+              fileSize: file.size,
+              mimeType: file.type || null,
+              notes: parsed.data.notes ?? null,
+              uploadedById: actor.id,
+            },
+          }),
+          db.activity.create({
+            data: {
+              type: 'DOCUMENTO_SUBIDO',
+              content: `Documento subido: ${displayName} (${parsed.data.category})`,
+              agentId: actor.id,
+              sellerLeadId: vehicle.sellerLeadId,
+            },
+          }),
+        ])
+      },
+    })
+  } catch (err) {
+    if (err instanceof StorageOperationError) {
+      return { ok: false as const, error: 'Error al subir el archivo' }
+    }
+    throw err
   }
-
-  const signedUrl = await vehicleDocumentSignedUrl(supabase, path, 3600 * 24 * 365)
-  const urlToStore = signedUrl ?? path
-
-  await db.$transaction([
-    db.vehicleDocument.create({
-      data: {
-        vehicleId,
-        category: parsed.data.category as VehicleDocumentCategory,
-        name: parsed.data.name,
-        url: urlToStore,
-        fileSize: file.size,
-        mimeType: file.type || null,
-        notes: parsed.data.notes ?? null,
-        uploadedById: actor.id,
-      },
-    }),
-    db.activity.create({
-      data: {
-        type: 'DOCUMENTO_SUBIDO',
-        content: `Documento subido: ${parsed.data.name} (${parsed.data.category})`,
-        agentId: actor.id,
-        sellerLeadId: vehicle.sellerLeadId,
-      },
-    }),
-  ])
 
   revalidatePath(`/vendedores/${vehicle.sellerLeadId}`)
   return { ok: true as const }
@@ -96,11 +123,23 @@ export async function deleteVehicleDocument(documentId: string) {
   })
   if (!doc) return { ok: false as const, error: 'Documento no encontrado' }
 
-  const supabase = createServerClient()
-  // Attempt to delete from storage (best-effort — URL may be external)
-  const path = vehicleDocumentPath(doc.vehicleId, doc.url.split('/').pop() ?? '')
-  await deleteVehicleDocumentFile(supabase, path).catch(console.error)
+  // Resuelve el object path real (path directo o extraído de una URL legacy). Si no se puede
+  // resolver de forma segura, no se borra a ciegas: se devuelve error (no se orphanea el objeto).
+  const path = extractVehicleDocumentPath(doc.url)
+  if (!path) {
+    return { ok: false as const, error: 'No se pudo resolver el documento para eliminarlo.' }
+  }
 
+  // Semántica estricta: se borra PRIMERO el objeto; solo si Storage lo confirma se elimina el
+  // registro (nunca se informa éxito con estado incierto ni se deja un objeto sin referencia).
+  const supabase = createServerClient()
+  const removed = await deleteVehicleDocumentFile(supabase, path)
+  if (!removed) {
+    return { ok: false as const, error: 'No se pudo eliminar el archivo del almacenamiento.' }
+  }
+
+  // Si la DB fallara aquí, el objeto ya no existe y el registro persiste (referencia colgante):
+  // el error se propaga para observabilidad (estado incierto documentado, no huérfano silencioso).
   await db.$transaction([
     db.vehicleDocument.delete({ where: { id: documentId } }),
     db.activity.create({
@@ -246,11 +285,15 @@ export async function getVehicleDocumentSignedUrl(documentId: string) {
   })
   if (!doc) return { ok: false as const, error: 'Documento no encontrado' }
 
-  // If already a full signed URL return as-is; if it's a path regenerate
-  if (doc.url.startsWith('http')) return { ok: true as const, url: doc.url }
+  // Siempre se genera una URL firmada de corta duración desde el path resuelto (nunca se
+  // re-sirve la URL almacenada). Compatible con filas legacy que guardaban una URL firmada
+  // de larga duración: se extrae su path y se vuelve a firmar en corto. Si no resuelve a un
+  // path seguro (dominio externo/otro bucket/malformada), se rechaza.
+  const path = extractVehicleDocumentPath(doc.url)
+  if (!path) return { ok: false as const, error: 'No se pudo resolver el documento.' }
 
   const supabase = createServerClient()
-  const url = await vehicleDocumentSignedUrl(supabase, doc.url, 3600)
+  const url = await vehicleDocumentSignedUrl(supabase, path, PRIVATE_DOC_SIGNED_URL_TTL_SECONDS)
   if (!url) return { ok: false as const, error: 'Error al generar la URL' }
 
   return { ok: true as const, url }

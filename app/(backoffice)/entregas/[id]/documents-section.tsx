@@ -1,7 +1,6 @@
 'use client'
 
 import { useState, useRef, useTransition } from 'react'
-import { createBrowserClient } from '@supabase/ssr'
 import { uploadDeliveryDocument, deleteDeliveryDocument } from '../actions'
 import type { DeliveryDocumentCategory } from '@prisma/client'
 
@@ -36,7 +35,7 @@ export function DocumentsSection({ deliveryId, documents, isTerminal, isAdmin }:
   const [category, setCategory] = useState<DeliveryDocumentCategory>('CONTRATO_FINAL')
   const [docName, setDocName] = useState('')
 
-  async function handleUpload(e: React.FormEvent) {
+  function handleUpload(e: React.FormEvent) {
     e.preventDefault()
     const file = fileRef.current?.files?.[0]
     if (!file) return
@@ -44,33 +43,23 @@ export function DocumentsSection({ deliveryId, documents, isTerminal, isAdmin }:
     setUploading(true)
     setUploadError(null)
 
-    try {
-      const supabase = createBrowserClient(
-        process.env.NEXT_PUBLIC_SUPABASE_URL!,
-        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-      )
+    // El archivo se envía a la Server Action, que valida y sube server-side (sin subir a
+    // Storage desde el navegador con la clave anónima).
+    const formData = new FormData()
+    formData.set('file', file)
+    formData.set('category', category)
+    formData.set('name', docName.trim())
 
-      const safeName = `${Date.now()}-${file.name.replace(/[^a-zA-Z0-9._-]/g, '_')}`
-      const path = `${deliveryId}/${safeName}`
-
-      const { error } = await supabase.storage.from('vehicle-documents').upload(path, file)
-      if (error) throw new Error(error.message)
-
-      startTransition(async () => {
-        await uploadDeliveryDocument(deliveryId, {
-          category,
-          name: docName.trim() || file.name,
-          url: path,
-        })
-      })
-
-      setDocName('')
-      if (fileRef.current) fileRef.current.value = ''
-    } catch (err) {
-      setUploadError(err instanceof Error ? err.message : 'Error al subir el archivo')
-    } finally {
+    startTransition(async () => {
+      const res = await uploadDeliveryDocument(deliveryId, formData)
+      if (!res.ok) {
+        setUploadError(res.error ?? 'Error al subir el archivo')
+      } else {
+        setDocName('')
+        if (fileRef.current) fileRef.current.value = ''
+      }
       setUploading(false)
-    }
+    })
   }
 
   function handleDelete(docId: string) {

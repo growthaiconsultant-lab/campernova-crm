@@ -9,6 +9,7 @@ vi.mock('@/lib/auth', () => ({
   requireCanEditEntregas: vi.fn(),
 }))
 vi.mock('@/lib/email/send', () => ({ sendDeliveryConfirmation: vi.fn(() => Promise.resolve()) }))
+vi.mock('@/lib/supabase/server', () => ({ createClient: vi.fn() }))
 
 // El servicio transaccional se mockea para controlar éxito/conflicto/error inesperado.
 // DeliveryConflictError se mantiene REAL (importOriginal) para que instanceof funcione.
@@ -20,6 +21,7 @@ vi.mock('@/lib/delivery-completion', async (importOriginal) => {
 const { mockDb } = vi.hoisted(() => {
   const mockDb = {
     delivery: { create: vi.fn(), findUnique: vi.fn(), update: vi.fn() },
+    deliveryDocument: { create: vi.fn(), findUnique: vi.fn(), delete: vi.fn() },
     activity: { create: vi.fn() },
     $transaction: vi.fn(),
   }
@@ -28,10 +30,35 @@ const { mockDb } = vi.hoisted(() => {
 vi.mock('@/lib/db', () => ({ db: mockDb }))
 
 import type { User } from '@prisma/client'
-import { requireCanEditEntregas } from '@/lib/auth'
+import { requireCanEditEntregas, requireAdmin } from '@/lib/auth'
 import { revalidatePath } from 'next/cache'
+import { createClient as createServerClient } from '@/lib/supabase/server'
 import { completeDeliveryTx, DeliveryConflictError } from '@/lib/delivery-completion'
-import { updateDeliveryStatus, signDelivery } from './actions'
+import {
+  updateDeliveryStatus,
+  signDelivery,
+  uploadDeliveryDocument,
+  deleteDeliveryDocument,
+} from './actions'
+
+const storageBucket = {
+  upload: vi.fn().mockResolvedValue({ error: null }),
+  remove: vi.fn().mockResolvedValue({ error: null }),
+}
+const mockSupabase = { storage: { from: vi.fn(() => storageBucket) } }
+
+function docFormData(
+  opts: { name?: string; type?: string; category?: string; bytes?: number } = {}
+) {
+  const fd = new FormData()
+  const file = new File([new Uint8Array(opts.bytes ?? 100)], opts.name ?? 'contrato.pdf', {
+    type: opts.type ?? 'application/pdf',
+  })
+  fd.set('file', file)
+  fd.set('category', opts.category ?? 'CONTRATO_FINAL')
+  fd.set('name', 'Contrato')
+  return fd
+}
 
 const editor = { id: 'user-1', role: 'ENTREGAS' } as User
 const admin = { id: 'admin-1', role: 'ADMIN' } as User
@@ -56,6 +83,94 @@ beforeEach(() => {
     fn(mockDb)
   )
   vi.mocked(completeDeliveryTx).mockResolvedValue({ warrantyId: 'war-1' })
+  vi.mocked(createServerClient).mockReturnValue(mockSupabase as never)
+  mockDb.deliveryDocument.create.mockResolvedValue({ id: 'ddoc-1' })
+  mockDb.deliveryDocument.delete.mockResolvedValue({})
+  storageBucket.upload.mockResolvedValue({ error: null })
+  storageBucket.remove.mockResolvedValue({ error: null })
+})
+
+describe('uploadDeliveryDocument · subida server-side', () => {
+  it('sube server-side y guarda el PATH interno seguro (no un path del cliente)', async () => {
+    mockDb.delivery.findUnique.mockResolvedValue({ status: 'EN_CURSO' })
+    const res = await uploadDeliveryDocument('del-1', docFormData())
+    expect(res).toEqual({ ok: true })
+
+    const stored = mockDb.deliveryDocument.create.mock.calls[0][0].data.url as string
+    // Path interno seguro deliveries/<id>/<uuid>.pdf: segmento medio UUID de servidor, no el
+    // nombre de fichero del cliente, y nunca una URL http.
+    expect(stored).toMatch(/^deliveries\/del-1\/[0-9a-f-]{36}\.pdf$/)
+    expect(stored.startsWith('http')).toBe(false)
+    expect(stored).not.toContain('contrato')
+    expect(revalidatePath).toHaveBeenCalledWith('/entregas/del-1')
+  })
+
+  it('rechaza un archivo de tipo no permitido (validación server-side) sin crear metadatos', async () => {
+    mockDb.delivery.findUnique.mockResolvedValue({ status: 'EN_CURSO' })
+    const res = await uploadDeliveryDocument(
+      'del-1',
+      docFormData({ name: 'x.svg', type: 'image/svg+xml' })
+    )
+    expect(res.ok).toBe(false)
+    expect(mockDb.deliveryDocument.create).not.toHaveBeenCalled()
+  })
+
+  it('rechaza una categoría no válida', async () => {
+    const res = await uploadDeliveryDocument('del-1', docFormData({ category: 'INVENTADA' }))
+    expect(res.ok).toBe(false)
+    expect(mockDb.deliveryDocument.create).not.toHaveBeenCalled()
+  })
+
+  it('rechaza subir a una entrega ya cerrada', async () => {
+    mockDb.delivery.findUnique.mockResolvedValue({ status: 'COMPLETADA' })
+    const res = await uploadDeliveryDocument('del-1', docFormData())
+    expect(res.ok).toBe(false)
+    if (!res.ok) expect(res.error).toContain('cerrada')
+    expect(mockDb.deliveryDocument.create).not.toHaveBeenCalled()
+  })
+
+  it('error si la entrega no existe', async () => {
+    mockDb.delivery.findUnique.mockResolvedValue(null)
+    const res = await uploadDeliveryDocument('nope', docFormData())
+    expect(res.ok).toBe(false)
+    expect(mockDb.deliveryDocument.create).not.toHaveBeenCalled()
+  })
+})
+
+describe('deleteDeliveryDocument · borrado estricto (Storage primero)', () => {
+  beforeEach(() => {
+    vi.mocked(requireAdmin).mockResolvedValue(admin)
+  })
+
+  it('borra el objeto y luego el registro cuando Storage confirma', async () => {
+    mockDb.deliveryDocument.findUnique.mockResolvedValue({
+      url: 'deliveries/del-1/abc.pdf',
+      deliveryId: 'del-1',
+    })
+    const res = await deleteDeliveryDocument('ddoc-1')
+    expect(res).toEqual({ ok: true })
+    expect(storageBucket.remove).toHaveBeenCalledWith(['deliveries/del-1/abc.pdf'])
+    expect(mockDb.deliveryDocument.delete).toHaveBeenCalledWith({ where: { id: 'ddoc-1' } })
+  })
+
+  it('NO elimina el registro si el borrado en Storage falla', async () => {
+    mockDb.deliveryDocument.findUnique.mockResolvedValue({
+      url: 'deliveries/del-1/abc.pdf',
+      deliveryId: 'del-1',
+    })
+    storageBucket.remove.mockResolvedValue({ error: { message: 'down' } })
+
+    const res = await deleteDeliveryDocument('ddoc-1')
+    expect(res.ok).toBe(false)
+    expect(mockDb.deliveryDocument.delete).not.toHaveBeenCalled()
+  })
+
+  it('error si el documento no existe', async () => {
+    mockDb.deliveryDocument.findUnique.mockResolvedValue(null)
+    const res = await deleteDeliveryDocument('nope')
+    expect(res.ok).toBe(false)
+    expect(mockDb.deliveryDocument.delete).not.toHaveBeenCalled()
+  })
 })
 
 describe('updateDeliveryStatus · validaciones previas', () => {

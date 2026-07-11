@@ -1,12 +1,33 @@
 'use server'
 
+import { randomUUID } from 'node:crypto'
 import { revalidatePath } from 'next/cache'
 import { z } from 'zod'
 import { db } from '@/lib/db'
 import { requireAdmin, requireCanViewEntregas, requireCanEditEntregas } from '@/lib/auth'
 import { completeDeliveryTx, DeliveryConflictError } from '@/lib/delivery-completion'
+import { createClient as createServerClient } from '@/lib/supabase/server'
+import { VEHICLE_DOCUMENTS_BUCKET } from '@/lib/supabase/storage'
+import {
+  validateDocumentFile,
+  safeDocumentObjectPath,
+  normalizeDisplayName,
+  DocumentValidationError,
+} from '@/lib/storage/private-documents'
+import {
+  uploadPrivateDocumentWithCompensation,
+  StorageOperationError,
+} from '@/lib/storage/store-document'
 import { sendDeliveryConfirmation } from '@/lib/email/send'
-import type { DeliveryStatus } from '@prisma/client'
+import type { DeliveryStatus, DeliveryDocumentCategory } from '@prisma/client'
+
+const DELIVERY_DOC_CATEGORIES: readonly string[] = [
+  'CONTRATO_FINAL',
+  'FACTURA',
+  'DOCUMENTO_ENTREGA',
+  'FOTO_ENTREGA',
+  'OTRO',
+]
 
 type ActionResult<T = undefined> = { ok: true; data?: T } | { ok: false; error: string }
 
@@ -255,21 +276,72 @@ export async function cancelDelivery(deliveryId: string, reason?: string): Promi
   })
 }
 
+/**
+ * PR5: subida de documento de entrega SERVER-SIDE. Antes el navegador subía con la anon key
+ * al bucket privado (sin validación) y pasaba el path elegido por el cliente. Ahora recibe el
+ * archivo, valida MIME/extensión/tamaño en servidor, genera un object path seguro, sube con el
+ * cliente de servidor y persiste con compensación (sin objetos huérfanos).
+ */
 export async function uploadDeliveryDocument(
   deliveryId: string,
-  data: { category: string; name: string; url: string }
+  formData: FormData
 ): Promise<ActionResult> {
   const actor = await requireCanEditEntregas()
 
-  await db.deliveryDocument.create({
-    data: {
-      deliveryId,
-      category: data.category as import('@prisma/client').DeliveryDocumentCategory,
-      name: data.name,
-      url: data.url,
-      uploadedById: actor.id,
-    },
+  const file = formData.get('file') as File | null
+  if (!file) return { ok: false, error: 'Archivo requerido' }
+
+  const categoryRaw = String(formData.get('category') ?? '')
+  if (!DELIVERY_DOC_CATEGORIES.includes(categoryRaw)) {
+    return { ok: false, error: 'Categoría no válida' }
+  }
+  const category = categoryRaw as DeliveryDocumentCategory
+
+  let ext: string
+  try {
+    ext = validateDocumentFile({ mimeType: file.type, fileName: file.name, size: file.size }).ext
+  } catch (err) {
+    if (err instanceof DocumentValidationError) return { ok: false, error: err.message }
+    throw err
+  }
+
+  const delivery = await db.delivery.findUnique({
+    where: { id: deliveryId },
+    select: { status: true },
   })
+  if (!delivery) return { ok: false, error: 'Entrega no encontrada' }
+  if (delivery.status === 'COMPLETADA' || delivery.status === 'CANCELADA') {
+    return { ok: false, error: 'La entrega ya está cerrada.' }
+  }
+
+  const documentId = randomUUID()
+  const path = safeDocumentObjectPath({
+    prefix: 'deliveries',
+    entityId: deliveryId,
+    documentId,
+    ext,
+  })
+  const displayName = normalizeDisplayName((formData.get('name') as string) || file.name)
+  const bytes = await file.arrayBuffer()
+  const supabase = createServerClient()
+
+  try {
+    await uploadPrivateDocumentWithCompensation({
+      storage: supabase.storage.from(VEHICLE_DOCUMENTS_BUCKET),
+      path,
+      bytes,
+      contentType: file.type,
+      persist: async () => {
+        await db.deliveryDocument.create({
+          data: { deliveryId, category, name: displayName, url: path, uploadedById: actor.id },
+        })
+      },
+    })
+  } catch (err) {
+    if (err instanceof StorageOperationError)
+      return { ok: false, error: 'Error al subir el archivo' }
+    throw err
+  }
 
   revalidatePath(`/entregas/${deliveryId}`)
   return { ok: true }
@@ -284,13 +356,17 @@ export async function deleteDeliveryDocument(docId: string): Promise<ActionResul
   })
   if (!doc) return { ok: false, error: 'Documento no encontrado' }
 
-  // Best-effort storage deletion (non-blocking if it fails)
-  try {
-    const { createClient } = await import('@/lib/supabase/server')
-    const supabase = createClient()
-    await supabase.storage.from('vehicle-documents').remove([doc.url])
-  } catch {
-    // log nothing — orphaned file is acceptable
+  // DeliveryDocument.url siempre es un object path interno. Guard defensivo contra traversal.
+  if (!doc.url || doc.url.startsWith('/') || doc.url.includes('..')) {
+    return { ok: false, error: 'No se pudo resolver el documento para eliminarlo.' }
+  }
+
+  // Semántica estricta: borra PRIMERO el objeto; solo si Storage lo confirma se elimina el
+  // registro (no se informa éxito con estado incierto ni se deja un objeto sin referencia).
+  const supabase = createServerClient()
+  const { error } = await supabase.storage.from(VEHICLE_DOCUMENTS_BUCKET).remove([doc.url])
+  if (error) {
+    return { ok: false, error: 'No se pudo eliminar el archivo del almacenamiento.' }
   }
 
   await db.deliveryDocument.delete({ where: { id: docId } })
