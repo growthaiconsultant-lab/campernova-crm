@@ -65,6 +65,11 @@ marketplace y multiempresa están **diferidos**.
   validación** (ACTIVE): pirámide real (721 unit · 59 integración · 19 Supabase), matriz
   cambio→tests, regresión, testing de migraciones/concurrencia/Storage/KPIs/Sentry/PostHog,
   anti-patrones, flakes y validación post-despliegue.
+- [`governance/ai-handoff-protocol.md`](governance/ai-handoff-protocol.md) — **protocolo de
+  comunicación y handoff** (ACTIVE): cómo un agente entrega resultados **verificables y
+  autosuficientes** — evidencia antes que narrativa; separación hecho/inferencia/recomendación/desconocido;
+  niveles de respuesta A–F proporcionales al riesgo; plantilla de handoff. Complementa (no duplica)
+  [`governance/engineering-change-process.md`](governance/engineering-change-process.md).
 - [`../.github/PULL_REQUEST_TEMPLATE.md`](../.github/PULL_REQUEST_TEMPLATE.md) — **plantilla de PR**
   (proporcionada, con escapes `N/A`): objetivo, clasificación, impacto, schema, seguridad,
   concurrencia, tests, observabilidad, documentación, rollback, despliegue y checklist final.

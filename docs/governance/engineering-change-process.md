@@ -14,7 +14,8 @@
 > Este documento **complementa**, no sustituye, [`CONTRIBUTING.md`](../../CONTRIBUTING.md) (ramas,
 > commits, hooks, PR flow) y el gobierno existente ([migraciones](database-migrations.md),
 > [Storage](supabase-storage.md), [seguridad](security-and-secrets.md), [CI](ci-quality-gates.md)).
-> Enlaza a ellos; no repite su contenido.
+> Enlaza a ellos; no repite su contenido. **Cómo comunicar el resultado** de un cambio (evidencia,
+> hecho vs inferencia, niveles de respuesta): [`ai-handoff-protocol.md`](ai-handoff-protocol.md).
 
 ---
 
