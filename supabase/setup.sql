@@ -1,7 +1,13 @@
 -- ============================================================
--- Campernova CRM — Supabase one-time setup
--- Ejecutar en el SQL Editor del dashboard de Supabase
--- (supabase.com/dashboard → proyecto → SQL Editor)
+-- Campernova CRM — Supabase one-time setup (LEGACY / HISTÓRICO)
+-- ============================================================
+-- ⚠️ DEPRECADO desde PR5B2. La fuente de verdad reproducible de buckets y políticas de
+-- `storage.objects` es ahora `supabase/config.toml` + `supabase/migrations/*.sql`.
+-- Este archivo se conserva solo como referencia histórica del setup manual que se ejecutó una
+-- vez en el panel del proyecto remoto. NO lo ejecutes en entornos nuevos ni lo dupliques: para
+-- local/CI usa `supabase start` + `supabase db reset` (aplica supabase/migrations). La
+-- reconciliación del entorno remoto existente (incl. la deprecación del bucket `lead-documents`)
+-- es trabajo de PR5B3.
 -- ============================================================
 
 -- ─── 1. Extensiones ─────────────────────────────────────────

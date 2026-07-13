@@ -1,0 +1,53 @@
+# Configuración de Supabase LOCAL (PR5B2). Fuente de verdad reproducible para levantar el
+# stack de Storage en el runner de CI y en máquinas de desarrollo con Docker.
+#
+# NO contiene secretos ni referencias remotas: `supabase start` genera claves locales efímeras
+# (anon / service_role) firmadas con el JWT secret local. Este archivo NUNCA debe usarse con
+# `supabase link` ni apuntar a staging/producción. La reconciliación del entorno remoto
+# existente es trabajo de PR5B3.
+project_id = "campernova-crm"
+
+[api]
+enabled = true
+port = 54321
+# `storage` se expone para poder inspeccionar buckets/objetos/políticas desde los tests.
+schemas = ["public", "storage", "graphql_public"]
+extra_search_path = ["public", "extensions"]
+max_rows = 1000
+
+[db]
+port = 54322
+shadow_port = 54320
+# Coincide con PostgreSQL 17 (mismo motor que producción y que el job `integration`).
+major_version = 17
+
+[db.pooler]
+enabled = false
+
+[realtime]
+enabled = false
+
+[studio]
+enabled = false
+
+[inbucket]
+enabled = false
+
+[storage]
+enabled = true
+# Techo global del servicio de Storage; el límite real por bucket (10 MiB para documentos
+# privados) lo fija la migración a nivel de bucket.
+file_size_limit = "50MiB"
+
+[auth]
+enabled = true
+site_url = "http://127.0.0.1:3000"
+additional_redirect_urls = ["http://127.0.0.1:3000"]
+jwt_expiry = 3600
+enable_signup = true
+
+[analytics]
+enabled = false
+
+[edge_runtime]
+enabled = false

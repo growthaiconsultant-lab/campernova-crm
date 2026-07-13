@@ -2,7 +2,7 @@ import { notFound } from 'next/navigation'
 import Link from 'next/link'
 import { db } from '@/lib/db'
 import { requireCanViewEntregas } from '@/lib/auth'
-import { createClient } from '@/lib/supabase/server'
+import { getSupabaseAdminClient } from '@/lib/supabase/admin'
 import { deliveryDocumentSignedUrl } from '@/lib/supabase/storage'
 import { PRIVATE_DOC_SIGNED_URL_TTL_SECONDS } from '@/lib/storage/private-documents'
 import { DeliveryTabs, TabPanel } from './delivery-tabs'
@@ -67,21 +67,29 @@ export default async function EntregaDetailPage({ params }: { params: { id: stri
   const isAdmin = currentUser.role === 'ADMIN'
 
   // URLs firmadas de corta duración (300 s) para documentos privados. Se prioriza el objectPath
-  // de la VERSIÓN ACTUAL (PR5B1); fallback legacy al `url` para filas sin versiones.
-  const supabase = createClient()
-  const docsWithUrls = await Promise.all(
-    delivery.documents.map(async (doc) => ({
-      id: doc.id,
-      name: doc.name,
-      category: doc.category,
-      uploadedByName: doc.uploadedBy?.name ?? null,
-      signedUrl: await deliveryDocumentSignedUrl(
-        supabase,
-        doc.currentVersion?.objectPath ?? doc.url,
-        PRIVATE_DOC_SIGNED_URL_TTL_SECONDS
-      ),
-    }))
-  )
+  // de la VERSIÓN ACTUAL (PR5B1); fallback legacy al `url` para filas sin versiones. El bucket es
+  // DENY-ALL para authenticated (PR5B2) → se firma con el cliente service_role (server-only); la
+  // autorización ya la hizo requireCanViewEntregas. Solo se construye el cliente admin si hay
+  // documentos: una entrega SIN documentos sigue renderizando aunque falte la clave service_role.
+  const docsWithUrls =
+    delivery.documents.length === 0
+      ? []
+      : await (async () => {
+          const supabase = getSupabaseAdminClient()
+          return Promise.all(
+            delivery.documents.map(async (doc) => ({
+              id: doc.id,
+              name: doc.name,
+              category: doc.category,
+              uploadedByName: doc.uploadedBy?.name ?? null,
+              signedUrl: await deliveryDocumentSignedUrl(
+                supabase,
+                doc.currentVersion?.objectPath ?? doc.url,
+                PRIVATE_DOC_SIGNED_URL_TTL_SECONDS
+              ),
+            }))
+          )
+        })()
 
   const checklistDone = delivery.checklist.length - pendingChecklist
   const checklistTotal = delivery.checklist.length

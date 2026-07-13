@@ -9,7 +9,8 @@ vi.mock('@/lib/auth', () => ({
   requireCanEditEntregas: vi.fn(),
 }))
 vi.mock('@/lib/email/send', () => ({ sendDeliveryConfirmation: vi.fn(() => Promise.resolve()) }))
-vi.mock('@/lib/supabase/server', () => ({ createClient: vi.fn() }))
+// PR5B2: los documentos privados se operan con el cliente service_role (server-only).
+vi.mock('@/lib/supabase/admin', () => ({ getSupabaseAdminClient: vi.fn() }))
 
 // El servicio transaccional se mockea para controlar éxito/conflicto/error inesperado.
 // DeliveryConflictError se mantiene REAL (importOriginal) para que instanceof funcione.
@@ -33,7 +34,7 @@ vi.mock('@/lib/db', () => ({ db: mockDb }))
 import type { User } from '@prisma/client'
 import { requireCanEditEntregas, requireAdmin } from '@/lib/auth'
 import { revalidatePath } from 'next/cache'
-import { createClient as createServerClient } from '@/lib/supabase/server'
+import { getSupabaseAdminClient } from '@/lib/supabase/admin'
 import { completeDeliveryTx, DeliveryConflictError } from '@/lib/delivery-completion'
 import {
   updateDeliveryStatus,
@@ -84,7 +85,7 @@ beforeEach(() => {
     fn(mockDb)
   )
   vi.mocked(completeDeliveryTx).mockResolvedValue({ warrantyId: 'war-1' })
-  vi.mocked(createServerClient).mockReturnValue(mockSupabase as never)
+  vi.mocked(getSupabaseAdminClient).mockReturnValue(mockSupabase as never)
   mockDb.deliveryDocument.create.mockResolvedValue({ id: 'ddoc-1' })
   mockDb.deliveryDocument.delete.mockResolvedValue({})
   mockDb.deliveryDocument.update.mockResolvedValue({})

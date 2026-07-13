@@ -214,3 +214,93 @@ jobs:
           out=$(pnpm prisma migrate deploy 2>&1)
           echo "$out"
           echo "$out" | grep -qi "No pending migrations to apply" || { echo "el segundo deploy no fue idempotente"; exit 1; }
+
+  supabase-storage:
+    name: supabase-storage
+    runs-on: ubuntu-latest
+    # Supabase LOCAL efímero (Docker del runner) para validar buckets + políticas de
+    # `storage.objects` con Storage REAL. Independiente de quality/integration/migration-replay.
+    # NUNCA usa `supabase link`, `--linked`, `--project-ref` ni `db push`: solo comandos locales.
+    # No usa secretos remotos ni se conecta a staging/producción.
+    needs: quality
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Guard — no remote linkage before starting Supabase
+        run: |
+          set -euo pipefail
+          for v in SUPABASE_ACCESS_TOKEN SUPABASE_PROJECT_ID SUPABASE_PROJECT_REF; do
+            if [ -n "${!v:-}" ]; then echo "variable remota presente ($v); abortando"; exit 1; fi
+          done
+          if [ -f supabase/.temp/project-ref ]; then echo "proyecto remoto enlazado; abortando"; exit 1; fi
+          echo "sin enlace remoto"
+
+      - name: Setup Supabase CLI
+        uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Start Supabase (local Docker only)
+        # La salida de `supabase start` imprime las claves locales (anon/service_role, claves demo
+        # públicas del stack local) ANTES de poder enmascararlas. Se silencia a un fichero; en caso
+        # de fallo se muestra un extracto SIN líneas de claves. Las credenciales se leen después con
+        # `supabase status -o env` y se enmascaran con `::add-mask::`.
+        run: |
+          set -euo pipefail
+          supabase start > "$RUNNER_TEMP/supabase-start.log" 2>&1 \
+            || { grep -ivE 'key|secret|token|jwt' "$RUNNER_TEMP/supabase-start.log" || true; exit 1; }
+
+      - name: Export local Supabase credentials (masked)
+        run: |
+          set -euo pipefail
+          supabase status -o env > "$RUNNER_TEMP/sb.env"
+          api_url=$(grep -E '^API_URL=' "$RUNNER_TEMP/sb.env" | cut -d= -f2- | tr -d '"')
+          anon=$(grep -E '^ANON_KEY=' "$RUNNER_TEMP/sb.env" | cut -d= -f2- | tr -d '"')
+          service=$(grep -E '^SERVICE_ROLE_KEY=' "$RUNNER_TEMP/sb.env" | cut -d= -f2- | tr -d '"')
+          db_url=$(grep -E '^DB_URL=' "$RUNNER_TEMP/sb.env" | cut -d= -f2- | tr -d '"')
+          # No se vuelca ningún valor al log; las claves se enmascaran.
+          echo "::add-mask::$anon"
+          echo "::add-mask::$service"
+          {
+            echo "SUPABASE_URL=$api_url"
+            echo "NEXT_PUBLIC_SUPABASE_URL=$api_url"
+            echo "SUPABASE_ANON_KEY=$anon"
+            echo "SUPABASE_SERVICE_ROLE_KEY=$service"
+            echo "SUPABASE_DB_URL=$db_url"
+          } >> "$GITHUB_ENV"
+
+      - name: Guard — Supabase endpoints are local
+        run: pnpm assert:local-supabase
+
+      - name: Apply storage migrations (local)
+        # Reaplica supabase/migrations de forma determinista sobre el Postgres local. No hay
+        # seed.sql en el repo, así que no se siembran datos.
+        run: supabase db reset
+
+      - name: Verify storage buckets and policies (catalog invariants)
+        run: psql "$SUPABASE_DB_URL" -v ON_ERROR_STOP=1 -f scripts/check-storage-policies.sql
+
+      - name: Real Storage policy tests
+        run: pnpm test:supabase
+
+      - name: Supabase logs on failure
+        if: failure()
+        # Estado sin volcar claves al log (se filtran las líneas de claves/tokens).
+        run: supabase status 2>&1 | grep -ivE 'key|secret|token|jwt' || true
+
+      - name: Stop Supabase
+        if: always()
+        run: supabase stop || true
