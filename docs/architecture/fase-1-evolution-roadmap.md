@@ -8,7 +8,7 @@
 | **Última revisión**              | 2026-07-13                                                                                                                                                                                                                      |
 | **Fuente de verdad relacionada** | Diseño: [`fase-1-domain-architecture.md`](fase-1-domain-architecture.md). Dominio actual: [`fase-1-current-domain-map.md`](fase-1-current-domain-map.md). Decisiones: [`architecture-decisions.md`](architecture-decisions.md). |
 | **Alcance**                      | Orden de evolución, drivers, gates y secuencia recomendada de PRs.                                                                                                                                                              |
-| **Fuera de alcance**             | Implementación. **Ningún PR de este roadmap está iniciado.** El roadmap es una recomendación, **no un compromiso inmutable**.                                                                                                   |
+| **Fuera de alcance**             | Implementación. **Solo el PR 1 (fact de venta canónico = Fase 1A-1) está implementado y desplegado (PR #111); el resto no iniciado.** El roadmap es una recomendación, **no un compromiso inmutable**.                          |
 
 > **El orden y el alcance de cada PR se revalidan tras cada entrega.** Autorizar este diseño **no**
 > autoriza automáticamente ningún PR técnico; cada uno requiere su propia aprobación explícita.
@@ -17,9 +17,26 @@
 
 ## Fase 1A — Mejoras fundacionales del CRM (additivas, valor NOW, no gated por documentos)
 
+### Estado de Fase 1A
+
+| Fase / PR        | Cambio                                  | Estado                                                 |
+| ---------------- | --------------------------------------- | ------------------------------------------------------ |
+| Fase 1A-1 (PR 1) | Fact de venta canónico                  | **IMPLEMENTED / DEPLOYED** (PR #111, squash `2f1e436`) |
+| Fase 1A-2 (PR 2) | Deduplicación de vendedores             | PENDING                                                |
+| Fase 1A-3 (PR 3) | `Vehicle.commercializationMode`         | PENDING                                                |
+| Fase 1A-4 (PR 4) | `ServiceOrder`                          | PENDING                                                |
+| Fase 1A-5 (PR 5) | Retirada documental legacy (`Document`) | BLOCKED / CONDITIONED BY ROLLOUT                       |
+
+> **Alcance activo del producto:** mejorar y consolidar el **CRM interno** de Campers Nova.
+> **Marketplace (Fase 1C) y SaaS multiempresa (Fase 1D) están fuera del alcance activo**: son
+> posibilidades futuras, opcionales y diferidas, **no fases obligatorias ni una secuencia
+> comprometida**. La arquitectura permite evolucionar hacia ellos sin construirlos ahora; cualquier
+> avance exige una **decisión empresarial y autorización explícita**. Tras Fase 1A se puede seguir
+> mejorando el CRM interno sin activar marketplace ni SaaS.
+
 Orden **recomendado** (cada PR es pequeño, aditivo y reversible):
 
-### PR 1 — Fact de venta canónico _(primer PR técnico recomendado)_
+### PR 1 — Fact de venta canónico — **IMPLEMENTADO / DESPLEGADO** (Fase 1A-1, PR #111)
 
 - Retirar el _parsing_ de `Activity` para contar ventas; leer desde columnas transaccionales
   (`Vehicle.status = VENDIDO`, `Vehicle.soldAt`; `Offer` para métricas de reserva).
@@ -73,7 +90,7 @@ Orden **recomendado** (cada PR es pequeño, aditivo y reversible):
 
 ---
 
-## Primer PR técnico recomendado (detalle) — RECOMENDACIÓN, no implementación
+## Primer PR técnico (detalle) — IMPLEMENTADO / DESPLEGADO (Fase 1A-1, PR #111, squash `2f1e436`)
 
 **Fact de venta canónico y retirada del _parsing_ de `Activity`.**
 
@@ -88,8 +105,11 @@ Orden **recomendado** (cada PR es pequeño, aditivo y reversible):
 - **Fuera de alcance:** Deal, Party, Listing, Organization, StatusTransition, DomainEvent, Outbox,
   documentos.
 
-> **El prompt ejecutable de este PR NO se escribe todavía.** Es una recomendación pendiente de
-> aprobación del diseño.
+> **Implementado y desplegado en PR #111** (squash `2f1e436`): retirado el _parsing_ de `Activity`;
+> ventas leídas desde `Vehicle.status = VENDIDO` + `Vehicle.soldAt`; los escritores
+> (`lib/delivery-completion.ts`, `updateVehicle`) garantizan `soldAt`; `Activity` sigue como timeline;
+> reservas siguen en `Offer`. **Sin tabla nueva, sin schema, sin migración, sin backfill.** Pendiente:
+> observación 24–48 h y validación tras la primera venta real.
 
 ---
 

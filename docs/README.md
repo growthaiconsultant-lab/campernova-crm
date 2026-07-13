@@ -23,13 +23,16 @@
 - [`architecture/architecture-decisions.md`](architecture/architecture-decisions.md) — decisiones
   estables: Fase 0 (AD-001…AD-008) + **Fase 0→1 (AD-009…AD-016)**.
 
-## Fase 1 — diseño de dominio (dirección aprobada; **no implementado**)
+## Fase 1 — diseño de dominio (dirección aprobada; **entidades no implementadas**, salvo Fase 1A-1)
 
-Todo lo de esta sección es **diseño y dirección**, no implementación. El foco actual sigue siendo el
-CRM interno de un único concesionario; marketplace y multiempresa están **diferidos**.
+La **Fase 1A-1 (fact de venta canónico)** está **IMPLEMENTED / DEPLOYED** (PR #111, squash `2f1e436`):
+las ventas se leen del hecho canónico `Vehicle.status`/`soldAt` y `Activity` sigue como timeline
+humano; **Fase 1A-2 y posteriores siguen pendientes**. El resto de esta sección es **diseño y
+dirección**, no implementación. El foco actual sigue siendo el CRM interno de un único concesionario;
+marketplace y multiempresa están **diferidos**.
 
 - [`architecture/fase-1-readiness.md`](architecture/fase-1-readiness.md) — **resumen ejecutivo**
-  (ACTIVE): estado, principios, primer PR recomendado, riesgos, gates.
+  (ACTIVE): estado (Fase 1A-1 implementada), principios, riesgos, gates.
 - [`architecture/fase-1-domain-architecture.md`](architecture/fase-1-domain-architecture.md) —
   **fuente de verdad del diseño** (ACTIVE): principio _driver-gated_, bounded contexts, decisiones,
   matriz actual→objetivo, riesgos.

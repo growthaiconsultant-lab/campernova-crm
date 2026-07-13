@@ -3,15 +3,16 @@
 | Campo                            | Valor                                                                                                                                                                                                                                                                                                                  |
 | -------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **Título**                       | Fase 1 — resumen ejecutivo de diseño y preparación                                                                                                                                                                                                                                                                     |
-| **Estado**                       | ACTIVE (diseño aprobado como dirección; **implementación no iniciada**)                                                                                                                                                                                                                                                |
+| **Estado**                       | ACTIVE (diseño aprobado como dirección; **Fase 1A-1 —fact de venta canónico— implementada y desplegada** en PR #111; resto de la implementación no iniciado)                                                                                                                                                           |
 | **Owner**                        | Architecture / Product                                                                                                                                                                                                                                                                                                 |
 | **Última revisión**              | 2026-07-13                                                                                                                                                                                                                                                                                                             |
 | **Fuente de verdad relacionada** | Diseño: [`fase-1-domain-architecture.md`](fase-1-domain-architecture.md). Dominio actual: [`fase-1-current-domain-map.md`](fase-1-current-domain-map.md). Roadmap: [`fase-1-evolution-roadmap.md`](fase-1-evolution-roadmap.md). Decisiones: [`architecture-decisions.md`](architecture-decisions.md) (AD-009…AD-016). |
 | **Alcance**                      | Resumen ejecutivo que enlaza a las fuentes de detalle de Fase 1.                                                                                                                                                                                                                                                       |
-| **Fuera de alcance**             | Implementación, schema definitivo, migraciones. **Nada de Fase 1 está implementado.**                                                                                                                                                                                                                                  |
+| **Fuera de alcance**             | Implementación (salvo Fase 1A-1), schema definitivo, migraciones. **Solo Fase 1A-1 (fact de venta canónico) está implementada; el resto de Fase 1 no.**                                                                                                                                                                |
 
-> **Análisis de Fase 1 completado. Diseño estratégico aprobado como dirección. Implementación NO
-> iniciada.** El foco actual sigue siendo el **CRM interno de un único concesionario**.
+> **Análisis de Fase 1 completado. Diseño estratégico aprobado como dirección. Implementación iniciada
+> solo en Fase 1A-1 (fact de venta canónico — PR #111, implementada y desplegada); el resto no
+> iniciado.** El foco actual sigue siendo el **CRM interno de un único concesionario**.
 
 ---
 
@@ -32,8 +33,9 @@
 - **Party / Listing / Deal / Organization / Membership / BuyerIntent / DomainEvent / Outbox:**
   **DIFERIDOS** (cada uno espera un driver — ver el roadmap).
 - **`ServiceOrder` y `Vehicle.commercializationMode`:** **recomendados, no implementados**.
-- **Primer PR técnico recomendado:** **fact de venta canónico + retirada del _parsing_ de `Activity`**
-  para contar ventas (additivo, reversible, sin tabla nueva, no gated por documentos).
+- **Primer PR técnico (fact de venta canónico + retirada del _parsing_ de `Activity`):**
+  **IMPLEMENTADO y DESPLEGADO** (PR #111, squash `2f1e436`; additivo, reversible, sin tabla nueva, no
+  gated por documentos). Pendiente: observación 24–48 h y validación tras la primera venta real.
 
 ## Principios
 
