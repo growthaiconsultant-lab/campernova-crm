@@ -24,6 +24,8 @@
     "test:integration:prepare": "tsx scripts/integration-prepare.ts",
     "test:integration": "vitest run --config vitest.integration.config.ts",
     "test:integration:ci": "pnpm test:integration:prepare && pnpm check:rls && pnpm test:integration",
+    "assert:local-supabase": "tsx scripts/assert-local-supabase.ts",
+    "test:supabase": "vitest run --config vitest.supabase.config.ts",
     "prepare": "husky",
     "seed": "tsx prisma/seed.ts"
   },

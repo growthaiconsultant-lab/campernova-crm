@@ -5,7 +5,10 @@ import { revalidatePath } from 'next/cache'
 import { z } from 'zod'
 import { db } from '@/lib/db'
 import { requireAdmin, requireAgente } from '@/lib/auth'
-import { createClient as createServerClient } from '@/lib/supabase/server'
+// Documentos privados: el bucket es DENY-ALL para anon/authenticated (PR5B2). Las operaciones
+// de Storage (subir/firmar/borrar) usan el cliente service_role SOLO servidor, tras autorizar
+// con Prisma (requireAgente/requireAdmin) en esta misma Server Action.
+import { getSupabaseAdminClient } from '@/lib/supabase/admin'
 import {
   VEHICLE_DOCUMENTS_BUCKET,
   vehicleDocumentSignedUrl,
@@ -71,7 +74,7 @@ export async function uploadVehicleDocument(vehicleId: string, formData: FormDat
   const path = safeDocumentObjectPath({ prefix: 'docs', entityId: vehicleId, documentId, ext })
   const displayName = normalizeDisplayName(parsed.data.name)
   const bytes = await file.arrayBuffer()
-  const supabase = createServerClient()
+  const supabase = getSupabaseAdminClient()
 
   try {
     // Sube al bucket privado y persiste metadatos con compensación (sin objetos huérfanos).
@@ -156,7 +159,7 @@ export async function deleteVehicleDocument(documentId: string) {
 
   // Semántica estricta: se borran PRIMERO los objetos; solo si Storage lo confirma se elimina el
   // registro (nunca se informa éxito con estado incierto ni se deja un objeto sin referencia).
-  const supabase = createServerClient()
+  const supabase = getSupabaseAdminClient()
   const removed = await deleteVehicleDocumentFiles(supabase, paths)
   if (!removed) {
     return { ok: false as const, error: 'No se pudo eliminar el archivo del almacenamiento.' }
@@ -317,7 +320,7 @@ export async function getVehicleDocumentSignedUrl(documentId: string) {
   const path = doc.currentVersion?.objectPath ?? extractVehicleDocumentPath(doc.url)
   if (!path) return { ok: false as const, error: 'No se pudo resolver el documento.' }
 
-  const supabase = createServerClient()
+  const supabase = getSupabaseAdminClient()
   const url = await vehicleDocumentSignedUrl(supabase, path, PRIVATE_DOC_SIGNED_URL_TTL_SECONDS)
   if (!url) return { ok: false as const, error: 'Error al generar la URL' }
 

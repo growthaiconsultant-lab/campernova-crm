@@ -9,8 +9,9 @@ vi.mock('@/lib/auth', () => ({
   requireAdmin: vi.fn(),
 }))
 
-vi.mock('@/lib/supabase/server', () => ({
-  createClient: vi.fn(),
+// PR5B2: los documentos privados se operan con el cliente service_role (server-only).
+vi.mock('@/lib/supabase/admin', () => ({
+  getSupabaseAdminClient: vi.fn(),
 }))
 
 vi.mock('@/lib/supabase/storage', () => ({
@@ -56,7 +57,7 @@ vi.mock('@/lib/db', () => ({ db: mockDb }))
 
 import type { User } from '@prisma/client'
 import { requireAdmin, requireAgente } from '@/lib/auth'
-import { createClient as createServerClient } from '@/lib/supabase/server'
+import { getSupabaseAdminClient } from '@/lib/supabase/admin'
 import { vehicleDocumentSignedUrl, deleteVehicleDocumentFiles } from '@/lib/supabase/storage'
 import {
   uploadVehicleDocument,
@@ -80,7 +81,7 @@ const mockSupabase = {
 
 beforeEach(() => {
   vi.clearAllMocks()
-  vi.mocked(createServerClient).mockReturnValue(mockSupabase as never)
+  vi.mocked(getSupabaseAdminClient).mockReturnValue(mockSupabase as never)
   // Por defecto: sin versiones (fila legacy) → el borrado cae al `url` legacy.
   mockDb.documentVersion.findMany.mockResolvedValue([])
   mockDb.documentVersion.create.mockResolvedValue({ id: 'ver-1' })
