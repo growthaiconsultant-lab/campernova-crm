@@ -72,3 +72,7 @@ docs/Technology-Participation-Agreement.*
 # Playwright auth state generado (sesión de test — no commitear)
 e2e/.auth/
 storageState.json
+
+# Artefactos de migración documental (PR5B3): informes, planes y checkpoints con IDs internos /
+# object paths reales — NUNCA se commitean. Los scripts y tests sí (no están bajo esta ruta).
+.artifacts/

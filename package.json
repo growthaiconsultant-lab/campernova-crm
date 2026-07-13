@@ -26,6 +26,13 @@
     "test:integration:ci": "pnpm test:integration:prepare && pnpm check:rls && pnpm test:integration",
     "assert:local-supabase": "tsx scripts/assert-local-supabase.ts",
     "test:supabase": "vitest run --config vitest.supabase.config.ts",
+    "documents:audit": "tsx scripts/audit-legacy-documents.ts",
+    "documents:audit-storage": "tsx scripts/audit-document-storage.ts",
+    "documents:plan-backfill": "tsx scripts/plan-document-backfill.ts",
+    "documents:apply-backfill": "tsx scripts/apply-document-backfill.ts",
+    "documents:verify-backfill": "tsx scripts/verify-document-backfill.ts",
+    "documents:rollback-backfill": "tsx scripts/rollback-document-backfill.ts",
+    "documents:plan-storage-reconciliation": "tsx scripts/plan-storage-reconciliation.ts",
     "prepare": "husky",
     "seed": "tsx prisma/seed.ts"
   },
