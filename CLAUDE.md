@@ -36,7 +36,7 @@ CRM interno para gestionar la compraventa de autocaravanas y campers semi-nuevas
 - `docs/Quickstart.md` — receta paso a paso de arranque
 - `docs/Vision-CRM-360.md` — spec de referencia del CRM operativo end-to-end para los sprints post-launch (6-10). Modelo de negocio real, 8 fases, objetos, roles, reglas de bloqueo, KPIs.
 - `docs/Roadmap-Infraestructura-Estado.md` — **vista única** del estado de las 10 capas de "CampersNova OS", pendiente técnico por capa, y **decisiones que dependen del dueño**. Consolidado tras B20; consultar antes de proponer el siguiente bloque. (La visión estratégica completa con cifras es privada — solo en memoria.)
-- `docs/README.md` — **índice de arquitectura y gobierno**. Fuente de verdad de **Fase 0** (seguridad, atomicidad, capa documental versionada): estado final, decisiones (AD-001…008), gobierno de migraciones/Storage/secretos/CI, cierre operativo y readiness de Fase 1. Los planes/auditoría originales están en `docs/historical/` (marcados como históricos).
+- `docs/README.md` — **índice de arquitectura y gobierno**. Fuente de verdad de **Fase 0** (seguridad, atomicidad, capa documental versionada): estado final, decisiones (AD-001…016), gobierno de migraciones/Storage/secretos/CI, cierre operativo. Incluye el **diseño de dominio de Fase 1** (dirección aprobada, **no implementado**): `docs/architecture/fase-1-domain-architecture.md` (diseño), `fase-1-current-domain-map.md` (as-is), `fase-1-evolution-roadmap.md` (secuencia/drivers/primer PR = _fact de venta canónico_). Marketplace y multiempresa **diferidos**. Los planes/auditoría originales están en `docs/historical/` (marcados como históricos).
 
 ## Convenciones
 

@@ -1,0 +1,109 @@
+# Fase 1 — Mapa del dominio actual
+
+| Campo                            | Valor                                                                                                                                                                                  |
+| -------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Título**                       | Mapa verificable del dominio actual (as-is)                                                                                                                                            |
+| **Estado**                       | ACTIVE                                                                                                                                                                                 |
+| **Owner**                        | Architecture / Engineering                                                                                                                                                             |
+| **Última revisión**              | 2026-07-13                                                                                                                                                                             |
+| **Fuente de verdad relacionada** | El repositorio (`prisma/schema.prisma`, `app/(backoffice)/**`, `lib/**`). Este documento lo resume. Diseño objetivo: [`fase-1-domain-architecture.md`](fase-1-domain-architecture.md). |
+| **Alcance**                      | Inventario, flujos y hechos del dominio **actual**.                                                                                                                                    |
+| **Fuera de alcance**             | Arquitectura objetivo (ver el documento de diseño). Este documento describe lo que **existe**, no lo que se propone.                                                                   |
+
+> Este documento describe el repositorio **real** en `main` (`f089a7e`), no la arquitectura futura.
+
+---
+
+## 7.1. Inventario por modelo (30 modelos)
+
+Clasificación: **A** activo · **P** parcial/soporte · **L** legacy · **M** muerto.
+
+| Modelo                             | Cl.   | Propósito real                                                  | Relaciones clave                               | Destino recomendado                                 |
+| ---------------------------------- | ----- | --------------------------------------------------------------- | ---------------------------------------------- | --------------------------------------------------- |
+| User                               | A     | Usuario interno + rol global                                    | hub de ~26 relaciones                          | conservar (→ Membership futuro)                     |
+| SellerLead                         | A     | Lead de vendedor + condiciones de operación                     | 1:1 Vehicle; Activity; Capture                 | conservar; **dedup**                                |
+| Vehicle                            | A     | Activo + inventario + publicación + economía + trust (conflado) | 1:1 SellerLead; Match/Offer/Delivery/WorkOrder | conservar; + `commercializationMode`                |
+| VehiclePhoto                       | A     | Fotos (bucket público)                                          | Vehicle                                        | conservar                                           |
+| Valuation                          | A     | Histórico de tasación                                           | Vehicle                                        | conservar                                           |
+| BuyerLead                          | A     | Lead de comprador + preferencias RV + trade-in                  | Match/Offer/Delivery; chat                     | conservar; **dedup**; + `partyId` futuro            |
+| BuyerChatSession                   | A     | Sesión de chat de captación                                     | 1:1 BuyerLead                                  | conservar                                           |
+| Match                              | A     | Cruce vehículo↔comprador (score)                                | Vehicle, BuyerLead                             | conservar                                           |
+| Offer                              | A     | Oferta/reserva (importe + señal)                                | Vehicle, BuyerLead, Match                      | conservar; + `dealId` futuro                        |
+| Activity                           | A     | Timeline humano (polimórfico leads)                             | SellerLead XOR BuyerLead                       | conservar como timeline; dejar de parsear para KPIs |
+| Document                           | **M** | (adjunto legal genérico) — **0 CRUD**                           | —                                              | **retirar**                                         |
+| VehicleAd                          | P     | **Texto** de anuncio IA para portales externos                  | Vehicle                                        | conservar; absorber en Listing (futuro)             |
+| VehicleCost                        | A     | Coste imputado al vehículo                                      | Vehicle, WorkOrder                             | conservar                                           |
+| WorkOrder (+ checklist/time/parts) | A     | Orden de taller                                                 | Vehicle                                        | conservar                                           |
+| Delivery (+ checklist/documents)   | A     | Entrega física + firma                                          | Vehicle, BuyerLead                             | conservar; + `dealId` futuro                        |
+| DeliveryDocument                   | A     | Documento de entrega (versionado)                               | Delivery, DocumentVersion                      | conservar (**gated** por rollout)                   |
+| DocumentVersion                    | A     | Versión física de documento (Fase 0)                            | VehicleDocument XOR DeliveryDocument           | conservar (**gated**)                               |
+| Warranty                           | A     | Garantía (1:1 vehicle/delivery/buyer)                           | tickets, followups                             | conservar                                           |
+| PostventaTicket (+ photos)         | A     | Incidencia de garantía                                          | Warranty                                       | conservar                                           |
+| PostventaFollowup                  | A     | Seguimiento día 7/30 (cron)                                     | Warranty                                       | conservar                                           |
+| CalendarEvent                      | A     | Evento de agenda operativa                                      | leads/vehicle/match                            | conservar                                           |
+| VehicleCapture                     | A     | Captación de portal (fase 0 del vendedor)                       | → SellerLead                                   | conservar                                           |
+| VehicleDocument                    | A     | Documento legal del vehículo (versionado)                       | Vehicle, DocumentVersion                       | conservar (**gated**)                               |
+| ReferencePrice                     | A     | Tabla de tasación (global)                                      | —                                              | conservar (platform-owned futuro)                   |
+| KpiEvent                           | P     | Log de eventos (**write-mostly**: 7 emisores, 1 lector)         | actor User?                                    | decidir (leer o dejar de escribir)                  |
+
+**Resumen:** activos ~24 · parciales/soporte ~4 · legacy 1 enum (`DocumentType`) · **muerto 1**
+(`Document`).
+
+## 7.2. Flujos actuales (reconstruidos del código)
+
+- **Captación:** `VehicleCapture` (portal externo) → estados NO_CONTACTADO…ENTRADA_AGENDADA.
+- **Conversión captura→vendedor:** `convertCaptureToSellerLead` crea `SellerLead` (con `email:''`) +
+  `Vehicle` dentro de `$transaction` con CAS (Fase 0 PR4).
+- **Tasación:** `Valuation` (auto/manual) — efecto reintentable, fuera de la tx principal.
+- **Publicación:** `Vehicle.status = PUBLICADO` (no hay entidad `Listing`).
+- **Comprador:** chat `/comprar` (`BuyerChatSession`, tool-use crea `BuyerLead` en tx) o alta
+  backoffice → preferencias RV.
+- **Matching:** `Match` (score 0-100, `lib/matching`, determinista).
+- **Oferta:** `Offer` (importe + señal opcional).
+- **Reserva:** **derivada**, no es una tabla — `Offer.status = ACEPTADA` + `depositAmount`
+  (`isReservation`, `lib/offers.ts:57`); aceptar pone `Vehicle = RESERVADO` (CAS, PR2).
+- **Entrega (venta canónica):** `lib/delivery-completion.ts` completa la entrega y hace CAS
+  `PUBLICADO|RESERVADO → VENDIDO` + `soldAt` (`:90-91`), y crea `Warranty` + 2 `PostventaFollowup` en
+  la misma tx (PR3).
+- **Garantía / postventa:** `Warranty` → `PostventaTicket` (cierre con `costReal` → `VehicleCost`
+  POSTVENTA) + `PostventaFollowup` (cron día 7/30).
+- **Trade-in:** `BuyerLead.tradeInSellerLeadId` (1:1) → `createSellerLeadFromTradeIn` crea
+  `SellerLead` + `Vehicle` en tx.
+- **Taller / costes:** `WorkOrder` → horas/piezas → `VehicleCost`.
+- **Documentos:** `VehicleDocument` / `DeliveryDocument` versionados vía `DocumentVersion`
+  (Fase 0; backfill legacy **pendiente**).
+
+## 7.3. Hechos importantes (verificados)
+
+- **No existe tabla `Reservation`**; la reserva se **deriva** de `Offer` aceptada + señal.
+- **No existe `Listing`**; publicar equivale a `Vehicle.status = PUBLICADO`.
+- **No existe `Deal`**; `Offer` y `Delivery` se relacionan por `Vehicle` y `BuyerLead`.
+- La **venta canónica** se completa en `lib/delivery-completion.ts` (`Vehicle.status=VENDIDO` +
+  `soldAt`, en `$transaction`).
+- `Activity` es un **timeline humano**; se usa **incorrectamente** como fuente de KPIs de venta por
+  _string-parsing_ (`content: { contains: '→ Vendido' }` en `lib/kpi/flow.ts:56`,
+  `lib/dashboard/metrics.ts:194`, `lib/dashboard/queries.ts:57`).
+- `KpiEvent` es **write-mostly** (7 sitios de emisión; único lector `lib/kpi/calidad.ts`, 2 `count()`).
+- `VehicleAd` es **texto** que un humano pega en portales externos (Wallapop/Coches.net); no tiene
+  precio ni estado.
+- La **modalidad comercial** vive implícita en `SellerLead.dealType` (`SellerDealType`:
+  DEPOSITO_VENTA / COMPRA_DIRECTA / PARTE_PAGO / INDECISO), no en el vehículo.
+- **Autorización** por **rol global** (`UserRole`) en las server actions (`requireAgente/Admin`); no
+  hay checks de ownership por entidad.
+- **Archivar = cambio de estado** (DESCARTADO/PERDIDO); no hay soft-delete genérico.
+
+## 7.4. Riesgos del dominio actual
+
+- Duplicados de **vendedores** (dedup inexistente; capturas con `email:''`).
+- **Venta contada por texto** de `Activity` (frágil ante reword/i18n/formato).
+- Datos `Json` sin contrato (`equipment`, `criticalEquipment`, `metadata`, `specificData`,
+  `messages`).
+- Autorización global (cualquier ADMIN/AGENTE ve/edita todo) — **decisión** para el equipo de
+  confianza actual, no un descuido.
+- Efectos diferidos _fire-and-forget_ (emails, `emitKpiEvent`, matching, tasación).
+- Sin auditoría estructurada.
+- Ambigüedad de `Document` legacy (muerto) frente a los documentos versionados reales.
+
+> **Las limitaciones futuras (sin `Organization`/`Party`/`Listing`/`Deal`) NO son defectos críticos
+> del CRM actual.** Son cimientos ausentes cuya introducción se difiere hasta que exista un driver
+> (ver [`fase-1-evolution-roadmap.md`](fase-1-evolution-roadmap.md)).
