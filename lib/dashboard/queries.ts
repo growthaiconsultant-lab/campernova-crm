@@ -43,25 +43,23 @@ export async function getVehicleCounts(
   return groups.map((g) => ({ status: g.status, count: g._count._all }))
 }
 
-/// Cuenta vehículos vendidos (estado VENDIDO) cuya activity de paso a VENDIDO
-/// ocurrió dentro del rango. Usa createdAt de la activity como fecha de venta.
+/// Cuenta ventas del periodo desde el hecho canónico del vehículo: `status = VENDIDO`
+/// con `soldAt` dentro del rango `[start, end)`. La fecha de venta es `Vehicle.soldAt`
+/// (estructurada), NO el texto de la timeline (`Activity`). Cada vehículo es único, así que
+/// `vehicle.count` no puede duplicar una venta.
 export async function getSalesInRange(
   db: PrismaClient,
   filter: DashboardFilter,
   start: Date,
   end: Date
 ): Promise<number> {
-  const activities = await db.activity.findMany({
+  return db.vehicle.count({
     where: {
-      type: 'CAMBIO_ESTADO',
-      content: { contains: '→ Vendido' },
-      createdAt: { gte: start, lt: end },
-      sellerLead: filter.agentId ? { agentId: filter.agentId } : undefined,
+      status: 'VENDIDO',
+      soldAt: { gte: start, lt: end },
+      ...(filter.agentId ? { sellerLead: { agentId: filter.agentId } } : {}),
     },
-    select: { sellerLeadId: true },
   })
-  // Una venta por sellerLead (caso defensive: si hay duplicados)
-  return new Set(activities.map((a) => a.sellerLeadId).filter(Boolean)).size
 }
 
 export type SalesDelta = {

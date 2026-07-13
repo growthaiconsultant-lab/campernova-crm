@@ -49,12 +49,12 @@ export async function getFlowKpis(
   const cur = window(range.start, range.end)
   const prev = window(range.prevStart, range.prevEnd)
 
-  // Ventas = transición real a Vendido, registrada en el activity log
-  // (mismo criterio que lib/dashboard: CAMBIO_ESTADO con "→ Vendido").
+  // Ventas = hecho canónico: vehículo VENDIDO con `soldAt` en el periodo. La fuente es el
+  // estado estructurado del vehículo, NO el texto de la timeline (`Activity`). `soldAt` lo
+  // escribe la transición a VENDIDO (`lib/delivery-completion.ts` y `updateVehicle`).
   const salesWhere = (w: { gte: Date; lt: Date }) => ({
-    type: 'CAMBIO_ESTADO' as const,
-    content: { contains: '→ Vendido' },
-    createdAt: w,
+    status: 'VENDIDO' as const,
+    soldAt: w,
     ...(filter.agentId ? { sellerLead: { agentId: filter.agentId } } : {}),
   })
 
@@ -100,8 +100,8 @@ export async function getFlowKpis(
     }),
     db.offer.count({ where: reservationWhere(cur) }),
     db.offer.count({ where: reservationWhere(prev) }),
-    db.activity.count({ where: salesWhere(cur) }),
-    db.activity.count({ where: salesWhere(prev) }),
+    db.vehicle.count({ where: salesWhere(cur) }),
+    db.vehicle.count({ where: salesWhere(prev) }),
   ])
 
   return {

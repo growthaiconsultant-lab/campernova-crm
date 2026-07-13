@@ -159,7 +159,7 @@ export async function updateVehicle(vehicleId: string, data: unknown) {
 
   const vehicle = await db.vehicle.findUnique({
     where: { id: vehicleId },
-    select: { sellerLeadId: true, status: true },
+    select: { sellerLeadId: true, status: true, soldAt: true },
   })
   if (!vehicle) return { error: { formErrors: ['Vehículo no encontrado'], fieldErrors: {} } }
 
@@ -264,6 +264,12 @@ export async function updateVehicle(vehicleId: string, data: unknown) {
         maxMassKg: maxMassKg ?? null,
         heightM: heightM ?? null,
         offGrid: offGrid ?? null,
+        // Hecho canónico de venta: al transicionar a VENDIDO se fija `soldAt` (instante
+        // estructurado de la venta, fuente de los KPIs). Se preserva un `soldAt` existente
+        // (idempotente); VENDIDO es terminal, así que en la práctica se fija una sola vez.
+        ...(status === 'VENDIDO' && vehicle.status !== 'VENDIDO'
+          ? { soldAt: vehicle.soldAt ?? new Date() }
+          : {}),
       },
     })
     if (statusChanging) {

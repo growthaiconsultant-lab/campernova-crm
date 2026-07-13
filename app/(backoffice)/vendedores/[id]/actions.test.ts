@@ -232,3 +232,83 @@ describe('updateVehicle — guard PUBLICADO', () => {
     expect(result.error?.formErrors[0]).toMatch(/2 orden/)
   })
 })
+
+// ─── Fact de venta canónico — soldAt en la transición a VENDIDO (Fase 1A-1) ────
+
+describe('updateVehicle — soldAt canónico', () => {
+  it('fija soldAt al transicionar a VENDIDO (garantiza VENDIDO ⟹ soldAt != null)', async () => {
+    mockDb.vehicle.findUnique.mockResolvedValue({
+      sellerLeadId: 'sl-1',
+      status: 'RESERVADO',
+      soldAt: null,
+    })
+    // La transición a VENDIDO exige una entrega completada y firmada.
+    mockDb.delivery.findFirst.mockResolvedValue({ id: 'd-1' })
+    mockDb.vehicle.update.mockResolvedValue({})
+    mockDb.activity.create.mockResolvedValue({})
+
+    const result = await updateVehicle('v-1', { ...baseVehicleData, status: 'VENDIDO' })
+
+    expect(result).toMatchObject({ ok: true })
+    const updateArg = mockDb.vehicle.update.mock.calls[0][0]
+    expect(updateArg.data.status).toBe('VENDIDO')
+    expect(updateArg.data.soldAt).toBeInstanceOf(Date)
+  })
+
+  it('NO toca soldAt en un cambio de datos que no transiciona a VENDIDO', async () => {
+    // Edición sin cambio de estado (RESERVADO→RESERVADO): no entra el guard legal ni fija soldAt.
+    mockDb.vehicle.findUnique.mockResolvedValue({
+      sellerLeadId: 'sl-1',
+      status: 'RESERVADO',
+      soldAt: null,
+    })
+    mockDb.vehicle.update.mockResolvedValue({})
+    mockDb.activity.create.mockResolvedValue({})
+
+    const result = await updateVehicle('v-1', { ...baseVehicleData, status: 'RESERVADO' })
+
+    expect(result).toMatchObject({ ok: true })
+    const updateArg = mockDb.vehicle.update.mock.calls[0][0]
+    expect(updateArg.data.soldAt).toBeUndefined()
+  })
+
+  it('preserva un soldAt existente al transicionar a VENDIDO (idempotente: no re-fecha con new Date)', async () => {
+    const existing = new Date('2026-02-01T10:00:00.000Z')
+    // Anomalía: el vehículo aún no es VENDIDO pero ya arrastra un soldAt. Al transicionar a
+    // VENDIDO, `vehicle.soldAt ?? new Date()` debe CONSERVAR el existente, no sobrescribirlo.
+    // Este caso ejercita el operando izquierdo del `??` (los otros dos no lo hacen), de modo
+    // que una reversión de `vehicle.soldAt ?? new Date()` a `new Date()` haría fallar el test.
+    mockDb.vehicle.findUnique.mockResolvedValue({
+      sellerLeadId: 'sl-1',
+      status: 'RESERVADO',
+      soldAt: existing,
+    })
+    mockDb.delivery.findFirst.mockResolvedValue({ id: 'd-1' })
+    mockDb.vehicle.update.mockResolvedValue({})
+    mockDb.activity.create.mockResolvedValue({})
+
+    const result = await updateVehicle('v-1', { ...baseVehicleData, status: 'VENDIDO' })
+
+    expect(result).toMatchObject({ ok: true })
+    const updateArg = mockDb.vehicle.update.mock.calls[0][0]
+    expect(updateArg.data.soldAt).toBe(existing)
+  })
+
+  it('NO re-fecha soldAt en una edición VENDIDO→VENDIDO (sin cambio de estado)', async () => {
+    const existing = new Date('2026-02-01T10:00:00.000Z')
+    // Vehículo ya VENDIDO: editar datos no cambia de estado → soldAt no se toca en el data.
+    mockDb.vehicle.findUnique.mockResolvedValue({
+      sellerLeadId: 'sl-1',
+      status: 'VENDIDO',
+      soldAt: existing,
+    })
+    mockDb.vehicle.update.mockResolvedValue({})
+    mockDb.activity.create.mockResolvedValue({})
+
+    const result = await updateVehicle('v-1', { ...baseVehicleData, status: 'VENDIDO' })
+
+    expect(result).toMatchObject({ ok: true })
+    const updateArg = mockDb.vehicle.update.mock.calls[0][0]
+    expect(updateArg.data.soldAt).toBeUndefined()
+  })
+})
