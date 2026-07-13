@@ -2,6 +2,7 @@
 Plantilla de PR. Rellena lo que aplique; marca N/A en lo que no.
 Proceso completo: docs/governance/engineering-change-process.md
 Testing: docs/governance/testing-strategy.md · Flujo git/commits: CONTRIBUTING.md
+Comunicación/handoff de resultados: docs/governance/ai-handoff-protocol.md
 No marques casillas de validación post-despliegue antes del despliegue real.
 -->
 
