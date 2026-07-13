@@ -51,6 +51,20 @@ CRM interno de un único concesionario; marketplace y multiempresa están **dife
   variables de guarda, rotación/revocación, checklist de go-live.
 - [`governance/ci-quality-gates.md`](governance/ci-quality-gates.md) — los 4 jobs de CI, checks
   requeridos vs recomendados, política de acciones.
+- [`governance/engineering-change-process.md`](governance/engineering-change-process.md) — **proceso
+  universal de cambios** (ACTIVE): clasificación C0–C9, niveles de riesgo, análisis de impacto,
+  invariantes, gobierno de migraciones/autorización/concurrencia/efectos externos/KPIs, gobierno de
+  **Sentry** y **PostHog** (según la integración real), feature flags, matriz de observabilidad,
+  hotfix y criterios de bloqueo. Cubre arquitectura, migraciones, seguridad, concurrencia, Storage,
+  testing, analítica y validación post-despliegue. Complementa (no duplica)
+  [`../CONTRIBUTING.md`](../CONTRIBUTING.md).
+- [`governance/testing-strategy.md`](governance/testing-strategy.md) — **estrategia de testing y
+  validación** (ACTIVE): pirámide real (721 unit · 59 integración · 19 Supabase), matriz
+  cambio→tests, regresión, testing de migraciones/concurrencia/Storage/KPIs/Sentry/PostHog,
+  anti-patrones, flakes y validación post-despliegue.
+- [`../.github/PULL_REQUEST_TEMPLATE.md`](../.github/PULL_REQUEST_TEMPLATE.md) — **plantilla de PR**
+  (proporcionada, con escapes `N/A`): objetivo, clasificación, impacto, schema, seguridad,
+  concurrencia, tests, observabilidad, documentación, rollback, despliegue y checklist final.
 
 ## Operaciones
 
