@@ -182,16 +182,18 @@ describe('getStagnantVehicles', () => {
 // ─── getMonthlyNetMargin ──────────────────────────────────────────────────────
 
 describe('getMonthlyNetMargin', () => {
-  it('returns zeros when no sales this month', async () => {
-    mockDb.activity.findMany.mockResolvedValue([])
+  it('returns zeros when no canonical sales this month', async () => {
+    // Fuente canónica: vehículos VENDIDO con soldAt en el mes. Sin ventas → sin vehículos.
+    mockDb.vehicle.findMany.mockResolvedValue([])
     const result = await getMonthlyNetMargin(mockDb as never, emptyFilter)
     expect(result.netMargin).toBe(0)
     expect(result.vehiclesSold).toBe(0)
     expect(result.averageTicket).toBeNull()
+    // No debe leer `Activity` para contar ventas.
+    expect(mockDb.activity.findMany).not.toHaveBeenCalled()
   })
 
-  it('calculates net margin correctly', async () => {
-    mockDb.activity.findMany.mockResolvedValue([{ sellerLeadId: 'sl-1' }, { sellerLeadId: 'sl-2' }])
+  it('calculates net margin from canonical sold vehicles', async () => {
     mockDb.vehicle.findMany.mockResolvedValue([
       { salePrice: 30000, purchasePrice: 25000, costs: [{ amount: 500 }] },
       { salePrice: 20000, purchasePrice: 17000, costs: [] },
@@ -201,13 +203,15 @@ describe('getMonthlyNetMargin', () => {
     expect(result.grossRevenue).toBe(50000)
     expect(result.netMargin).toBe(50000 - 42000 - 500)
     expect(result.vehiclesSold).toBe(2)
+    // La consulta es sobre el hecho canónico (status VENDIDO + soldAt en el mes), no Activity.
+    const whereArg = mockDb.vehicle.findMany.mock.calls[0][0].where
+    expect(whereArg.status).toBe('VENDIDO')
+    expect(whereArg.soldAt).toHaveProperty('gte')
+    expect(whereArg.soldAt).toHaveProperty('lt')
+    expect(mockDb.activity.findMany).not.toHaveBeenCalled()
   })
 
-  it('deduplicates sellerLeadIds from activities', async () => {
-    mockDb.activity.findMany.mockResolvedValue([
-      { sellerLeadId: 'sl-1' },
-      { sellerLeadId: 'sl-1' }, // duplicate
-    ])
+  it('counts vehiclesSold as the number of canonical sold vehicles (no dedup needed)', async () => {
     mockDb.vehicle.findMany.mockResolvedValue([
       { salePrice: 30000, purchasePrice: 25000, costs: [] },
     ])
@@ -343,14 +347,13 @@ describe('getAverageWorkshopHoursPerVehicle', () => {
 
 describe('getAverageTicket', () => {
   it('returns null ticket when no sales this month', async () => {
-    mockDb.activity.findMany.mockResolvedValue([])
+    mockDb.vehicle.findMany.mockResolvedValue([])
     const result = await getAverageTicket(mockDb as never, emptyFilter)
     expect(result.averageTicket).toBeNull()
     expect(result.vehiclesSold).toBe(0)
   })
 
   it('calculates average ticket from sale prices', async () => {
-    mockDb.activity.findMany.mockResolvedValue([{ sellerLeadId: 'sl-1' }, { sellerLeadId: 'sl-2' }])
     mockDb.vehicle.findMany.mockResolvedValue([
       { salePrice: 40000, purchasePrice: 35000, costs: [] },
       { salePrice: 20000, purchasePrice: 15000, costs: [] },

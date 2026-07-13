@@ -187,33 +187,24 @@ export async function getMonthlyNetMargin(
   const startOfMonth = new Date(reference.getFullYear(), reference.getMonth(), 1)
   const startOfNext = new Date(reference.getFullYear(), reference.getMonth() + 1, 1)
 
-  // Find vehicles sold this month via activity log
-  const soldActivities = await database.activity.findMany({
-    where: {
-      type: 'CAMBIO_ESTADO',
-      content: { contains: '→ Vendido' },
-      createdAt: { gte: startOfMonth, lt: startOfNext },
-      sellerLead: filter.agentId ? { agentId: filter.agentId } : undefined,
-    },
-    select: { sellerLeadId: true },
-  })
-
-  const sellerLeadIds = Array.from(
-    new Set(soldActivities.map((a) => a.sellerLeadId).filter(Boolean) as string[])
-  )
-
-  if (sellerLeadIds.length === 0) {
-    return { netMargin: 0, grossRevenue: 0, totalCosts: 0, vehiclesSold: 0, averageTicket: null }
-  }
-
+  // Vehículos vendidos este mes desde el hecho canónico: `status = VENDIDO` con `soldAt` en
+  // el mes. La fecha de venta es `Vehicle.soldAt` (estructurada), NO el texto de `Activity`.
   const vehicles = await database.vehicle.findMany({
-    where: { sellerLeadId: { in: sellerLeadIds } },
+    where: {
+      status: 'VENDIDO',
+      soldAt: { gte: startOfMonth, lt: startOfNext },
+      ...(filter.agentId ? { sellerLead: { agentId: filter.agentId } } : {}),
+    },
     select: {
       salePrice: true,
       purchasePrice: true,
       costs: { select: { amount: true } },
     },
   })
+
+  if (vehicles.length === 0) {
+    return { netMargin: 0, grossRevenue: 0, totalCosts: 0, vehiclesSold: 0, averageTicket: null }
+  }
 
   let grossRevenue = 0
   let totalPurchase = 0
@@ -226,7 +217,7 @@ export async function getMonthlyNetMargin(
   }
 
   const netMargin = grossRevenue - totalPurchase - totalCosts
-  const vehiclesSold = sellerLeadIds.length
+  const vehiclesSold = vehicles.length
   const averageTicket = vehiclesSold > 0 ? grossRevenue / vehiclesSold : null
 
   return { netMargin, grossRevenue, totalCosts, vehiclesSold, averageTicket }
