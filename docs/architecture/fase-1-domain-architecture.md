@@ -8,12 +8,13 @@
 | **Última revisión**              | 2026-07-13                                                                                                                                                                                                                                                                        |
 | **Fuente de verdad relacionada** | Este documento (diseño de Fase 1). Dominio actual: [`fase-1-current-domain-map.md`](fase-1-current-domain-map.md). Secuencia: [`fase-1-evolution-roadmap.md`](fase-1-evolution-roadmap.md). Decisiones: [`architecture-decisions.md`](architecture-decisions.md) (AD-009…AD-016). |
 | **Alcance**                      | Diseño conceptual del dominio, decisiones de dirección, y qué NO construir todavía.                                                                                                                                                                                               |
-| **Fuera de alcance**             | Implementación, schema Prisma definitivo, migraciones, marketplace, multi-tenancy. **Nada de Fase 1 está implementado.**                                                                                                                                                          |
+| **Fuera de alcance**             | Implementación (salvo Fase 1A-1), schema Prisma definitivo, migraciones, marketplace, multi-tenancy. **Solo Fase 1A-1 (fact de venta canónico) está implementada; el resto de Fase 1 no.**                                                                                        |
 
 > **Cómo leer este documento.** Distingue siempre cuatro grados: **diseñado** (modelo conceptual),
 > **aprobado como dirección** (ADR), **recomendado** (candidato a PR), **pendiente/diferido** (espera
-> un driver). Ninguna parte está **implementada**. "Diseñar el marketplace" ≠ "implementar el
-> marketplace"; "diseñar multi-tenancy" ≠ "crear `Organization` ahora".
+> un driver). Salvo el **fact de venta canónico (Fase 1A-1, PR #111)**, ninguna otra parte está
+> **implementada**. "Diseñar el marketplace" ≠ "implementar el marketplace"; "diseñar multi-tenancy" ≠
+> "crear `Organization` ahora".
 
 ---
 
@@ -70,12 +71,12 @@ Distinción deliberada — una limitación futura **no** obliga a crear una tabl
 
 ### Dolor actual verificado (justifica trabajo NOW)
 
-| Dolor                                                                                                         | Evidencia                                                                                                                   | Naturaleza                        |
-| ------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------- | --------------------------------- |
-| Deduplicación de **vendedores** inexistente                                                                   | capturas crean `SellerLead` con `email:''`; dedup solo en compradores                                                       | corrección de datos               |
-| Ventas calculadas por **parsing de `Activity`**                                                               | `content: { contains: '→ Vendido' }` en `lib/kpi/flow.ts:56`, `lib/dashboard/metrics.ts:194`, `lib/dashboard/queries.ts:57` | integridad de KPI                 |
-| **Servicios de comisión sin modelo** (financiación, seguro, gestoría, transporte, peritaje, contrato externo) | no existe entidad; hoy es nota libre                                                                                        | superficie de ingresos ausente    |
-| **Modalidad comercial** del vehículo implícita                                                                | vive en `SellerLead.dealType` (`SellerDealType`), no en el vehículo                                                         | _porqué_ comercial no consultable |
+| Dolor                                                                                                         | Evidencia                                                                                                                                                           | Naturaleza                        |
+| ------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------- |
+| Deduplicación de **vendedores** inexistente                                                                   | capturas crean `SellerLead` con `email:''`; dedup solo en compradores                                                                                               | corrección de datos               |
+| Ventas calculadas por **parsing de `Activity`** — **RESUELTO (PR #111)**                                      | antes `content: { contains: '→ Vendido' }` en `lib/kpi/flow.ts`, `lib/dashboard/metrics.ts`, `lib/dashboard/queries.ts`; ahora leen desde `Vehicle.status`/`soldAt` | integridad de KPI (resuelto)      |
+| **Servicios de comisión sin modelo** (financiación, seguro, gestoría, transporte, peritaje, contrato externo) | no existe entidad; hoy es nota libre                                                                                                                                | superficie de ingresos ausente    |
+| **Modalidad comercial** del vehículo implícita                                                                | vive en `SellerLead.dealType` (`SellerDealType`), no en el vehículo                                                                                                 | _porqué_ comercial no consultable |
 
 ### Limitaciones futuras (dirección, no defecto del CRM actual)
 
@@ -130,8 +131,8 @@ Data & Analytics. **Todo dentro de un monolito modular Next.js + Prisma + Postgr
   físico; InventoryPosition = _por qué_ la organización lo comercializa; Listing = representación
   comercial publicada; ListingPublication = publicación por canal.
 - **Dirección aprobada:** `Vehicle` sigue siendo el activo del CRM. **Capturar la modalidad comercial
-  con un campo `commercializationMode`** (candidatas: OWN / CONSIGNMENT / INTERMEDIATION / TRADE_IN),
-  seed _best-effort_ desde `SellerLead.dealType` (`DEPOSITO_VENTA`→CONSIGNMENT, `COMPRA_DIRECTA`→OWN,
+  con un campo `commercializationMode`** (candidatas: OWN / CONSIGNMENT / INTERMEDIATION / TRADE*IN),
+  seed \_best-effort* desde `SellerLead.dealType` (`DEPOSITO_VENTA`→CONSIGNMENT, `COMPRA_DIRECTA`→OWN,
   `PARTE_PAGO`→TRADE_IN, `INDECISO`→sin dato; INTERMEDIATION no es directamente derivable). **Diferir
   `Listing`, `Ownership` e `InventoryPosition`.** **No** dual-write `Vehicle.status ↔ Listing.status`
   en esta etapa (coste real: ~30 readers + acoplamiento con la reserva `RESERVADO`).
@@ -271,7 +272,7 @@ Data & Analytics. **Todo dentro de un monolito modular Next.js + Prisma + Postgr
 | DomainEvent / Outbox               | **DIFERIDOS**                                  |
 | ServiceOrder                       | **RECOMENDADO, no implementado**               |
 | commercializationMode              | **RECOMENDADO, no implementado**               |
-| Fact de venta canónico (primer PR) | **RECOMENDADO, no implementado**               |
+| Fact de venta canónico (primer PR) | **IMPLEMENTADO / DESPLEGADO** (PR #111)        |
 
 El orden de implementación, los drivers y el primer PR se detallan en
 [`fase-1-evolution-roadmap.md`](fase-1-evolution-roadmap.md).

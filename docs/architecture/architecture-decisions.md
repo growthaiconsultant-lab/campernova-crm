@@ -214,6 +214,7 @@
 - **Consecuencias:** el único dolor NOW (KPI de venta) se arregla sin agregado.
 - **Driver:** operación con identidad propia / intentos secuenciales / contrato.
 - **Estado:** ACTIVE (dirección; Deal = DRAFT). **Fecha:** 2026-07-13. **Evidencia:** `lib/offers.ts`, `lib/delivery-completion.ts`, `ofertas`/`entregas` actions.
+- **Implementado (2026-07-13, PR #111):** corregido el dolor NOW (KPI de venta) **sin** crear `Deal` — el fact de venta canónico se leyó desde `Vehicle.status`/`soldAt`. `Deal` sigue **DIFERIDO** (sin driver).
 
 ## AD-013 — Tenancy futura (dirección, cero tablas)
 
@@ -242,6 +243,7 @@
 - **Consecuencias:** KPIs fiables sin infraestructura de eventos prematura.
 - **Driver (DomainEvent/Outbox):** múltiples consumidores / efecto externo con entrega garantizada.
 - **Estado:** ACTIVE. **Fecha:** 2026-07-13. **Evidencia:** `lib/kpi/flow.ts:56`, `lib/dashboard/metrics.ts:194`, `lib/dashboard/queries.ts:57`, `lib/kpi/calidad.ts`.
+- **Implementado (2026-07-13, PR #111, squash `2f1e436`):** retirado el _string-parsing_ de `Activity` para contar ventas; las tres lecturas (`lib/kpi/flow.ts`, `lib/dashboard/metrics.ts`, `lib/dashboard/queries.ts`) leen desde el hecho canónico `Vehicle.status = VENDIDO` + `Vehicle.soldAt`. `Activity` permanece como timeline humano; las reservas siguen derivándose de `Offer`. Sin schema, migración ni backfill.
 
 ## AD-015 — Servicios transaccionales (`ServiceOrder` recomendado)
 

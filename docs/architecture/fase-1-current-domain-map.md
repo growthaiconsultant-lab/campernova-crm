@@ -80,9 +80,10 @@ Clasificación: **A** activo · **P** parcial/soporte · **L** legacy · **M** m
 - **No existe `Deal`**; `Offer` y `Delivery` se relacionan por `Vehicle` y `BuyerLead`.
 - La **venta canónica** se completa en `lib/delivery-completion.ts` (`Vehicle.status=VENDIDO` +
   `soldAt`, en `$transaction`).
-- `Activity` es un **timeline humano**; se usa **incorrectamente** como fuente de KPIs de venta por
-  _string-parsing_ (`content: { contains: '→ Vendido' }` en `lib/kpi/flow.ts:56`,
-  `lib/dashboard/metrics.ts:194`, `lib/dashboard/queries.ts:57`).
+- `Activity` es un **timeline humano**; ya **no** se usa para KPIs de venta. Desde **PR #111** (fact de
+  venta canónico) las lecturas (`lib/kpi/flow.ts`, `lib/dashboard/metrics.ts`,
+  `lib/dashboard/queries.ts`) cuentan desde el **hecho canónico** (`Vehicle.status = VENDIDO` +
+  `Vehicle.soldAt` en el periodo), no desde `content: { contains: '→ Vendido' }`.
 - `KpiEvent` es **write-mostly** (7 sitios de emisión; único lector `lib/kpi/calidad.ts`, 2 `count()`).
 - `VehicleAd` es **texto** que un humano pega en portales externos (Wallapop/Coches.net); no tiene
   precio ni estado.
