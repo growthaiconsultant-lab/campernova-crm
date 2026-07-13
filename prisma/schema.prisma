@@ -475,6 +475,7 @@ model User {
   assignedCaptures         VehicleCapture[]       @relation("AssignedCaptures")
   createdOffers            Offer[]                @relation("CreatedOffers")
   kpiEvents                KpiEvent[]             @relation("KpiEventActor")
+  documentVersionsUploaded DocumentVersion[]
 
   @@map("users")
 }
@@ -1030,19 +1031,72 @@ model DeliveryChecklistItem {
 
 /// Documento adjunto generado en la entrega (contratos, facturas, fotos).
 model DeliveryDocument {
-  id           String                   @id @default(cuid())
-  deliveryId   String                   @map("delivery_id")
-  category     DeliveryDocumentCategory
-  name         String
-  url          String
-  uploadedById String?                  @map("uploaded_by_id")
-  createdAt    DateTime                 @default(now()) @map("created_at")
+  id               String                   @id @default(cuid())
+  deliveryId       String                   @map("delivery_id")
+  category         DeliveryDocumentCategory
+  name             String
+  url              String
+  uploadedById     String?                  @map("uploaded_by_id")
+  currentVersionId String?                  @map("current_version_id")
+  versionSequence  Int                      @default(0) @map("version_sequence")
+  createdAt        DateTime                 @default(now()) @map("created_at")
 
-  delivery   Delivery @relation(fields: [deliveryId], references: [id], onDelete: Cascade)
-  uploadedBy User?    @relation(fields: [uploadedById], references: [id])
+  delivery       Delivery          @relation(fields: [deliveryId], references: [id], onDelete: Cascade)
+  uploadedBy     User?             @relation(fields: [uploadedById], references: [id])
+  versions       DocumentVersion[] @relation("DeliveryDocumentVersions")
+  // FK compuesta: la versión actual DEBE pertenecer a esta misma raíz (deliveryDocumentId = id).
+  currentVersion DocumentVersion?  @relation("DeliveryCurrentVersion", fields: [id, currentVersionId], references: [deliveryDocumentId, id], onDelete: NoAction, onUpdate: NoAction)
 
+  @@unique([id, currentVersionId])
   @@index([deliveryId])
   @@map("delivery_documents")
+}
+
+/// Estado de una versión física de documento (PR5B1).
+enum DocumentVersionStatus {
+  ACTIVE
+  REPLACED
+  DELETED
+}
+
+/// Versión física versionada de un documento (PR5B1, Opción C). Pertenece a EXACTAMENTE una
+/// raíz lógica (VehicleDocument XOR DeliveryDocument) mediante FKs explícitas. La versión
+/// actual la determina el puntero `currentVersionId` de la raíz (no un `isCurrent` redundante),
+/// garantizado por una FK compuesta que exige que la actual pertenezca a esa misma raíz. Los
+/// invariantes cross-table (una raíz, versión eliminada ≠ actual) los aseguran CHECKs + el
+/// servicio transaccional. `checksum` es nullable (no se calcula en PR5B1). El objeto físico
+/// histórico se conserva; el reemplazo nunca sobrescribe un objectPath.
+model DocumentVersion {
+  id                 String                @id @default(cuid())
+  vehicleDocumentId  String?               @map("vehicle_document_id")
+  deliveryDocumentId String?               @map("delivery_document_id")
+  version            Int
+  bucket             String
+  objectPath         String                @unique @map("object_path")
+  originalFilename   String?               @map("original_filename")
+  mimeType           String?               @map("mime_type")
+  sizeBytes          Int?                  @map("size_bytes")
+  checksum           String?
+  status             DocumentVersionStatus @default(ACTIVE)
+  uploadedById       String?               @map("uploaded_by_id")
+  createdAt          DateTime              @default(now()) @map("created_at")
+  replacedAt         DateTime?             @map("replaced_at")
+  deletedAt          DateTime?             @map("deleted_at")
+
+  vehicleDocument  VehicleDocument?  @relation("VehicleDocumentVersions", fields: [vehicleDocumentId], references: [id], onDelete: Cascade)
+  deliveryDocument DeliveryDocument? @relation("DeliveryDocumentVersions", fields: [deliveryDocumentId], references: [id], onDelete: Cascade)
+  uploadedBy       User?             @relation(fields: [uploadedById], references: [id])
+
+  currentOfVehicleDocument  VehicleDocument?  @relation("VehicleCurrentVersion")
+  currentOfDeliveryDocument DeliveryDocument? @relation("DeliveryCurrentVersion")
+
+  @@unique([vehicleDocumentId, version])
+  @@unique([deliveryDocumentId, version])
+  @@unique([vehicleDocumentId, id])
+  @@unique([deliveryDocumentId, id])
+  @@index([vehicleDocumentId])
+  @@index([deliveryDocumentId])
+  @@map("document_versions")
 }
 
 /// Garantía activada automáticamente al completar la entrega (12 meses, ampliable a 36).
@@ -1220,20 +1274,26 @@ model VehicleCapture {
 
 /// Documento legal asociado al expediente del vehículo (DNI, contratos, ITV, etc.)
 model VehicleDocument {
-  id           String                  @id @default(cuid())
-  vehicleId    String                  @map("vehicle_id")
-  category     VehicleDocumentCategory
-  name         String
-  url          String
-  fileSize     Int?                    @map("file_size")
-  mimeType     String?                 @map("mime_type")
-  notes        String?
-  uploadedById String?                 @map("uploaded_by_id")
-  createdAt    DateTime                @default(now()) @map("created_at")
+  id               String                  @id @default(cuid())
+  vehicleId        String                  @map("vehicle_id")
+  category         VehicleDocumentCategory
+  name             String
+  url              String
+  fileSize         Int?                    @map("file_size")
+  mimeType         String?                 @map("mime_type")
+  notes            String?
+  uploadedById     String?                 @map("uploaded_by_id")
+  currentVersionId String?                 @map("current_version_id")
+  versionSequence  Int                     @default(0) @map("version_sequence")
+  createdAt        DateTime                @default(now()) @map("created_at")
 
-  vehicle    Vehicle @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
-  uploadedBy User?   @relation(fields: [uploadedById], references: [id])
+  vehicle        Vehicle           @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+  uploadedBy     User?             @relation(fields: [uploadedById], references: [id])
+  versions       DocumentVersion[] @relation("VehicleDocumentVersions")
+  // FK compuesta: la versión actual DEBE pertenecer a esta misma raíz (vehicleDocumentId = id).
+  currentVersion DocumentVersion?  @relation("VehicleCurrentVersion", fields: [id, currentVersionId], references: [vehicleDocumentId, id], onDelete: NoAction, onUpdate: NoAction)
 
+  @@unique([id, currentVersionId])
   @@index([vehicleId, category])
   @@map("vehicle_documents")
 }

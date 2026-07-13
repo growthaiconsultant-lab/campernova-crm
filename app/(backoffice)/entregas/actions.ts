@@ -7,7 +7,7 @@ import { db } from '@/lib/db'
 import { requireAdmin, requireCanViewEntregas, requireCanEditEntregas } from '@/lib/auth'
 import { completeDeliveryTx, DeliveryConflictError } from '@/lib/delivery-completion'
 import { createClient as createServerClient } from '@/lib/supabase/server'
-import { VEHICLE_DOCUMENTS_BUCKET } from '@/lib/supabase/storage'
+import { VEHICLE_DOCUMENTS_BUCKET, deleteVehicleDocumentFiles } from '@/lib/supabase/storage'
 import {
   validateDocumentFile,
   safeDocumentObjectPath,
@@ -18,6 +18,11 @@ import {
   uploadPrivateDocumentWithCompensation,
   StorageOperationError,
 } from '@/lib/storage/store-document'
+import {
+  createFirstVersionTx,
+  collectVersionObjects,
+  detachAndDeleteRootTx,
+} from '@/lib/storage/versioned-documents'
 import { sendDeliveryConfirmation } from '@/lib/email/send'
 import type { DeliveryStatus, DeliveryDocumentCategory } from '@prisma/client'
 
@@ -332,8 +337,21 @@ export async function uploadDeliveryDocument(
       bytes,
       contentType: file.type,
       persist: async () => {
-        await db.deliveryDocument.create({
-          data: { deliveryId, category, name: displayName, url: path, uploadedById: actor.id },
+        // Raíz lógica + DocumentVersion nº 1, ATÓMICOS (transacción interactiva: la versión
+        // referencia el id de la raíz recién creada). Fija versionSequence=1, currentVersionId
+        // y sincroniza `url` con el objectPath.
+        await db.$transaction(async (tx) => {
+          const root = await tx.deliveryDocument.create({
+            data: { deliveryId, category, name: displayName, url: path, uploadedById: actor.id },
+          })
+          await createFirstVersionTx(tx, 'delivery', root.id, {
+            bucket: VEHICLE_DOCUMENTS_BUCKET,
+            objectPath: path,
+            originalFilename: displayName,
+            mimeType: file.type || null,
+            sizeBytes: file.size,
+            uploadedById: actor.id,
+          })
         })
       },
     })
@@ -356,20 +374,32 @@ export async function deleteDeliveryDocument(docId: string): Promise<ActionResul
   })
   if (!doc) return { ok: false, error: 'Documento no encontrado' }
 
-  // DeliveryDocument.url siempre es un object path interno. Guard defensivo contra traversal.
-  if (!doc.url || doc.url.startsWith('/') || doc.url.includes('..')) {
-    return { ok: false, error: 'No se pudo resolver el documento para eliminarlo.' }
+  // Recolecta los objetos de TODAS las versiones (sin dejar huérfanos históricos). Si la fila es
+  // legacy (sin versiones), cae al `url` legacy, que siempre es un object path interno.
+  const versionObjects = await collectVersionObjects(db, 'delivery', docId)
+  let paths: string[]
+  if (versionObjects.length > 0) {
+    paths = versionObjects.map((v) => v.objectPath)
+  } else {
+    // Guard defensivo contra traversal (DeliveryDocument.url siempre es un object path interno).
+    if (!doc.url || doc.url.startsWith('/') || doc.url.includes('..')) {
+      return { ok: false, error: 'No se pudo resolver el documento para eliminarlo.' }
+    }
+    paths = [doc.url]
   }
 
-  // Semántica estricta: borra PRIMERO el objeto; solo si Storage lo confirma se elimina el
+  // Semántica estricta: borra PRIMERO los objetos; solo si Storage lo confirma se elimina el
   // registro (no se informa éxito con estado incierto ni se deja un objeto sin referencia).
   const supabase = createServerClient()
-  const { error } = await supabase.storage.from(VEHICLE_DOCUMENTS_BUCKET).remove([doc.url])
-  if (error) {
+  const removed = await deleteVehicleDocumentFiles(supabase, paths)
+  if (!removed) {
     return { ok: false, error: 'No se pudo eliminar el archivo del almacenamiento.' }
   }
 
-  await db.deliveryDocument.delete({ where: { id: docId } })
+  // `detachAndDeleteRootTx` anula el puntero y borra la raíz; las versiones caen por cascada.
+  await db.$transaction(async (tx) => {
+    await detachAndDeleteRootTx(tx, 'delivery', docId)
+  })
   revalidatePath(`/entregas/${doc.deliveryId}`)
   return { ok: true }
 }

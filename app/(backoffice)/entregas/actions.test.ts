@@ -21,7 +21,8 @@ vi.mock('@/lib/delivery-completion', async (importOriginal) => {
 const { mockDb } = vi.hoisted(() => {
   const mockDb = {
     delivery: { create: vi.fn(), findUnique: vi.fn(), update: vi.fn() },
-    deliveryDocument: { create: vi.fn(), findUnique: vi.fn(), delete: vi.fn() },
+    deliveryDocument: { create: vi.fn(), findUnique: vi.fn(), delete: vi.fn(), update: vi.fn() },
+    documentVersion: { create: vi.fn(), findMany: vi.fn() },
     activity: { create: vi.fn() },
     $transaction: vi.fn(),
   }
@@ -86,6 +87,10 @@ beforeEach(() => {
   vi.mocked(createServerClient).mockReturnValue(mockSupabase as never)
   mockDb.deliveryDocument.create.mockResolvedValue({ id: 'ddoc-1' })
   mockDb.deliveryDocument.delete.mockResolvedValue({})
+  mockDb.deliveryDocument.update.mockResolvedValue({})
+  // Por defecto: sin versiones (fila legacy) → el borrado cae al `url` legacy.
+  mockDb.documentVersion.findMany.mockResolvedValue([])
+  mockDb.documentVersion.create.mockResolvedValue({ id: 'dver-1' })
   storageBucket.upload.mockResolvedValue({ error: null })
   storageBucket.remove.mockResolvedValue({ error: null })
 })

@@ -4,6 +4,7 @@ import { db } from '@/lib/db'
 import { requireCanViewEntregas } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
 import { deliveryDocumentSignedUrl } from '@/lib/supabase/storage'
+import { PRIVATE_DOC_SIGNED_URL_TTL_SECONDS } from '@/lib/storage/private-documents'
 import { DeliveryTabs, TabPanel } from './delivery-tabs'
 import { ChecklistSection } from './checklist-section'
 import { DocumentsSection } from './documents-section'
@@ -47,7 +48,10 @@ export default async function EntregaDetailPage({ params }: { params: { id: stri
         orderBy: [{ category: 'asc' }, { createdAt: 'asc' }],
       },
       documents: {
-        include: { uploadedBy: { select: { name: true } } },
+        include: {
+          uploadedBy: { select: { name: true } },
+          currentVersion: { select: { objectPath: true } },
+        },
         orderBy: { createdAt: 'desc' },
       },
       warranty: { select: { id: true } },
@@ -62,7 +66,8 @@ export default async function EntregaDetailPage({ params }: { params: { id: stri
   const isTerminal = delivery.status === 'COMPLETADA' || delivery.status === 'CANCELADA'
   const isAdmin = currentUser.role === 'ADMIN'
 
-  // Generate 1-hour signed URLs for private documents
+  // URLs firmadas de corta duración (300 s) para documentos privados. Se prioriza el objectPath
+  // de la VERSIÓN ACTUAL (PR5B1); fallback legacy al `url` para filas sin versiones.
   const supabase = createClient()
   const docsWithUrls = await Promise.all(
     delivery.documents.map(async (doc) => ({
@@ -70,7 +75,11 @@ export default async function EntregaDetailPage({ params }: { params: { id: stri
       name: doc.name,
       category: doc.category,
       uploadedByName: doc.uploadedBy?.name ?? null,
-      signedUrl: await deliveryDocumentSignedUrl(supabase, doc.url),
+      signedUrl: await deliveryDocumentSignedUrl(
+        supabase,
+        doc.currentVersion?.objectPath ?? doc.url,
+        PRIVATE_DOC_SIGNED_URL_TTL_SECONDS
+      ),
     }))
   )
 

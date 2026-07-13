@@ -16,7 +16,7 @@ vi.mock('@/lib/supabase/server', () => ({
 vi.mock('@/lib/supabase/storage', () => ({
   VEHICLE_DOCUMENTS_BUCKET: 'vehicle-documents',
   vehicleDocumentSignedUrl: vi.fn(),
-  deleteVehicleDocumentFile: vi.fn(),
+  deleteVehicleDocumentFiles: vi.fn(),
   // Extrae el path de una URL firmada legacy o devuelve el path (null si no resoluble).
   extractVehicleDocumentPath: vi.fn((stored: string) => {
     if (!stored) return null
@@ -41,6 +41,11 @@ const { mockDb } = vi.hoisted(() => {
       delete: vi.fn(),
       update: vi.fn(),
     },
+    documentVersion: {
+      create: vi.fn(),
+      findMany: vi.fn(),
+      update: vi.fn(),
+    },
     activity: { create: vi.fn() },
     $transaction: vi.fn(),
   }
@@ -52,7 +57,7 @@ vi.mock('@/lib/db', () => ({ db: mockDb }))
 import type { User } from '@prisma/client'
 import { requireAdmin, requireAgente } from '@/lib/auth'
 import { createClient as createServerClient } from '@/lib/supabase/server'
-import { vehicleDocumentSignedUrl, deleteVehicleDocumentFile } from '@/lib/supabase/storage'
+import { vehicleDocumentSignedUrl, deleteVehicleDocumentFiles } from '@/lib/supabase/storage'
 import {
   uploadVehicleDocument,
   deleteVehicleDocument,
@@ -76,6 +81,9 @@ const mockSupabase = {
 beforeEach(() => {
   vi.clearAllMocks()
   vi.mocked(createServerClient).mockReturnValue(mockSupabase as never)
+  // Por defecto: sin versiones (fila legacy) → el borrado cae al `url` legacy.
+  mockDb.documentVersion.findMany.mockResolvedValue([])
+  mockDb.documentVersion.create.mockResolvedValue({ id: 'ver-1' })
   mockDb.$transaction.mockImplementation(async (ops: unknown) => {
     if (typeof ops === 'function') return (ops as (tx: typeof mockDb) => Promise<unknown>)(mockDb)
     const results = await Promise.all(ops as Promise<unknown>[])
@@ -192,21 +200,42 @@ describe('deleteVehicleDocument', () => {
   it('elimina el objeto y luego el registro (Storage confirma primero)', async () => {
     vi.mocked(requireAdmin).mockResolvedValue(mockAdmin)
     mockDb.vehicleDocument.findUnique.mockResolvedValue({ ...docRow })
-    vi.mocked(deleteVehicleDocumentFile).mockResolvedValue(true)
+    vi.mocked(deleteVehicleDocumentFiles).mockResolvedValue(true)
     mockDb.vehicleDocument.delete.mockResolvedValue({})
     mockDb.activity.create.mockResolvedValue({})
 
     const result = await deleteVehicleDocument('doc-1')
     expect(result.ok).toBe(true)
-    // El objeto se borra con el path resuelto, ANTES del registro.
-    expect(deleteVehicleDocumentFile).toHaveBeenCalledWith(expect.anything(), 'docs/v-1/doc.pdf')
+    // Fila legacy (sin versiones): se borra el objeto del `url` resuelto, ANTES del registro.
+    expect(deleteVehicleDocumentFiles).toHaveBeenCalledWith(expect.anything(), ['docs/v-1/doc.pdf'])
+    expect(mockDb.vehicleDocument.delete).toHaveBeenCalledWith({ where: { id: 'doc-1' } })
+  })
+
+  it('borra los objetos de TODAS las versiones cuando el documento está versionado', async () => {
+    vi.mocked(requireAdmin).mockResolvedValue(mockAdmin)
+    mockDb.vehicleDocument.findUnique.mockResolvedValue({ ...docRow })
+    // Documento con historial: 2 versiones → se borran ambos objetos, sin huérfanos.
+    mockDb.documentVersion.findMany.mockResolvedValue([
+      { bucket: 'vehicle-documents', objectPath: 'docs/v-1/v2.pdf' },
+      { bucket: 'vehicle-documents', objectPath: 'docs/v-1/v1.pdf' },
+    ])
+    vi.mocked(deleteVehicleDocumentFiles).mockResolvedValue(true)
+    mockDb.vehicleDocument.delete.mockResolvedValue({})
+    mockDb.activity.create.mockResolvedValue({})
+
+    const result = await deleteVehicleDocument('doc-1')
+    expect(result.ok).toBe(true)
+    expect(deleteVehicleDocumentFiles).toHaveBeenCalledWith(expect.anything(), [
+      'docs/v-1/v2.pdf',
+      'docs/v-1/v1.pdf',
+    ])
     expect(mockDb.vehicleDocument.delete).toHaveBeenCalledWith({ where: { id: 'doc-1' } })
   })
 
   it('NO elimina el registro si el borrado en Storage falla (sin éxito con estado incierto)', async () => {
     vi.mocked(requireAdmin).mockResolvedValue(mockAdmin)
     mockDb.vehicleDocument.findUnique.mockResolvedValue({ ...docRow })
-    vi.mocked(deleteVehicleDocumentFile).mockResolvedValue(false) // Storage falla
+    vi.mocked(deleteVehicleDocumentFiles).mockResolvedValue(false) // Storage falla
 
     const result = await deleteVehicleDocument('doc-1')
     expect(result.ok).toBe(false)
@@ -222,7 +251,7 @@ describe('deleteVehicleDocument', () => {
 
     const result = await deleteVehicleDocument('doc-1')
     expect(result.ok).toBe(false)
-    expect(deleteVehicleDocumentFile).not.toHaveBeenCalled()
+    expect(deleteVehicleDocumentFiles).not.toHaveBeenCalled()
     expect(mockDb.vehicleDocument.delete).not.toHaveBeenCalled()
   })
 
@@ -360,6 +389,22 @@ describe('getVehicleDocumentSignedUrl', () => {
     // No devuelve la URL de 1 año almacenada; firma desde el path extraído (arg 1).
     const path = vi.mocked(vehicleDocumentSignedUrl).mock.calls[0][1]
     expect(path).toBe('docs/v-1/doc.pdf')
+  })
+
+  it('prioriza el objectPath de la versión ACTUAL sobre el `url` legacy (PR5B1)', async () => {
+    vi.mocked(requireAgente).mockResolvedValue(mockAgent)
+    // Fila versionada: `url` legacy antiguo + currentVersion con el path vigente. Debe firmarse
+    // el path de la versión actual, no el legacy.
+    mockDb.vehicleDocument.findUnique.mockResolvedValue({
+      url: 'docs/v-1/OLD.pdf',
+      currentVersion: { objectPath: 'docs/v-1/CURRENT.pdf' },
+    })
+    vi.mocked(vehicleDocumentSignedUrl).mockResolvedValue('https://freshly.signed/current')
+
+    const result = await getVehicleDocumentSignedUrl('doc-1')
+    expect(result.ok).toBe(true)
+    const path = vi.mocked(vehicleDocumentSignedUrl).mock.calls[0][1]
+    expect(path).toBe('docs/v-1/CURRENT.pdf')
   })
 
   it('devuelve error si el documento no existe', async () => {
