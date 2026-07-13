@@ -130,9 +130,11 @@ con la fuente anterior durante la migración.
 por hecho**; propiedades mínimas; cardinalidad; sin PII; identidad; reset; compatibilidad con feature
 flags; validación en entorno real cuando proceda.
 
-> **Ejemplo conceptual (futuro PR de fact de venta, no implementado):** la venta se valida contra la
+> **Ejemplo (fact de venta canónico, implementado en PR #111):** la venta se valida contra la
 > **base de datos** (`Vehicle.status=VENDIDO`/`soldAt`); PostHog puede medir la interacción del
-> usuario con el flujo, pero **no** define si una venta ocurrió.
+> usuario con el flujo, pero **no** define si una venta ocurrió. Su batería incluyó unitarios,
+> integración PostgreSQL, límites temporales `[inicio, fin)`, aislamiento por agente, preservación de
+> `soldAt` y ausencia de _parsing_ de `Activity`.
 
 ### 6.5 Sentry
 
