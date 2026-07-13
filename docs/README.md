@@ -21,9 +21,25 @@
   estado de Fase 0**: qué se cerró, garantías, riesgos residuales, decisión técnica (`PASS`) y
   operativa (`PENDING`).
 - [`architecture/architecture-decisions.md`](architecture/architecture-decisions.md) — decisiones
-  estables de Fase 0 (AD-001…AD-008).
-- [`architecture/fase-1-readiness.md`](architecture/fase-1-readiness.md) — análisis de preparación de
-  Fase 1 (**no** implementación).
+  estables: Fase 0 (AD-001…AD-008) + **Fase 0→1 (AD-009…AD-016)**.
+
+## Fase 1 — diseño de dominio (dirección aprobada; **no implementado**)
+
+Todo lo de esta sección es **diseño y dirección**, no implementación. El foco actual sigue siendo el
+CRM interno de un único concesionario; marketplace y multiempresa están **diferidos**.
+
+- [`architecture/fase-1-readiness.md`](architecture/fase-1-readiness.md) — **resumen ejecutivo**
+  (ACTIVE): estado, principios, primer PR recomendado, riesgos, gates.
+- [`architecture/fase-1-domain-architecture.md`](architecture/fase-1-domain-architecture.md) —
+  **fuente de verdad del diseño** (ACTIVE): principio _driver-gated_, bounded contexts, decisiones,
+  matriz actual→objetivo, riesgos.
+- [`architecture/fase-1-current-domain-map.md`](architecture/fase-1-current-domain-map.md) — **mapa
+  del dominio actual** (ACTIVE): inventario as-is, flujos, hechos verificados.
+- [`architecture/fase-1-evolution-roadmap.md`](architecture/fase-1-evolution-roadmap.md) — **roadmap**
+  (ACTIVE/DRAFT por bloque): secuencia de PRs, drivers, gates, relación con el rollout documental.
+
+> El roadmap es una recomendación, **no un compromiso inmutable**; cada PR se revalida y requiere su
+> propia aprobación.
 
 ## Gobierno
 
