@@ -9,7 +9,7 @@ import { createClient as createServerClient } from '@/lib/supabase/server'
 import {
   VEHICLE_DOCUMENTS_BUCKET,
   vehicleDocumentSignedUrl,
-  deleteVehicleDocumentFile,
+  deleteVehicleDocumentFiles,
   extractVehicleDocumentPath,
 } from '@/lib/supabase/storage'
 import {
@@ -23,6 +23,11 @@ import {
   uploadPrivateDocumentWithCompensation,
   StorageOperationError,
 } from '@/lib/storage/store-document'
+import {
+  createFirstVersionTx,
+  collectVersionObjects,
+  detachAndDeleteRootTx,
+} from '@/lib/storage/versioned-documents'
 import type { VehicleDocumentCategory } from '@prisma/client'
 
 // ── Upload document ───────────────────────────────────────────────────────────
@@ -77,8 +82,11 @@ export async function uploadVehicleDocument(vehicleId: string, formData: FormDat
       bytes,
       contentType: file.type,
       persist: async () => {
-        await db.$transaction([
-          db.vehicleDocument.create({
+        // Raíz lógica + DocumentVersion nº 1 + actividad, ATÓMICOS (transacción interactiva:
+        // la versión referencia el id de la raíz recién creada). `createFirstVersionTx` fija
+        // versionSequence=1, currentVersionId y sincroniza `url` con el objectPath.
+        await db.$transaction(async (tx) => {
+          const root = await tx.vehicleDocument.create({
             data: {
               vehicleId,
               category: parsed.data.category as VehicleDocumentCategory,
@@ -89,16 +97,24 @@ export async function uploadVehicleDocument(vehicleId: string, formData: FormDat
               notes: parsed.data.notes ?? null,
               uploadedById: actor.id,
             },
-          }),
-          db.activity.create({
+          })
+          await createFirstVersionTx(tx, 'vehicle', root.id, {
+            bucket: VEHICLE_DOCUMENTS_BUCKET,
+            objectPath: path,
+            originalFilename: displayName,
+            mimeType: file.type || null,
+            sizeBytes: file.size,
+            uploadedById: actor.id,
+          })
+          await tx.activity.create({
             data: {
               type: 'DOCUMENTO_SUBIDO',
               content: `Documento subido: ${displayName} (${parsed.data.category})`,
               agentId: actor.id,
               sellerLeadId: vehicle.sellerLeadId,
             },
-          }),
-        ])
+          })
+        })
       },
     })
   } catch (err) {
@@ -123,34 +139,43 @@ export async function deleteVehicleDocument(documentId: string) {
   })
   if (!doc) return { ok: false as const, error: 'Documento no encontrado' }
 
-  // Resuelve el object path real (path directo o extraído de una URL legacy). Si no se puede
-  // resolver de forma segura, no se borra a ciegas: se devuelve error (no se orphanea el objeto).
-  const path = extractVehicleDocumentPath(doc.url)
-  if (!path) {
-    return { ok: false as const, error: 'No se pudo resolver el documento para eliminarlo.' }
+  // Recolecta los objetos de TODAS las versiones (sin dejar huérfanos históricos). Si la fila es
+  // legacy (sin versiones), cae al `url` legacy con la resolución estricta de PR5A. Si nada
+  // resuelve de forma segura, no se borra a ciegas.
+  const versionObjects = await collectVersionObjects(db, 'vehicle', documentId)
+  let paths: string[]
+  if (versionObjects.length > 0) {
+    paths = versionObjects.map((v) => v.objectPath)
+  } else {
+    const legacyPath = extractVehicleDocumentPath(doc.url)
+    if (!legacyPath) {
+      return { ok: false as const, error: 'No se pudo resolver el documento para eliminarlo.' }
+    }
+    paths = [legacyPath]
   }
 
-  // Semántica estricta: se borra PRIMERO el objeto; solo si Storage lo confirma se elimina el
+  // Semántica estricta: se borran PRIMERO los objetos; solo si Storage lo confirma se elimina el
   // registro (nunca se informa éxito con estado incierto ni se deja un objeto sin referencia).
   const supabase = createServerClient()
-  const removed = await deleteVehicleDocumentFile(supabase, path)
+  const removed = await deleteVehicleDocumentFiles(supabase, paths)
   if (!removed) {
     return { ok: false as const, error: 'No se pudo eliminar el archivo del almacenamiento.' }
   }
 
-  // Si la DB fallara aquí, el objeto ya no existe y el registro persiste (referencia colgante):
+  // Si la DB fallara aquí, los objetos ya no existen y el registro persiste (referencia colgante):
   // el error se propaga para observabilidad (estado incierto documentado, no huérfano silencioso).
-  await db.$transaction([
-    db.vehicleDocument.delete({ where: { id: documentId } }),
-    db.activity.create({
+  // `detachAndDeleteRootTx` anula el puntero y borra la raíz; las versiones caen por cascada.
+  await db.$transaction(async (tx) => {
+    await detachAndDeleteRootTx(tx, 'vehicle', documentId)
+    await tx.activity.create({
       data: {
         type: 'DOCUMENTO_ELIMINADO',
         content: `Documento eliminado: ${doc.name} (${doc.category})`,
         agentId: actor.id,
         sellerLeadId: doc.vehicle.sellerLeadId,
       },
-    }),
-  ])
+    })
+  })
 
   revalidatePath(`/vendedores/${doc.vehicle.sellerLeadId}`)
   return { ok: true as const }
@@ -281,15 +306,15 @@ export async function getVehicleDocumentSignedUrl(documentId: string) {
 
   const doc = await db.vehicleDocument.findUnique({
     where: { id: documentId },
-    select: { url: true },
+    select: { url: true, currentVersion: { select: { objectPath: true } } },
   })
   if (!doc) return { ok: false as const, error: 'Documento no encontrado' }
 
-  // Siempre se genera una URL firmada de corta duración desde el path resuelto (nunca se
-  // re-sirve la URL almacenada). Compatible con filas legacy que guardaban una URL firmada
-  // de larga duración: se extrae su path y se vuelve a firmar en corto. Si no resuelve a un
-  // path seguro (dominio externo/otro bucket/malformada), se rechaza.
-  const path = extractVehicleDocumentPath(doc.url)
+  // Se genera una URL firmada de corta duración desde el path resuelto (nunca se re-sirve una URL
+  // almacenada). Prioridad: objectPath de la VERSIÓN ACTUAL (path interno ya seguro, generado
+  // server-side). Fallback legacy: filas sin versiones → se extrae el path del `url` (compatible
+  // con URLs firmadas de larga duración antiguas). Si nada resuelve de forma segura, se rechaza.
+  const path = doc.currentVersion?.objectPath ?? extractVehicleDocumentPath(doc.url)
   if (!path) return { ok: false as const, error: 'No se pudo resolver el documento.' }
 
   const supabase = createServerClient()

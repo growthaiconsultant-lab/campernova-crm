@@ -156,14 +156,14 @@ jobs:
       - name: Apply baseline on empty PostgreSQL 17
         run: pnpm prisma migrate deploy
 
-      - name: Confirm exactly the baseline was applied
+      - name: Confirm exactly the baseline + PR5B1 migration were applied
         run: |
           set -euo pipefail
           count=$(psql "$PSQL_URL" -tAc "SELECT count(*) FROM _prisma_migrations WHERE finished_at IS NOT NULL")
-          name=$(psql "$PSQL_URL" -tAc "SELECT string_agg(migration_name, ',') FROM _prisma_migrations")
-          echo "migraciones aplicadas: $count · nombres: $name"
-          test "$count" = "1" || { echo "esperado 1 migración aplicada"; exit 1; }
-          test "$name" = "000000000000_squashed_migrations" || { echo "baseline inesperada"; exit 1; }
+          names=$(psql "$PSQL_URL" -tAc "SELECT string_agg(migration_name, ',' ORDER BY migration_name) FROM _prisma_migrations WHERE finished_at IS NOT NULL")
+          echo "migraciones aplicadas: $count · nombres: $names"
+          test "$count" = "2" || { echo "esperado 2 migraciones aplicadas (baseline + PR5B1)"; exit 1; }
+          test "$names" = "000000000000_squashed_migrations,20260712000000_add_versioned_document_model" || { echo "conjunto u orden de migraciones inesperado"; exit 1; }
 
       - name: Prisma migrate status (must be up to date)
         run: pnpm prisma migrate status
@@ -190,12 +190,20 @@ jobs:
           without_rls=$(psql "$PSQL_URL" -tAc "SELECT count(*) FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace WHERE n.nspname='public' AND c.relkind='r' AND c.relrowsecurity=false")
           forced=$(psql "$PSQL_URL" -tAc "SELECT count(*) FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace WHERE n.nspname='public' AND c.relkind='r' AND c.relforcerowsecurity=true")
           policies=$(psql "$PSQL_URL" -tAc "SELECT count(*) FROM pg_policies WHERE schemaname='public'")
-          assert tables "$tables" 30
-          assert columns "$columns" 412
-          assert enums "$enums" 48
-          assert enum_values "$enum_values" 255
-          assert foreign_keys "$fks" 60
-          assert indexes "$indexes" 101
+          # Valores tras PR5B1 (add_versioned_document_model). Delta documentado en el informe:
+          #   tables      30 → 31   (+1: document_versions)
+          #   columns     412 → 431 (+19: delivery_documents +2, vehicle_documents +2, document_versions +15)
+          #   enums       48 → 49   (+1: DocumentVersionStatus)
+          #   enum_values 255 → 258 (+3: ACTIVE, REPLACED, DELETED)
+          #   foreign_keys 60 → 65  (+5: 2 FK compuestas de versión actual + 3 de document_versions)
+          #   indexes     101 → 111 (+10: PK + object_path + 2 idx + 4 unique en document_versions + 2 unique (id,current_version_id))
+          # Sin cambio: without_rls=0 (nueva tabla con RLS deny-all), forced=0, policies=0.
+          assert tables "$tables" 31
+          assert columns "$columns" 431
+          assert enums "$enums" 49
+          assert enum_values "$enum_values" 258
+          assert foreign_keys "$fks" 65
+          assert indexes "$indexes" 111
           assert tables_without_rls "$without_rls" 0
           assert tables_forced_rls "$forced" 0
           assert policies "$policies" 0

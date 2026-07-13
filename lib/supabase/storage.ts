@@ -143,3 +143,17 @@ export async function deleteVehicleDocumentFile(
   const { error } = await supabase.storage.from(VEHICLE_DOCUMENTS_BUCKET).remove([path])
   return !error
 }
+
+/**
+ * Borra varios objetos del bucket privado en una sola llamada (PR5B1: al eliminar un documento
+ * versionado se borran los objetos de TODAS sus versiones, que viven en el mismo bucket). Con
+ * lista vacía es un no-op exitoso. Devuelve `false` si Storage reporta error.
+ */
+export async function deleteVehicleDocumentFiles(
+  supabase: SupabaseStorageClient,
+  paths: string[]
+): Promise<boolean> {
+  if (paths.length === 0) return true
+  const { error } = await supabase.storage.from(VEHICLE_DOCUMENTS_BUCKET).remove(paths)
+  return !error
+}
