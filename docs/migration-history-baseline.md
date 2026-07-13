@@ -1,5 +1,14 @@
 # Baseline del historial de migraciones (squash)
 
+> **Nota de vigencia (2026-07-13).** Este documento describe **cómo se generó la baseline**
+> (`000000000000_squashed_migrations`, commit `00be57b`). Los conteos de catálogo que aparecen más
+> abajo (30/412/48/255/60/101) y el paso «se aplicó **solo** la baseline» corresponden al estado
+> **con la baseline como única migración**. Desde entonces se añadió la migración aditiva
+> `20260712000000_add_versioned_document_model` (PR5B1), por lo que el historial vigente son
+> **2 migraciones** y el catálogo vigente es **31/431/49/258/65/111**. La fuente de verdad del
+> **estado actual** de migraciones es [`governance/database-migrations.md`](governance/database-migrations.md);
+> el job de CI `migration-replay` valida los conteos vigentes.
+
 ## Motivo
 
 El historial de 26 migraciones **no era reproducible desde una base de datos vacía**: dos
@@ -86,19 +95,27 @@ Migraciones retiradas del directorio activo (26):
    No crea políticas · no usa `FORCE ROW LEVEL SECURITY` · no cambia grants/roles/ownership ·
    solo tablas ordinarias de `public`. Deja `relrowsecurity=true` y `relforcerowsecurity=false`.
 
-## Cómo se valida
+## Cómo se validó (baseline sola, en el momento de crearla)
+
+> Los pasos y conteos de esta sección describen la validación **cuando la baseline era la única
+> migración** (estado histórico). El job `migration-replay` **actual** aplica **2** migraciones
+> (baseline + `20260712000000_add_versioned_document_model`) y valida el catálogo **vigente**
+> (31/431/49/258/65/111). La descripción vigente del job está en
+> [`governance/ci-quality-gates.md`](governance/ci-quality-gates.md) y el catálogo vigente en
+> [`governance/database-migrations.md`](governance/database-migrations.md).
 
 - **Local:** `pnpm typecheck`, `pnpm lint`, `pnpm test`, `pnpm check:migration-history`.
-- **CI (job `migration-replay`, PostgreSQL 17 real y efímero):**
+- **CI (job `migration-replay`, PostgreSQL 17 real y efímero) — así se validó la baseline sola:**
   1. `pnpm check:migration-history` (invariante del historial).
-  2. `prisma migrate deploy` sobre base vacía → aplica solo la baseline.
-  3. Confirma que se aplicó exactamente `000000000000_squashed_migrations`.
+  2. `prisma migrate deploy` sobre base vacía aplicaba solo la baseline (entonces era la única).
+  3. Confirmaba que se aplicó exactamente `000000000000_squashed_migrations`.
   4. `prisma migrate status` (up to date).
   5. `pnpm check:rls` (0 tablas de `public` sin RLS).
   6. `prisma migrate diff --from-url <db> --to-schema-datamodel prisma/schema.prisma --exit-code`
      (paridad estructural; RLS no cuenta como diff porque Prisma no lo modela).
-  7. Verificaciones de catálogo: **30** tablas, **412** columnas, **48** enums, **255** valores,
-     **60** FKs, **101** índices, **0** tablas sin RLS, **0** con FORCE RLS, **0** políticas.
+  7. Verificaciones de catálogo **de la baseline sola**: **30** tablas, **412** columnas, **48**
+     enums, **255** valores, **60** FKs, **101** índices, **0** tablas sin RLS, **0** con FORCE RLS,
+     **0** políticas. _(Tras PR5B1 el job valida 31/431/49/258/65/111.)_
   8. Segundo `prisma migrate deploy` idempotente (sin cambios).
 
 ## Cómo crear futuras migraciones
@@ -110,13 +127,20 @@ Migraciones retiradas del directorio activo (26):
   baseline o falta `migration.sql`.
 - El job `migration-replay` garantiza que el historial sigue siendo reconstruible desde cero.
 
-## ⚠️ Advertencia crítica de despliegue
+## ⚠️ Advertencia de despliegue remoto (estado actual)
 
-**La baseline NO debe fusionarse en `main` hasta que haya sido marcada como aplicada mediante
-`prisma migrate resolve --applied 000000000000_squashed_migrations` en staging y producción,
-siguiendo el procedimiento autorizado y verificado por separado.**
+> **Contexto (2026-07-13).** La baseline **ya está fusionada en `main`** (commit `00be57b`; HEAD
+> `1b0f6fb` desciende de él). La intención original de esta advertencia era **no** fusionar la
+> baseline antes de marcarla como aplicada en los entornos remotos; el orden real difirió y el
+> paso remoto quedó como tarea de rollout. Lo que sigue vigente es el **procedimiento** del paso
+> remoto, no un bloqueo de merge.
 
-Ningún entorno remoto ha sido modificado por este cambio: staging y producción permanecen
-intactos (esquema y datos). El `resolve` es un paso posterior que **solo inserta un registro de
-metadatos** en `_prisma_migrations` (no ejecuta DDL, no toca datos), y requiere su propia
-autorización.
+**Marcar la baseline como aplicada en los entornos remotos** mediante
+`prisma migrate resolve --applied 000000000000_squashed_migrations` en staging y producción es un
+paso **pendiente del rollout operativo**, que debe seguir el procedimiento autorizado y verificado
+por separado (ver [`operations/fase-0-operational-closeout.md`](operations/fase-0-operational-closeout.md)
+y [`governance/database-migrations.md`](governance/database-migrations.md)).
+
+El `resolve` **solo inserta un registro de metadatos** en `_prisma_migrations` (no ejecuta DDL, no
+toca datos), y requiere su propia autorización, backup previo y `project_ref` confirmado. Hasta
+ejecutarlo, ningún entorno remoto ha sido modificado por la baseline (esquema y datos intactos).
