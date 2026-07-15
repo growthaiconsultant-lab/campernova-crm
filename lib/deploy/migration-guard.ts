@@ -171,3 +171,76 @@ export function urlMatchesExpectation(
   if (!expectContains) return { ok: true }
   return { ok: url.includes(expectContains) }
 }
+
+// ─── Preflight (puro): decide SKIP / FAIL / CONNECT sin abrir ninguna conexión ─
+
+export type GuardEnv = {
+  VERCEL_ENV?: string
+  REMOTE_MIGRATION_GUARD_ENV?: string
+  REMOTE_MIGRATION_GUARD_DATABASE_URL?: string
+  DIRECT_URL?: string
+  DATABASE_URL?: string
+  REMOTE_MIGRATION_GUARD_EXPECT_URL_CONTAINS?: string
+}
+
+export type FailReason = 'missing-url' | 'missing-marker' | 'env-mismatch'
+
+export type Preflight =
+  | { action: 'skip'; reason: 'preview' | 'local' }
+  | { action: 'fail'; reason: FailReason; declaredEnv: 'production' | 'staging' }
+  /** `url` es de uso interno para abrir la conexión read-only; NUNCA se registra. */
+  | { action: 'connect'; url: string; declaredEnv: 'production' | 'staging' }
+
+/**
+ * Decide, sin efectos y sin abrir conexión, qué debe hacer el guard.
+ *
+ * Endurecimiento: cuando el guard está **activo** (Vercel `production` o modo manual), el marcador
+ * de identidad `REMOTE_MIGRATION_GUARD_EXPECT_URL_CONTAINS` es **obligatorio** — su ausencia es
+ * `fail` (no se abre conexión). Así, una URL de staging mal configurada en Production no puede
+ * validar la base equivocada. La URL se elige con la prioridad
+ * `REMOTE_MIGRATION_GUARD_DATABASE_URL → DIRECT_URL → DATABASE_URL` (no obliga a crear una nueva).
+ */
+export function preflight(env: GuardEnv): Preflight {
+  const mode = resolveGuardMode(env)
+  if (!mode.active) return { action: 'skip', reason: mode.reason }
+
+  const url = env.REMOTE_MIGRATION_GUARD_DATABASE_URL || env.DIRECT_URL || env.DATABASE_URL || ''
+  if (!url) return { action: 'fail', reason: 'missing-url', declaredEnv: mode.declaredEnv }
+
+  const expect = env.REMOTE_MIGRATION_GUARD_EXPECT_URL_CONTAINS
+  if (!expect) return { action: 'fail', reason: 'missing-marker', declaredEnv: mode.declaredEnv }
+  if (!urlMatchesExpectation(url, expect).ok) {
+    return { action: 'fail', reason: 'env-mismatch', declaredEnv: mode.declaredEnv }
+  }
+  return { action: 'connect', url, declaredEnv: mode.declaredEnv }
+}
+
+/** Mensajes seguros por causa de FAIL de configuración (sin URL/host/credenciales). */
+export const FAIL_REASON_LABELS: Record<FailReason, string> = {
+  'missing-url':
+    'falta la URL de base de datos (REMOTE_MIGRATION_GUARD_DATABASE_URL / DIRECT_URL / DATABASE_URL)',
+  'missing-marker':
+    'falta la guarda de identidad del entorno: define REMOTE_MIGRATION_GUARD_EXPECT_URL_CONTAINS (obligatorio cuando el guard está activo)',
+  'env-mismatch':
+    'la URL resuelta no corresponde al entorno declarado (marcador de identidad no encontrado); no se abre ninguna conexión',
+}
+
+// ─── Sanitización de errores (nunca expone host/URL/credenciales) ──────────────
+
+/**
+ * Devuelve un token SEGURO para un error de conexión/consulta: el código de Prisma (`P####`) si
+ * existe, `TIMEOUT` si el error es de timeout, o `UNKNOWN`. **Nunca** devuelve el mensaje, el host,
+ * el usuario, la contraseña ni la URL — solo se usa el mensaje para detectar el patrón de timeout.
+ */
+export function safeErrorCode(err: unknown): string {
+  const code = (err as { code?: unknown } | null)?.code
+  if (typeof code === 'string' && /^P\d{3,4}$/.test(code)) return code
+  const msg = err instanceof Error ? err.message : ''
+  if (/timeout/i.test(msg)) return 'TIMEOUT'
+  return 'UNKNOWN'
+}
+
+/** Cadena SEGURA para un fallo de verificación remota: solo código + entorno. */
+export function describeConnectionFailure(declaredEnv: string, err: unknown): string {
+  return `no se pudo verificar el estado remoto de migraciones. code=${safeErrorCode(err)} · environment=${declaredEnv}`
+}

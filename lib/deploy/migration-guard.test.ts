@@ -5,10 +5,22 @@ import {
   computeLocalMigrations,
   resolveGuardMode,
   urlMatchesExpectation,
+  preflight,
+  safeErrorCode,
+  describeConnectionFailure,
+  FAIL_REASON_LABELS,
   PROBLEM_LABELS,
   type LocalMigration,
   type RemoteMigrationRow,
 } from './migration-guard'
+
+const PROD_URL =
+  'postgresql://postgres.bbmglaatlyilxutzomxd:PWD@aws-1-eu-central-1.pooler.supabase.com:5432/postgres'
+const PROD_DBURL =
+  'postgresql://postgres.bbmglaatlyilxutzomxd:PWD@aws-1-eu-central-1.pooler.supabase.com:6543/postgres?pgbouncer=true'
+const STG_URL =
+  'postgresql://postgres.iatuhydsfwoeprpbklod:PWD@aws-1-eu-central-1.pooler.supabase.com:5432/postgres'
+const PROD_REF = 'bbmglaatlyilxutzomxd'
 
 const D = (iso: string) => new Date(iso)
 
@@ -217,5 +229,124 @@ describe('caso 17: los problemas no contienen credenciales (solo nombre + tipo)'
     const serialized = JSON.stringify(r.problems) + JSON.stringify(PROBLEM_LABELS)
     expect(serialized).not.toMatch(/postgres(ql)?:\/\//)
     expect(serialized).not.toMatch(/password|@.*supabase/i)
+  })
+})
+
+// ─── Preflight: identidad de entorno OBLIGATORIA cuando el guard está activo ────
+
+describe('preflight — decisión sin abrir conexión', () => {
+  it('caso 5 (endurecido): VERCEL_ENV=production SIN marcador → fail missing-marker (no connect)', () => {
+    const p = preflight({ VERCEL_ENV: 'production', DIRECT_URL: PROD_URL })
+    expect(p).toEqual({ action: 'fail', reason: 'missing-marker', declaredEnv: 'production' })
+  })
+
+  it('caso 2: producción con marcador INCORRECTO → fail env-mismatch (no connect)', () => {
+    // URL de staging colada como producción: el marcador de prod no aparece → NO se conecta.
+    const p = preflight({
+      VERCEL_ENV: 'production',
+      DIRECT_URL: STG_URL,
+      REMOTE_MIGRATION_GUARD_EXPECT_URL_CONTAINS: PROD_REF,
+    })
+    expect(p).toEqual({ action: 'fail', reason: 'env-mismatch', declaredEnv: 'production' })
+  })
+
+  it('caso 3: producción con marcador correcto + DIRECT_URL → connect usando DIRECT_URL', () => {
+    const p = preflight({
+      VERCEL_ENV: 'production',
+      DIRECT_URL: PROD_URL,
+      REMOTE_MIGRATION_GUARD_EXPECT_URL_CONTAINS: PROD_REF,
+    })
+    expect(p).toEqual({ action: 'connect', url: PROD_URL, declaredEnv: 'production' })
+  })
+
+  it('caso 4: producción sin DIRECT_URL, con DATABASE_URL válida → connect (fallback)', () => {
+    const p = preflight({
+      VERCEL_ENV: 'production',
+      DATABASE_URL: PROD_DBURL,
+      REMOTE_MIGRATION_GUARD_EXPECT_URL_CONTAINS: PROD_REF,
+    })
+    expect(p).toEqual({ action: 'connect', url: PROD_DBURL, declaredEnv: 'production' })
+  })
+
+  it('prioridad de URL: REMOTE_MIGRATION_GUARD_DATABASE_URL gana a DIRECT_URL y DATABASE_URL', () => {
+    const p = preflight({
+      REMOTE_MIGRATION_GUARD_ENV: 'staging',
+      REMOTE_MIGRATION_GUARD_DATABASE_URL: STG_URL,
+      DIRECT_URL: PROD_URL,
+      DATABASE_URL: PROD_DBURL,
+      REMOTE_MIGRATION_GUARD_EXPECT_URL_CONTAINS: 'iatuhydsfwoeprpbklod',
+    })
+    expect(p).toMatchObject({ action: 'connect', url: STG_URL, declaredEnv: 'staging' })
+  })
+
+  it('producción activa sin URL → fail missing-url', () => {
+    const p = preflight({
+      VERCEL_ENV: 'production',
+      REMOTE_MIGRATION_GUARD_EXPECT_URL_CONTAINS: PROD_REF,
+    })
+    expect(p).toEqual({ action: 'fail', reason: 'missing-url', declaredEnv: 'production' })
+  })
+
+  it('manual sin marcador → fail missing-marker', () => {
+    const p = preflight({ REMOTE_MIGRATION_GUARD_ENV: 'staging', DIRECT_URL: STG_URL })
+    expect(p).toEqual({ action: 'fail', reason: 'missing-marker', declaredEnv: 'staging' })
+  })
+
+  it('caso 5 (Preview): VERCEL_ENV=preview con TODAS las variables → skip (no connect, no marcador)', () => {
+    const p = preflight({
+      VERCEL_ENV: 'preview',
+      DIRECT_URL: PROD_URL,
+      DATABASE_URL: PROD_DBURL,
+      REMOTE_MIGRATION_GUARD_EXPECT_URL_CONTAINS: PROD_REF,
+    })
+    expect(p).toEqual({ action: 'skip', reason: 'preview' })
+  })
+
+  it('build local (sin VERCEL_ENV ni env manual) → skip local', () => {
+    expect(preflight({ DIRECT_URL: PROD_URL })).toEqual({ action: 'skip', reason: 'local' })
+  })
+
+  it('los mensajes de FAIL no contienen URL/host/credenciales', () => {
+    const blob = JSON.stringify(FAIL_REASON_LABELS)
+    expect(blob).not.toMatch(/postgres(ql)?:\/\//)
+    expect(blob).not.toMatch(/supabase|password|@|:\d{4}/i)
+  })
+})
+
+// ─── Sanitización de errores de conexión ───────────────────────────────────────
+
+describe('safeErrorCode / describeConnectionFailure — sin fuga de secretos', () => {
+  it('devuelve el código Prisma (P####) si existe', () => {
+    expect(safeErrorCode(Object.assign(new Error('boom'), { code: 'P1001' }))).toBe('P1001')
+    expect(safeErrorCode(Object.assign(new Error('x'), { code: 'P2022' }))).toBe('P2022')
+  })
+  it('detecta timeout sin devolver el mensaje', () => {
+    expect(safeErrorCode(new Error('timeout tras 15000ms (consulta)'))).toBe('TIMEOUT')
+  })
+  it('desconocido → UNKNOWN', () => {
+    expect(safeErrorCode(new Error('algo raro'))).toBe('UNKNOWN')
+    expect(safeErrorCode(null)).toBe('UNKNOWN')
+  })
+  it('caso 6: un error cuyo mensaje contiene host/puerto/usuario/password/URL NO se filtra', () => {
+    const leaky = Object.assign(
+      new Error(
+        "Can't reach database server at `postgres.bbmglaatlyilxutzomxd:SUPERSECRET@aws-1-eu-central-1.pooler.supabase.com:5432/postgres`"
+      ),
+      { code: 'P1001' }
+    )
+    const out = describeConnectionFailure('production', leaky)
+    expect(out).toBe(
+      'no se pudo verificar el estado remoto de migraciones. code=P1001 · environment=production'
+    )
+    for (const secret of [
+      'SUPERSECRET',
+      'postgres.bbmglaatlyilxutzomxd',
+      'aws-1-eu-central-1.pooler.supabase.com',
+      ':5432',
+      'postgresql://',
+      "Can't reach",
+    ]) {
+      expect(out).not.toContain(secret)
+    }
   })
 })

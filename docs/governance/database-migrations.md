@@ -126,10 +126,18 @@ install → prisma generate → check-remote-migrations (solo lectura) → next 
 - **Solo bloquea producción.** Se conecta a la base remota únicamente cuando `VERCEL_ENV=production`.
   En **Preview**, build local y CI ordinaria hace **SKIP** (no se conecta a producción, no bloquea
   por falta de credenciales). Los Previews **no** ejecutan migraciones ni consultan producción.
+- **Identidad de entorno OBLIGATORIA.** Cuando el guard está activo (Production o modo manual),
+  `REMOTE_MIGRATION_GUARD_EXPECT_URL_CONTAINS` es **obligatorio**: si falta, o si la URL resuelta no
+  lo contiene, el guard **falla antes de abrir conexión** (exit 2). Así, una `DATABASE_URL`/`DIRECT_URL`
+  de staging mal configurada en Production **no puede** validar la base equivocada.
 - **Fail-closed.** En producción el build **falla** (exit ≠ 0, el deployment anterior se conserva y
-  no es sustituido) si: falta `DIRECT_URL`; la URL no supera la guarda de entorno; la base no
-  responde; no existe `_prisma_migrations`; o alguna migración local está **ausente**, **sin
-  finalizar**, **revertida**, con **intento fallido no resuelto**, o con **checksum distinto**.
+  no es sustituido) si: falta `DIRECT_URL`/`DATABASE_URL`; **falta el marcador de identidad** o no
+  coincide con la URL; la base no responde; no existe `_prisma_migrations`; o alguna migración local
+  está **ausente**, **sin finalizar**, **revertida**, con **intento fallido no resuelto**, o con
+  **checksum distinto**.
+- **Errores sanitizados.** Ante un fallo de conexión/consulta, el guard imprime únicamente un código
+  seguro (`code=P#### | TIMEOUT | UNKNOWN`) + el entorno. **Nunca** imprime host, puerto, usuario,
+  contraseña, URL ni el mensaje bruto de Prisma.
 - **Compatible con el historial post-squash.** Exige que toda migración **presente en el repo** esté
   aplicada y con checksum coincidente; **permite** migraciones remotas históricas adicionales que ya
   no existen como carpeta local. El `checksum` almacenado por Prisma es el **SHA-256 del contenido de
@@ -150,10 +158,12 @@ REMOTE_MIGRATION_GUARD_EXPECT_URL_CONTAINS="<ref-staging>" \
 Exit `0` = todo coincide · `1` = migración pendiente/incompatible · `2` = error de configuración o
 conexión. El comando **no** adivina el entorno ni edita ficheros `.env`.
 
-**Requisito operativo:** `DIRECT_URL` (o `REMOTE_MIGRATION_GUARD_DATABASE_URL`) debe estar disponible
-para el **paso de build de Production** en Vercel; si es runtime-only, el guard falla de forma segura
-y bloquea el deploy. Se recomienda definir también `REMOTE_MIGRATION_GUARD_EXPECT_URL_CONTAINS` con el
-project ref de producción para la guarda anti-confusión. **Este PR no configura variables remotas.**
+**Requisito operativo:** en Vercel **Production** deben estar disponibles, en el **paso de build**:
+(1) `DIRECT_URL` (o `REMOTE_MIGRATION_GUARD_DATABASE_URL`; si solo hay `DATABASE_URL`, el guard usa
+ese fallback); y (2) **`REMOTE_MIGRATION_GUARD_EXPECT_URL_CONTAINS` = project ref de producción**
+(obligatorio: sin él el build falla antes de conectar). Configúralo **solo en el scope Production**
+— **no** en Preview ni Development (Preview hace SKIP y no debe recibir el marcador). Si algo falta,
+el guard falla de forma segura y bloquea el deploy (el deployment anterior sigue sirviendo).
 
 ## Secuencia obligatoria para cambios con migración
 
