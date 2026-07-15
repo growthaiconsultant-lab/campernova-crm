@@ -104,6 +104,71 @@ Toda migración aditiva futura cambia el catálogo. Al añadir una migración:
 
 ---
 
+## Guard de despliegue: Prisma ↔ base de datos (fail-closed en producción)
+
+**Incidente que evita (2026-07-15):** Vercel desplegó un cliente Prisma que dependía de
+`20260712000000_add_versioned_document_model`, aún **no aplicada** en la base de datos de
+producción. El cliente seleccionaba `vehicle_documents.current_version_id` → PostgreSQL respondía
+`P2022` → reventaban las fichas de vendedor/vehículo (`/vendedores/[id]`) y de entrega
+(`/entregas/[id]`). La lista `/vendedores` no consulta documentos; el mensaje de error procedía del
+`error.tsx` compartido del segmento.
+
+**Mecanismo:** `scripts/check-remote-migrations.ts` (lógica pura en
+[`../../lib/deploy/migration-guard.ts`](../../lib/deploy/migration-guard.ts)) se integra en el
+`build` de Vercel:
+
+```text
+install → prisma generate → check-remote-migrations (solo lectura) → next build → deployment
+```
+
+- **Solo lectura.** Ejecuta un único `SELECT` sobre `_prisma_migrations`. No ejecuta DDL/DML, ni
+  migraciones, ni backfills, ni escribe en `_prisma_migrations`. **No** añade `migrate deploy` al build.
+- **Solo bloquea producción.** Se conecta a la base remota únicamente cuando `VERCEL_ENV=production`.
+  En **Preview**, build local y CI ordinaria hace **SKIP** (no se conecta a producción, no bloquea
+  por falta de credenciales). Los Previews **no** ejecutan migraciones ni consultan producción.
+- **Fail-closed.** En producción el build **falla** (exit ≠ 0, el deployment anterior se conserva y
+  no es sustituido) si: falta `DIRECT_URL`; la URL no supera la guarda de entorno; la base no
+  responde; no existe `_prisma_migrations`; o alguna migración local está **ausente**, **sin
+  finalizar**, **revertida**, con **intento fallido no resuelto**, o con **checksum distinto**.
+- **Compatible con el historial post-squash.** Exige que toda migración **presente en el repo** esté
+  aplicada y con checksum coincidente; **permite** migraciones remotas históricas adicionales que ya
+  no existen como carpeta local. El `checksum` almacenado por Prisma es el **SHA-256 del contenido de
+  `migration.sql`** (verificado en staging y producción), por eso la comparación es directa.
+- **Sin secretos en logs.** Nunca imprime URLs, credenciales, hosts ni parámetros de conexión: solo
+  nombre de migración, tipo de inconsistencia, entorno, commit y conteos.
+
+**Comprobación manual (staging/producción), solo lectura:**
+
+```bash
+# Declara el entorno y un marcador inequívoco (p. ej. el project ref) que la URL debe contener.
+REMOTE_MIGRATION_GUARD_ENV=staging \
+REMOTE_MIGRATION_GUARD_DATABASE_URL="<url staging>" \
+REMOTE_MIGRATION_GUARD_EXPECT_URL_CONTAINS="<ref-staging>" \
+  pnpm check:remote-migrations
+```
+
+Exit `0` = todo coincide · `1` = migración pendiente/incompatible · `2` = error de configuración o
+conexión. El comando **no** adivina el entorno ni edita ficheros `.env`.
+
+**Requisito operativo:** `DIRECT_URL` (o `REMOTE_MIGRATION_GUARD_DATABASE_URL`) debe estar disponible
+para el **paso de build de Production** en Vercel; si es runtime-only, el guard falla de forma segura
+y bloquea el deploy. Se recomienda definir también `REMOTE_MIGRATION_GUARD_EXPECT_URL_CONTAINS` con el
+project ref de producción para la guarda anti-confusión. **Este PR no configura variables remotas.**
+
+## Secuencia obligatoria para cambios con migración
+
+```text
+Migración preparada y validada localmente
+→ aplicada en staging → staging validado
+→ aplicada en producción → producción validada
+→ el código dependiente puede desplegarse
+```
+
+El guard es la red de seguridad de este orden: si el código llega a producción **antes** que su
+migración, el build queda bloqueado en lugar de servir una versión incompatible. Los cambios **no
+compatibles hacia atrás** siguen la estrategia **expand → backfill → observar → contraer** en PRs
+separados (regla 7); el guard no sustituye ese diseño ni automatiza nada destructivo.
+
 ## Checklist para una nueva migración
 
 - [ ] `pnpm prisma migrate dev --name <slug>` (timestamp único de 14 dígitos; nunca reutilizar prefijo).
