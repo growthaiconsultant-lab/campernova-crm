@@ -8,7 +8,7 @@
   },
   "scripts": {
     "dev": "next dev",
-    "build": "prisma generate && next build",
+    "build": "prisma generate && tsx scripts/check-remote-migrations.ts && next build",
     "start": "next start",
     "lint": "next lint",
     "lint:fix": "next lint --fix",
@@ -21,6 +21,7 @@
     "test:e2e": "playwright test",
     "check:rls": "tsx scripts/check-rls.ts",
     "check:migration-history": "tsx scripts/check-migration-history.ts",
+    "check:remote-migrations": "tsx scripts/check-remote-migrations.ts",
     "test:integration:prepare": "tsx scripts/integration-prepare.ts",
     "test:integration": "vitest run --config vitest.integration.config.ts",
     "test:integration:ci": "pnpm test:integration:prepare && pnpm check:rls && pnpm test:integration",

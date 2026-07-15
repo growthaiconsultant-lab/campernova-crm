@@ -84,8 +84,12 @@ no un cambio de código.
 
 ## Vercel
 
-- Build/deploy verde. `build` = `prisma generate && next build`. Limitación conocida: los previews
-  requieren las env vars de Supabase en el scope Preview (independiente de estos jobs).
+- Build/deploy verde. `build` = `prisma generate && check-remote-migrations && next build`. El guard
+  de migraciones es **solo lectura** y **solo activo en `VERCEL_ENV=production`** (fail-closed si una
+  migración local no está aplicada en la BD remota); en Preview/local hace SKIP. Ver
+  [`database-migrations.md`](database-migrations.md#guard-de-despliegue-prisma--base-de-datos-fail-closed-en-producción).
+  Limitación conocida: los previews requieren las env vars de Supabase en el scope Preview
+  (independiente de estos jobs); Production necesita `DIRECT_URL` disponible en el paso de build.
 
 ## Números de referencia (validados)
 

@@ -106,6 +106,16 @@ jobs:
       - name: Integration tests
         run: pnpm test:integration
 
+      # Guard de despliegue (solo lectura) end-to-end contra la base efímera migrada: debe
+      # devolver PASS porque todas las migraciones locales están aplicadas. No usa secretos ni
+      # se conecta a staging/producción; el marcador de entorno valida la guarda anti-confusión.
+      - name: Remote-migration guard (read-only → PASS)
+        env:
+          REMOTE_MIGRATION_GUARD_ENV: production
+          REMOTE_MIGRATION_GUARD_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/campernova_test?schema=public
+          REMOTE_MIGRATION_GUARD_EXPECT_URL_CONTAINS: campernova_test
+        run: pnpm check:remote-migrations
+
   migration-replay:
     name: migration-replay
     runs-on: ubuntu-latest
