@@ -46,7 +46,7 @@ import {
   isReadyForStatus,
   listMissingRequirements,
 } from '@/lib/vehicle-legal'
-import { updateVehicle } from './actions'
+import { updateVehicle, discardSellerLead } from './actions'
 
 const mockAgent = { id: 'agent-1', role: 'AGENTE' as const, name: 'Agente' } as unknown as User
 
@@ -310,5 +310,70 @@ describe('updateVehicle — soldAt canónico', () => {
     expect(result).toMatchObject({ ok: true })
     const updateArg = mockDb.vehicle.update.mock.calls[0][0]
     expect(updateArg.data.soldAt).toBeUndefined()
+  })
+})
+
+// ─── discardSellerLead — decisión comercial (NO archiva, NO elimina) ───────────
+
+describe('discardSellerLead', () => {
+  it('descarta (→ DESCARTADO) con motivo y guarda lostReason + notas', async () => {
+    mockDb.sellerLead.findUnique.mockResolvedValue({ status: 'NUEVO' })
+    const res = await discardSellerLead('s1', 'PRECIO', 'pide muy por encima de la tasación')
+    expect(res).toEqual({ error: null })
+    expect(mockDb.sellerLead.update).toHaveBeenCalledWith({
+      where: { id: 's1' },
+      data: {
+        status: 'DESCARTADO',
+        lostReason: 'PRECIO',
+        lostReasonNotes: 'pide muy por encima de la tasación',
+      },
+    })
+  })
+
+  it('registra una Activity con el motivo', async () => {
+    mockDb.sellerLead.findUnique.mockResolvedValue({ status: 'CONTACTADO' })
+    await discardSellerLead('s1', 'PRECIO')
+    const activity = mockDb.activity.create.mock.calls[0][0].data
+    expect(activity.type).toBe('CAMBIO_ESTADO')
+    expect(activity.sellerLeadId).toBe('s1')
+    expect(activity.agentId).toBe('agent-1')
+    expect(activity.content).toContain('Motivo: Precio')
+  })
+
+  it('rechaza descartar sin motivo (CAM-61)', async () => {
+    const res = await discardSellerLead('s1')
+    expect(res.error).toContain('motivo')
+    expect(mockDb.sellerLead.update).not.toHaveBeenCalled()
+  })
+
+  it('rechaza un motivo inválido', async () => {
+    const res = await discardSellerLead('s1', 'INVENTADO')
+    expect(res.error).toContain('motivo')
+    expect(mockDb.sellerLead.update).not.toHaveBeenCalled()
+  })
+
+  it('notas vacías se guardan como null', async () => {
+    mockDb.sellerLead.findUnique.mockResolvedValue({ status: 'NUEVO' })
+    await discardSellerLead('s1', 'NO_RESPONDE', '   ')
+    expect(mockDb.sellerLead.update.mock.calls[0][0].data.lostReasonNotes).toBeNull()
+  })
+
+  it('no descarta un lead ya en estado terminal', async () => {
+    mockDb.sellerLead.findUnique.mockResolvedValue({ status: 'CERRADO' })
+    const res = await discardSellerLead('s1', 'PRECIO')
+    expect(res.error).toContain('estado final')
+    expect(mockDb.sellerLead.update).not.toHaveBeenCalled()
+  })
+
+  it('NO archiva ni elimina: solo cambia estado; no toca vehículo ni añade campos de archivado', async () => {
+    mockDb.sellerLead.findUnique.mockResolvedValue({ status: 'NUEVO' })
+    await discardSellerLead('s1', 'PRECIO')
+    const data = mockDb.sellerLead.update.mock.calls[0][0].data
+    // Solo los tres campos de la decisión comercial: ningún campo de archivado ni de borrado.
+    expect(Object.keys(data).sort()).toEqual(['lostReason', 'lostReasonNotes', 'status'])
+    expect(data).not.toHaveProperty('archivedAt')
+    expect(data).not.toHaveProperty('deletedAt')
+    // No se modifica el vehículo asociado ni ninguna otra entidad de negocio.
+    expect(mockDb.vehicle.update).not.toHaveBeenCalled()
   })
 })

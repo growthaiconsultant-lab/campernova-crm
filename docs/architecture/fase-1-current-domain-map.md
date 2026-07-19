@@ -91,7 +91,10 @@ Clasificación: **A** activo · **P** parcial/soporte · **L** legacy · **M** m
   DEPOSITO_VENTA / COMPRA_DIRECTA / PARTE_PAGO / INDECISO), no en el vehículo.
 - **Autorización** por **rol global** (`UserRole`) en las server actions (`requireAgente/Admin`); no
   hay checks de ownership por entidad.
-- **Archivar = cambio de estado** (DESCARTADO/PERDIDO); no hay soft-delete genérico.
+- **No existe archivado.** Lo que hay son decisiones **comerciales** terminales: `discardSellerLead`
+  (→ `DESCARTADO`) y `markBuyerLeadLost` (→ `PERDIDO`), con motivo obligatorio y `Activity`. No
+  ocultan el registro de las bandejas, no eliminan datos y no son reversibles. No hay soft-delete
+  genérico. El prefijo `archive*` queda **reservado** para el archivado real (no implementado).
 
 ## 7.4. Riesgos del dominio actual
 

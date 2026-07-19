@@ -18,8 +18,8 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
-import { Archive, MoreHorizontal, Copy, ExternalLink } from 'lucide-react'
-import { archiveBuyerLead } from './actions'
+import { UserX, MoreHorizontal, Copy, ExternalLink } from 'lucide-react'
+import { markBuyerLeadLost } from './actions'
 import { LOST_REASON_OPTIONS } from '@/lib/lost-reason'
 
 type Props = {
@@ -28,25 +28,25 @@ type Props = {
 }
 
 export function BuyerTopbarActions({ leadId, isTerminal }: Props) {
-  const [archiveOpen, setArchiveOpen] = useState(false)
+  const [lostOpen, setLostOpen] = useState(false)
   const [reason, setReason] = useState('')
   const [notes, setNotes] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [isPending, startTransition] = useTransition()
   const router = useRouter()
 
-  function handleArchive() {
+  function handleMarkLost() {
     if (!reason) {
       setError('Selecciona el motivo de la pérdida')
       return
     }
     setError(null)
     startTransition(async () => {
-      const result = await archiveBuyerLead(leadId, reason, notes)
+      const result = await markBuyerLeadLost(leadId, reason, notes)
       if (result.error) {
         setError(result.error)
       } else {
-        setArchiveOpen(false)
+        setLostOpen(false)
         router.refresh()
       }
     })
@@ -59,12 +59,12 @@ export function BuyerTopbarActions({ leadId, isTerminal }: Props) {
   return (
     <>
       <button
-        onClick={() => !isTerminal && setArchiveOpen(true)}
+        onClick={() => !isTerminal && setLostOpen(true)}
         disabled={isTerminal}
         className="flex h-8 w-8 items-center justify-center rounded-lg border border-[#e6e9ee] text-[#586173] transition-colors hover:bg-[#f8fafc] disabled:cursor-not-allowed disabled:opacity-40"
         title={isTerminal ? 'Lead en estado final' : 'Marcar como perdido'}
       >
-        <Archive className="h-4 w-4" />
+        <UserX className="h-4 w-4" />
       </button>
 
       <DropdownMenu>
@@ -86,10 +86,10 @@ export function BuyerTopbarActions({ leadId, isTerminal }: Props) {
             <>
               <DropdownMenuSeparator />
               <DropdownMenuItem
-                onClick={() => setArchiveOpen(true)}
+                onClick={() => setLostOpen(true)}
                 className="text-amber-600 focus:bg-amber-50 focus:text-amber-700"
               >
-                <Archive className="mr-2 h-3.5 w-3.5" />
+                <UserX className="mr-2 h-3.5 w-3.5" />
                 Marcar como perdido
               </DropdownMenuItem>
             </>
@@ -97,14 +97,16 @@ export function BuyerTopbarActions({ leadId, isTerminal }: Props) {
         </DropdownMenuContent>
       </DropdownMenu>
 
-      <Dialog open={archiveOpen} onOpenChange={setArchiveOpen}>
+      <Dialog open={lostOpen} onOpenChange={setLostOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Marcar lead como perdido</DialogTitle>
+            <DialogTitle>Marcar comprador como perdido</DialogTitle>
             <DialogDescription>
-              El lead pasará al estado <strong>Perdido</strong>. Quedará registrado que el comprador
-              no finalizó la compra. Podrás reactivarlo editando el estado manualmente si cambia de
-              opinión.
+              Es una <strong>pérdida comercial</strong>: el comprador pasará al estado{' '}
+              <strong>Perdido</strong> con el motivo que indiques. No se elimina ningún dato y el
+              registro <strong>seguirá visible</strong> en la bandeja y en la búsqueda (no se
+              archiva ni se oculta). <strong>Perdido es un estado final</strong>: no podrá
+              revertirse desde la ficha.
             </DialogDescription>
           </DialogHeader>
           {/* CAM-61: motivo estructurado */}
@@ -142,10 +144,10 @@ export function BuyerTopbarActions({ leadId, isTerminal }: Props) {
             {error && <p className="text-[13px] text-red-600">{error}</p>}
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setArchiveOpen(false)} disabled={isPending}>
+            <Button variant="outline" onClick={() => setLostOpen(false)} disabled={isPending}>
               Cancelar
             </Button>
-            <Button variant="destructive" disabled={isPending} onClick={handleArchive}>
+            <Button variant="destructive" disabled={isPending} onClick={handleMarkLost}>
               {isPending ? 'Procesando…' : 'Marcar como perdido'}
             </Button>
           </DialogFooter>

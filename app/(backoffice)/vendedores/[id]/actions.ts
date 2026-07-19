@@ -300,7 +300,12 @@ export async function updateVehicle(vehicleId: string, data: unknown) {
   return { ok: true }
 }
 
-export async function archiveSellerLead(
+/**
+ * Descarta un vendedor: decisión COMERCIAL que lleva el lead al estado terminal `DESCARTADO`
+ * con un motivo estructurado. NO archiva, NO oculta el registro de las bandejas y NO elimina
+ * datos. El nombre `archive*` queda reservado para el archivado real (aún no implementado).
+ */
+export async function discardSellerLead(
   leadId: string,
   lostReason?: string,
   lostReasonNotes?: string
