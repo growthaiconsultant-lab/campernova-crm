@@ -91,10 +91,20 @@ Clasificación: **A** activo · **P** parcial/soporte · **L** legacy · **M** m
   DEPOSITO_VENTA / COMPRA_DIRECTA / PARTE_PAGO / INDECISO), no en el vehículo.
 - **Autorización** por **rol global** (`UserRole`) en las server actions (`requireAgente/Admin`); no
   hay checks de ownership por entidad.
-- **No existe archivado.** Lo que hay son decisiones **comerciales** terminales: `discardSellerLead`
-  (→ `DESCARTADO`) y `markBuyerLeadLost` (→ `PERDIDO`), con motivo obligatorio y `Activity`. No
-  ocultan el registro de las bandejas, no eliminan datos y no son reversibles. No hay soft-delete
-  genérico. El prefijo `archive*` queda **reservado** para el archivado real (no implementado).
+- **Dos ejes independientes en los leads:**
+  - **Estado comercial** (terminal, irreversible): `discardSellerLead` (→ `DESCARTADO`) y
+    `markBuyerLeadLost` (→ `PERDIDO`), con motivo obligatorio y `Activity`. No eliminan datos.
+  - **Archivado** (organizativo, **reversible**): `archiveSellerLead`/`reactivateSellerLead` y
+    `archiveBuyerLead`/`reactivateBuyerLead` (`app/(backoffice)/lead-archiving-actions.ts`).
+    `archivedAt == null` ⇔ activo. No cambia el estado comercial, ni vehículo, ofertas, entregas,
+    documentos o KPIs; solo escribe los 4 campos de archivado + una `Activity`
+    (`LEAD_ARCHIVADO`/`LEAD_REACTIVADO`, no borrables con `deleteNote`).
+  - **Bloqueos:** archivar se **bloquea** si hay operativa abierta (vehículo en stock, oferta o
+    reserva viva, entrega programada/en curso, próxima acción pendiente, evento futuro). No se
+    cancela ni reasigna nada automáticamente: el operador debe resolverlo antes.
+  - ⚠️ **`ARCHIVED LEADS REMAIN VISIBLE UNTIL PR C`**: las bandejas y la búsqueda todavía **no**
+    filtran por archivado. Ese filtrado llega en PR C.
+- No hay soft-delete genérico, ni hard delete, ni anonimización, ni fusión de duplicados.
 
 ## 7.4. Riesgos del dominio actual
 
