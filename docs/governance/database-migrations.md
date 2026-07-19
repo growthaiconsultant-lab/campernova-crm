@@ -16,9 +16,10 @@
 
 1. **Prisma es la fuente de verdad** del esquema `public` de aplicación (`prisma/schema.prisma` +
    `prisma/migrations/`).
-2. **Hoy existen exactamente 2 migraciones:** `000000000000_squashed_migrations` (baseline) +
-   `20260712000000_add_versioned_document_model` (PR5B1). El job CI `migration-replay` lo verifica
-   por nombre y conteo.
+2. **Hoy existen exactamente 3 migraciones:** `000000000000_squashed_migrations` (baseline) +
+   `20260712000000_add_versioned_document_model` (PR5B1) +
+   `20260719120000_add_lead_archiving_model` (PR B1 · archivado de leads). El job CI
+   `migration-replay` lo verifica por nombre y conteo.
 3. **La baseline es inmutable.** No se edita, no se renombra, no se restaura el historial antiguo
    dentro de `prisma/migrations/` (reintroduciría el defecto de orden). El historial previo vive en
    Git (commit `5ce93d6`, retirado del directorio activo).
@@ -39,11 +40,11 @@
 | Métrica                | Valor            |
 | ---------------------- | ---------------- |
 | Tablas (`public`)      | **31**           |
-| Columnas               | **431**          |
-| Enums                  | **49**           |
-| Valores de enum        | **258**          |
-| Claves foráneas        | **65**           |
-| Índices                | **111**          |
+| Columnas               | **439**          |
+| Enums                  | **50**           |
+| Valores de enum        | **266**          |
+| Claves foráneas        | **67**           |
+| Índices                | **113**          |
 | Tablas sin RLS         | **0**            |
 | Tablas con `FORCE RLS` | **0**            |
 | Políticas en `public`  | **0** (deny-all) |

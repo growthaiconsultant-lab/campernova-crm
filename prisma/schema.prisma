@@ -174,6 +174,10 @@ enum ActivityType {
   OFERTA_ACTUALIZADA
   TRUST_SELLO_OTORGADO
   TRUST_SELLO_REVOCADO
+  // Archivado real (PR B1): valores añadidos de forma aditiva para que PR B2 pueda registrar
+  // archivado/reactivación sin necesitar otra migración. Aún no se emiten.
+  LEAD_ARCHIVADO
+  LEAD_REACTIVADO
 }
 
 /// Temperatura comercial del lead comprador (CAM-62).
@@ -202,6 +206,18 @@ enum LostReason {
   APLAZA
   SIN_STOCK
   EXPECTATIVAS
+  OTRO
+}
+
+/// Motivo ORGANIZATIVO del archivado (PR B1). Es ortogonal a `LostReason`, que expresa el motivo
+/// COMERCIAL de una pérdida/descarte. `POSIBLE_DUPLICADO` es solo una etiqueta de motivo: este PR
+/// no introduce detección ni fusión de duplicados.
+enum ArchiveReason {
+  SIN_RESPUESTA
+  FUERA_DE_MERCADO
+  POSIBLE_DUPLICADO
+  PRUEBA_INTERNA
+  LIMPIEZA_BANDEJA
   OTRO
 }
 
@@ -454,6 +470,8 @@ model User {
 
   sellerLeads              SellerLead[]           @relation("AgentSellerLeads")
   buyerLeads               BuyerLead[]            @relation("AgentBuyerLeads")
+  archivedSellerLeads      SellerLead[]           @relation("ArchivedSellerLeads")
+  archivedBuyerLeads       BuyerLead[]            @relation("ArchivedBuyerLeads")
   activities               Activity[]
   valuations               Valuation[]
   vehicleAds               VehicleAd[]
@@ -527,10 +545,18 @@ model SellerLead {
   riskNotes       String?          @map("risk_notes") // detalle del riesgo
   gdprConsentAt   DateTime?        @map("gdpr_consent_at")
   gdprConsentIp   String?          @map("gdpr_consent_ip")
+  // ── Archivado real (PR B1) — ORTOGONAL al estado comercial, aditivo y reversible ──
+  // `archivedAt == null` ⇔ no archivado. NO es soft-delete: el registro sigue existiendo y
+  // se sigue encontrando en búsqueda. El backend que lo escribe llega en PR B2.
+  archivedAt      DateTime?        @map("archived_at")
+  archivedById    String?          @map("archived_by_id")
+  archiveReason   ArchiveReason?   @map("archive_reason")
+  archiveNotes    String?          @map("archive_notes")
   createdAt       DateTime         @default(now()) @map("created_at")
   updatedAt       DateTime         @updatedAt @map("updated_at")
 
   agent          User?           @relation("AgentSellerLeads", fields: [agentId], references: [id])
+  archivedBy     User?           @relation("ArchivedSellerLeads", fields: [archivedById], references: [id], onDelete: SetNull)
   vehicle        Vehicle?
   activities     Activity[]
   documents      Document[]
@@ -541,6 +567,7 @@ model SellerLead {
   @@index([status])
   @@index([agentId])
   @@index([nextActionDueAt])
+  @@index([archivedAt])
   @@map("seller_leads")
 }
 
@@ -657,38 +684,38 @@ model Valuation {
 /// Lead de comprador — persona que busca comprar un vehículo.
 /// criticalEquipment es JSONB con flags: solar, kitchen, bathroom, shower, heating.
 model BuyerLead {
-  id                     String           @id @default(cuid())
+  id                     String              @id @default(cuid())
   name                   String
   email                  String
   phone                  String
-  agentId                String?          @map("agent_id")
-  vehicleType            VehicleType?     @map("vehicle_type")
-  minSeats               Int?             @map("min_seats") // plazas de viaje requeridas (homologadas)
-  maxBudget              Decimal?         @map("max_budget") @db.Decimal(10, 2)
+  agentId                String?             @map("agent_id")
+  vehicleType            VehicleType?        @map("vehicle_type")
+  minSeats               Int?                @map("min_seats") // plazas de viaje requeridas (homologadas)
+  maxBudget              Decimal?            @map("max_budget") @db.Decimal(10, 2)
   // ── Financiación (Buyer Demand Graph, Block 17) — nullable / additivo ──
-  financingNeeded        Boolean?         @map("financing_needed") // ¿necesita financiación?
-  maxMonthlyPayment      Decimal?         @map("max_monthly_payment") @db.Decimal(10, 2) // cuota máx. mensual
-  criticalEquipment      Json             @default("{}") @map("critical_equipment")
-  useZone                String?          @map("use_zone")
-  purchaseTimeline       String?          @map("purchase_timeline")
+  financingNeeded        Boolean?            @map("financing_needed") // ¿necesita financiación?
+  maxMonthlyPayment      Decimal?            @map("max_monthly_payment") @db.Decimal(10, 2) // cuota máx. mensual
+  criticalEquipment      Json                @default("{}") @map("critical_equipment")
+  useZone                String?             @map("use_zone")
+  purchaseTimeline       String?             @map("purchase_timeline")
   // ── Preferencias RV (Fase #3 v1) — nullable / additivo ──
-  preferredCategory      VehicleCategory? @map("preferred_category") // preferencia (puntúa)
-  preferredBedLayout     BedLayout?       @map("preferred_bed_layout") // preferencia (puntúa)
-  sleepingPlacesRequired Int?             @map("sleeping_places_required") // excluyente
-  bathroomRequired       Boolean?         @map("bathroom_required") // excluyente si true
-  licenseType            LicenseType?     @map("license_type") // B → excluye vehículos > 3.500 kg
-  needsWinter            Boolean?         @map("needs_winter") // penaliza si no está preparado
-  needsGarage            Boolean?         @map("needs_garage") // preferencia
-  maxLengthM             Float?           @map("max_length_m") // restricción parking (excluyente si def.)
-  maxHeightM             Float?           @map("max_height_m") // restricción parking (excluyente si def.)
-  hasKids                Boolean?         @map("has_kids") // → literas / Isofix (preferencia)
-  status                 BuyerLeadStatus  @default(NUEVO)
+  preferredCategory      VehicleCategory?    @map("preferred_category") // preferencia (puntúa)
+  preferredBedLayout     BedLayout?          @map("preferred_bed_layout") // preferencia (puntúa)
+  sleepingPlacesRequired Int?                @map("sleeping_places_required") // excluyente
+  bathroomRequired       Boolean?            @map("bathroom_required") // excluyente si true
+  licenseType            LicenseType?        @map("license_type") // B → excluye vehículos > 3.500 kg
+  needsWinter            Boolean?            @map("needs_winter") // penaliza si no está preparado
+  needsGarage            Boolean?            @map("needs_garage") // preferencia
+  maxLengthM             Float?              @map("max_length_m") // restricción parking (excluyente si def.)
+  maxHeightM             Float?              @map("max_height_m") // restricción parking (excluyente si def.)
+  hasKids                Boolean?            @map("has_kids") // → literas / Isofix (preferencia)
+  status                 BuyerLeadStatus     @default(NUEVO)
   source                 String?
-  nextActionType         NextActionType?  @map("next_action_type")
-  nextActionDueAt        DateTime?        @map("next_action_due_at")
-  lostReason             LostReason?      @map("lost_reason")
-  lostReasonNotes        String?          @map("lost_reason_notes")
-  temperature            LeadTemperature? @map("temperature")
+  nextActionType         NextActionType?     @map("next_action_type")
+  nextActionDueAt        DateTime?           @map("next_action_due_at")
+  lostReason             LostReason?         @map("lost_reason")
+  lostReasonNotes        String?             @map("lost_reason_notes")
+  temperature            LeadTemperature?    @map("temperature")
   // ── Vehículo de parte de pago / trade-in (CAM-63) — nullable / additivo ──
   hasTradeIn             Boolean?            @map("has_trade_in")
   tradeInType            TradeInVehicleType? @map("trade_in_type")
@@ -699,23 +726,32 @@ model BuyerLead {
   tradeInFinancePending  Boolean?            @map("trade_in_finance_pending")
   tradeInNotes           String?             @map("trade_in_notes")
   tradeInSellerLeadId    String?             @unique @map("trade_in_seller_lead_id")
-  createdAt              DateTime         @default(now()) @map("created_at")
-  updatedAt              DateTime         @updatedAt @map("updated_at")
+  // ── Archivado real (PR B1) — ORTOGONAL al estado comercial, aditivo y reversible ──
+  // `archivedAt == null` ⇔ no archivado. NO es soft-delete: el registro sigue existiendo y
+  // se sigue encontrando en búsqueda. El backend que lo escribe llega en PR B2.
+  archivedAt             DateTime?           @map("archived_at")
+  archivedById           String?             @map("archived_by_id")
+  archiveReason          ArchiveReason?      @map("archive_reason")
+  archiveNotes           String?             @map("archive_notes")
+  createdAt              DateTime            @default(now()) @map("created_at")
+  updatedAt              DateTime            @updatedAt @map("updated_at")
 
-  agent            User?             @relation("AgentBuyerLeads", fields: [agentId], references: [id])
-  matches          Match[]
-  activities       Activity[]
-  documents        Document[]
-  chatSession      BuyerChatSession?
-  deliveries       Delivery[]
-  warranty         Warranty?
-  tradeInSellerLead SellerLead?      @relation("BuyerTradeIn", fields: [tradeInSellerLeadId], references: [id])
-  calendarEvents   CalendarEvent[]
-  offers           Offer[]
+  agent             User?             @relation("AgentBuyerLeads", fields: [agentId], references: [id])
+  archivedBy        User?             @relation("ArchivedBuyerLeads", fields: [archivedById], references: [id], onDelete: SetNull)
+  matches           Match[]
+  activities        Activity[]
+  documents         Document[]
+  chatSession       BuyerChatSession?
+  deliveries        Delivery[]
+  warranty          Warranty?
+  tradeInSellerLead SellerLead?       @relation("BuyerTradeIn", fields: [tradeInSellerLeadId], references: [id])
+  calendarEvents    CalendarEvent[]
+  offers            Offer[]
 
   @@index([status])
   @@index([agentId])
   @@index([nextActionDueAt])
+  @@index([archivedAt])
   @@map("buyer_leads")
 }
 
@@ -1217,9 +1253,9 @@ model CalendarEvent {
   vehicleId    String? @map("vehicle_id")
   matchId      String? @map("match_id")
 
-  resultNotes        String? @map("result_notes")
-  internalNotes      String? @map("internal_notes")
-  specificData       Json?   @map("specific_data")
+  resultNotes        String?   @map("result_notes")
+  internalNotes      String?   @map("internal_notes")
+  specificData       Json?     @map("specific_data")
   completedAt        DateTime? @map("completed_at")
   cancelledAt        DateTime? @map("cancelled_at")
   cancellationReason String?   @map("cancellation_reason")
