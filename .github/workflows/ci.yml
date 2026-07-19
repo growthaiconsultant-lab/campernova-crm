@@ -172,8 +172,8 @@ jobs:
           count=$(psql "$PSQL_URL" -tAc "SELECT count(*) FROM _prisma_migrations WHERE finished_at IS NOT NULL")
           names=$(psql "$PSQL_URL" -tAc "SELECT string_agg(migration_name, ',' ORDER BY migration_name) FROM _prisma_migrations WHERE finished_at IS NOT NULL")
           echo "migraciones aplicadas: $count · nombres: $names"
-          test "$count" = "2" || { echo "esperado 2 migraciones aplicadas (baseline + PR5B1)"; exit 1; }
-          test "$names" = "000000000000_squashed_migrations,20260712000000_add_versioned_document_model" || { echo "conjunto u orden de migraciones inesperado"; exit 1; }
+          test "$count" = "3" || { echo "esperado 3 migraciones aplicadas (baseline + PR5B1 + archivado)"; exit 1; }
+          test "$names" = "000000000000_squashed_migrations,20260712000000_add_versioned_document_model,20260719120000_add_lead_archiving_model" || { echo "conjunto u orden de migraciones inesperado"; exit 1; }
 
       - name: Prisma migrate status (must be up to date)
         run: pnpm prisma migrate status
@@ -207,13 +207,19 @@ jobs:
           #   enum_values 255 → 258 (+3: ACTIVE, REPLACED, DELETED)
           #   foreign_keys 60 → 65  (+5: 2 FK compuestas de versión actual + 3 de document_versions)
           #   indexes     101 → 111 (+10: PK + object_path + 2 idx + 4 unique en document_versions + 2 unique (id,current_version_id))
-          # Sin cambio: without_rls=0 (nueva tabla con RLS deny-all), forced=0, policies=0.
+          # Delta tras add_lead_archiving_model (PR B1, aditivo; sin tablas nuevas):
+          #   columns     431 → 439 (+8: seller_leads +4, buyer_leads +4)
+          #   enums       49 → 50   (+1: ArchiveReason)
+          #   enum_values 258 → 266 (+8: 6 de ArchiveReason + LEAD_ARCHIVADO + LEAD_REACTIVADO)
+          #   foreign_keys 65 → 67  (+2: archived_by_id → users, ON DELETE SET NULL)
+          #   indexes     111 → 113 (+2: seller_leads/buyer_leads (archived_at))
+          # Sin cambio: tables=31, without_rls=0, forced=0, policies=0.
           assert tables "$tables" 31
-          assert columns "$columns" 431
-          assert enums "$enums" 49
-          assert enum_values "$enum_values" 258
-          assert foreign_keys "$fks" 65
-          assert indexes "$indexes" 111
+          assert columns "$columns" 439
+          assert enums "$enums" 50
+          assert enum_values "$enum_values" 266
+          assert foreign_keys "$fks" 67
+          assert indexes "$indexes" 113
           assert tables_without_rls "$without_rls" 0
           assert tables_forced_rls "$forced" 0
           assert policies "$policies" 0

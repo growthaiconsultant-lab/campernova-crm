@@ -67,7 +67,7 @@ controlado.
 | **Tests unitarios**               | **721**                                                                                                                  |
 | **Tests de integración**          | **59** (PostgreSQL 17 real y efímero, 10 ficheros)                                                                       |
 | **Tests Supabase**                | **19** (Supabase local efímero, 2 ficheros)                                                                              |
-| **Catálogo (`public`)**           | **31** tablas · **431** columnas · **49** enums · **258** valores de enum · **65** FKs · **111** índices                 |
+| **Catálogo (`public`)**           | **31** tablas · **439** columnas · **50** enums · **266** valores de enum · **67** FKs · **113** índices                 |
 | **Paridad de esquema**            | `prisma migrate diff --exit-code` sin drift (RLS no lo modela Prisma)                                                    |
 | **RLS**                           | **0** tablas de `public` sin RLS · **0** con `FORCE RLS` · **0** políticas en `public` (deny-all)                        |
 | **Supabase local**                | `supabase start` + `supabase db reset` reproducen buckets/políticas; guard anti-remoto activo                            |
@@ -151,7 +151,7 @@ con su commit de squash en `main`.
   (`CREATE TYPE`/`ALTER ADD`/`CREATE TABLE` + 4 `CHECK` + RLS deny-all; sin `DROP`/`DELETE`).
 - **Garantías:** una única fuente de verdad de la versión actual; integridad referencial a nivel de
   motor; escritura de `url` sólo junto a `currentVersionId` no nulo.
-- **Pruebas:** unitarias + integración (CAS, idempotencia). Catálogo actualizado a 31/431/49/258/65/111.
+- **Pruebas:** unitarias + integración (CAS, idempotencia). Catálogo actualizado a 31/439/50/266/67/113.
 - **Limitaciones:** el flujo de _reemplazo_ es code-complete y testeado pero **no está cableado** a
   UI/Server Action todavía.
 

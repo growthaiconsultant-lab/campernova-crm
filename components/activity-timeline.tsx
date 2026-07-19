@@ -60,6 +60,10 @@ const ACTIVITY_LABELS: Record<ActivityType, string> = {
   OFERTA_ACTUALIZADA: 'Oferta actualizada',
   TRUST_SELLO_OTORGADO: 'Sello de confianza',
   TRUST_SELLO_REVOCADO: 'Sello revocado',
+  // PR B1: los valores existen en el enum para que PR B2 los emita. Aún no se crea ninguna
+  // Activity de este tipo; estas entradas solo mantienen exhaustivos los mapas.
+  LEAD_ARCHIVADO: 'Lead archivado',
+  LEAD_REACTIVADO: 'Lead reactivado',
 }
 
 const ICON_CLASSES: Record<ActivityType, string> = {
@@ -106,6 +110,8 @@ const ICON_CLASSES: Record<ActivityType, string> = {
   TRUST_SELLO_OTORGADO:
     'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300',
   TRUST_SELLO_REVOCADO: 'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300',
+  LEAD_ARCHIVADO: 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300',
+  LEAD_REACTIVADO: 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300',
 }
 
 function ActivityIcon({ type }: { type: ActivityType }) {

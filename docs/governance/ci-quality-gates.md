@@ -31,9 +31,10 @@
 
 - Reconstruye el esquema desde una base **vacía** (PostgreSQL 17 efímero).
 - Pasos: `check:migration-history` → `prisma migrate deploy` → confirma que se aplicaron
-  **exactamente** `000000000000_squashed_migrations` + `20260712000000_add_versioned_document_model`
+  **exactamente** las 3 migraciones (`000000000000_squashed_migrations`,
+  `20260712000000_add_versioned_document_model`, `20260719120000_add_lead_archiving_model`)
   → `migrate status` (up to date) → `check:rls` → **paridad** (`migrate diff --exit-code`, sin drift)
-  → **conteos de catálogo** (31/431/49/258/65/111; 0 sin RLS; 0 `FORCE`; 0 políticas) → **segundo
+  → **conteos de catálogo** (31/439/50/266/67/113; 0 sin RLS; 0 `FORCE`; 0 políticas) → **segundo
   `migrate deploy` idempotente**.
 
 ### `supabase-storage`
@@ -94,4 +95,4 @@ no un cambio de código.
 ## Números de referencia (validados)
 
 - Tests unitarios: **721** · integración: **59** (10 ficheros) · Supabase: **19** (2 ficheros).
-- Catálogo `public`: **31/431/49/258/65/111**; **0** tablas sin RLS.
+- Catálogo `public`: **31/439/50/266/67/113**; **0** tablas sin RLS.
