@@ -162,7 +162,12 @@ export async function updateBuyerLead(leadId: string, data: unknown) {
   return { ok: true }
 }
 
-export async function archiveBuyerLead(
+/**
+ * Marca un comprador como perdido: decisión COMERCIAL que lleva el lead al estado terminal
+ * `PERDIDO` con un motivo estructurado. NO archiva, NO oculta el registro de las bandejas y NO
+ * elimina datos. El nombre `archive*` queda reservado para el archivado real (aún no implementado).
+ */
+export async function markBuyerLeadLost(
   leadId: string,
   lostReason?: string,
   lostReasonNotes?: string

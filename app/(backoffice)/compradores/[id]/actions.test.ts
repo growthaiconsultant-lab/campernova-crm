@@ -20,7 +20,7 @@ vi.mock('@/lib/db', () => ({ db: mockDb }))
 
 import type { User } from '@prisma/client'
 import { requireAgente } from '@/lib/auth'
-import { updateBuyerLead, archiveBuyerLead, addBuyerLeadNote } from './actions'
+import { updateBuyerLead, markBuyerLeadLost, addBuyerLeadNote } from './actions'
 
 const admin = { id: 'admin-1', role: 'ADMIN' } as User
 const agent = { id: 'agent-1', role: 'AGENTE' } as User
@@ -96,10 +96,10 @@ describe('updateBuyerLead', () => {
   })
 })
 
-describe('archiveBuyerLead', () => {
-  it('archiva (→ PERDIDO) con motivo y guarda lostReason + notas', async () => {
+describe('markBuyerLeadLost', () => {
+  it('marca como PERDIDO con motivo y guarda lostReason + notas', async () => {
     mockDb.buyerLead.findUnique.mockResolvedValue({ status: 'NUEVO' })
-    const res = await archiveBuyerLead('b1', 'PRECIO', 'quería algo más barato')
+    const res = await markBuyerLeadLost('b1', 'PRECIO', 'quería algo más barato')
     expect(res).toEqual({ error: null })
     expect(mockDb.buyerLead.update).toHaveBeenCalledWith({
       where: { id: 'b1' },
@@ -108,27 +108,27 @@ describe('archiveBuyerLead', () => {
     expect(mockDb.activity.create.mock.calls[0][0].data.content).toContain('Motivo: Precio')
   })
 
-  it('rechaza archivar sin motivo (CAM-61)', async () => {
-    const res = await archiveBuyerLead('b1')
+  it('rechaza marcar sin motivo (CAM-61)', async () => {
+    const res = await markBuyerLeadLost('b1')
     expect(res.error).toContain('motivo')
     expect(mockDb.buyerLead.update).not.toHaveBeenCalled()
   })
 
   it('rechaza un motivo inválido', async () => {
-    const res = await archiveBuyerLead('b1', 'INVENTADO')
+    const res = await markBuyerLeadLost('b1', 'INVENTADO')
     expect(res.error).toContain('motivo')
     expect(mockDb.buyerLead.update).not.toHaveBeenCalled()
   })
 
   it('notas vacías se guardan como null', async () => {
     mockDb.buyerLead.findUnique.mockResolvedValue({ status: 'NUEVO' })
-    await archiveBuyerLead('b1', 'NO_RESPONDE', '   ')
+    await markBuyerLeadLost('b1', 'NO_RESPONDE', '   ')
     expect(mockDb.buyerLead.update.mock.calls[0][0].data.lostReasonNotes).toBeNull()
   })
 
-  it('no archiva un lead en estado terminal CERRADO (CERRADO → PERDIDO inválido)', async () => {
+  it('no marca un lead en estado terminal CERRADO (CERRADO → PERDIDO inválido)', async () => {
     mockDb.buyerLead.findUnique.mockResolvedValue({ status: 'CERRADO' })
-    const res = await archiveBuyerLead('b1', 'PRECIO')
+    const res = await markBuyerLeadLost('b1', 'PRECIO')
     expect(res.error).toContain('estado final')
     expect(mockDb.buyerLead.update).not.toHaveBeenCalled()
   })

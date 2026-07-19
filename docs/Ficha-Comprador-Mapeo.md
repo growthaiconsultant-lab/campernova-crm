@@ -40,7 +40,7 @@ El cambio de mayor ROI del spec (§4.1, §19.2). Campos `nextActionType` (enum: 
 
 ### CAM-61 [P1] Motivo de pérdida estructurado
 
-Enum `lostReason` (PRECIO, FINANCIACION, COMPRO_A_OTRO, NO_RESPONDE, APLAZA, SIN_STOCK, EXPECTATIVAS, OTRO) + `lostReasonNotes` en `BuyerLead` (y `discardReason` equivalente en `SellerLead`). El diálogo de archivar (BuyerTopbarActions) pide el motivo antes de confirmar. Dashboard: distribución de motivos de pérdida (30/90 días).
+Enum `lostReason` (PRECIO, FINANCIACION, COMPRO_A_OTRO, NO_RESPONDE, APLAZA, SIN_STOCK, EXPECTATIVAS, OTRO) + `lostReasonNotes` en `BuyerLead` (y `discardReason` equivalente en `SellerLead`). El diálogo de «Marcar como perdido» (BuyerTopbarActions → `markBuyerLeadLost`) pide el motivo antes de confirmar; es una pérdida comercial, no un archivado. Dashboard: distribución de motivos de pérdida (30/90 días).
 
 ### CAM-62 [P1] Temperatura del lead
 

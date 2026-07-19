@@ -18,8 +18,8 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
-import { Archive, MoreHorizontal, Copy, ExternalLink } from 'lucide-react'
-import { archiveSellerLead } from './actions'
+import { Ban, MoreHorizontal, Copy, ExternalLink } from 'lucide-react'
+import { discardSellerLead } from './actions'
 import { LOST_REASON_OPTIONS } from '@/lib/lost-reason'
 
 type Props = {
@@ -28,25 +28,25 @@ type Props = {
 }
 
 export function SellerTopbarActions({ leadId, isTerminal }: Props) {
-  const [archiveOpen, setArchiveOpen] = useState(false)
+  const [discardOpen, setDiscardOpen] = useState(false)
   const [reason, setReason] = useState('')
   const [notes, setNotes] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [isPending, startTransition] = useTransition()
   const router = useRouter()
 
-  function handleArchive() {
+  function handleDiscard() {
     if (!reason) {
       setError('Selecciona el motivo del descarte')
       return
     }
     setError(null)
     startTransition(async () => {
-      const result = await archiveSellerLead(leadId, reason, notes)
+      const result = await discardSellerLead(leadId, reason, notes)
       if (result.error) {
         setError(result.error)
       } else {
-        setArchiveOpen(false)
+        setDiscardOpen(false)
         router.refresh()
       }
     })
@@ -59,12 +59,12 @@ export function SellerTopbarActions({ leadId, isTerminal }: Props) {
   return (
     <>
       <button
-        onClick={() => !isTerminal && setArchiveOpen(true)}
+        onClick={() => !isTerminal && setDiscardOpen(true)}
         disabled={isTerminal}
         className="flex h-8 w-8 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:cursor-not-allowed disabled:opacity-40"
-        title={isTerminal ? 'Lead en estado final' : 'Descartar lead'}
+        title={isTerminal ? 'Lead en estado final' : 'Descartar vendedor'}
       >
-        <Archive className="h-4 w-4" />
+        <Ban className="h-4 w-4" />
       </button>
 
       <DropdownMenu>
@@ -86,25 +86,27 @@ export function SellerTopbarActions({ leadId, isTerminal }: Props) {
             <>
               <DropdownMenuSeparator />
               <DropdownMenuItem
-                onClick={() => setArchiveOpen(true)}
+                onClick={() => setDiscardOpen(true)}
                 className="text-amber-600 focus:bg-amber-50 focus:text-amber-700"
               >
-                <Archive className="mr-2 h-3.5 w-3.5" />
-                Descartar lead
+                <Ban className="mr-2 h-3.5 w-3.5" />
+                Descartar vendedor
               </DropdownMenuItem>
             </>
           )}
         </DropdownMenuContent>
       </DropdownMenu>
 
-      <Dialog open={archiveOpen} onOpenChange={setArchiveOpen}>
+      <Dialog open={discardOpen} onOpenChange={setDiscardOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Descartar lead</DialogTitle>
+            <DialogTitle>Descartar vendedor</DialogTitle>
             <DialogDescription>
-              El lead pasará al estado <strong>Descartado</strong>. Quedará registrado que no
-              continuó el proceso. Puedes reactivarlo editando el estado manualmente si el vendedor
-              vuelve a contactar.
+              Es una <strong>decisión comercial</strong>: el vendedor pasará al estado{' '}
+              <strong>Descartado</strong> con el motivo que indiques. No se elimina ningún dato y el
+              registro <strong>seguirá visible</strong> en la bandeja y en la búsqueda (no se
+              archiva ni se oculta). <strong>Descartado es un estado final</strong>: no podrá
+              revertirse desde la ficha.
             </DialogDescription>
           </DialogHeader>
           {/* CAM-61: motivo estructurado */}
@@ -142,11 +144,11 @@ export function SellerTopbarActions({ leadId, isTerminal }: Props) {
             {error && <p className="text-[13px] text-red-600">{error}</p>}
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setArchiveOpen(false)} disabled={isPending}>
+            <Button variant="outline" onClick={() => setDiscardOpen(false)} disabled={isPending}>
               Cancelar
             </Button>
-            <Button variant="destructive" disabled={isPending} onClick={handleArchive}>
-              {isPending ? 'Procesando…' : 'Descartar lead'}
+            <Button variant="destructive" disabled={isPending} onClick={handleDiscard}>
+              {isPending ? 'Procesando…' : 'Descartar vendedor'}
             </Button>
           </DialogFooter>
         </DialogContent>
