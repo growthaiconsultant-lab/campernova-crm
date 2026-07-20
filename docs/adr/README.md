@@ -12,5 +12,6 @@ Formato corto: Contexto · Decisión · Consecuencias · Estado.
 | 0004 | Lógica de negocio pura en `lib/` con deps inyectables | Aceptado |
 | 0005 | Trunk-based + entorno de staging + CI como gate       | Aceptado |
 | 0006 | Taxonomía RV en el matching (distribución, camas…)    | Aceptado |
+| 0009 | Coordinación de locks de filas raíz (infra inerte)    | Aceptado |
 
 Para crear uno nuevo: copia un ADR existente, incrementa el número y rellena las secciones.
