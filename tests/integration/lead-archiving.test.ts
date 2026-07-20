@@ -12,7 +12,12 @@
 import { describe, it, expect, beforeAll, afterEach, afterAll, vi } from 'vitest'
 import type { PrismaClient, User } from '@prisma/client'
 
-vi.mock('next/cache', () => ({ revalidatePath: vi.fn() }))
+// Mock PARCIAL: solo se intercepta `revalidatePath`. El resto de `next/cache` debe seguir siendo
+// real porque `lib/dashboard/metrics` usa `unstable_cache` al cargar el módulo.
+vi.mock('next/cache', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('next/cache')>()
+  return { ...actual, revalidatePath: vi.fn() }
+})
 
 const { authHolder } = vi.hoisted(() => ({ authHolder: { user: null as unknown as User } }))
 vi.mock('@/lib/auth', () => ({
