@@ -17,6 +17,12 @@ import {
 import type { SellerLeadStatus } from '@prisma/client'
 import { isValidLostReason, LOST_REASON_LABELS } from '@/lib/lost-reason'
 import {
+  applyVehicleUpdateTx,
+  isVehicleStatusConflict,
+  VEHICLE_STATUS_CONFLICT_MESSAGE,
+  INVALID_VEHICLE_TRANSITION_MESSAGE,
+} from '@/lib/vehicle-status'
+import {
   getVehicleLegalInput,
   getVehicleDocumentSummary,
   listMissingRequirements,
@@ -159,19 +165,12 @@ export async function updateVehicle(vehicleId: string, data: unknown) {
 
   const vehicle = await db.vehicle.findUnique({
     where: { id: vehicleId },
-    select: { sellerLeadId: true, status: true, soldAt: true },
+    select: { sellerLeadId: true, status: true },
   })
   if (!vehicle) return { error: { formErrors: ['Vehículo no encontrado'], fieldErrors: {} } }
 
   if (!isValidTransition(VEHICLE_TRANSITIONS, vehicle.status, status)) {
-    return {
-      error: {
-        formErrors: [
-          `Transición no permitida: ${VEHICLE_STATUS_LABELS[vehicle.status]} → ${VEHICLE_STATUS_LABELS[status]}`,
-        ],
-        fieldErrors: {},
-      },
-    }
+    return { error: { formErrors: [INVALID_VEHICLE_TRANSITION_MESSAGE], fieldErrors: {} } }
   }
 
   // ── Legal guards for TASADO and PUBLICADO ──────────────────────────────────
@@ -214,75 +213,51 @@ export async function updateVehicle(vehicleId: string, data: unknown) {
     }
   }
 
-  if (status === 'VENDIDO' && vehicle.status !== 'VENDIDO') {
-    const delivery = await db.delivery.findFirst({
-      where: {
+  // La venta ya no es alcanzable desde aquí: `VEHICLE_TRANSITIONS` no ofrece ninguna transición
+  // manual a `VENDIDO`, así que el guard que exigía una entrega firmada quedó inalcanzable y se
+  // retiró con él. `soldAt` lo fija el único propietario de la venta, `completeDeliveryTx`.
+  try {
+    await db.$transaction((tx) =>
+      applyVehicleUpdateTx(tx, {
         vehicleId,
-        status: 'COMPLETADA',
-        signedByName: { not: null },
-        signedByDni: { not: null },
-        signatureUrl: { not: null },
-      },
-    })
-    if (!delivery) {
-      return {
-        error: {
-          formErrors: [
-            'El vehículo no puede marcarse como VENDIDO sin una entrega completada y firmada. Crea la entrega desde /entregas.',
-          ],
-          fieldErrors: {},
-        },
-      }
-    }
-  }
-
-  const statusChanging = status !== vehicle.status
-
-  await db.$transaction(async (tx) => {
-    await tx.vehicle.update({
-      where: { id: vehicleId },
-      data: {
-        type,
-        brand,
-        model,
-        year,
-        km,
-        seats,
-        length: length ?? null,
-        conservationState,
-        location: location ?? null,
-        desiredPrice: desiredPrice ?? null,
-        equipment: equipmentResolved,
-        status,
-        category: category ?? null,
-        bedLayout: bedLayout ?? null,
-        sleepingPlaces: sleepingPlaces ?? null,
-        bathroomType: bathroomType ?? null,
-        heatingType: heatingType ?? null,
-        winterized: winterized ?? null,
-        hasGarage: hasGarage ?? null,
-        maxMassKg: maxMassKg ?? null,
-        heightM: heightM ?? null,
-        offGrid: offGrid ?? null,
-        // Hecho canónico de venta: al transicionar a VENDIDO se fija `soldAt` (instante
-        // estructurado de la venta, fuente de los KPIs). Se preserva un `soldAt` existente
-        // (idempotente); VENDIDO es terminal, así que en la práctica se fija una sola vez.
-        ...(status === 'VENDIDO' && vehicle.status !== 'VENDIDO'
-          ? { soldAt: vehicle.soldAt ?? new Date() }
-          : {}),
-      },
-    })
-    if (statusChanging) {
-      await tx.activity.create({
+        expectedStatus: vehicle.status,
+        nextStatus: status,
+        sellerLeadId: vehicle.sellerLeadId,
+        actorId: actor.id,
+        activityContent: `Vehículo: ${VEHICLE_STATUS_LABELS[vehicle.status]} → ${VEHICLE_STATUS_LABELS[status]}`,
         data: {
-          type: 'CAMBIO_ESTADO',
-          content: `Vehículo: ${VEHICLE_STATUS_LABELS[vehicle.status]} → ${VEHICLE_STATUS_LABELS[status]}`,
-          agentId: actor.id,
-          sellerLeadId: vehicle.sellerLeadId,
+          type,
+          brand,
+          model,
+          year,
+          km,
+          seats,
+          length: length ?? null,
+          conservationState,
+          location: location ?? null,
+          desiredPrice: desiredPrice ?? null,
+          equipment: equipmentResolved,
+          status,
+          category: category ?? null,
+          bedLayout: bedLayout ?? null,
+          sleepingPlaces: sleepingPlaces ?? null,
+          bathroomType: bathroomType ?? null,
+          heatingType: heatingType ?? null,
+          winterized: winterized ?? null,
+          hasGarage: hasGarage ?? null,
+          maxMassKg: maxMassKg ?? null,
+          heightM: heightM ?? null,
+          offGrid: offGrid ?? null,
         },
       })
+    )
+  } catch (err) {
+    if (isVehicleStatusConflict(err)) {
+      return { error: { formErrors: [VEHICLE_STATUS_CONFLICT_MESSAGE], fieldErrors: {} } }
     }
-  })
+    // Error técnico inesperado → propágalo; no se disfraza de conflicto de negocio.
+    throw err
+  }
 
   // Re-tasar automáticamente tras cualquier cambio de datos del vehículo
   await runAndSaveAutoValuation(vehicleId, {

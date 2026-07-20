@@ -101,11 +101,20 @@ Helpers: `isValidOfferTransition`, `isTerminalOfferStatus`, `isReservation` (ACE
 > varios tipos de reserva, reservas temporales simultáneas, integraciones externas que escriban
 > stock, o necesidad de enforcement por FK o índice.
 >
-> ⚠️ **`I3 MUST REMOVE MANUAL PUBLICADO ↔ RESERVADO TRANSITIONS FROM updateVehicle`.** Hoy
-> `updateVehicle` todavía permite mover el estado del vehículo a mano, de modo que podría fabricarse
-> el estado anómalo de dos ofertas `ACEPTADA` por fuera de este dominio. Hasta que I3 lo cierre, I2C
-> se **defiende** fallando cerrado. I3 deberá además auditar el resto de escritores de
-> `VehicleStatus`.
+> ✅ **`I3 MUST REMOVE MANUAL PUBLICADO ↔ RESERVADO TRANSITIONS FROM updateVehicle` — completado
+> por I3A.** `VEHICLE_TRANSITIONS` ya no ofrece ninguna transición manual a `RESERVADO` ni a
+> `VENDIDO`, y `RESERVADO` no tiene salidas manuales; además `updateVehicle` escribe con
+> compare-and-swap sobre el estado releído.
+>
+> ```
+> I3A REMOVES MANUAL RESERVATION, RELEASE AND SALE TRANSITIONS FROM updateVehicle
+> OFFER OWNS PUBLICADO ↔ RESERVADO
+> DELIVERY OWNS THE TRANSITION TO VENDIDO
+> DISCARD BLOCKERS AND ROOT LOCK COORDINATION REMAIN PENDING UNTIL I3B
+> ```
+>
+> I3 **no** está completo: I3B (publicación y descarte con raíces y blockers), I3C (Delivery) e I3D
+> (tasación) siguen pendientes, y el resto de escritores de `VehicleStatus` sigue sin coordinar.
 >
 > ⚠️ **`DELIVERY, VEHICLE AND VALUATION WRITERS REMAIN UNCOORDINATED UNTIL I3`** — el invariante
 > global del archivado **todavía no está garantizado**.
