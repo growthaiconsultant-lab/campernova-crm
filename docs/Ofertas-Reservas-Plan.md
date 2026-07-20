@@ -30,7 +30,12 @@ Helpers: `isValidOfferTransition`, `isTerminalOfferStatus`, `isReservation` (ACE
 - **CONVERTIDA**: marca la venta; el `VENDIDO` real lo gestiona `Delivery` (no se toca aquí).
 - Cada cambio deja traza en el timeline de **ambos lados** (comprador + vendedor).
 
-`createOffer`, `updateOfferStatus(id, status, extra)`, `updateOffer` — guard `requireAgente`.
+`createOffer`, `updateOfferStatus(id, status, extra)` — guard `requireAgente`.
+
+> **I2A:** se retiró `updateOffer` (edición genérica de importe/notas/señal). No tenía consumidores y
+> permitía fijar `depositAmount` en cualquier estado sin transacción, sin Activity y sin sincronizar
+> el vehículo. La señal se registra únicamente al ACEPTAR. Una futura corrección o devolución
+> requerirá una operación explícita, auditable y coordinada.
 
 ## UI
 

@@ -53,6 +53,18 @@ export function isValidOfferStatus(v: string): v is OfferStatus {
   return v in OFFER_STATUS_LABELS
 }
 
+/**
+ * Una señal válida es `null` (no la hubo) o un importe **no negativo**.
+ *
+ * Aceptar sin señal es legítimo y sigue inmovilizando el vehículo; lo que no tiene sentido en el
+ * dominio es una señal negativa, que además rompería los importes retenidos que se muestran en
+ * `/ofertas`. `NaN` e infinitos también se rechazan: el formulario acepta texto libre.
+ */
+export function isValidDepositAmount(depositAmount: number | null | undefined): boolean {
+  if (depositAmount == null) return true
+  return Number.isFinite(depositAmount) && depositAmount >= 0
+}
+
 /** Una oferta aceptada con señal es una reserva activa (retiene el vehículo). */
 export function isReservation(status: OfferStatus, depositAmount: number | null): boolean {
   return status === 'ACEPTADA' && depositAmount != null && depositAmount > 0

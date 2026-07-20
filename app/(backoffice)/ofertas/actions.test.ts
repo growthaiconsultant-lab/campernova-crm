@@ -166,3 +166,64 @@ describe('updateOfferStatus · liberación y conversión', () => {
     )
   })
 })
+
+describe('superficie del módulo (I2A)', () => {
+  it('no expone una edición genérica de oferta', async () => {
+    // Comprobación estructural, no de texto: `updateOffer` permitía fijar `depositAmount` en
+    // cualquier estado, sin transacción, sin Activity y sin sincronizar el vehículo.
+    const mod = await import('./actions')
+    expect(Object.keys(mod)).not.toContain('updateOffer')
+  })
+
+  it('solo expone las dos operaciones del dominio', async () => {
+    const mod = await import('./actions')
+    expect(Object.keys(mod).sort()).toEqual(['createOffer', 'updateOfferStatus'])
+  })
+})
+
+describe('validación de señal (I2A)', () => {
+  it.each([-1, -0.5, -5000])(
+    'rechaza una señal negativa (%s) sin escribir nada',
+    async (deposit) => {
+      mockDb.offer.findUnique.mockResolvedValue({ ...offerRow, status: 'PROPUESTA' })
+
+      const res = await updateOfferStatus('offer-1', 'ACEPTADA', { depositAmount: deposit })
+
+      expect(res.error).toBe('La señal no puede ser negativa')
+      expect(mockDb.$transaction).not.toHaveBeenCalled()
+      expect(applyOfferStatusChangeTx).not.toHaveBeenCalled()
+      expect(emitKpiEvent).not.toHaveBeenCalled()
+      expect(revalidatePath).not.toHaveBeenCalled()
+    }
+  )
+
+  it('rechaza una señal no finita', async () => {
+    mockDb.offer.findUnique.mockResolvedValue({ ...offerRow, status: 'PROPUESTA' })
+    const res = await updateOfferStatus('offer-1', 'ACEPTADA', { depositAmount: Number.NaN })
+    expect(res.error).toBe('La señal no puede ser negativa')
+    expect(mockDb.$transaction).not.toHaveBeenCalled()
+  })
+
+  it('sigue aceptando señal nula: aceptar sin señal es legítimo', async () => {
+    mockDb.offer.findUnique.mockResolvedValue({ ...offerRow, status: 'PROPUESTA' })
+    mockDb.$transaction.mockImplementation((fn: (tx: unknown) => unknown) => fn(mockDb))
+    vi.mocked(applyOfferStatusChangeTx).mockResolvedValue({ reserved: true, released: false })
+
+    const res = await updateOfferStatus('offer-1', 'ACEPTADA', { depositAmount: null })
+
+    expect(res.error).toBeUndefined()
+    expect(applyOfferStatusChangeTx).toHaveBeenCalled()
+  })
+
+  it('sigue aceptando una señal positiva', async () => {
+    mockDb.offer.findUnique.mockResolvedValue({ ...offerRow, status: 'PROPUESTA' })
+    mockDb.$transaction.mockImplementation((fn: (tx: unknown) => unknown) => fn(mockDb))
+    vi.mocked(applyOfferStatusChangeTx).mockResolvedValue({ reserved: true, released: false })
+
+    const res = await updateOfferStatus('offer-1', 'ACEPTADA', { depositAmount: 1500 })
+
+    expect(res.error).toBeUndefined()
+    const params = vi.mocked(applyOfferStatusChangeTx).mock.calls[0][1]
+    expect(params.offerData.depositAmount).toBe(1500)
+  })
+})
