@@ -16,13 +16,17 @@ import {
   OFFER_CREATION_ERROR_MESSAGES,
   type CreateOfferTxResult,
 } from '@/lib/offers-creation'
-import { isLockError, withLockedRoots } from '@/lib/locking'
 import {
-  applyOfferStatusChangeTx,
-  OfferConflictError,
-  shouldReserveVehicle,
-  shouldReleaseVehicle,
-} from '@/lib/offers-reservation'
+  applyOfferTransitionTx,
+  buildOfferTransitionRoots,
+  isOfferTransitionError,
+  OFFER_TRANSITION_ERROR_MESSAGES,
+  type OfferTransitionResult,
+} from '@/lib/offers-transition'
+import { isLockError, withLockedRoots } from '@/lib/locking'
+// El servicio de reserva (CAS de Offer y Vehicle) lo invoca ahora el núcleo de transición, dentro
+// de la transacción con las raíces bloqueadas. Aquí solo se necesita su error de conflicto.
+import { OfferConflictError } from '@/lib/offers-reservation'
 import { isValidLostReason } from '@/lib/lost-reason'
 import { emitKpiEvent } from '@/lib/kpi/emit'
 import { KPI_EVENTS } from '@/lib/kpi/events'
@@ -35,9 +39,6 @@ type CreateOfferInput = {
   amount: number
   notes?: string | null
 }
-
-const EUR = (n: number) =>
-  n.toLocaleString('es-ES', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 })
 
 /** Revalida las fichas de ambos lados + el listado de ofertas. */
 function revalidateOffer(buyerLeadId: string, sellerLeadId: string | null) {
@@ -136,17 +137,18 @@ export async function updateOfferStatus(
   const actor = await requireAgente()
   if (!isValidOfferStatus(status)) return { error: 'Estado no válido' }
 
+  // Lectura preliminar: sirve ÚNICAMENTE para descubrir las raíces a bloquear. La transición se
+  // revalida dentro de la transacción sobre datos releídos.
   const offer = await db.offer.findUnique({
     where: { id },
     select: {
       id: true,
       status: true,
-      amount: true,
       buyerLeadId: true,
-      vehicle: { select: { id: true, sellerLeadId: true, brand: true, model: true } },
+      vehicle: { select: { id: true, sellerLeadId: true } },
     },
   })
-  if (!offer) return { error: 'Oferta no encontrada' }
+  if (!offer) return { error: OFFER_TRANSITION_ERROR_MESSAGES.OFFER_NOT_FOUND }
 
   const next = status as OfferStatus
   if (!isValidOfferTransition(offer.status, next)) {
@@ -168,57 +170,47 @@ export async function updateOfferStatus(
     return { error: 'La señal no puede ser negativa' }
   }
 
-  const wasReservation = offer.status === 'ACEPTADA'
   const reservedUntil =
     next === 'ACEPTADA' && extra.reservedUntil ? new Date(extra.reservedUntil) : null
   if (next === 'ACEPTADA' && extra.reservedUntil && isNaN(reservedUntil!.getTime())) {
     return { error: 'Fecha de reserva no válida' }
   }
 
-  const veh = offer.vehicle
-  const reserve = shouldReserveVehicle(next)
-  const release = shouldReleaseVehicle(offer.status, next)
+  const roots = buildOfferTransitionRoots({
+    vehicleId: offer.vehicle.id,
+    sellerLeadId: offer.vehicle.sellerLeadId,
+    buyerLeadId: offer.buyerLeadId,
+  })
 
-  const label = `Oferta ${OFFER_STATUS_LABELS[next].toLowerCase()}`
-  const detail =
-    next === 'ACEPTADA' && extra.depositAmount
-      ? `${label} · señal ${EUR(extra.depositAmount)}`
-      : next === 'RECHAZADA' && rejection
-        ? `${label} (${rejection})`
-        : label
-  const content = `${detail} — ${veh.brand} ${veh.model}`
-
-  // Aceptación/liberación atómica: la disponibilidad se decide con compare-and-swap
-  // dentro de la transacción, no con una lectura previa (evita la carrera de doble reserva).
+  // Locks de raíz + relectura + CAS: los locks coordinan el dominio (archivado, doble aceptación);
+  // el CAS conserva su papel de detectar expectativas obsoletas del llamante.
+  let result: OfferTransitionResult
   try {
-    await db.$transaction((tx) =>
-      applyOfferStatusChangeTx(tx, {
+    result = await withLockedRoots(roots, (tx) =>
+      applyOfferTransitionTx(tx, {
         offerId: id,
-        fromStatus: offer.status,
         toStatus: next,
-        offerData: {
-          rejectionReason: next === 'RECHAZADA' ? (rejection ?? undefined) : undefined,
-          depositAmount: next === 'ACEPTADA' ? (extra.depositAmount ?? undefined) : undefined,
-          reservedUntil: next === 'ACEPTADA' ? reservedUntil : undefined,
-          amount: extra.finalAmount ?? undefined,
-        },
-        vehicleId: veh.id,
-        reserve,
-        release,
-        activityContent: content,
+        resolvedVehicleId: offer.vehicle.id,
+        resolvedBuyerLeadId: offer.buyerLeadId,
+        resolvedSellerLeadId: offer.vehicle.sellerLeadId,
+        depositAmount: next === 'ACEPTADA' ? extra.depositAmount : undefined,
+        reservedUntil,
+        rejectionReason: rejection,
+        finalAmount: extra.finalAmount ?? undefined,
         actorId: actor.id,
-        buyerLeadId: offer.buyerLeadId,
-        sellerLeadId: veh.sellerLeadId,
       })
     )
   } catch (err) {
-    // Conflicto de negocio esperado por concurrencia → mensaje claro al usuario.
+    // Conflictos de negocio y de coordinación esperados → mensaje seguro para el comercial.
+    if (isOfferTransitionError(err)) return { error: err.message }
     if (err instanceof OfferConflictError) return { error: err.message }
+    if (isLockError(err)) return { error: err.message }
     // Error técnico inesperado → propágalo (no ocultarlo como "no disponible").
     throw err
   }
 
-  // Eventos KPI de la transición transaccional
+  // Eventos KPI de la transición transaccional. Siempre DESPUÉS del commit.
+  const wasReservation = result.fromStatus === 'ACEPTADA'
   const kpiEvent =
     next === 'ACEPTADA' && extra.depositAmount
       ? KPI_EVENTS.RESERVATION_CREATED
@@ -231,16 +223,17 @@ export async function updateOfferStatus(
     await emitKpiEvent({
       event: kpiEvent,
       entityType: 'offer',
-      entityId: offer.id,
+      entityId: id,
       relatedEntityType: 'vehicle',
-      relatedEntityId: veh.id,
+      relatedEntityId: result.vehicleId,
       actorUserId: actor.id,
       source: 'ui',
-      metadata: { amount: Number(offer.amount), status: next },
+      metadata: { amount: result.amount, status: next },
     })
   }
 
-  revalidateOffer(offer.buyerLeadId, veh.sellerLeadId)
+  // Se revalida con los datos que vio la transacción, no con los de la lectura preliminar.
+  revalidateOffer(result.buyerLeadId, result.sellerLeadId)
   revalidatePath('/vendedores')
   return {}
 }
