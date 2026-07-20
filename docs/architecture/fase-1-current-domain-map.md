@@ -95,6 +95,25 @@ Clasificación: **A** activo · **P** parcial/soporte · **L** legacy · **M** m
   (→ `DESCARTADO`) y `markBuyerLeadLost` (→ `PERDIDO`), con motivo obligatorio y `Activity`. No
   ocultan el registro de las bandejas, no eliminan datos y no son reversibles. No hay soft-delete
   genérico. El prefijo `archive*` queda **reservado** para el archivado real (no implementado).
+- **`CalendarEvent.commitment`** (`EventCommitment`: EXTERNO / INTERNO / INDETERMINADO) — el tipo de
+  evento **no** basta para saber si romperlo afecta a un cliente: una `LLAMADA` puede ser una
+  llamada concertada o un recordatorio para llamar. La clasificación es explícita y la impone el
+  servidor (`lib/calendar/commitment.ts`): `CITA → EXTERNO`, `LIMPIEZA → INTERNO`; `LLAMADA` y
+  `OTRO` **exigen elección** del usuario. `SEGUIMIENTO` no es creable desde la UI (fuera de
+  `NATIVE_EVENT_TYPES`) y queda `INDETERMINADO`.
+  - **Histórico:** el backfill solo clasificó lo inequívoco (`CITA`, `LIMPIEZA`); `LLAMADA`, `OTRO`
+    y `SEGUIMIENTO` quedaron `INDETERMINADO` **a propósito** — suponerlos internos podría ocultar un
+    compromiso real con un cliente. Se clasifican a mano desde la ficha del evento
+    (`setEventCommitment`), sin posibilidad de volver a `INDETERMINADO`.
+  - **Uso previsto — todavía NO implementado:** el archivado de leads bloqueará ante un evento
+    futuro no terminal `EXTERNO` **o** `INDETERMINADO` (no puede demostrarse que sea interno), y
+    solo advertirá ante `INTERNO`. Esa regla llega en I4/B2 final; **hoy este campo no gobierna
+    ningún comportamiento**: solo se guarda y se muestra.
+  - **Sin índice propio:** la consulta futura de archivado filtra primero por `seller_lead_id` /
+    `buyer_lead_id` / `vehicle_id` (ya indexados), lo que deja pocas filas por lead; `commitment`
+    tiene 3 valores y no aportaría selectividad.
+  - Las órdenes de taller que el calendario **agrega** no son `CalendarEvent`, no tienen
+    `commitment` y siguen gobernadas por el estado del vehículo y de la orden.
 
 ## 7.4. Riesgos del dominio actual
 

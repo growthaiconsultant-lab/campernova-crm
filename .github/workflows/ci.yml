@@ -166,14 +166,14 @@ jobs:
       - name: Apply baseline on empty PostgreSQL 17
         run: pnpm prisma migrate deploy
 
-      - name: Confirm exactly the baseline + PR5B1 migration were applied
+      - name: Confirm exactly the expected migrations were applied
         run: |
           set -euo pipefail
           count=$(psql "$PSQL_URL" -tAc "SELECT count(*) FROM _prisma_migrations WHERE finished_at IS NOT NULL")
           names=$(psql "$PSQL_URL" -tAc "SELECT string_agg(migration_name, ',' ORDER BY migration_name) FROM _prisma_migrations WHERE finished_at IS NOT NULL")
           echo "migraciones aplicadas: $count · nombres: $names"
-          test "$count" = "3" || { echo "esperado 3 migraciones aplicadas (baseline + PR5B1 + archivado)"; exit 1; }
-          test "$names" = "000000000000_squashed_migrations,20260712000000_add_versioned_document_model,20260719120000_add_lead_archiving_model" || { echo "conjunto u orden de migraciones inesperado"; exit 1; }
+          test "$count" = "4" || { echo "esperado 4 migraciones aplicadas (baseline + PR5B1 + archivado + commitment)"; exit 1; }
+          test "$names" = "000000000000_squashed_migrations,20260712000000_add_versioned_document_model,20260719120000_add_lead_archiving_model,20260720000000_add_calendar_event_commitment" || { echo "conjunto u orden de migraciones inesperado"; exit 1; }
 
       - name: Prisma migrate status (must be up to date)
         run: pnpm prisma migrate status
@@ -213,11 +213,16 @@ jobs:
           #   enum_values 258 → 266 (+8: 6 de ArchiveReason + LEAD_ARCHIVADO + LEAD_REACTIVADO)
           #   foreign_keys 65 → 67  (+2: archived_by_id → users, ON DELETE SET NULL)
           #   indexes     111 → 113 (+2: seller_leads/buyer_leads (archived_at))
-          # Sin cambio: tables=31, without_rls=0, forced=0, policies=0.
+          # Delta tras add_calendar_event_commitment (PR I0, aditivo; sin tablas ni FK nuevas):
+          #   columns     439 → 440 (+1: calendar_events.commitment)
+          #   enums       50 → 51   (+1: EventCommitment)
+          #   enum_values 266 → 269 (+3: EXTERNO, INTERNO, INDETERMINADO)
+          #   indexes     113 (sin cambio: la consulta de archivado filtra por las FK ya indexadas)
+          # Sin cambio: tables=31, foreign_keys=67, without_rls=0, forced=0, policies=0.
           assert tables "$tables" 31
-          assert columns "$columns" 439
-          assert enums "$enums" 50
-          assert enum_values "$enum_values" 266
+          assert columns "$columns" 440
+          assert enums "$enums" 51
+          assert enum_values "$enum_values" 269
           assert foreign_keys "$fks" 67
           assert indexes "$indexes" 113
           assert tables_without_rls "$without_rls" 0

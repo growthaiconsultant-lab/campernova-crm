@@ -5,6 +5,7 @@ import { db } from '@/lib/db'
 import { requireAgente } from '@/lib/auth'
 import { createCalendarEventSchema } from '@/lib/validators/calendar-event'
 import { isValidEventTransition, EVENT_TYPE_LABELS } from '@/lib/calendar/event-meta'
+import { resolveCommitment, canReclassify } from '@/lib/calendar/commitment'
 import { sendCalendarEventAssigned } from '@/lib/email/send'
 import type { CalendarEventStatus, Prisma } from '@prisma/client'
 
@@ -18,6 +19,17 @@ export async function createCalendarEvent(data: unknown): Promise<{ error?: stri
   }
   const d = parsed.data
 
+  // La clasificación se decide SIEMPRE en el servidor: el valor del cliente es una propuesta.
+  const commitment = resolveCommitment(d.type, d.commitment ?? null)
+  if (!commitment.ok) {
+    return {
+      error:
+        commitment.reason === 'required'
+          ? 'Indica si el evento es un compromiso acordado con el cliente o una tarea interna'
+          : 'La clasificación no es compatible con el tipo de evento',
+    }
+  }
+
   const start = new Date(d.startAt)
   const endAt =
     d.durationMinutes != null ? new Date(start.getTime() + d.durationMinutes * 60000) : null
@@ -25,6 +37,7 @@ export async function createCalendarEvent(data: unknown): Promise<{ error?: stri
   const event = await db.calendarEvent.create({
     data: {
       type: d.type,
+      commitment: commitment.value,
       title: d.title,
       description: d.description ?? null,
       priority: d.priority,
@@ -120,6 +133,37 @@ export async function updateCalendarEventStatus(
         : {}),
     },
   })
+
+  revalidatePath('/calendario')
+  revalidatePath(`/calendario/${id}`)
+  if (event.buyerLeadId) revalidatePath(`/compradores/${event.buyerLeadId}`)
+  if (event.sellerLeadId) revalidatePath(`/vendedores/${event.sellerLeadId}`)
+  return {}
+}
+
+/**
+ * I0: clasifica un evento como compromiso externo o tarea interna.
+ *
+ * Pensado para los eventos históricos que quedaron `INDETERMINADO` en la migración, cuya
+ * semántica no era deducible del tipo. No permite devolver un evento a `INDETERMINADO`: ese
+ * estado describe el origen del dato, no un destino elegible.
+ */
+export async function setEventCommitment(
+  id: string,
+  commitment: string
+): Promise<{ error?: string }> {
+  await requireAgente()
+
+  const event = await db.calendarEvent.findUnique({
+    where: { id },
+    select: { type: true, buyerLeadId: true, sellerLeadId: true },
+  })
+  if (!event) return { error: 'Evento no encontrado' }
+
+  const resolved = canReclassify(event.type, commitment as never)
+  if (!resolved.ok) return { error: 'La clasificación no es compatible con el tipo de evento' }
+
+  await db.calendarEvent.update({ where: { id }, data: { commitment: resolved.value } })
 
   revalidatePath('/calendario')
   revalidatePath(`/calendario/${id}`)
