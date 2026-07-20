@@ -265,9 +265,10 @@ describe('propiedad de la reserva: como máximo una ACEPTADA por vehículo', () 
     expect(st.dosAceptadas).toBe(false)
     expect(st.aceptadaSinReserva).toBe(false)
 
-    // La perdedora no dejó traza.
-    const activities = await prismaA.activity.count({ where: { buyerLeadId: f.buyerId } })
-    expect(activities).toBe(2) // una aceptación × dos lados
+    // La perdedora no dejó traza: la ganadora escribe UNA Activity por lado (una con
+    // `buyerLeadId` y otra con `sellerLeadId`), así que cada lado debe contar exactamente 1.
+    expect(await prismaA.activity.count({ where: { buyerLeadId: f.buyerId } })).toBe(1)
+    expect(await prismaA.activity.count({ where: { sellerLeadId: f.sellerId } })).toBe(1)
   })
 
   it('cancelar con otra ACEPTADA anómala falla cerrado y no libera', async () => {
