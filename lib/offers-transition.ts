@@ -46,6 +46,7 @@ export type OfferTransitionErrorCode =
   | 'RESERVATION_ALREADY_OWNED'
   | 'RESERVATION_OWNERSHIP_CONFLICT'
   | 'VEHICLE_RESERVATION_STATE_CONFLICT'
+  | 'VEHICLE_NOT_READY_FOR_CONVERSION'
 
 /** Mensajes visibles: sin ids, sin estado interno, sin SQL, sin Prisma, sin PII. */
 export const OFFER_TRANSITION_ERROR_MESSAGES: Record<OfferTransitionErrorCode, string> = {
@@ -64,6 +65,8 @@ export const OFFER_TRANSITION_ERROR_MESSAGES: Record<OfferTransitionErrorCode, s
     'No se puede cancelar la reserva porque el vehículo presenta otra oferta aceptada.',
   VEHICLE_RESERVATION_STATE_CONFLICT:
     'El estado del vehículo no permite completar esta operación. Revísalo antes de continuar.',
+  VEHICLE_NOT_READY_FOR_CONVERSION:
+    'El vehículo no se encuentra reservado y la oferta no puede convertirse en venta.',
 }
 
 /** Conflicto de negocio esperado al transicionar una oferta. No es un error técnico. */
@@ -93,6 +96,24 @@ export const CANCELLABLE_VEHICLE_STATUS_POLICY: Record<VehicleStatus, boolean> =
   NUEVO: false,
   TASADO: false,
   PUBLICADO: true,
+  RESERVADO: true,
+  VENDIDO: false,
+  DESCARTADO: false,
+}
+
+/**
+ * Estados del vehículo compatibles con convertir una oferta aceptada en venta.
+ *
+ * Solo `RESERVADO`. Convertir cierra una venta y emite `SALE_CLOSED`: hacerlo sobre un vehículo
+ * `PUBLICADO` (la reserva se deshizo por fuera), `VENDIDO`/`DESCARTADO` (el ciclo ya terminó) o
+ * `NUEVO`/`TASADO` registraría un cierre sobre un estado operativo incoherente. La conversión **no**
+ * modifica el vehículo: se limita a exigir que la reserva siga viva. Delivery/I3 lo llevará a
+ * `VENDIDO` después.
+ */
+export const OFFER_CONVERSION_VEHICLE_STATUS_POLICY: Record<VehicleStatus, boolean> = {
+  NUEVO: false,
+  TASADO: false,
+  PUBLICADO: false,
   RESERVADO: true,
   VENDIDO: false,
   DESCARTADO: false,
@@ -261,6 +282,14 @@ export async function applyOfferTransitionTx(
   if (fromStatus === 'ACEPTADA' && p.toStatus === 'CANCELADA') {
     if (!CANCELLABLE_VEHICLE_STATUS_POLICY[vehicle.status]) {
       throw new OfferTransitionError('VEHICLE_RESERVATION_STATE_CONFLICT')
+    }
+  }
+
+  if (fromStatus === 'ACEPTADA' && p.toStatus === 'CONVERTIDA') {
+    // Cerrar la venta exige que la reserva siga viva. `!== true` para fallar cerrado también ante
+    // un `VehicleStatus` que la política no contemple en runtime.
+    if (OFFER_CONVERSION_VEHICLE_STATUS_POLICY[vehicle.status] !== true) {
+      throw new OfferTransitionError('VEHICLE_NOT_READY_FOR_CONVERSION')
     }
   }
 

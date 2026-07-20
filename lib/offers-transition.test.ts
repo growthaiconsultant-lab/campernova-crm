@@ -3,6 +3,7 @@ import type { OfferStatus, VehicleStatus } from '@prisma/client'
 import {
   CANCELLABLE_VEHICLE_STATUS_POLICY,
   OFFER_ACCEPTANCE_REQUIRED_VEHICLE_STATUS,
+  OFFER_CONVERSION_VEHICLE_STATUS_POLICY,
   OFFER_TRANSITION_ERROR_MESSAGES,
   OfferTransitionError,
   applyOfferTransitionTx,
@@ -377,6 +378,68 @@ describe('conversión', () => {
     expect(res.toStatus).toBe('CONVERTIDA')
     expect(res.released).toBe(false)
     expect(calls.vehicleUpdate).toBe(0)
+  })
+
+  it('con el vehículo RESERVADO: convierte y deja traza en ambos lados', async () => {
+    const { tx, calls } = fakeTx({
+      offer: acceptedOffer,
+      vehicle: { id: 'v1', status: 'RESERVADO', sellerLeadId: 's1', brand: 'A', model: 'B' },
+    })
+    const res = await run(tx, convert)
+    expect(res.toStatus).toBe('CONVERTIDA')
+    expect(calls.offerUpdate).toBe(1)
+    expect(calls.vehicleUpdate).toBe(0)
+    expect(calls.activity).toBe(2)
+  })
+
+  // F1: convertir cierra una venta y emite SALE_CLOSED. Solo desde una reserva viva.
+  it.each(['NUEVO', 'TASADO', 'PUBLICADO', 'VENDIDO', 'DESCARTADO'] as VehicleStatus[])(
+    'con el vehículo en %s → VEHICLE_NOT_READY_FOR_CONVERSION, sin tocar nada',
+    async (status) => {
+      const { tx, calls } = fakeTx({
+        offer: acceptedOffer,
+        vehicle: { id: 'v1', status, sellerLeadId: 's1', brand: 'A', model: 'B' },
+      })
+      await expect(run(tx, convert)).rejects.toMatchObject({
+        code: 'VEHICLE_NOT_READY_FOR_CONVERSION',
+      })
+      expect(calls.offerUpdate).toBe(0)
+      expect(calls.vehicleUpdate).toBe(0)
+      expect(calls.activity).toBe(0)
+    }
+  )
+
+  it('un VehicleStatus desconocido en runtime falla cerrado', async () => {
+    const { tx, calls } = fakeTx({
+      offer: acceptedOffer,
+      vehicle: { id: 'v1', status: 'ESTADO_FUTURO', sellerLeadId: 's1', brand: 'A', model: 'B' },
+    })
+    await expect(run(tx, convert)).rejects.toMatchObject({
+      code: 'VEHICLE_NOT_READY_FOR_CONVERSION',
+    })
+    expect(calls.offerUpdate).toBe(0)
+    expect(calls.activity).toBe(0)
+  })
+
+  it('la política cubre todos los VehicleStatus y solo permite RESERVADO', () => {
+    // Un valor nuevo del enum rompe la compilación del Record y obliga a decidir la política.
+    expect(Object.keys(OFFER_CONVERSION_VEHICLE_STATUS_POLICY).sort()).toEqual(
+      [...ALL_VEHICLE_STATUSES].sort()
+    )
+    const permitidos = ALL_VEHICLE_STATUSES.filter((s) => OFFER_CONVERSION_VEHICLE_STATUS_POLICY[s])
+    expect(permitidos).toEqual(['RESERVADO'])
+  })
+
+  it('la propiedad se valida antes que el estado del vehículo', async () => {
+    // Con otra ACEPTADA y el vehículo PUBLICADO gana el conflicto de propiedad: orden determinista.
+    const { tx } = fakeTx({
+      offer: acceptedOffer,
+      vehicle: { id: 'v1', status: 'PUBLICADO', sellerLeadId: 's1', brand: 'A', model: 'B' },
+      otherAccepted: 1,
+    })
+    await expect(run(tx, convert)).rejects.toMatchObject({
+      code: 'RESERVATION_OWNERSHIP_CONFLICT',
+    })
   })
 
   it('si existe otra ACEPTADA → RESERVATION_OWNERSHIP_CONFLICT', async () => {

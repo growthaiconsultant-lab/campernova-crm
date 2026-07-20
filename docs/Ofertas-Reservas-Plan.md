@@ -26,8 +26,8 @@ Helpers: `isValidOfferTransition`, `isTerminalOfferStatus`, `isReservation` (ACE
 ## Efectos sobre el stock (server actions)
 
 - **ACEPTADA**: el vehículo pasa a `RESERVADO` si estaba `PUBLICADO` (transición validada con `VEHICLE_TRANSITIONS`).
-- **CANCELADA / RETIRADA / EXPIRADA** desde una reserva: libera el vehículo (`RESERVADO → PUBLICADO`).
-- **CONVERTIDA**: marca la venta; el `VENDIDO` real lo gestiona `Delivery` (no se toca aquí).
+- **CANCELADA** desde una reserva: libera el vehículo (`RESERVADO → PUBLICADO`). `RECHAZADA`, `EXPIRADA` y `RETIRADA` no son alcanzables desde `ACEPTADA` y no tocan el stock.
+- **CONVERTIDA**: exige el vehículo `RESERVADO` y marca la venta; el `VENDIDO` real lo gestiona `Delivery` (no se toca aquí).
 - Cada cambio deja traza en el timeline de **ambos lados** (comprador + vendedor).
 
 `createOffer`, `updateOfferStatus(id, status, extra)` — guard `requireAgente`.
@@ -86,8 +86,14 @@ Helpers: `isValidOfferTransition`, `isTerminalOfferStatus`, `isReservation` (ACE
 > **Cancelación**: libera solo si el vehículo sigue `RESERVADO`; si ya está `PUBLICADO` la liberación
 > se considera hecha y no es un fallo; en `NUEVO`, `TASADO`, `VENDIDO` o `DESCARTADO` falla cerrado
 > con `VEHICLE_RESERVATION_STATE_CONFLICT` — nunca se fuerza el vehículo a `PUBLICADO`.
-> **Conversión**: no libera; el vehículo sigue `RESERVADO` hasta que la entrega lo lleve a `VENDIDO`.
-> **Terminales desde `PROPUESTA`/`CONTRAOFERTA`**: no tocan el stock.
+> **Conversión**: solo se permite cuando el vehículo está `RESERVADO` y **no modifica ese estado**
+> (`VEHICLE_NOT_READY_FOR_CONVERSION` en cualquier otro). Convertir cierra una venta y emite
+> `SALE_CLOSED`, así que exige que la reserva siga viva; Delivery/I3 será responsable de llevar el
+> vehículo posteriormente a `VENDIDO`.
+> **Terminales desde `PROPUESTA`/`CONTRAOFERTA`**: `RECHAZADA`, `EXPIRADA` y `RETIRADA` solo parten
+> de esos dos estados y **no tocan el stock**. No existe «retirar o expirar una reserva»: desde
+> `ACEPTADA` la máquina de estados únicamente admite `CANCELADA` (que puede liberar) y `CONVERTIDA`
+> (que no libera).
 >
 > **Decisión vigente: no se añade `reservedByOfferId`.** La propiedad se deriva de la unicidad, el
 > lock de `Vehicle` la protege en los escritores de oferta, e I3 eliminará el escritor manual que

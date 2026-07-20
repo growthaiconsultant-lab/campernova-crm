@@ -458,12 +458,23 @@ describe('updateOfferStatus · errores de dominio de I2C', () => {
     ['VEHICLE_RESERVATION_STATE_CONFLICT', 'estado del vehículo'],
     ['OFFER_ROOT_CHANGED', 'han cambiado'],
     ['VEHICLE_NOT_AVAILABLE', 'publicado'],
+    ['VEHICLE_NOT_READY_FOR_CONVERSION', 'no se encuentra reservado'],
   ])('%s → mensaje seguro, sin KPI ni revalidación', async (code, fragmento) => {
     vi.mocked(applyOfferTransitionTx).mockRejectedValue(new OfferTransitionError(code as never))
 
     const res = await updateOfferStatus('offer-1', 'CANCELADA')
     expect(res.error).toContain(fragmento)
     expect(res.error).not.toMatch(/prisma|select|update |[0-9a-f]{20,}/i)
+    expect(emitKpiEvent).not.toHaveBeenCalled()
+    expect(revalidatePath).not.toHaveBeenCalled()
+  })
+
+  it('conversión rechazada: no emite SALE_CLOSED', async () => {
+    vi.mocked(applyOfferTransitionTx).mockRejectedValue(
+      new OfferTransitionError('VEHICLE_NOT_READY_FOR_CONVERSION')
+    )
+    const res = await updateOfferStatus('offer-1', 'CONVERTIDA')
+    expect(res.error).toContain('no se encuentra reservado')
     expect(emitKpiEvent).not.toHaveBeenCalled()
     expect(revalidatePath).not.toHaveBeenCalled()
   })

@@ -25,7 +25,33 @@ import { createGuardedTestPrisma, uniqueSuffix } from './db'
 
 let prismaA: PrismaClient
 let prismaB: PrismaClient
+/** Tercera conexión, solo observa: no participa en las carreras. */
+let prismaObs: PrismaClient
 const cleanups: Array<() => Promise<void>> = []
+
+/**
+ * Espera a que **otra** sesión quede bloqueada esperando un lock, consultando `pg_stat_activity`.
+ * Es la prueba de que la segunda operación llegó realmente a contender y no se limitó a ejecutarse
+ * después. Si nadie llega a esperar dentro del plazo, lanza y el test falla.
+ */
+async function waitUntilBlocked(timeoutMs = 8_000): Promise<void> {
+  const deadline = Date.now() + timeoutMs
+  for (;;) {
+    const rows = await prismaObs.$queryRaw<Array<{ n: number }>>`
+      SELECT count(*)::int AS n
+      FROM pg_stat_activity
+      WHERE datname = current_database()
+        AND pid <> pg_backend_pid()
+        AND wait_event_type = 'Lock'`
+    if ((rows[0]?.n ?? 0) > 0) return
+    if (Date.now() > deadline) {
+      throw new Error(
+        'la segunda operación nunca llegó a esperar un lock: contención no demostrada'
+      )
+    }
+    await new Promise((r) => setTimeout(r, 25))
+  }
+}
 
 function barrier() {
   let open!: () => void
@@ -204,6 +230,7 @@ async function forbiddenState(f: Fixture) {
 beforeAll(() => {
   prismaA = createGuardedTestPrisma()
   prismaB = createGuardedTestPrisma()
+  prismaObs = createGuardedTestPrisma()
 })
 
 afterEach(async () => {
@@ -211,7 +238,7 @@ afterEach(async () => {
 })
 
 afterAll(async () => {
-  await Promise.all([prismaA.$disconnect(), prismaB.$disconnect()])
+  await Promise.all([prismaA.$disconnect(), prismaB.$disconnect(), prismaObs.$disconnect()])
 })
 
 describe('propiedad de la reserva: como máximo una ACEPTADA por vehículo', () => {
@@ -360,11 +387,12 @@ describe('cancelación y estado del vehículo', () => {
     )
     await cancelLocked.wait
 
-    // B intenta aceptar mientras A retiene las raíces: espera al lock.
+    // B intenta aceptar mientras A retiene las raíces: debe quedarse esperando al lock.
     const accept = transition(f, f.offerB, 'ACEPTADA', prismaB, { depositAmount: 2000 }).catch(
       (e) => e
     )
-    for (let i = 0; i < 20; i++) await new Promise((r) => setImmediate(r))
+    // Prueba positiva de contención: si B no llega a bloquearse, el test falla aquí.
+    await waitUntilBlocked()
 
     releaseCancel.open()
     await cancel
@@ -381,6 +409,66 @@ describe('cancelación y estado del vehículo', () => {
       expect(st.aceptadas).toBe(1)
       expect(st.vehicleStatus).toBe('RESERVADO')
     }
+  })
+})
+
+describe('conversión y estado del vehículo', () => {
+  /** Deja la oferta A ACEPTADA (vehículo RESERVADO) y opcionalmente fuerza otro estado. */
+  async function accepted(force?: VehicleStatus) {
+    const f = await seed()
+    await transition(f, f.offerA, 'ACEPTADA', prismaA, { depositAmount: 1000 })
+    if (force) {
+      // Simula al escritor no coordinado que I3 debe eliminar (`updateVehicle`).
+      await prismaA.vehicle.update({ where: { id: f.vehicleId }, data: { status: force } })
+    }
+    return f
+  }
+
+  it('con el vehículo RESERVADO: convierte y el vehículo sigue RESERVADO', async () => {
+    const f = await accepted()
+    const before = await prismaA.activity.count({ where: { buyerLeadId: f.buyerId } })
+
+    const res = await transition(f, f.offerA, 'CONVERTIDA', prismaA)
+
+    expect(res.toStatus).toBe('CONVERTIDA')
+    const offer = await prismaA.offer.findUniqueOrThrow({ where: { id: f.offerA } })
+    expect(offer.status).toBe('CONVERTIDA')
+    const st = await forbiddenState(f)
+    expect(st.vehicleStatus).toBe('RESERVADO')
+    // Una Activity por lado; aquí se cuenta la del comprador.
+    expect(await prismaA.activity.count({ where: { buyerLeadId: f.buyerId } })).toBe(before + 1)
+    expect(await prismaA.activity.count({ where: { sellerLeadId: f.sellerId } })).toBeGreaterThan(0)
+  })
+
+  it.each(['PUBLICADO', 'VENDIDO', 'DESCARTADO'] as VehicleStatus[])(
+    'con el vehículo en %s: falla cerrado y no cambia nada',
+    async (status) => {
+      const f = await accepted(status)
+      const before = await prismaA.activity.count({ where: { buyerLeadId: f.buyerId } })
+
+      const err = await transition(f, f.offerA, 'CONVERTIDA', prismaA).catch((e) => e)
+
+      expect(codeOf(err)).toBe('VEHICLE_NOT_READY_FOR_CONVERSION')
+      const offer = await prismaA.offer.findUniqueOrThrow({ where: { id: f.offerA } })
+      expect(offer.status).toBe('ACEPTADA')
+      const vehicle = await prismaA.vehicle.findUniqueOrThrow({ where: { id: f.vehicleId } })
+      expect(vehicle.status).toBe(status)
+      expect(await prismaA.activity.count({ where: { buyerLeadId: f.buyerId } })).toBe(before)
+    }
+  )
+
+  it('con otra oferta ACEPTADA: conflicto de propiedad y cero cambios', async () => {
+    const f = await accepted()
+    // Estado anómalo fabricado fuera del dominio (lo que I3 debe impedir).
+    await prismaA.offer.update({ where: { id: f.offerB }, data: { status: 'ACEPTADA' } })
+    const before = await prismaA.activity.count({ where: { buyerLeadId: f.buyerId } })
+
+    const err = await transition(f, f.offerA, 'CONVERTIDA', prismaA).catch((e) => e)
+
+    expect(codeOf(err)).toBe('RESERVATION_OWNERSHIP_CONFLICT')
+    const offer = await prismaA.offer.findUniqueOrThrow({ where: { id: f.offerA } })
+    expect(offer.status).toBe('ACEPTADA')
+    expect(await prismaA.activity.count({ where: { buyerLeadId: f.buyerId } })).toBe(before)
   })
 })
 
