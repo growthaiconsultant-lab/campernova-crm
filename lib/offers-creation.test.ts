@@ -5,6 +5,7 @@ import {
   OFFER_CREATION_ERROR_MESSAGES,
   OfferCreationError,
   buildOfferCreationRoots,
+  OFFER_CREATION_VEHICLE_STATUS_POLICY,
   canCreateOfferForVehicleStatus,
   createOfferTx,
   isOfferCreationError,
@@ -20,7 +21,7 @@ const ALL_VEHICLE_STATUSES: VehicleStatus[] = [
 ]
 
 describe('estados permitidos para crear oferta', () => {
-  it('la regla es explícita y contiene exactamente los tres acordados', () => {
+  it('la lista derivada contiene exactamente los tres acordados', () => {
     expect(OFFER_CREATION_ALLOWED_VEHICLE_STATUSES).toEqual(['TASADO', 'PUBLICADO', 'RESERVADO'])
   })
 
@@ -32,17 +33,28 @@ describe('estados permitidos para crear oferta', () => {
     expect(canCreateOfferForVehicleStatus(status)).toBe(false)
   })
 
-  it('cubre TODOS los valores del enum, sin deducir por exclusión', () => {
-    // Si alguien añade un estado nuevo al enum, este test obliga a decidirlo explícitamente.
-    const decided = ALL_VEHICLE_STATUSES.map((s) => [s, canCreateOfferForVehicleStatus(s)])
-    expect(decided).toEqual([
-      ['NUEVO', false],
-      ['TASADO', true],
-      ['PUBLICADO', true],
-      ['RESERVADO', true],
-      ['VENDIDO', false],
-      ['DESCARTADO', false],
-    ])
+  it('la política declara una decisión para cada valor del enum', () => {
+    // La garantía real es de COMPILACIÓN: `Record<VehicleStatus, boolean>` obliga a declarar el
+    // estado nuevo. Este test comprueba en runtime que la política y el enum siguen alineados.
+    expect(Object.keys(OFFER_CREATION_VEHICLE_STATUS_POLICY).sort()).toEqual(
+      [...ALL_VEHICLE_STATUSES].sort()
+    )
+    for (const status of ALL_VEHICLE_STATUSES) {
+      expect(typeof OFFER_CREATION_VEHICLE_STATUS_POLICY[status]).toBe('boolean')
+    }
+  })
+
+  it('la lista derivada no es una segunda fuente: sale de la política', () => {
+    const esperados = (Object.keys(OFFER_CREATION_VEHICLE_STATUS_POLICY) as VehicleStatus[]).filter(
+      (s) => OFFER_CREATION_VEHICLE_STATUS_POLICY[s]
+    )
+    expect(OFFER_CREATION_ALLOWED_VEHICLE_STATUSES).toEqual(esperados)
+  })
+
+  it('es fail-closed ante un estado no declarado que llegue sin tipar', () => {
+    // p. ej. un valor procedente de la base que el enum de la app todavía no conoce.
+    expect(canCreateOfferForVehicleStatus('ESTADO_FUTURO' as VehicleStatus)).toBe(false)
+    expect(canCreateOfferForVehicleStatus(undefined as unknown as VehicleStatus)).toBe(false)
   })
 })
 
@@ -189,11 +201,26 @@ describe('createOfferTx — validaciones', () => {
     expect(calls.offerCreate).toBe(0)
   })
 
-  it('el vehículo pasó a tener vendedor donde no lo había → OFFER_ROOT_CHANGED', async () => {
+  it('el vehículo pasó a tener vendedor donde no lo había (null → S2) → OFFER_ROOT_CHANGED', async () => {
     const { tx } = fakeTx()
     await expect(run(tx, { ...params, resolvedSellerLeadId: null })).rejects.toMatchObject({
       code: 'OFFER_ROOT_CHANGED',
     })
+  })
+
+  it('el vehículo PERDIÓ su vendedor (S1 → null) → OFFER_ROOT_CHANGED, sin escribir', async () => {
+    // Tercera dirección del cambio de raíz: se bloqueó S1, pero la relectura ya no ve ningún
+    // vendedor. Continuar dejaría la operación apoyada en un lock que ya no describe la realidad.
+    const { tx, calls } = fakeTx({
+      vehicle: { id: 'v1', status: 'PUBLICADO', sellerLeadId: null, brand: 'A', model: 'B' },
+    })
+
+    await expect(run(tx, { ...params, resolvedSellerLeadId: 's1' })).rejects.toMatchObject({
+      code: 'OFFER_ROOT_CHANGED',
+    })
+    expect(tx.sellerLead.findUnique).not.toHaveBeenCalled()
+    expect(calls.offerCreate).toBe(0)
+    expect(calls.activityCreateMany).toBe(0)
   })
 
   it.each(['NUEVO', 'VENDIDO', 'DESCARTADO'] as VehicleStatus[])(

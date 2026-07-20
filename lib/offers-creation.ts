@@ -24,8 +24,12 @@ import type { Prisma, VehicleStatus } from '@prisma/client'
 import type { LockRoot } from '@/lib/locking'
 
 /**
- * Estados del vehículo que admiten registrar una oferta nueva. Regla explícita y centralizada: no
- * se deduce por exclusión ni se reparte entre llamantes.
+ * Política por estado del vehículo para registrar una oferta nueva. Regla explícita y centralizada:
+ * no se deduce por exclusión ni se reparte entre llamantes.
+ *
+ * Es un `Record<VehicleStatus, boolean>` **exhaustivo** a propósito: añadir un valor al enum
+ * `VehicleStatus` rompe la compilación hasta que alguien declare si permite crear ofertas. Un array
+ * de estados permitidos no daría esa garantía — el nuevo estado quedaría fuera en silencio.
  *
  * - `TASADO`: se permite empezar a negociar antes de la publicación formal.
  * - `PUBLICADO`: caso operativo normal.
@@ -40,14 +44,29 @@ import type { LockRoot } from '@/lib/locking'
  * sobre `TASADO` o `RESERVADO` no podrá aceptarse mientras el vehículo no esté publicado y libre.
  * Revisar esa coherencia corresponde a **I2C**; I2B no la toca.
  */
-export const OFFER_CREATION_ALLOWED_VEHICLE_STATUSES: VehicleStatus[] = [
-  'TASADO',
-  'PUBLICADO',
-  'RESERVADO',
-]
+export const OFFER_CREATION_VEHICLE_STATUS_POLICY: Record<VehicleStatus, boolean> = {
+  NUEVO: false,
+  TASADO: true,
+  PUBLICADO: true,
+  RESERVADO: true,
+  VENDIDO: false,
+  DESCARTADO: false,
+}
 
+/**
+ * Lista derivada, para los consumidores que necesiten enumerar los estados admitidos. **No** es
+ * una segunda fuente de verdad: se calcula de la política, así que no puede desincronizarse.
+ */
+export const OFFER_CREATION_ALLOWED_VEHICLE_STATUSES: VehicleStatus[] = (
+  Object.keys(OFFER_CREATION_VEHICLE_STATUS_POLICY) as VehicleStatus[]
+).filter((status) => OFFER_CREATION_VEHICLE_STATUS_POLICY[status])
+
+/**
+ * Fail-closed también en runtime: un valor que no esté en la política —por ejemplo un dato no
+ * tipado procedente de la base— se rechaza en lugar de colarse por ausencia de regla.
+ */
 export function canCreateOfferForVehicleStatus(status: VehicleStatus): boolean {
-  return OFFER_CREATION_ALLOWED_VEHICLE_STATUSES.includes(status)
+  return OFFER_CREATION_VEHICLE_STATUS_POLICY[status] === true
 }
 
 export type OfferCreationErrorCode =
