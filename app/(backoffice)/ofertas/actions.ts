@@ -10,6 +10,14 @@ import {
   OFFER_STATUS_LABELS,
 } from '@/lib/offers'
 import {
+  buildOfferCreationRoots,
+  createOfferTx,
+  isOfferCreationError,
+  OFFER_CREATION_ERROR_MESSAGES,
+  type CreateOfferTxResult,
+} from '@/lib/offers-creation'
+import { isLockError, withLockedRoots } from '@/lib/locking'
+import {
   applyOfferStatusChangeTx,
   OfferConflictError,
   shouldReserveVehicle,
@@ -50,48 +58,51 @@ export async function createOffer(
   if (!data.vehicleId || !data.buyerLeadId) return { error: 'Falta el vehículo o el comprador' }
   if (!data.amount || data.amount <= 0) return { error: 'Indica un importe válido' }
 
+  // Lectura preliminar: sirve ÚNICAMENTE para descubrir las raíces a bloquear. Ninguna decisión
+  // comercial se toma con estos datos — todo se revalida dentro de la transacción.
   const [vehicle, buyer] = await Promise.all([
     db.vehicle.findUnique({
       where: { id: data.vehicleId },
-      select: { id: true, brand: true, model: true, sellerLeadId: true },
+      select: { id: true, sellerLeadId: true },
     }),
-    db.buyerLead.findUnique({ where: { id: data.buyerLeadId }, select: { id: true, name: true } }),
+    db.buyerLead.findUnique({ where: { id: data.buyerLeadId }, select: { id: true } }),
   ])
-  if (!vehicle) return { error: 'Vehículo no encontrado' }
-  if (!buyer) return { error: 'Comprador no encontrado' }
+  if (!vehicle) return { error: OFFER_CREATION_ERROR_MESSAGES.VEHICLE_NOT_FOUND }
+  if (!buyer) return { error: OFFER_CREATION_ERROR_MESSAGES.BUYER_LEAD_NOT_FOUND }
 
-  const offer = await db.offer.create({
-    data: {
-      vehicleId: data.vehicleId,
-      buyerLeadId: data.buyerLeadId,
-      matchId: data.matchId || null,
-      amount: data.amount,
-      notes: data.notes?.trim() || null,
-      createdById: actor.id,
-    },
+  const roots = buildOfferCreationRoots({
+    vehicleId: vehicle.id,
+    sellerLeadId: vehicle.sellerLeadId,
+    buyerLeadId: buyer.id,
   })
 
-  const content = `Oferta registrada: ${EUR(data.amount)} — ${buyer.name} por ${vehicle.brand} ${vehicle.model}`
-  await db.activity.createMany({
-    data: [
-      { type: 'OFERTA_REGISTRADA', content, agentId: actor.id, buyerLeadId: buyer.id },
-      ...(vehicle.sellerLeadId
-        ? [
-            {
-              type: 'OFERTA_REGISTRADA' as const,
-              content,
-              agentId: actor.id,
-              sellerLeadId: vehicle.sellerLeadId,
-            },
-          ]
-        : []),
-    ],
-  })
+  let created: CreateOfferTxResult
+  try {
+    created = await withLockedRoots(roots, (tx) =>
+      createOfferTx(tx, {
+        vehicleId: data.vehicleId,
+        buyerLeadId: data.buyerLeadId,
+        resolvedSellerLeadId: vehicle.sellerLeadId,
+        matchId: data.matchId || null,
+        amount: data.amount,
+        notes: data.notes?.trim() || null,
+        actorId: actor.id,
+      })
+    )
+  } catch (err) {
+    // Conflictos de negocio y de coordinación esperados → mensaje seguro para el comercial.
+    if (isOfferCreationError(err)) return { error: err.message }
+    if (isLockError(err)) return { error: err.message }
+    // Cualquier otro error es técnico e inesperado: se propaga para que lo capture Sentry.
+    throw err
+  }
 
+  // Efectos externos: SIEMPRE después del commit. Dentro del lock alargarían su retención tanto
+  // como tarde el servicio externo.
   await emitKpiEvent({
     event: KPI_EVENTS.OFFER_CREATED,
     entityType: 'offer',
-    entityId: offer.id,
+    entityId: created.offerId,
     relatedEntityType: 'vehicle',
     relatedEntityId: data.vehicleId,
     actorUserId: actor.id,
@@ -99,8 +110,9 @@ export async function createOffer(
     metadata: { amount: data.amount, buyerLeadId: data.buyerLeadId },
   })
 
-  revalidateOffer(buyer.id, vehicle.sellerLeadId)
-  return { id: offer.id }
+  // Se revalida con el vendedor que vio la transacción, no con el de la lectura preliminar.
+  revalidateOffer(buyer.id, created.sellerLeadId)
+  return { id: created.offerId }
 }
 
 type StatusExtra = {

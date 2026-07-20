@@ -8,6 +8,13 @@ vi.mock('@/lib/kpi/emit', () => ({ emitKpiEvent: vi.fn(() => Promise.resolve()) 
 
 // El servicio atómico se mockea para controlar éxito/conflicto/error inesperado.
 // OfferConflictError y los guards puros se mantienen REALES (importOriginal).
+// `withLockedRoots` se mockea para inspeccionar las RAÍCES solicitadas y ejecutar el callback; su
+// semántica real (locks, orden, fail-closed) está probada en `lib/locking` y en integración.
+vi.mock('@/lib/locking', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/lib/locking')>()
+  return { ...actual, withLockedRoots: vi.fn() }
+})
+
 vi.mock('@/lib/offers-reservation', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@/lib/offers-reservation')>()
   return { ...actual, applyOfferStatusChangeTx: vi.fn() }
@@ -16,6 +23,8 @@ vi.mock('@/lib/offers-reservation', async (importOriginal) => {
 const { mockDb } = vi.hoisted(() => ({
   mockDb: {
     offer: { findUnique: vi.fn() },
+    vehicle: { findUnique: vi.fn() },
+    buyerLead: { findUnique: vi.fn() },
     // El $transaction se simula ejecutando el callback con el propio mock como tx.
     $transaction: vi.fn(),
   },
@@ -28,7 +37,9 @@ import { emitKpiEvent } from '@/lib/kpi/emit'
 import { revalidatePath } from 'next/cache'
 import { applyOfferStatusChangeTx, OfferConflictError } from '@/lib/offers-reservation'
 import { KPI_EVENTS } from '@/lib/kpi/events'
-import { updateOfferStatus } from './actions'
+import { withLockedRoots, LockError } from '@/lib/locking'
+import { OfferCreationError } from '@/lib/offers-creation'
+import { createOffer, updateOfferStatus } from './actions'
 
 const actor = { id: 'user-1', role: 'AGENTE' } as User
 
@@ -225,5 +236,175 @@ describe('validación de señal (I2A)', () => {
     expect(res.error).toBeUndefined()
     const params = vi.mocked(applyOfferStatusChangeTx).mock.calls[0][1]
     expect(params.offerData.depositAmount).toBe(1500)
+  })
+})
+
+// ─── I2B · creación coordinada ────────────────────────────────────────────────
+
+const vehicleRow = { id: 'veh-1', sellerLeadId: 'seller-1' }
+const buyerRow = { id: 'buyer-1' }
+const createInput = { vehicleId: 'veh-1', buyerLeadId: 'buyer-1', amount: 25000 }
+
+describe('createOffer · resolución de raíces', () => {
+  beforeEach(() => {
+    mockDb.vehicle.findUnique.mockResolvedValue(vehicleRow)
+    mockDb.buyerLead.findUnique.mockResolvedValue(buyerRow)
+    vi.mocked(withLockedRoots).mockResolvedValue({
+      offerId: 'offer-1',
+      sellerLeadId: 'seller-1',
+    } as never)
+  })
+
+  it('bloquea vehículo, vendedor y comprador', async () => {
+    await createOffer(createInput)
+    const roots = vi.mocked(withLockedRoots).mock.calls[0][0]
+    expect(roots).toEqual([
+      { type: 'vehicle', id: 'veh-1' },
+      { type: 'sellerLead', id: 'seller-1' },
+      { type: 'buyerLead', id: 'buyer-1' },
+    ])
+  })
+
+  it('omite el vendedor si el vehículo no tiene: nunca una raíz con id vacío', async () => {
+    mockDb.vehicle.findUnique.mockResolvedValue({ id: 'veh-1', sellerLeadId: null })
+    vi.mocked(withLockedRoots).mockResolvedValue({
+      offerId: 'offer-1',
+      sellerLeadId: null,
+    } as never)
+
+    await createOffer(createInput)
+    const roots = vi.mocked(withLockedRoots).mock.calls[0][0]
+    expect(roots).toEqual([
+      { type: 'vehicle', id: 'veh-1' },
+      { type: 'buyerLead', id: 'buyer-1' },
+    ])
+    expect(roots.some((r) => r.id === '')).toBe(false)
+  })
+
+  it('no abre transacción si el vehículo no existe en la lectura preliminar', async () => {
+    mockDb.vehicle.findUnique.mockResolvedValue(null)
+    const res = await createOffer(createInput)
+    expect(res).toEqual({ error: 'Vehículo no encontrado' })
+    expect(withLockedRoots).not.toHaveBeenCalled()
+    expect(emitKpiEvent).not.toHaveBeenCalled()
+    expect(revalidatePath).not.toHaveBeenCalled()
+  })
+
+  it('no abre transacción si el comprador no existe en la lectura preliminar', async () => {
+    mockDb.buyerLead.findUnique.mockResolvedValue(null)
+    const res = await createOffer(createInput)
+    expect(res).toEqual({ error: 'Comprador no encontrado' })
+    expect(withLockedRoots).not.toHaveBeenCalled()
+  })
+
+  it('valida el input antes de leer nada', async () => {
+    expect(await createOffer({ ...createInput, amount: 0 })).toEqual({
+      error: 'Indica un importe válido',
+    })
+    expect(await createOffer({ ...createInput, vehicleId: '' })).toEqual({
+      error: 'Falta el vehículo o el comprador',
+    })
+    expect(mockDb.vehicle.findUnique).not.toHaveBeenCalled()
+    expect(withLockedRoots).not.toHaveBeenCalled()
+  })
+})
+
+describe('createOffer · efectos externos fuera del lock', () => {
+  beforeEach(() => {
+    mockDb.vehicle.findUnique.mockResolvedValue(vehicleRow)
+    mockDb.buyerLead.findUnique.mockResolvedValue(buyerRow)
+  })
+
+  it('emite KPI y revalida DESPUÉS del commit, nunca dentro', async () => {
+    const orden: string[] = []
+    vi.mocked(emitKpiEvent).mockImplementation(async () => void orden.push('kpi'))
+    vi.mocked(revalidatePath).mockImplementation(() => void orden.push('revalidate'))
+    vi.mocked(withLockedRoots).mockImplementation(async () => {
+      orden.push('commit')
+      return { offerId: 'offer-1', sellerLeadId: 'seller-1' } as never
+    })
+
+    const res = await createOffer(createInput)
+    expect(res).toEqual({ id: 'offer-1' })
+    expect(orden[0]).toBe('commit')
+    expect(orden).toContain('kpi')
+    expect(orden.indexOf('kpi')).toBeGreaterThan(orden.indexOf('commit'))
+    expect(orden.indexOf('revalidate')).toBeGreaterThan(orden.indexOf('commit'))
+  })
+
+  it('revalida con el vendedor que vio la transacción, no con el de la lectura previa', async () => {
+    vi.mocked(withLockedRoots).mockResolvedValue({
+      offerId: 'offer-1',
+      sellerLeadId: 'seller-1',
+    } as never)
+    await createOffer(createInput)
+    expect(revalidatePath).toHaveBeenCalledWith('/vendedores/seller-1')
+  })
+})
+
+describe('createOffer · errores de dominio y de coordinación', () => {
+  beforeEach(() => {
+    mockDb.vehicle.findUnique.mockResolvedValue(vehicleRow)
+    mockDb.buyerLead.findUnique.mockResolvedValue(buyerRow)
+  })
+
+  it.each([
+    [
+      'LEAD_ARCHIVED',
+      'No se puede registrar una oferta sobre un lead archivado. Reactívalo primero.',
+    ],
+    ['VEHICLE_NOT_AVAILABLE', 'El vehículo no está disponible para registrar una nueva oferta.'],
+    [
+      'OFFER_ROOT_CHANGED',
+      'Los datos del vehículo han cambiado mientras se registraba la oferta. Inténtalo de nuevo.',
+    ],
+  ])('%s → mensaje seguro, sin KPI ni revalidación', async (code, message) => {
+    vi.mocked(withLockedRoots).mockRejectedValue(new OfferCreationError(code as never))
+
+    const res = await createOffer(createInput)
+    expect(res).toEqual({ error: message })
+    expect(emitKpiEvent).not.toHaveBeenCalled()
+    expect(revalidatePath).not.toHaveBeenCalled()
+  })
+
+  it('propaga los errores de locking como mensaje de dominio', async () => {
+    vi.mocked(withLockedRoots).mockRejectedValue(new LockError('LOCK_TIMEOUT'))
+    const res = await createOffer(createInput)
+    expect(res.error).toContain('otro proceso')
+    expect(emitKpiEvent).not.toHaveBeenCalled()
+  })
+
+  it('no disfraza un error técnico inesperado: lo propaga', async () => {
+    vi.mocked(withLockedRoots).mockRejectedValue(new Error('DB caída'))
+    await expect(createOffer(createInput)).rejects.toThrow('DB caída')
+    expect(emitKpiEvent).not.toHaveBeenCalled()
+    expect(revalidatePath).not.toHaveBeenCalled()
+  })
+})
+
+describe('createOffer · atomicidad delegada al núcleo', () => {
+  it('Offer y Activity se escriben con el MISMO cliente transaccional', async () => {
+    mockDb.vehicle.findUnique.mockResolvedValue(vehicleRow)
+    mockDb.buyerLead.findUnique.mockResolvedValue(buyerRow)
+    // El tx que recibe el núcleo es el que expone las escrituras; si createOfferTx usara `db`
+    // global en vez de `tx`, estas llamadas no aparecerían aquí.
+    const txCalls: string[] = []
+    const tx = {
+      vehicle: {
+        findUnique: async () => ({ ...vehicleRow, status: 'PUBLICADO', brand: 'A', model: 'B' }),
+      },
+      buyerLead: { findUnique: async () => ({ id: 'buyer-1', name: 'C', archivedAt: null }) },
+      sellerLead: { findUnique: async () => ({ id: 'seller-1', archivedAt: null }) },
+      offer: { create: async () => (txCalls.push('offer'), { id: 'offer-1' }) },
+      activity: { createMany: async () => (txCalls.push('activity'), { count: 2 }) },
+    }
+    vi.mocked(withLockedRoots).mockImplementation(async (_roots, operation) => {
+      const r = await operation(tx as never)
+      return r as never
+    })
+
+    const res = await createOffer(createInput)
+    expect(res).toEqual({ id: 'offer-1' })
+    expect(txCalls).toEqual(['offer', 'activity'])
   })
 })
