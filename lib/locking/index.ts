@@ -10,14 +10,21 @@ export {
   ROOT_LABELS,
   isLockRootType,
   rootKey,
+  assertLockRoot,
   normalizeRoots,
 } from './roots'
 export {
   LockError,
   LOCK_ERROR_MESSAGES,
   isLockError,
+  isPrismaError,
   extractPostgresCode,
+  extractPrismaCode,
   toLockError,
+  translateConcurrencyError,
+  PG_LOCK_NOT_AVAILABLE,
+  PG_DEADLOCK_DETECTED,
+  PRISMA_TRANSACTION_CLOSED,
   type LockErrorCode,
 } from './errors'
 export {

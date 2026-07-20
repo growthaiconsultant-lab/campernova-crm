@@ -25,8 +25,12 @@ export type LockOptions = {
   /** Duración máxima de cada sentencia dentro de la transacción (`SET LOCAL statement_timeout`). */
   statementTimeoutMs?: number
   /**
-   * Cliente Prisma a usar. Por defecto el singleton de la app; se inyecta en los tests para
-   * apuntar a la base efímera o a un doble.
+   * `TEST INFRASTRUCTURE ONLY`
+   *
+   * @internal Cliente Prisma alternativo. Existe para que los tests apunten a la base efímera o a
+   * un doble. **El código de producción (I2/I3/I4/B2) no debe usarlo**: debe dejar que el helper
+   * tome el singleton de la app, de modo que todos los flujos compartan el mismo pool y el mismo
+   * comportamiento transaccional.
    */
   client?: LockCapableClient
 }

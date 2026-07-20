@@ -96,13 +96,68 @@ describe('SQL seguro', () => {
     expect(lock.values[0]).toBe("x'; DROP TABLE vehicles; --")
   })
 
-  it('la tabla solo puede salir del mapping cerrado', async () => {
+  it('un tipo fuera del mapping cerrado no llega al SQL: aborta antes', async () => {
     const { client, recorded } = fakeClient()
     const intruso = { type: 'workOrder', id: 'w1' } as unknown as LockRoot
-    await withLockedRoots([intruso, V('v1')], async () => 'ok', { client })
+
+    await expect(
+      withLockedRoots([intruso, V('v1')], async () => 'ok', { client })
+    ).rejects.toMatchObject({ code: 'INVALID_LOCK_ROOT' })
+    expect(recorded).toHaveLength(0)
+  })
+
+  it('solo se emiten tablas del mapping cerrado', async () => {
+    const { client, recorded } = fakeClient()
+    await withLockedRoots([V('v1'), S('s1'), B('b1')], async () => 'ok', { client })
 
     const tables = lockQueries(recorded).map((r) => r.sql.match(/FROM "(\w+)"/)?.[1])
-    expect(tables).toEqual(['vehicles'])
+    expect(tables).toEqual(['vehicles', 'seller_leads', 'buyer_leads'])
+  })
+})
+
+describe('fail-closed antes de tocar la base de datos', () => {
+  const invalidas: Array<[string, unknown]> = [
+    ['id vacío', { type: 'vehicle', id: '' }],
+    ['id solo espacios', { type: 'vehicle', id: '   ' }],
+    ['id undefined', { type: 'vehicle', id: undefined }],
+    ['tipo ajeno', { type: 'unknown', id: 'abc' }],
+    ['null', null],
+    ['undefined', undefined],
+  ]
+
+  it.each(invalidas)(
+    '%s → INVALID_LOCK_ROOT sin transacción, sin SQL, sin callback',
+    async (_label, entrada) => {
+      const { client, recorded } = fakeClient()
+      const operation = vi.fn(async () => 'ok')
+
+      await expect(
+        withLockedRoots([entrada as LockRoot, V('v-valido')], operation, { client })
+      ).rejects.toMatchObject({ code: 'INVALID_LOCK_ROOT' })
+
+      expect(client.$transaction).not.toHaveBeenCalled()
+      expect(recorded).toHaveLength(0)
+      expect(operation).not.toHaveBeenCalled()
+    }
+  )
+
+  it('una lista no vacía nunca degenera en una operación sin locks', async () => {
+    const { client, recorded } = fakeClient()
+    const operation = vi.fn(async () => 'ok')
+
+    await expect(
+      withLockedRoots([{ type: 'vehicle', id: '' } as LockRoot], operation, { client })
+    ).rejects.toBeInstanceOf(LockError)
+    expect(operation).not.toHaveBeenCalled()
+    expect(recorded).toHaveLength(0)
+  })
+
+  it('un duplicado válido NO es un error: se colapsa en una adquisición', async () => {
+    const { client, recorded } = fakeClient()
+    await expect(withLockedRoots([V('abc'), V('abc')], async () => 'ok', { client })).resolves.toBe(
+      'ok'
+    )
+    expect(lockQueries(recorded)).toHaveLength(1)
   })
 })
 
@@ -222,6 +277,97 @@ describe('resultado y errores', () => {
         { client }
       )
     ).rejects.toBeInstanceOf(ConflictoDeNegocio)
+  })
+
+  it('un deadlock DENTRO de la operación se traduce a DEADLOCK', async () => {
+    // Es lo que harán I2/I3: sus CAS pueden colisionar dentro del callback.
+    const { client } = fakeClient()
+    const pgError = new Prisma.PrismaClientKnownRequestError('Raw query failed', {
+      code: 'P2010',
+      clientVersion: 'test',
+      meta: { code: '40P01' },
+    })
+    await expect(
+      withLockedRoots(
+        [V('v1')],
+        async () => {
+          throw pgError
+        },
+        { client }
+      )
+    ).rejects.toMatchObject({ code: 'DEADLOCK' })
+  })
+
+  it('un lock timeout DENTRO de la operación se traduce a LOCK_TIMEOUT', async () => {
+    const { client } = fakeClient()
+    const pgError = new Prisma.PrismaClientKnownRequestError('Raw query failed', {
+      code: 'P2010',
+      clientVersion: 'test',
+      meta: { code: '55P03' },
+    })
+    await expect(
+      withLockedRoots(
+        [V('v1')],
+        async () => {
+          throw pgError
+        },
+        { client }
+      )
+    ).rejects.toMatchObject({ code: 'LOCK_TIMEOUT' })
+  })
+
+  it('un fallo al COMMIT se traduce aunque ocurra fuera del callback', async () => {
+    const { tx } = fakeClient()
+    const commitError = new Prisma.PrismaClientKnownRequestError('Raw query failed', {
+      code: 'P2010',
+      clientVersion: 'test',
+      meta: { code: '40P01' },
+    })
+    // Simula Prisma: el callback termina bien y el fallo llega al confirmar.
+    const client: LockCapableClient = {
+      $transaction: vi.fn(async (fn) => {
+        await fn(tx as never)
+        throw commitError
+      }),
+    }
+
+    await expect(withLockedRoots([V('v1')], async () => 'ok', { client })).rejects.toMatchObject({
+      code: 'DEADLOCK',
+    })
+  })
+
+  it('P2028 (techo de la transacción en Prisma) → TRANSACTION_TIMEOUT', async () => {
+    const { tx } = fakeClient()
+    const p2028 = new Prisma.PrismaClientKnownRequestError(
+      'Transaction already closed: timeout exceeded',
+      { code: 'P2028', clientVersion: 'test' }
+    )
+    const client: LockCapableClient = {
+      $transaction: vi.fn(async (fn) => {
+        await fn(tx as never)
+        throw p2028
+      }),
+    }
+
+    await expect(withLockedRoots([V('v1')], async () => 'ok', { client })).rejects.toMatchObject({
+      code: 'TRANSACTION_TIMEOUT',
+    })
+  })
+
+  it('un error de negocio con un SQLSTATE en el texto NO se disfraza de concurrencia', async () => {
+    const { client } = fakeClient()
+    class ConflictoDeNegocio extends Error {}
+    const conflicto = new ConflictoDeNegocio('La oferta 40P01 ya no está disponible')
+
+    await expect(
+      withLockedRoots(
+        [V('v1')],
+        async () => {
+          throw conflicto
+        },
+        { client }
+      )
+    ).rejects.toBe(conflicto)
   })
 
   it('un fallo en la operación no se convierte nunca en éxito', async () => {

@@ -27,7 +27,7 @@
  */
 import { Prisma } from '@prisma/client'
 import { db } from '@/lib/db'
-import { LockError, toLockError } from './errors'
+import { LockError, toLockError, translateConcurrencyError } from './errors'
 import { ROOT_TABLES, normalizeRoots } from './roots'
 import type { LockCapableClient, LockOptions, LockRoot } from './types'
 
@@ -90,18 +90,31 @@ async function lockRoot(tx: Prisma.TransactionClient, root: LockRoot): Promise<v
 /**
  * Ejecuta `operation` con las raíces indicadas bloqueadas, en el orden global.
  *
- * Con `roots` vacío no se ejecuta ningún SQL de bloqueo, pero la operación sigue corriendo dentro
- * de una transacción: así un llamante cuyo caso no tenga raíz operativa (por ejemplo un evento de
- * calendario sin vínculos) conserva la atomicidad sin tratar ese caso como especial.
+ * **Fail-closed**: la validación de las raíces ocurre ANTES de abrir la transacción. Una raíz
+ * inválida (tipo ajeno, `id` que no es cadena, vacío o solo espacios) aborta con
+ * `INVALID_LOCK_ROOT` sin emitir SQL y sin ejecutar `operation`. Un duplicado válido sí se colapsa
+ * en una sola adquisición.
  *
- * Los errores que lance `operation` se propagan **intactos**: envolverlos ocultaría conflictos de
- * dominio legítimos. Solo se traducen los fallos de la fase de bloqueo.
+ * Con `roots` vacío no se ejecuta SQL de bloqueo, pero la operación sigue corriendo dentro de una
+ * transacción: un llamante cuyo caso no tenga raíz operativa (por ejemplo un evento de calendario
+ * sin vínculos) conserva la atomicidad sin tratar ese caso como especial. Una lista **no** vacía
+ * nunca se convierte en vacía en silencio.
+ *
+ * Contrato de errores:
+ *   - los fallos de concurrencia reconocidos (`55P03`, `40P01`, `P2028`) se traducen a
+ *     `LOCK_TIMEOUT`, `DEADLOCK` y `TRANSACTION_TIMEOUT` **ocurran donde ocurran**: preparación,
+ *     operación, commit o rollback;
+ *   - cualquier otro error de `operation` se propaga **intacto** (`OfferConflictError`, validación,
+ *     etc.): envolverlo ocultaría conflictos de dominio legítimos;
+ *   - `INFRA_ERROR` queda reservado a fallos desconocidos de la maquinaria propia del helper
+ *     (timeouts locales y adquisición de locks), nunca a errores de negocio arbitrarios.
  */
 export async function withLockedRoots<T>(
   roots: readonly LockRoot[],
   operation: (tx: Prisma.TransactionClient) => Promise<T>,
   options: LockOptions = {}
 ): Promise<T> {
+  // Fail-closed: lanza antes de tocar la base de datos.
   const ordered = normalizeRoots(roots)
   const lockTimeoutMs = assertTimeout(
     options.lockTimeoutMs ?? DEFAULT_LOCK_TIMEOUT_MS,
@@ -113,18 +126,22 @@ export async function withLockedRoots<T>(
   )
   const client: LockCapableClient = options.client ?? db
 
-  return client.$transaction(
-    async (tx) => {
-      // Fase de bloqueo: sus fallos SÍ se traducen a códigos de dominio.
-      try {
-        await applyLocalTimeouts(tx, lockTimeoutMs, statementTimeoutMs)
-        for (const root of ordered) await lockRoot(tx, root)
-      } catch (err) {
-        throw toLockError(err)
-      }
-      // Fase de negocio: sus fallos se propagan tal cual.
-      return operation(tx)
-    },
-    { timeout: DEFAULT_TRANSACTION_TIMEOUT_MS, maxWait: DEFAULT_MAX_WAIT_MS }
-  )
+  try {
+    return await client.$transaction(
+      async (tx) => {
+        // Preparación: un fallo desconocido aquí sí es del helper → INFRA_ERROR.
+        try {
+          await applyLocalTimeouts(tx, lockTimeoutMs, statementTimeoutMs)
+          for (const root of ordered) await lockRoot(tx, root)
+        } catch (err) {
+          throw toLockError(err)
+        }
+        return operation(tx)
+      },
+      { timeout: DEFAULT_TRANSACTION_TIMEOUT_MS, maxWait: DEFAULT_MAX_WAIT_MS }
+    )
+  } catch (err) {
+    // Cubre también commit y rollback, que ocurren fuera del callback.
+    throw translateConcurrencyError(err)
+  }
 }

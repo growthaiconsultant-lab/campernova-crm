@@ -308,6 +308,114 @@ describe('SET LOCAL no se escapa de la transacción', () => {
   })
 })
 
+describe('fail-closed con base real', () => {
+  it('una raíz inválida aborta sin tocar la base ni ejecutar la operación', async () => {
+    const { vehicleId } = await seedSeller()
+    let ejecutada = false
+
+    const err = await withLockedRoots(
+      [{ type: 'vehicle', id: vehicleId }, { type: 'vehicle', id: '' } as LockRoot],
+      async (tx) => {
+        ejecutada = true
+        return tx.vehicle.update({ where: { id: vehicleId }, data: { km: 777 } })
+      },
+      { client: prismaA }
+    ).catch((e) => e)
+
+    expect(err).toBeInstanceOf(LockError)
+    expect((err as LockError).code).toBe('INVALID_LOCK_ROOT')
+    expect(ejecutada).toBe(false)
+
+    const vehicle = await prismaA.vehicle.findUniqueOrThrow({ where: { id: vehicleId } })
+    expect(vehicle.km).toBe(1000)
+  })
+
+  it('el duplicado válido sigue funcionando y adquiere el lock una vez', async () => {
+    const { vehicleId } = await seedSeller()
+    const root: LockRoot = { type: 'vehicle', id: vehicleId }
+
+    await expect(
+      withLockedRoots([root, root, root], async () => 'ok', { client: prismaA })
+    ).resolves.toBe('ok')
+  })
+})
+
+describe('concurrencia dentro de la operación', () => {
+  it('un lock timeout DENTRO de la operación se traduce a LOCK_TIMEOUT', async () => {
+    const { vehicleId } = await seedSeller()
+
+    const aHoldsTheLock = barrier()
+    const releaseA = barrier()
+
+    const a = withLockedRoots(
+      [{ type: 'vehicle', id: vehicleId }],
+      async () => {
+        aHoldsTheLock.open()
+        await releaseA.wait
+        return 'A'
+      },
+      { client: prismaA }
+    )
+    await aHoldsTheLock.wait
+
+    // B no declara raíces: el conflicto lo produce su propia operación de negocio.
+    const err = await withLockedRoots(
+      [],
+      async (tx) => {
+        await tx.$queryRaw`SELECT id FROM "vehicles" WHERE id = ${vehicleId} FOR UPDATE`
+        return 'B'
+      },
+      { client: prismaB, lockTimeoutMs: 300 }
+    ).catch((e) => e)
+
+    releaseA.open()
+    await a
+
+    expect(err).toBeInstanceOf(LockError)
+    expect((err as LockError).code).toBe('LOCK_TIMEOUT')
+  })
+
+  it('un deadlock DENTRO de la operación se traduce a DEADLOCK', async () => {
+    const first = await seedSeller()
+    const second = await seedSeller()
+
+    const aLocked = barrier()
+    const bLocked = barrier()
+
+    // Cada una bloquea su raíz por el protocolo y luego escribe en la del otro: la inversión la
+    // provoca la operación de negocio, no el helper.
+    const a = withLockedRoots(
+      [{ type: 'vehicle', id: first.vehicleId }],
+      async (tx) => {
+        aLocked.open()
+        await bLocked.wait
+        await tx.vehicle.update({ where: { id: second.vehicleId }, data: { km: 11 } })
+        return 'a'
+      },
+      { client: prismaA, lockTimeoutMs: 5_000 }
+    )
+
+    const b = withLockedRoots(
+      [{ type: 'vehicle', id: second.vehicleId }],
+      async (tx) => {
+        bLocked.open()
+        await aLocked.wait
+        await tx.vehicle.update({ where: { id: first.vehicleId }, data: { km: 22 } })
+        return 'b'
+      },
+      { client: prismaB, lockTimeoutMs: 5_000 }
+    )
+
+    const results = await Promise.allSettled([a, b])
+    const rejected = results.filter((r) => r.status === 'rejected')
+
+    expect(rejected).toHaveLength(1)
+    const reason = (rejected[0] as PromiseRejectedResult).reason
+    expect(reason).toBeInstanceOf(LockError)
+    expect((reason as LockError).code).toBe('DEADLOCK')
+  })
+})
+
 describe('deadlock de control', () => {
   // Demuestra que el patrón que el orden global evita es real: dos transacciones que adquieren
   // las MISMAS filas en sentido contrario, saltándose el helper a propósito, producen 40P01.

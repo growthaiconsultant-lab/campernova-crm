@@ -47,11 +47,51 @@ Coordinar mediante **bloqueo pesimista de filas raíz**, con un orden global ún
 Justificado por los flujos reales: las operaciones que tocan dos raíces (crear oferta, aceptar
 reserva, crear o completar entrega) implican siempre un vehículo y un comprador, y ninguna necesita
 el comprador antes que el vehículo. Archivar un vendedor toma `{Vehicle, SellerLead}` y archivar un
-comprador toma `{BuyerLead}`: ambos son subconjuntos que respetan el mismo orden. **No existe ciclo
-posible**, así que la ausencia de deadlock es una propiedad del diseño, no una casualidad.
+comprador toma `{BuyerLead}`: ambos son subconjuntos que respetan el mismo orden.
+
+```
+ROOT ORDERING PREVENTS ROOT-LEVEL INVERSION, NOT ALL POSSIBLE DATABASE DEADLOCKS
+```
+
+El alcance de esa garantía es **estrictamente** este:
+
+- evita la inversión **entre raíces adquiridas a través de este helper**;
+- **no** controla los locks de entidades hijas (`offers`, `deliveries`, `calendar_events`,
+  `matches`, `activities`) que una operación tome después, ni los que un flujo adquiera **antes** de
+  invocarlo;
+- **no** protege a los módulos que no adopten el protocolo — hoy, todos;
+- **no** garantiza todavía el invariante del archivado;
+- el orden total deberá **volver a auditarse en I2, I3 y I4**, cuando esas entidades hijas entren en
+  la misma transacción.
 
 El orden vive en un **único módulo** (`lib/locking/roots.ts`). Repartirlo entre llamantes
 reintroduciría exactamente el riesgo que elimina.
+
+El comparador es lexicográfico **por unidades de código**, no `localeCompare`: este último depende de
+ICU y del locale del proceso, de modo que dos instancias podrían ordenar distinto las mismas raíces
+—y órdenes distintos son precisamente la condición que produce deadlocks—. Los identificadores
+actuales son ASCII (`cuid`), pero la infraestructura no debe depender de esa coincidencia.
+
+### Validación de las raíces
+
+```
+INVALID ROOTS FAIL CLOSED
+EMPTY ROOT SET IS EXPLICIT; INVALID ROOTS ARE REJECTED
+```
+
+Una raíz inválida —tipo fuera del conjunto cerrado, `id` que no es cadena, vacío o solo espacios,
+`null`, `undefined`— **aborta la llamada con `INVALID_LOCK_ROOT` antes de abrir la transacción**, sin
+emitir SQL y sin ejecutar la operación. Descartarla dejaría al llamante creyendo que pidió N locks
+con solo N-1 adquiridos, que es la forma más silenciosa de debilitar un invariante. Es un riesgo
+concreto, no teórico: `Vehicle.sellerLeadId` es nullable, así que un caller podría construir
+`{ type: 'sellerLead', id: sellerLeadId ?? '' }` sin darse cuenta.
+
+Un **duplicado válido** sí se colapsa en una sola adquisición, sin error: deduplicar no pierde
+exclusión. Una lista **vacía** es una decisión explícita y legítima del llamante (un caso sin raíz
+operativa); lo que nunca ocurre es que una lista **no** vacía degenere en vacía.
+
+La validación es de **runtime**, no solo de TypeScript: el contrato del tipo se puede eludir desde
+datos deserializados, campos nullable, resultados parciales y casts en server actions futuras.
 
 ### Aislamiento
 
@@ -61,7 +101,7 @@ y añadiría `P2034` y reintentos a toda la superficie.
 
 ### Protocolo
 
-1. normalizar raíces (deduplicar + ordenar);
+1. **validar** raíces (fail-closed), deduplicar y ordenar — **antes** de abrir nada;
 2. abrir transacción interactiva;
 3. `SET LOCAL lock_timeout` y `SET LOCAL statement_timeout`;
 4. `SELECT id … FOR UPDATE` por raíz, en orden;
@@ -81,13 +121,31 @@ el fallo pueda traducirse a un código de dominio.
 
 ### Errores
 
-`LOCK_TIMEOUT` (55P03), `DEADLOCK` (40P01), `ROOT_NOT_FOUND` (la fila raíz no existe) e
-`INFRA_ERROR` (fallo no reconocido **de la fase de bloqueo**). Los mensajes no contienen SQL, host,
-usuario, credenciales, códigos de PostgreSQL, detalles de Prisma ni trazas; el error original se
-conserva en `cause` solo para observabilidad interna.
+| Código                | Origen                                                                                                               |
+| --------------------- | -------------------------------------------------------------------------------------------------------------------- |
+| `INVALID_LOCK_ROOT`   | raíz inválida; se lanza **antes** de abrir la transacción                                                            |
+| `LOCK_TIMEOUT`        | SQLSTATE `55P03`                                                                                                     |
+| `DEADLOCK`            | SQLSTATE `40P01`                                                                                                     |
+| `TRANSACTION_TIMEOUT` | `P2028` — techo de la transacción en Prisma, **distinto** de `statement_timeout`, que llega como error de PostgreSQL |
+| `ROOT_NOT_FOUND`      | la fila raíz no existe                                                                                               |
+| `INFRA_ERROR`         | fallo desconocido de la maquinaria propia del helper (timeouts locales, adquisición)                                 |
 
-Los errores que lance la operación de negocio **se propagan intactos**: envolverlos ocultaría
-conflictos de dominio legítimos como `OfferConflictError`.
+**Frontera de traducción.** Los fallos de concurrencia reconocidos se traducen **ocurran donde
+ocurran**: preparación, operación de negocio, commit o rollback. El envoltorio rodea la llamada
+completa a `$transaction`, no solo el callback, porque el commit sucede fuera de él. Cualquier otro
+error se propaga **intacto** — `OfferConflictError`, `DeliveryConflictError`, errores de validación y
+cualquier fallo ajeno a la concurrencia llegan a su llamante sin disfrazarse. `INFRA_ERROR` **no** se
+usa para errores de negocio arbitrarios.
+
+**Detección de SQLSTATE.** Primero el código estructurado (`meta.code` de Prisma o `code` del driver)
+en el error y en su cadena de `cause`, recorrida con profundidad acotada y detección de ciclos. El
+respaldo por texto se aplica **solo** si el eslabón es un error de Prisma: que un mensaje comercial
+contenga «40P01» no puede convertirlo en un deadlock.
+
+**Serialización.** Los mensajes no contienen SQL, host, usuario, credenciales, códigos de PostgreSQL,
+detalles de Prisma ni trazas. `code` es enumerable para que el llamante discrimine; **`cause` no lo
+es**, así que no aparece en `JSON.stringify` ni viaja por accidente en una respuesta. Los llamantes
+deben devolver únicamente `{ code, message }` y enviar `cause` solo a observabilidad interna.
 
 ### Efectos externos
 
