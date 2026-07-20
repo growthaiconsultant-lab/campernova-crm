@@ -8,7 +8,9 @@ import {
   EVENT_STATUS_LABELS,
   EVENT_TYPE_LABELS,
 } from '@/lib/calendar/event-meta'
+import { COMMITMENT_LABELS } from '@/lib/calendar/commitment'
 import { EventStatusBar } from './event-status-bar'
+import { EventCommitmentCard } from './event-commitment-card'
 
 const fmtDateTime = (d: Date) =>
   d.toLocaleString('es-ES', {
@@ -53,6 +55,15 @@ export default async function EventoDetallePage({ params }: { params: { id: stri
           </span>
           <span className="rounded-full border border-border px-2 py-0.5 text-[11px] font-medium text-foreground">
             {EVENT_STATUS_LABELS[event.status]}
+          </span>
+          <span
+            className={`rounded-full px-2 py-0.5 text-[11px] font-medium ${
+              event.commitment === 'INDETERMINADO'
+                ? 'bg-amber-100 text-amber-800'
+                : 'border border-border text-muted-foreground'
+            }`}
+          >
+            {COMMITMENT_LABELS[event.commitment]}
           </span>
           <span className="text-[11px] text-muted-foreground">
             Prioridad {EVENT_PRIORITY_LABELS[event.priority].toLowerCase()}
@@ -150,6 +161,8 @@ export default async function EventoDetallePage({ params }: { params: { id: stri
         <p className="mb-3 font-mono text-[10px] uppercase tracking-[0.12em] text-muted-foreground">
           Estado
         </p>
+        <EventCommitmentCard eventId={event.id} type={event.type} commitment={event.commitment} />
+
         <EventStatusBar eventId={event.id} status={event.status} />
       </div>
 

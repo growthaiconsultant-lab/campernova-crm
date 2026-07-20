@@ -283,6 +283,16 @@ enum CalendarEventType {
   OTRO
 }
 
+/// Naturaleza del compromiso que representa un evento de calendario.
+/// EXTERNO: acordado con un cliente o tercero — incumplirlo tiene consecuencias comerciales.
+/// INTERNO: tarea, recordatorio u operación propia.
+/// INDETERMINADO: sin evidencia suficiente para clasificarlo (histórico previo a esta distinción).
+enum EventCommitment {
+  EXTERNO
+  INTERNO
+  INDETERMINADO
+}
+
 enum CalendarEventStatus {
   PROGRAMADO
   CONFIRMADO
@@ -1239,6 +1249,7 @@ model CalendarEvent {
   title           String
   description     String?
   status          CalendarEventStatus   @default(PROGRAMADO)
+  commitment      EventCommitment       @default(INDETERMINADO)
   priority        CalendarEventPriority @default(MEDIA)
   startAt         DateTime              @map("start_at")
   endAt           DateTime?             @map("end_at")
