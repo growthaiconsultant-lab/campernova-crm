@@ -3,7 +3,12 @@
 import { revalidatePath } from 'next/cache'
 import { db } from '@/lib/db'
 import { requireAgente } from '@/lib/auth'
-import { isValidOfferStatus, isValidOfferTransition, OFFER_STATUS_LABELS } from '@/lib/offers'
+import {
+  isValidDepositAmount,
+  isValidOfferStatus,
+  isValidOfferTransition,
+  OFFER_STATUS_LABELS,
+} from '@/lib/offers'
 import {
   applyOfferStatusChangeTx,
   OfferConflictError,
@@ -144,6 +149,13 @@ export async function updateOfferStatus(
     rejection = extra.rejectionReason
   }
 
+  // Única entrada de señal del dominio (I2A). El formulario acepta texto libre, así que un importe
+  // negativo llega hasta aquí; se rechaza antes de escribir nada. `null` y `0` siguen siendo
+  // válidos: aceptar sin señal es una operación legítima que igualmente inmoviliza el vehículo.
+  if (!isValidDepositAmount(extra.depositAmount)) {
+    return { error: 'La señal no puede ser negativa' }
+  }
+
   const wasReservation = offer.status === 'ACEPTADA'
   const reservedUntil =
     next === 'ACEPTADA' && extra.reservedUntil ? new Date(extra.reservedUntil) : null
@@ -221,30 +233,16 @@ export async function updateOfferStatus(
   return {}
 }
 
-/** Block 18: edita importe/notas/señal de una oferta viva. */
-export async function updateOffer(
-  id: string,
-  data: { amount?: number | null; notes?: string | null; depositAmount?: number | null }
-): Promise<{ error?: string }> {
-  await requireAgente()
-
-  const offer = await db.offer.findUnique({
-    where: { id },
-    select: { id: true, buyerLeadId: true, vehicle: { select: { sellerLeadId: true } } },
-  })
-  if (!offer) return { error: 'Oferta no encontrada' }
-
-  if (data.amount != null && data.amount <= 0) return { error: 'Importe no válido' }
-
-  await db.offer.update({
-    where: { id },
-    data: {
-      ...(data.amount != null ? { amount: data.amount } : {}),
-      ...(data.notes !== undefined ? { notes: data.notes?.trim() || null } : {}),
-      ...(data.depositAmount !== undefined ? { depositAmount: data.depositAmount } : {}),
-    },
-  })
-
-  revalidateOffer(offer.buyerLeadId, offer.vehicle.sellerLeadId)
-  return {}
-}
+/*
+ * NOTA (I2A): aquí vivía `updateOffer`, una edición genérica de importe, notas y señal.
+ *
+ * Se retiró porque no tenía ningún consumidor —ni UI, ni otro módulo— y en cambio permitía fijar
+ * `depositAmount` en cualquier estado, sin transacción, sin Activity y sin sincronizar el estado
+ * del vehículo: es decir, convertir una oferta aceptada en reserva por un camino que el dominio no
+ * observaba.
+ *
+ * La señal se registra exclusivamente al ACEPTAR, dentro de `updateOfferStatus`, que sí es
+ * transaccional y deja traza. Si en el futuro hace falta corregir o devolver una señal, será una
+ * operación explícita, auditable y coordinada —con su transición, su Activity y su efecto sobre el
+ * stock—, no una actualización genérica de campos.
+ */

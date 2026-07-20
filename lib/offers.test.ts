@@ -5,6 +5,7 @@ import {
   isValidOfferTransition,
   isTerminalOfferStatus,
   isValidOfferStatus,
+  isValidDepositAmount,
   isReservation,
   isActiveHold,
 } from './offers'
@@ -53,5 +54,42 @@ describe('reserva y hold', () => {
     expect(isActiveHold('ACEPTADA')).toBe(true)
     expect(isActiveHold('RECHAZADA')).toBe(false)
     expect(isActiveHold('CONVERTIDA')).toBe(false)
+  })
+})
+
+describe('isValidDepositAmount (I2A)', () => {
+  it('acepta null: aceptar sin señal es legítimo', () => {
+    expect(isValidDepositAmount(null)).toBe(true)
+    expect(isValidDepositAmount(undefined)).toBe(true)
+  })
+
+  it('acepta cero y positivos', () => {
+    expect(isValidDepositAmount(0)).toBe(true)
+    expect(isValidDepositAmount(500)).toBe(true)
+    expect(isValidDepositAmount(1234.56)).toBe(true)
+  })
+
+  it('rechaza importes negativos', () => {
+    expect(isValidDepositAmount(-1)).toBe(false)
+    expect(isValidDepositAmount(-0.01)).toBe(false)
+    expect(isValidDepositAmount(-5000)).toBe(false)
+  })
+
+  it('rechaza valores no finitos: el formulario acepta texto libre', () => {
+    expect(isValidDepositAmount(Number.NaN)).toBe(false)
+    expect(isValidDepositAmount(Number.POSITIVE_INFINITY)).toBe(false)
+    expect(isValidDepositAmount(Number.NEGATIVE_INFINITY)).toBe(false)
+  })
+
+  it('no altera la semántica de reserva: sigue exigiendo señal > 0', () => {
+    // Una señal de 0 es válida como entrada pero NO convierte la oferta en reserva.
+    expect(isValidDepositAmount(0)).toBe(true)
+    expect(isReservation('ACEPTADA', 0)).toBe(false)
+    expect(isReservation('ACEPTADA', null)).toBe(false)
+    expect(isReservation('ACEPTADA', 500)).toBe(true)
+  })
+
+  it('ACEPTADA sigue inmovilizando stock con o sin señal', () => {
+    expect(isActiveHold('ACEPTADA')).toBe(true)
   })
 })
