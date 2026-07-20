@@ -102,6 +102,15 @@ Clasificación: **A** activo · **P** parcial/soporte · **L** legacy · **M** m
   - **Bloqueos:** archivar se **bloquea** si hay operativa abierta (vehículo en stock, oferta o
     reserva viva, entrega programada/en curso, próxima acción pendiente, evento futuro). No se
     cancela ni reasigna nada automáticamente: el operador debe resolverlo antes.
+  - **Integridad concurrente:** la lectura del lead, la de **todas** las dependencias, la
+    clasificación, el compare-and-swap y la `Activity` van en **una única transacción
+    `Serializable`**, con reintentos acotados (3 intentos) solo ante conflicto de serialización
+    (`P2034`). Al agotarlos se devuelve un error de negocio sin detalles de Prisma. Así no puede
+    archivarse un lead cuya dependencia se creó entre la comprobación y la escritura.
+  - **Efecto aceptado:** Prisma actualiza `updatedAt` (`@updatedAt`) al archivar y al reactivar.
+    Es inevitable; puede alterar el orden de las vistas que ordenan por `sort=updatedAt`. **No**
+    afecta a los KPIs canónicos (`getSalesInRange`, `getMonthlyNetMargin`, `getFlowKpis`), que
+    leen `Vehicle.status`/`soldAt` — verificado ejecutándolos antes/después en integración.
   - ⚠️ **`ARCHIVED LEADS REMAIN VISIBLE UNTIL PR C`**: las bandejas y la búsqueda todavía **no**
     filtran por archivado. Ese filtrado llega en PR C.
 - No hay soft-delete genérico, ni hard delete, ni anonimización, ni fusión de duplicados.

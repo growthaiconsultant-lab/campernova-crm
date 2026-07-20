@@ -28,6 +28,8 @@ const { mockDb } = vi.hoisted(() => {
 vi.mock('@/lib/db', () => ({ db: mockDb }))
 
 import type { User } from '@prisma/client'
+import { Prisma } from '@prisma/client'
+import { revalidatePath } from 'next/cache'
 import { requireAgente } from '@/lib/auth'
 import {
   loadSellerArchiveDependencies,
@@ -104,21 +106,10 @@ describe('archiveSellerLead', () => {
     expect(a.content).toContain('Archivado: no → sí')
   })
 
-  it('notas vacías → null; notas largas se recortan a 500', async () => {
+  it('notas vacías o solo espacios → null', async () => {
     mockDb.sellerLead.findUnique.mockResolvedValue({ status: 'NUEVO', archivedAt: null })
     await archiveSellerLead('s1', 'OTRO', '   ')
     expect(mockDb.sellerLead.updateMany.mock.calls[0][0].data.archiveNotes).toBeNull()
-
-    vi.clearAllMocks()
-    vi.mocked(requireAgente).mockResolvedValue(agent)
-    vi.mocked(loadSellerArchiveDependencies).mockResolvedValue(NO_DEPS)
-    mockDb.sellerLead.updateMany.mockResolvedValue({ count: 1 })
-    mockDb.$transaction.mockImplementation(async (fn: (tx: typeof mockDb) => Promise<unknown>) =>
-      fn(mockDb)
-    )
-    mockDb.sellerLead.findUnique.mockResolvedValue({ status: 'NUEVO', archivedAt: null })
-    await archiveSellerLead('s1', 'OTRO', 'x'.repeat(600))
-    expect(mockDb.sellerLead.updateMany.mock.calls[0][0].data.archiveNotes).toHaveLength(500)
   })
 
   it('rechaza sin motivo o con motivo inválido, sin escribir nada', async () => {
@@ -175,6 +166,150 @@ describe('archiveSellerLead', () => {
     vi.mocked(requireAgente).mockRejectedValue(new Error('forbidden'))
     await expect(archiveSellerLead('s1', 'OTRO')).rejects.toThrow('forbidden')
     expect(mockDb.sellerLead.updateMany).not.toHaveBeenCalled()
+  })
+
+  it('RECHAZA notas de más de 500 caracteres (no las trunca) y no escribe', async () => {
+    mockDb.sellerLead.findUnique.mockResolvedValue({ status: 'NUEVO', archivedAt: null })
+    const res = await archiveSellerLead('s1', 'OTRO', 'x'.repeat(501))
+    expect(res).toMatchObject({ status: 'error' })
+    if (res.status === 'error') expect(res.message).toContain('500')
+    expect(mockDb.sellerLead.updateMany).not.toHaveBeenCalled()
+    expect(mockDb.$transaction).not.toHaveBeenCalled()
+  })
+
+  it('acepta exactamente 500 caracteres', async () => {
+    mockDb.sellerLead.findUnique.mockResolvedValue({ status: 'NUEVO', archivedAt: null })
+    const res = await archiveSellerLead('s1', 'OTRO', 'x'.repeat(500))
+    expect(res).toEqual({ status: 'archived' })
+    expect(mockDb.sellerLead.updateMany.mock.calls[0][0].data.archiveNotes).toHaveLength(500)
+  })
+
+  it('usa aislamiento Serializable y ejecuta las lecturas DENTRO de la transacción', async () => {
+    mockDb.sellerLead.findUnique.mockResolvedValue({ status: 'NUEVO', archivedAt: null })
+    await archiveSellerLead('s1', 'OTRO')
+    // Las dependencias se cargan con el cliente transaccional, no con el global.
+    expect(vi.mocked(loadSellerArchiveDependencies).mock.calls[0][0]).toBe(mockDb)
+    expect(mockDb.$transaction.mock.calls[0][1]).toEqual({ isolationLevel: 'Serializable' })
+  })
+})
+
+// ─── Conflictos de serialización ──────────────────────────────────────────────
+
+function conflict() {
+  return new Prisma.PrismaClientKnownRequestError('write conflict', {
+    code: 'P2034',
+    clientVersion: 'test',
+  })
+}
+
+describe('conflictos de serialización', () => {
+  it('reintenta ante P2034 y acaba archivando', async () => {
+    mockDb.sellerLead.findUnique.mockResolvedValue({ status: 'NUEVO', archivedAt: null })
+    let calls = 0
+    mockDb.$transaction.mockImplementation(async (fn: (tx: typeof mockDb) => Promise<unknown>) => {
+      calls += 1
+      if (calls === 1) throw conflict()
+      return fn(mockDb)
+    })
+
+    const res = await archiveSellerLead('s1', 'OTRO')
+    expect(res).toEqual({ status: 'archived' })
+    expect(calls).toBe(2)
+  })
+
+  it('al agotar los intentos devuelve error seguro, sin detalles de Prisma', async () => {
+    mockDb.sellerLead.findUnique.mockResolvedValue({ status: 'NUEVO', archivedAt: null })
+    mockDb.$transaction.mockImplementation(async () => {
+      throw conflict()
+    })
+
+    const res = await archiveSellerLead('s1', 'OTRO')
+    expect(res.status).toBe('error')
+    if (res.status === 'error') {
+      expect(res.message).toMatch(/concurrencia/i)
+      // Mensaje de negocio: sin código ni rastro técnico de Prisma.
+      expect(res.message).not.toMatch(/P2034/i)
+      expect(res.message).not.toMatch(/prisma/i)
+      expect(res.message).not.toMatch(/transaction|serializ/i)
+    }
+    // Acotado: 3 intentos totales, sin bucle infinito.
+    expect(mockDb.$transaction).toHaveBeenCalledTimes(3)
+    expect(revalidatePath).not.toHaveBeenCalled()
+  })
+
+  it('NO reintenta ante un error Prisma distinto: se propaga', async () => {
+    mockDb.sellerLead.findUnique.mockResolvedValue({ status: 'NUEVO', archivedAt: null })
+    mockDb.$transaction.mockImplementation(async () => {
+      throw new Prisma.PrismaClientKnownRequestError('otro', {
+        code: 'P2002',
+        clientVersion: 'test',
+      })
+    })
+    await expect(archiveSellerLead('s1', 'OTRO')).rejects.toMatchObject({ code: 'P2002' })
+    expect(mockDb.$transaction).toHaveBeenCalledTimes(1)
+  })
+})
+
+// ─── Revalidación: solo tras mutación real ────────────────────────────────────
+
+describe('revalidatePath', () => {
+  it('se ejecuta con las rutas exactas tras archivar (vendedor)', async () => {
+    mockDb.sellerLead.findUnique.mockResolvedValue({ status: 'NUEVO', archivedAt: null })
+    await archiveSellerLead('s1', 'OTRO')
+    expect(vi.mocked(revalidatePath).mock.calls.map((c) => c[0])).toEqual([
+      '/vendedores/s1',
+      '/vendedores',
+    ])
+  })
+
+  it('se ejecuta con las rutas exactas tras archivar (comprador)', async () => {
+    mockDb.buyerLead.findUnique.mockResolvedValue({ status: 'NUEVO', archivedAt: null })
+    await archiveBuyerLead('b1', 'OTRO')
+    expect(vi.mocked(revalidatePath).mock.calls.map((c) => c[0])).toEqual([
+      '/compradores/b1',
+      '/compradores',
+      '/compradores/pipeline',
+    ])
+  })
+
+  it('NO se ejecuta si el archivado está bloqueado', async () => {
+    mockDb.sellerLead.findUnique.mockResolvedValue({ status: 'NUEVO', archivedAt: null })
+    vi.mocked(loadSellerArchiveDependencies).mockResolvedValue({
+      ...NO_DEPS,
+      vehicleStatus: 'PUBLICADO',
+    })
+    await archiveSellerLead('s1', 'OTRO')
+    expect(revalidatePath).not.toHaveBeenCalled()
+  })
+
+  it('NO se ejecuta si ya estaba archivado', async () => {
+    mockDb.sellerLead.findUnique.mockResolvedValue({ status: 'NUEVO', archivedAt: new Date() })
+    await archiveSellerLead('s1', 'OTRO')
+    expect(revalidatePath).not.toHaveBeenCalled()
+  })
+
+  it('NO se ejecuta si ya estaba activo (reactivar)', async () => {
+    mockDb.sellerLead.findUnique.mockResolvedValue({
+      status: 'NUEVO',
+      archivedAt: null,
+      archiveReason: null,
+    })
+    await reactivateSellerLead('s1')
+    expect(revalidatePath).not.toHaveBeenCalled()
+  })
+
+  it('NO se ejecuta con input inválido ni con lead inexistente', async () => {
+    await archiveSellerLead('s1', 'INVENTADO')
+    await archiveSellerLead('', 'OTRO')
+    mockDb.sellerLead.findUnique.mockResolvedValue(null)
+    await archiveSellerLead('nope', 'OTRO')
+    expect(revalidatePath).not.toHaveBeenCalled()
+  })
+
+  it('NO se ejecuta si el permiso es rechazado', async () => {
+    vi.mocked(requireAgente).mockRejectedValue(new Error('forbidden'))
+    await expect(archiveSellerLead('s1', 'OTRO')).rejects.toThrow()
+    expect(revalidatePath).not.toHaveBeenCalled()
   })
 })
 

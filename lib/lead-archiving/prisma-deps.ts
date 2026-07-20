@@ -3,10 +3,17 @@
  *
  * Solo LECTURA: cuenta operaciones abiertas. No modifica, cancela ni reasigna nada — el
  * operador debe resolver las dependencias explícitamente (decisión de producto).
+ *
+ * IMPORTANTE: aceptan `PrismaClient` **o** `Prisma.TransactionClient`. Las acciones SIEMPRE les
+ * pasan el cliente transaccional, de modo que estas lecturas quedan dentro de la misma
+ * transacción `Serializable` que el CAS — no pueden escapar de ella ni abrir otra conexión.
  */
-import type { PrismaClient } from '@prisma/client'
+import type { Prisma, PrismaClient } from '@prisma/client'
 import { ACTIVE_DELIVERY_STATUSES, ACTIVE_OFFER_STATUSES, TERMINAL_EVENT_STATUSES } from './domain'
 import type { ArchiveDependencyInput } from './types'
+
+/** Cliente válido para estas lecturas: el global o el de una transacción en curso. */
+export type ArchiveDbClient = PrismaClient | Prisma.TransactionClient
 
 /** Evento de calendario futuro y no terminal, vinculado al lead (o a su vehículo). */
 function futureEventWhere(now: Date) {
@@ -21,7 +28,7 @@ function futureEventWhere(now: Date) {
  * más su propia próxima acción y eventos futuros.
  */
 export async function loadSellerArchiveDependencies(
-  db: PrismaClient,
+  db: ArchiveDbClient,
   leadId: string,
   now: Date = new Date()
 ): Promise<ArchiveDependencyInput> {
@@ -78,7 +85,7 @@ export async function loadSellerArchiveDependencies(
 
 /** Dependencias de un COMPRADOR: sus ofertas, entregas, próxima acción y eventos futuros. */
 export async function loadBuyerArchiveDependencies(
-  db: PrismaClient,
+  db: ArchiveDbClient,
   leadId: string,
   now: Date = new Date()
 ): Promise<ArchiveDependencyInput> {

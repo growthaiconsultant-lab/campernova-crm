@@ -1,3 +1,7 @@
 export * from './types'
 export * from './domain'
-export { loadSellerArchiveDependencies, loadBuyerArchiveDependencies } from './prisma-deps'
+export {
+  loadSellerArchiveDependencies,
+  loadBuyerArchiveDependencies,
+  type ArchiveDbClient,
+} from './prisma-deps'

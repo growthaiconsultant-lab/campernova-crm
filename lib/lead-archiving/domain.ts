@@ -25,9 +25,22 @@ export function isValidArchiveReason(v: unknown): v is ArchiveReason {
   return typeof v === 'string' && v in ARCHIVE_REASON_LABELS
 }
 
-/** Notas: trim, vacío → null, máximo 500 caracteres (mismo patrón que `lostReasonNotes`). */
-export function normalizeArchiveNotes(notes?: string | null): string | null {
-  return notes?.trim().slice(0, 500) || null
+/** Longitud máxima de las notas de archivado. */
+export const ARCHIVE_NOTES_MAX_LENGTH = 500
+
+export type ArchiveNotesValidation =
+  | { ok: true; value: string | null }
+  | { ok: false; reason: 'too_long' }
+
+/**
+ * Notas: se trimean; vacío → `null`; de 1 a 500 caracteres se aceptan; **más de 500 se RECHAZAN**.
+ * No se truncan en silencio: truncar haría perder texto del operador sin avisar.
+ */
+export function validateArchiveNotes(notes?: string | null): ArchiveNotesValidation {
+  const trimmed = notes?.trim() ?? ''
+  if (trimmed.length === 0) return { ok: true, value: null }
+  if (trimmed.length > ARCHIVE_NOTES_MAX_LENGTH) return { ok: false, reason: 'too_long' }
+  return { ok: true, value: trimmed }
 }
 
 // ─── Estados que implican operativa activa ────────────────────────────────────

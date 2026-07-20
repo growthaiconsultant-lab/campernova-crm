@@ -7,7 +7,7 @@ import {
   BLOCKING_VEHICLE_STATUSES,
   classifyBlockers,
   isValidArchiveReason,
-  normalizeArchiveNotes,
+  validateArchiveNotes,
 } from './domain'
 import type { ArchiveDependencyInput } from './types'
 
@@ -43,14 +43,32 @@ describe('motivos de archivado', () => {
   })
 })
 
-describe('normalizeArchiveNotes', () => {
-  it('trim, vacío → null, máximo 500', () => {
-    expect(normalizeArchiveNotes('  hola  ')).toBe('hola')
-    expect(normalizeArchiveNotes('   ')).toBeNull()
-    expect(normalizeArchiveNotes('')).toBeNull()
-    expect(normalizeArchiveNotes(null)).toBeNull()
-    expect(normalizeArchiveNotes(undefined)).toBeNull()
-    expect(normalizeArchiveNotes('x'.repeat(600))).toHaveLength(500)
+describe('validateArchiveNotes', () => {
+  it('trimea los espacios alrededor', () => {
+    expect(validateArchiveNotes('  hola  ')).toEqual({ ok: true, value: 'hola' })
+  })
+
+  it('texto vacío, solo espacios o ausente → null', () => {
+    expect(validateArchiveNotes('   ')).toEqual({ ok: true, value: null })
+    expect(validateArchiveNotes('')).toEqual({ ok: true, value: null })
+    expect(validateArchiveNotes(null)).toEqual({ ok: true, value: null })
+    expect(validateArchiveNotes(undefined)).toEqual({ ok: true, value: null })
+  })
+
+  it('exactamente 500 caracteres se acepta', () => {
+    const res = validateArchiveNotes('x'.repeat(500))
+    expect(res.ok).toBe(true)
+    if (res.ok) expect(res.value).toHaveLength(500)
+  })
+
+  it('501 caracteres se RECHAZA (no se trunca en silencio)', () => {
+    expect(validateArchiveNotes('x'.repeat(501))).toEqual({ ok: false, reason: 'too_long' })
+  })
+
+  it('el límite se aplica tras el trim', () => {
+    // 500 caracteres + espacios alrededor sigue siendo válido.
+    expect(validateArchiveNotes(`   ${'x'.repeat(500)}   `).ok).toBe(true)
+    expect(validateArchiveNotes(`   ${'x'.repeat(501)}   `).ok).toBe(false)
   })
 })
 

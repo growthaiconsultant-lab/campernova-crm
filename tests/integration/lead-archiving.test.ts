@@ -36,12 +36,22 @@ import {
 } from '@/app/(backoffice)/lead-archiving-actions'
 import { deleteNote } from '@/app/(backoffice)/note-actions'
 import { findDuplicateBuyerByPhone, prismaBuyerDedupDeps } from '@/lib/buyer-dedup'
+import { getSalesInRange, type DashboardFilter } from '@/lib/dashboard/queries'
+import { getMonthlyNetMargin } from '@/lib/dashboard/metrics'
+import { getFlowKpis } from '@/lib/kpi/flow'
+import { resolveRange } from '@/lib/kpi/range'
 
 const prisma = db as PrismaClient
 const cleanups: Array<() => Promise<void>> = []
 
 const FUTURE = new Date(Date.now() + 7 * 86_400_000)
 const PAST = new Date(Date.now() - 7 * 86_400_000)
+
+// Ventana determinista para los KPIs: día 1 del mes en curso, siempre dentro del mes.
+const NOW = new Date()
+const SOLD_AT = new Date(NOW.getFullYear(), NOW.getMonth(), 1, 12, 0, 0)
+const MONTH_START = new Date(NOW.getFullYear(), NOW.getMonth(), 1)
+const MONTH_END = new Date(NOW.getFullYear(), NOW.getMonth() + 1, 1)
 
 async function makeAgent(): Promise<User> {
   const s = uniqueSuffix()
@@ -68,6 +78,8 @@ async function makeSeller(
       name: `Vendedor ${s}`,
       email: `v_${s}@integ.test`,
       phone: `6000${s.slice(0, 5)}`,
+      // Se asigna el agente para poder filtrar los KPIs a ESTE fixture y que sean deterministas.
+      agentId: authHolder.user.id,
       ...(opts.withNextAction ? { nextActionType: 'LLAMAR', nextActionDueAt: PAST } : {}),
     },
   })
@@ -225,6 +237,56 @@ describe('archivar y reactivar no alteran el negocio', () => {
     expect(acts).toHaveLength(2)
   })
 
+  it('los KPIs canónicos REALES son idénticos antes de archivar, archivado y reactivado', async () => {
+    const { leadId, vehicleId } = await makeSeller({ vehicleStatus: 'VENDIDO', soldAt: SOLD_AT })
+    const buyer = await makeBuyer()
+    const offer = await prisma.offer.create({
+      data: {
+        vehicleId: vehicleId!,
+        buyerLeadId: buyer.leadId,
+        amount: 30_000,
+        status: 'CONVERTIDA',
+        createdById: authHolder.user.id,
+      },
+    })
+    cleanups.push(async () => {
+      await prisma.offer.deleteMany({ where: { id: offer.id } })
+    })
+
+    // Filtrado por el agente del fixture → resultados deterministas y aislados.
+    const filter: DashboardFilter = { agentId: authHolder.user.id }
+    const range = resolveRange('mes', NOW)
+
+    // Se ejecutan las consultas KPI de producción, no se infiere la invariancia.
+    const snapshot = async () => ({
+      sales: await getSalesInRange(prisma, filter, MONTH_START, MONTH_END),
+      margin: await getMonthlyNetMargin(prisma, filter, NOW),
+      flow: await getFlowKpis(prisma, filter, range),
+    })
+
+    const before = await snapshot()
+    // El fixture debe producir KPIs con contenido real (si no, la invariancia sería trivial).
+    expect(before.sales).toBe(1)
+    expect(before.margin.vehiclesSold).toBe(1)
+    expect(before.margin.grossRevenue).toBe(30_000)
+
+    expect(await archiveSellerLead(leadId, 'SIN_RESPUESTA')).toEqual({ status: 'archived' })
+    expect(await snapshot()).toEqual(before)
+
+    expect(await reactivateSellerLead(leadId)).toEqual({ status: 'reactivated' })
+    expect(await snapshot()).toEqual(before)
+  })
+
+  it('archivar y reactivar modifican updatedAt (efecto aceptado de Prisma)', async () => {
+    const { leadId } = await makeSeller()
+    const before = await prisma.sellerLead.findUnique({ where: { id: leadId } })
+    await archiveSellerLead(leadId, 'OTRO')
+    const afterArchive = await prisma.sellerLead.findUnique({ where: { id: leadId } })
+    expect(afterArchive!.updatedAt.getTime()).toBeGreaterThanOrEqual(before!.updatedAt.getTime())
+    // `createdAt` NO cambia: solo `updatedAt` es un efecto automático.
+    expect(afterArchive!.createdAt.toISOString()).toBe(before!.createdAt.toISOString())
+  })
+
   it('la traza de archivado NO puede borrarse con deleteNote', async () => {
     const { leadId } = await makeSeller()
     await archiveSellerLead(leadId, 'OTRO')
@@ -371,6 +433,57 @@ describe('idempotencia y concurrencia', () => {
       where: { sellerLeadId: leadId, type: 'LEAD_ARCHIVADO' },
     })
     expect(acts).toBe(1)
+  })
+
+  it('reserva concurrente: nunca queda un estado roto ni una decisión incoherente', async () => {
+    // LIMITACIÓN: Prisma no permite pausar dentro de la transacción, así que la ventana de
+    // solapamiento no es determinista. Se repite el interleaving varias veces y se comprueba una
+    // INVARIANTE que debe cumplirse en cualquier orden de serialización:
+    //   · si devuelve `blocked` → el lead NO puede quedar archivado;
+    //   · si devuelve `archived` → hay EXACTAMENTE una Activity de archivado (nunca 0 ni 2);
+    //   · nunca hay estado roto (archivado sin Activity, o Activity sin archivar).
+    // Con `Serializable` se elimina además la anomalía de READ COMMITTED en la que la lectura de
+    // dependencias no ve una oferta ya confirmada y aun así el CAS se aplica.
+    for (let i = 0; i < 6; i++) {
+      const { leadId, vehicleId } = await makeSeller({ vehicleStatus: 'VENDIDO' })
+      const buyer = await makeBuyer()
+
+      const [outcome] = await Promise.all([
+        archiveSellerLead(leadId, 'OTRO'),
+        prisma.offer.create({
+          data: {
+            vehicleId: vehicleId!,
+            buyerLeadId: buyer.leadId,
+            amount: 30_000,
+            depositAmount: 1_000,
+            status: 'ACEPTADA',
+            createdById: authHolder.user.id,
+          },
+        }),
+      ])
+
+      const lead = await prisma.sellerLead.findUnique({ where: { id: leadId } })
+      const activityCount = await prisma.activity.count({
+        where: { sellerLeadId: leadId, type: 'LEAD_ARCHIVADO' },
+      })
+
+      expect(['archived', 'blocked', 'error']).toContain(outcome.status)
+      if (outcome.status === 'blocked') {
+        expect(lead!.archivedAt).toBeNull()
+        expect(activityCount).toBe(0)
+      } else if (outcome.status === 'archived') {
+        expect(lead!.archivedAt).not.toBeNull()
+        expect(activityCount).toBe(1)
+      } else {
+        // Conflicto agotado: no debe haber dejado nada a medias.
+        expect(lead!.archivedAt).toBeNull()
+        expect(activityCount).toBe(0)
+      }
+      // Estado roto imposible en cualquier caso.
+      expect(activityCount).toBe(lead!.archivedAt ? 1 : 0)
+
+      await prisma.offer.deleteMany({ where: { vehicleId: vehicleId! } })
+    }
   })
 
   it('doble reactivación no crea dos Activities', async () => {
