@@ -27,7 +27,7 @@ vi.mock('@/lib/vehicle-legal', () => ({
 const { mockDb } = vi.hoisted(() => {
   const mockDb = {
     sellerLead: { findUnique: vi.fn(), update: vi.fn() },
-    vehicle: { findUnique: vi.fn(), update: vi.fn() },
+    vehicle: { findUnique: vi.fn(), update: vi.fn(), updateMany: vi.fn() },
     delivery: { findFirst: vi.fn() },
     activity: { create: vi.fn() },
     user: { findUnique: vi.fn() },
@@ -46,7 +46,13 @@ import {
   isReadyForStatus,
   listMissingRequirements,
 } from '@/lib/vehicle-legal'
+import { revalidatePath } from 'next/cache'
+import { VEHICLE_TRANSITIONS } from '@/lib/state-machine'
 import { updateVehicle, discardSellerLead } from './actions'
+import {
+  VEHICLE_STATUS_CONFLICT_MESSAGE,
+  INVALID_VEHICLE_TRANSITION_MESSAGE,
+} from '@/lib/vehicle-status'
 
 const mockAgent = { id: 'agent-1', role: 'AGENTE' as const, name: 'Agente' } as unknown as User
 
@@ -151,7 +157,7 @@ describe('updateVehicle — guard TASADO', () => {
     })
     vi.mocked(getVehicleDocumentSummary).mockResolvedValue(mockDocs)
     vi.mocked(isReadyForStatus).mockReturnValue(true)
-    mockDb.vehicle.update.mockResolvedValue({})
+    mockDb.vehicle.updateMany.mockResolvedValue({ count: 1 })
     mockDb.activity.create.mockResolvedValue({})
 
     const result = await updateVehicle('v-1', { ...baseVehicleData, status: 'TASADO' })
@@ -192,18 +198,21 @@ describe('updateVehicle — guard PUBLICADO', () => {
 
   it('no vuelve a comprobar el expediente si la transición no involucra TASADO/PUBLICADO', async () => {
     mockDb.vehicle.findUnique.mockResolvedValue({ sellerLeadId: 'sl-1', status: 'PUBLICADO' })
-    mockDb.vehicle.update.mockResolvedValue({})
+    mockDb.vehicle.updateMany.mockResolvedValue({ count: 1 })
     mockDb.activity.create.mockResolvedValue({})
 
-    await updateVehicle('v-1', { ...baseVehicleData, status: 'RESERVADO' })
+    // PUBLICADO → DESCARTADO: transición manual válida que no pasa por el expediente legal.
+    // (Antes usaba PUBLICADO → RESERVADO, que I3A rechaza: el test habría pasado en vacío.)
+    const result = await updateVehicle('v-1', { ...baseVehicleData, status: 'DESCARTADO' })
 
+    expect(result).toMatchObject({ ok: true })
     expect(getVehicleLegalInput).not.toHaveBeenCalled()
     expect(isReadyForStatus).not.toHaveBeenCalled()
   })
 
   it('el guard se salta si el vehículo ya está en TASADO y se mantiene en TASADO', async () => {
     mockDb.vehicle.findUnique.mockResolvedValue({ sellerLeadId: 'sl-1', status: 'TASADO' })
-    mockDb.vehicle.update.mockResolvedValue({})
+    mockDb.vehicle.updateMany.mockResolvedValue({ count: 1 })
     mockDb.activity.create.mockResolvedValue({})
 
     await updateVehicle('v-1', { ...baseVehicleData, status: 'TASADO' })
@@ -235,81 +244,131 @@ describe('updateVehicle — guard PUBLICADO', () => {
 
 // ─── Fact de venta canónico — soldAt en la transición a VENDIDO (Fase 1A-1) ────
 
-describe('updateVehicle — soldAt canónico', () => {
-  it('fija soldAt al transicionar a VENDIDO (garantiza VENDIDO ⟹ soldAt != null)', async () => {
-    mockDb.vehicle.findUnique.mockResolvedValue({
-      sellerLeadId: 'sl-1',
-      status: 'RESERVADO',
-      soldAt: null,
+// ─── I3A: transiciones manuales retiradas ─────────────────────────────────────
+
+describe('updateVehicle — transiciones manuales retiradas (I3A)', () => {
+  const rechazadas: Array<[string, string]> = [
+    ['PUBLICADO', 'RESERVADO'], // reservar a mano invade el dominio de ofertas
+    ['RESERVADO', 'PUBLICADO'], // liberar a mano invade el dominio de ofertas
+    ['RESERVADO', 'VENDIDO'], // vender a mano invade el dominio de entregas
+    ['PUBLICADO', 'VENDIDO'],
+    ['TASADO', 'VENDIDO'],
+    ['NUEVO', 'VENDIDO'],
+    ['RESERVADO', 'DESCARTADO'], // no hay salidas manuales desde RESERVADO
+  ]
+
+  it.each(rechazadas)('%s → %s se rechaza sin escribir nada', async (from, to) => {
+    mockDb.vehicle.findUnique.mockResolvedValue({ sellerLeadId: 'sl-1', status: from })
+
+    const result = await updateVehicle('v-1', { ...baseVehicleData, status: to })
+
+    expect(result).toMatchObject({
+      error: { formErrors: [INVALID_VEHICLE_TRANSITION_MESSAGE] },
     })
-    // La transición a VENDIDO exige una entrega completada y firmada.
-    mockDb.delivery.findFirst.mockResolvedValue({ id: 'd-1' })
-    mockDb.vehicle.update.mockResolvedValue({})
-    mockDb.activity.create.mockResolvedValue({})
+    expect(mockDb.vehicle.updateMany).not.toHaveBeenCalled()
+    expect(mockDb.activity.create).not.toHaveBeenCalled()
+  })
+
+  it('el mensaje de transición inválida no filtra estado interno, ids ni SQL', () => {
+    expect(INVALID_VEHICLE_TRANSITION_MESSAGE).toBe('Este cambio de estado no está permitido.')
+    expect(INVALID_VEHICLE_TRANSITION_MESSAGE).not.toMatch(
+      /prisma|select|update |v-1|[0-9a-f]{20,}/i
+    )
+  })
+
+  it('la tabla canónica no ofrece ninguna transición manual a RESERVADO ni a VENDIDO', () => {
+    const destinos = Object.values(VEHICLE_TRANSITIONS).flat()
+    expect(destinos).not.toContain('RESERVADO')
+    expect(destinos).not.toContain('VENDIDO')
+    // La UI deriva sus opciones de esta misma tabla, así que deja de ofrecerlas automáticamente.
+    expect(VEHICLE_TRANSITIONS.RESERVADO).toBeUndefined()
+  })
+
+  it('conserva las transiciones manuales legítimas', () => {
+    expect(VEHICLE_TRANSITIONS.NUEVO).toContain('TASADO')
+    expect(VEHICLE_TRANSITIONS.TASADO).toContain('PUBLICADO')
+    // El descarte conserva su comportamiento actual; los blockers llegan en I3B.
+    expect(VEHICLE_TRANSITIONS.NUEVO).toContain('DESCARTADO')
+    expect(VEHICLE_TRANSITIONS.TASADO).toContain('DESCARTADO')
+    expect(VEHICLE_TRANSITIONS.PUBLICADO).toContain('DESCARTADO')
+  })
+
+  it('editar un vehículo VENDIDO sin cambiar de estado sigue permitido', async () => {
+    // `from === to` es válido: un vehículo terminal conserva sus campos editables.
+    mockDb.vehicle.findUnique.mockResolvedValue({ sellerLeadId: 'sl-1', status: 'VENDIDO' })
+    mockDb.vehicle.updateMany.mockResolvedValue({ count: 1 })
 
     const result = await updateVehicle('v-1', { ...baseVehicleData, status: 'VENDIDO' })
 
     expect(result).toMatchObject({ ok: true })
-    const updateArg = mockDb.vehicle.update.mock.calls[0][0]
-    expect(updateArg.data.status).toBe('VENDIDO')
-    expect(updateArg.data.soldAt).toBeInstanceOf(Date)
+    expect(mockDb.activity.create).not.toHaveBeenCalled() // no hay cambio de estado
   })
 
-  it('NO toca soldAt en un cambio de datos que no transiciona a VENDIDO', async () => {
-    // Edición sin cambio de estado (RESERVADO→RESERVADO): no entra el guard legal ni fija soldAt.
-    mockDb.vehicle.findUnique.mockResolvedValue({
-      sellerLeadId: 'sl-1',
-      status: 'RESERVADO',
-      soldAt: null,
-    })
-    mockDb.vehicle.update.mockResolvedValue({})
-    mockDb.activity.create.mockResolvedValue({})
+  it('editar un vehículo RESERVADO sin cambiar de estado sigue permitido', async () => {
+    mockDb.vehicle.findUnique.mockResolvedValue({ sellerLeadId: 'sl-1', status: 'RESERVADO' })
+    mockDb.vehicle.updateMany.mockResolvedValue({ count: 1 })
 
     const result = await updateVehicle('v-1', { ...baseVehicleData, status: 'RESERVADO' })
 
     expect(result).toMatchObject({ ok: true })
-    const updateArg = mockDb.vehicle.update.mock.calls[0][0]
-    expect(updateArg.data.soldAt).toBeUndefined()
   })
 
-  it('preserva un soldAt existente al transicionar a VENDIDO (idempotente: no re-fecha con new Date)', async () => {
-    const existing = new Date('2026-02-01T10:00:00.000Z')
-    // Anomalía: el vehículo aún no es VENDIDO pero ya arrastra un soldAt. Al transicionar a
-    // VENDIDO, `vehicle.soldAt ?? new Date()` debe CONSERVAR el existente, no sobrescribirlo.
-    // Este caso ejercita el operando izquierdo del `??` (los otros dos no lo hacen), de modo
-    // que una reversión de `vehicle.soldAt ?? new Date()` a `new Date()` haría fallar el test.
-    mockDb.vehicle.findUnique.mockResolvedValue({
-      sellerLeadId: 'sl-1',
-      status: 'RESERVADO',
-      soldAt: existing,
-    })
-    mockDb.delivery.findFirst.mockResolvedValue({ id: 'd-1' })
-    mockDb.vehicle.update.mockResolvedValue({})
-    mockDb.activity.create.mockResolvedValue({})
+  it('updateVehicle ya no consulta entregas: la venta dejó de ser asunto suyo', async () => {
+    mockDb.vehicle.findUnique.mockResolvedValue({ sellerLeadId: 'sl-1', status: 'RESERVADO' })
 
-    const result = await updateVehicle('v-1', { ...baseVehicleData, status: 'VENDIDO' })
+    await updateVehicle('v-1', { ...baseVehicleData, status: 'VENDIDO' })
 
-    expect(result).toMatchObject({ ok: true })
-    const updateArg = mockDb.vehicle.update.mock.calls[0][0]
-    expect(updateArg.data.soldAt).toBe(existing)
+    expect(mockDb.delivery.findFirst).not.toHaveBeenCalled()
+  })
+})
+
+// ─── I3A: CAS sobre el estado releído ─────────────────────────────────────────
+
+describe('updateVehicle — CAS de estado (I3A)', () => {
+  it('la escritura va condicionada al estado releído', async () => {
+    mockDb.vehicle.findUnique.mockResolvedValue({ sellerLeadId: 'sl-1', status: 'NUEVO' })
+    mockDb.vehicle.updateMany.mockResolvedValue({ count: 1 })
+
+    await updateVehicle('v-1', { ...baseVehicleData, status: 'NUEVO' })
+
+    const arg = mockDb.vehicle.updateMany.mock.calls[0][0]
+    expect(arg.where).toEqual({ id: 'v-1', status: 'NUEVO' })
   })
 
-  it('NO re-fecha soldAt en una edición VENDIDO→VENDIDO (sin cambio de estado)', async () => {
-    const existing = new Date('2026-02-01T10:00:00.000Z')
-    // Vehículo ya VENDIDO: editar datos no cambia de estado → soldAt no se toca en el data.
-    mockDb.vehicle.findUnique.mockResolvedValue({
-      sellerLeadId: 'sl-1',
-      status: 'VENDIDO',
-      soldAt: existing,
-    })
-    mockDb.vehicle.update.mockResolvedValue({})
-    mockDb.activity.create.mockResolvedValue({})
+  it('CAS con cero filas → conflicto seguro, sin Activity ni efectos posteriores', async () => {
+    // Otro proceso movió el vehículo entre la relectura y la escritura.
+    mockDb.vehicle.findUnique.mockResolvedValue({ sellerLeadId: 'sl-1', status: 'PUBLICADO' })
+    mockDb.vehicle.updateMany.mockResolvedValue({ count: 0 })
 
-    const result = await updateVehicle('v-1', { ...baseVehicleData, status: 'VENDIDO' })
+    const result = await updateVehicle('v-1', { ...baseVehicleData, status: 'DESCARTADO' })
 
-    expect(result).toMatchObject({ ok: true })
-    const updateArg = mockDb.vehicle.update.mock.calls[0][0]
-    expect(updateArg.data.soldAt).toBeUndefined()
+    expect(result).toMatchObject({ error: { formErrors: [VEHICLE_STATUS_CONFLICT_MESSAGE] } })
+    expect(mockDb.activity.create).not.toHaveBeenCalled()
+    expect(revalidatePath).not.toHaveBeenCalled()
+  })
+
+  it('el mensaje de conflicto es seguro y accionable', () => {
+    expect(VEHICLE_STATUS_CONFLICT_MESSAGE).toContain('Recarga')
+    expect(VEHICLE_STATUS_CONFLICT_MESSAGE).not.toMatch(/prisma|select|update |v-1|[0-9a-f]{20,}/i)
+  })
+
+  it('la Activity solo se escribe tras un CAS exitoso y con cambio de estado', async () => {
+    mockDb.vehicle.findUnique.mockResolvedValue({ sellerLeadId: 'sl-1', status: 'NUEVO' })
+    mockDb.vehicle.updateMany.mockResolvedValue({ count: 1 })
+
+    await updateVehicle('v-1', { ...baseVehicleData, status: 'DESCARTADO' })
+
+    expect(mockDb.activity.create).toHaveBeenCalledTimes(1)
+    expect(mockDb.activity.create.mock.calls[0][0].data.type).toBe('CAMBIO_ESTADO')
+  })
+
+  it('un error técnico inesperado se propaga, no se disfraza de conflicto', async () => {
+    mockDb.vehicle.findUnique.mockResolvedValue({ sellerLeadId: 'sl-1', status: 'NUEVO' })
+    mockDb.vehicle.updateMany.mockRejectedValue(new Error('boom'))
+
+    await expect(updateVehicle('v-1', { ...baseVehicleData, status: 'NUEVO' })).rejects.toThrow(
+      'boom'
+    )
   })
 })
 
