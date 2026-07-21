@@ -4,8 +4,17 @@ import { randomUUID } from 'node:crypto'
 import { revalidatePath } from 'next/cache'
 import { z } from 'zod'
 import { db } from '@/lib/db'
-import { requireAdmin, requireCanViewEntregas, requireCanEditEntregas } from '@/lib/auth'
+import { requireAdmin, requireCanEditEntregas } from '@/lib/auth'
 import { completeDeliveryTx, DeliveryConflictError } from '@/lib/delivery-completion'
+import { withLockedRoots, isLockError } from '@/lib/locking'
+import { Prisma } from '@prisma/client'
+import {
+  createDeliveryTx,
+  buildDeliveryCreationRoots,
+  isDeliveryCreationError,
+  DELIVERY_CREATION_ERROR_MESSAGES,
+  ACTIVE_DELIVERY_UNIQUE_INDEX,
+} from '@/lib/delivery-creation'
 // Documentos privados de entrega: bucket DENY-ALL para anon/authenticated (PR5B2). Storage se
 // opera con el cliente service_role SOLO servidor, tras autorizar con Prisma en la Server Action.
 import { getSupabaseAdminClient } from '@/lib/supabase/admin'
@@ -47,6 +56,17 @@ function isValidDeliveryTransition(from: DeliveryStatus, to: DeliveryStatus) {
   return VALID_TRANSITIONS[from]?.includes(to) ?? false
 }
 
+/**
+ * Solo la violación del índice único parcial de Delivery activa se traduce a un conflicto de
+ * negocio. Cualquier otro P2002 (target distinto) se propaga como error técnico.
+ */
+function isActiveDeliveryUniqueViolation(err: unknown): boolean {
+  if (!(err instanceof Prisma.PrismaClientKnownRequestError) || err.code !== 'P2002') return false
+  const target = err.meta?.target
+  const targetStr = Array.isArray(target) ? target.join(',') : String(target ?? '')
+  return targetStr.includes(ACTIVE_DELIVERY_UNIQUE_INDEX)
+}
+
 // 14-item checklist created with every delivery
 const INITIAL_CHECKLIST = [
   { category: 'PRE_ENTREGA' as const, item: 'Limpieza final OK' },
@@ -68,6 +88,9 @@ const INITIAL_CHECKLIST = [
 const createDeliverySchema = z.object({
   vehicleId: z.string().min(1),
   buyerLeadId: z.string().min(1),
+  // I3C1A: obligatorio. La columna es nullable solo para compatibilidad de rollout, pero el código
+  // nuevo NUNCA crea una entrega sin una Offer CONVERTIDA.
+  offerId: z.string().min(1),
   scheduledAt: z.string().min(1),
   responsableId: z.string().optional().nullable(),
   notes: z.string().trim().optional().nullable(),
@@ -80,56 +103,74 @@ const signDeliverySchema = z.object({
 })
 
 export async function createDelivery(formData: unknown): Promise<ActionResult<{ id: string }>> {
-  const actor = await requireCanViewEntregas()
+  // I3C1A: pasa de permiso de LECTURA a permiso de EDICIÓN (era una escalada de privilegios).
+  const actor = await requireCanEditEntregas()
 
   const parsed = createDeliverySchema.safeParse(formData)
   if (!parsed.success) return { ok: false, error: 'Datos inválidos' }
 
-  const { vehicleId, buyerLeadId, scheduledAt, responsableId, notes } = parsed.data
+  const { vehicleId, buyerLeadId, offerId, scheduledAt, responsableId, notes } = parsed.data
 
-  const delivery = await db.delivery.create({
-    data: {
-      vehicleId,
-      buyerLeadId,
-      responsableId: responsableId ?? null,
-      scheduledAt: new Date(scheduledAt),
-      notes: notes ?? null,
-      checklist: {
-        create: INITIAL_CHECKLIST.map((c) => ({ ...c, result: 'PENDIENTE' as const })),
-      },
-    },
-    include: {
-      buyerLead: { select: { name: true, email: true } },
-      vehicle: { select: { brand: true, model: true } },
-    },
-  })
-
+  // Lectura preliminar: solo resuelve identidades para las raíces. Ninguna decisión de negocio se
+  // toma sobre estos datos; todo se relee dentro de la transacción.
   const vehicle = await db.vehicle.findUnique({
     where: { id: vehicleId },
     select: { sellerLeadId: true },
   })
+  if (!vehicle) return { ok: false, error: DELIVERY_CREATION_ERROR_MESSAGES.VEHICLE_NOT_FOUND }
 
-  await db.activity.create({
-    data: {
-      type: 'ENTREGA_PROGRAMADA',
-      content: `Entrega programada para el ${new Date(scheduledAt).toLocaleDateString('es-ES')}`,
-      agentId: actor.id,
-      sellerLeadId: vehicle?.sellerLeadId ?? null,
-      buyerLeadId,
-    },
+  const roots = buildDeliveryCreationRoots({
+    vehicleId,
+    sellerLeadId: vehicle.sellerLeadId,
+    buyerLeadId,
   })
 
-  // Non-blocking confirmation email to buyer
-  sendDeliveryConfirmation({
-    buyerName: delivery.buyerLead.name,
-    buyerEmail: delivery.buyerLead.email,
-    vehicleLabel: `${delivery.vehicle.brand} ${delivery.vehicle.model}`,
-    scheduledAt: new Date(scheduledAt),
-    deliveryId: delivery.id,
-  }).catch(console.error)
+  let created: { deliveryId: string }
+  try {
+    created = await withLockedRoots(roots, (tx) =>
+      createDeliveryTx(tx, {
+        vehicleId,
+        buyerLeadId,
+        offerId,
+        resolvedSellerLeadId: vehicle.sellerLeadId,
+        scheduledAt: new Date(scheduledAt),
+        responsableId: responsableId ?? null,
+        notes: notes ?? null,
+        actorId: actor.id,
+        checklist: INITIAL_CHECKLIST.map((c) => ({ category: c.category, item: c.item })),
+      })
+    )
+  } catch (err) {
+    if (isDeliveryCreationError(err)) return { ok: false, error: err.message }
+    if (isLockError(err)) return { ok: false, error: err.message }
+    // La violación del índice único parcial (dos activas por vehículo) → conflicto de negocio.
+    if (isActiveDeliveryUniqueViolation(err)) {
+      return { ok: false, error: DELIVERY_CREATION_ERROR_MESSAGES.DELIVERY_ALREADY_ACTIVE }
+    }
+    // Error técnico inesperado → propágalo.
+    throw err
+  }
+
+  // Efectos post-commit: email de confirmación (no bloqueante) + revalidación.
+  const detail = await db.delivery.findUnique({
+    where: { id: created.deliveryId },
+    select: {
+      buyerLead: { select: { name: true, email: true } },
+      vehicle: { select: { brand: true, model: true } },
+    },
+  })
+  if (detail) {
+    sendDeliveryConfirmation({
+      buyerName: detail.buyerLead.name,
+      buyerEmail: detail.buyerLead.email,
+      vehicleLabel: `${detail.vehicle.brand} ${detail.vehicle.model}`,
+      scheduledAt: new Date(scheduledAt),
+      deliveryId: created.deliveryId,
+    }).catch(console.error)
+  }
 
   revalidatePath('/entregas')
-  return { ok: true, data: { id: delivery.id } }
+  return { ok: true, data: { id: created.deliveryId } }
 }
 
 export async function updateDeliveryStatus(

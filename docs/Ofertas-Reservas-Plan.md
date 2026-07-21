@@ -132,8 +132,30 @@ Helpers: `isValidOfferTransition`, `isTerminalOfferStatus`, `isReservation` (ACE
 > Coordinar el descarte ahora daría una garantía falsa: `createDelivery` sigue sin coordinar y podría
 > crear una entrega **después** del descarte. Núcleo en `lib/vehicle-status.ts`.
 >
-> I3 **no** está completo: I3C (Delivery), I3D (descarte coordinado) e I3E (tasación) siguen
-> pendientes, y el resto de escritores de `VehicleStatus` sigue sin coordinar.
+> ✅ **I3C1A — enlace `Delivery → Offer` y creación coordinada** (`lib/delivery-creation.ts`).
+> Migración additiva expand: `Delivery.offerId` **nullable** (`ON DELETE NO ACTION`) + índice de FK +
+> índice único parcial `deliveries_active_vehicle_key`. `createDelivery` con `requireCanEditEntregas`
+> bajo `withLockedRoots`, exige Offer `CONVERTIDA` coherente + Vehicle `RESERVADO` + sin Delivery
+> activa/completada, atómico con la Activity.
+>
+> ```
+> I3C1A ADDS AN OPTIONAL DELIVERY OFFER LINK FOR EXPAND–CONTRACT COMPATIBILITY
+> NEW DELIVERY WRITERS MUST ALWAYS PERSIST offerId
+> SCHEMA I3C1A IS BACKWARD-COMPATIBLE WITH THE CURRENT PRODUCTION CODE
+> AT MOST ONE PROGRAMADA OR EN_CURSO DELIVERY IS ALLOWED PER VEHICLE
+> DELIVERY COMPLETION REMAINS UNCOORDINATED UNTIL I3C3
+> offerId MUST BECOME NOT NULL IN I3C1B AFTER ZERO-NULL VALIDATION
+> LEAD_ARCHIVED REMAINS PREPARATORY UNTIL PR #117 IS MERGED
+> ```
+>
+> La columna es nullable **solo** durante expand–contract para que el código actualmente desplegado
+> (que no envía `offer_id`) siga funcionando durante el rollout; el escritor nuevo nunca crea sin
+> Offer. `NoAction` (no `Restrict`) evita romper el cascade convergente `Vehicle → Offer` /
+> `Vehicle → Delivery`.
+>
+> I3 **no** está completo: I3C1B (`SET NOT NULL`), I3C2 (transiciones/cancelación), I3C3
+> (compleción/venta), I3D (descarte coordinado) e I3E (tasación) siguen pendientes, y el resto de
+> escritores de `VehicleStatus` sigue sin coordinar.
 >
 > ⚠️ **`DELIVERY, VEHICLE AND VALUATION WRITERS REMAIN UNCOORDINATED UNTIL I3`** — el invariante
 > global del archivado **todavía no está garantizado**.

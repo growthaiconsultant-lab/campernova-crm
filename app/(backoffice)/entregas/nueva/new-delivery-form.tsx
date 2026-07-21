@@ -4,16 +4,11 @@ import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { createDelivery } from '../actions'
 
-interface Vehicle {
-  id: string
-  brand: string
-  model: string
-  year: number
-}
-
-interface Buyer {
-  id: string
-  name: string
+interface Operation {
+  offerId: string
+  vehicleId: string
+  buyerLeadId: string
+  label: string
 }
 
 interface User {
@@ -22,12 +17,11 @@ interface User {
 }
 
 interface Props {
-  vehicles: Vehicle[]
-  buyers: Buyer[]
+  operations: Operation[]
   users: User[]
 }
 
-export function NewDeliveryForm({ vehicles, buyers, users }: Props) {
+export function NewDeliveryForm({ operations, users }: Props) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
   const [error, setError] = useState<string | null>(null)
@@ -35,9 +29,16 @@ export function NewDeliveryForm({ vehicles, buyers, users }: Props) {
   function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()
     const fd = new FormData(e.currentTarget)
+    const offerId = fd.get('offerId') as string
+    const op = operations.find((o) => o.offerId === offerId)
+    if (!op) {
+      setError('Selecciona una operación válida.')
+      return
+    }
     const data = {
-      vehicleId: fd.get('vehicleId') as string,
-      buyerLeadId: fd.get('buyerLeadId') as string,
+      vehicleId: op.vehicleId,
+      buyerLeadId: op.buyerLeadId,
+      offerId: op.offerId,
       scheduledAt: fd.get('scheduledAt') as string,
       responsableId: (fd.get('responsableId') as string) || null,
       notes: (fd.get('notes') as string) || null,
@@ -60,43 +61,31 @@ export function NewDeliveryForm({ vehicles, buyers, users }: Props) {
     >
       {error && <div className="rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>}
 
-      <div className="space-y-1.5">
-        <label htmlFor="vehicleId" className="block text-sm font-medium">
-          Vehículo <span className="text-red-500">*</span>
-        </label>
-        <select
-          id="vehicleId"
-          name="vehicleId"
-          required
-          className="h-10 w-full rounded-lg border border-cn-line bg-white px-3 text-sm focus:outline-none"
-        >
-          <option value="">Seleccionar vehículo…</option>
-          {vehicles.map((v) => (
-            <option key={v.id} value={v.id}>
-              {v.brand} {v.model} ({v.year})
-            </option>
-          ))}
-        </select>
-      </div>
-
-      <div className="space-y-1.5">
-        <label htmlFor="buyerLeadId" className="block text-sm font-medium">
-          Comprador <span className="text-red-500">*</span>
-        </label>
-        <select
-          id="buyerLeadId"
-          name="buyerLeadId"
-          required
-          className="h-10 w-full rounded-lg border border-cn-line bg-white px-3 text-sm focus:outline-none"
-        >
-          <option value="">Seleccionar comprador…</option>
-          {buyers.map((b) => (
-            <option key={b.id} value={b.id}>
-              {b.name}
-            </option>
-          ))}
-        </select>
-      </div>
+      {operations.length === 0 ? (
+        <div className="rounded-lg bg-cn-cream-50 px-4 py-3 text-sm text-muted-foreground">
+          No hay ventas cerradas pendientes de entrega. Una entrega se programa desde una oferta
+          convertida con el vehículo reservado.
+        </div>
+      ) : (
+        <div className="space-y-1.5">
+          <label htmlFor="offerId" className="block text-sm font-medium">
+            Operación (venta cerrada) <span className="text-red-500">*</span>
+          </label>
+          <select
+            id="offerId"
+            name="offerId"
+            required
+            className="h-10 w-full rounded-lg border border-cn-line bg-white px-3 text-sm focus:outline-none"
+          >
+            <option value="">Seleccionar operación…</option>
+            {operations.map((o) => (
+              <option key={o.offerId} value={o.offerId}>
+                {o.label}
+              </option>
+            ))}
+          </select>
+        </div>
+      )}
 
       <div className="space-y-1.5">
         <label htmlFor="scheduledAt" className="block text-sm font-medium">
@@ -151,7 +140,7 @@ export function NewDeliveryForm({ vehicles, buyers, users }: Props) {
         </a>
         <button
           type="submit"
-          disabled={isPending}
+          disabled={isPending || operations.length === 0}
           className="inline-flex h-10 items-center rounded-lg bg-primary px-5 text-sm font-medium text-white hover:opacity-90 disabled:opacity-50"
         >
           {isPending ? 'Creando…' : 'Crear entrega'}
