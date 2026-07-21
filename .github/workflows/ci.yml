@@ -78,6 +78,10 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          # Historial completo: old-client-compat.test.ts genera el Prisma Client de ca6015e
+          # (git show ca6015e:prisma/schema.prisma) para probar la compatibilidad del rollout.
+          fetch-depth: 0
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
@@ -172,8 +176,8 @@ jobs:
           count=$(psql "$PSQL_URL" -tAc "SELECT count(*) FROM _prisma_migrations WHERE finished_at IS NOT NULL")
           names=$(psql "$PSQL_URL" -tAc "SELECT string_agg(migration_name, ',' ORDER BY migration_name) FROM _prisma_migrations WHERE finished_at IS NOT NULL")
           echo "migraciones aplicadas: $count · nombres: $names"
-          test "$count" = "4" || { echo "esperado 4 migraciones aplicadas (baseline + PR5B1 + archivado + commitment)"; exit 1; }
-          test "$names" = "000000000000_squashed_migrations,20260712000000_add_versioned_document_model,20260719120000_add_lead_archiving_model,20260720000000_add_calendar_event_commitment" || { echo "conjunto u orden de migraciones inesperado"; exit 1; }
+          test "$count" = "5" || { echo "esperado 5 migraciones aplicadas (baseline + PR5B1 + archivado + commitment + delivery_offer_link)"; exit 1; }
+          test "$names" = "000000000000_squashed_migrations,20260712000000_add_versioned_document_model,20260719120000_add_lead_archiving_model,20260720000000_add_calendar_event_commitment,20260721100000_add_delivery_offer_link_expand" || { echo "conjunto u orden de migraciones inesperado"; exit 1; }
 
       - name: Prisma migrate status (must be up to date)
         run: pnpm prisma migrate status
@@ -218,13 +222,17 @@ jobs:
           #   enums       50 → 51   (+1: EventCommitment)
           #   enum_values 266 → 269 (+3: EXTERNO, INTERNO, INDETERMINADO)
           #   indexes     113 (sin cambio: la consulta de archivado filtra por las FK ya indexadas)
-          # Sin cambio: tables=31, foreign_keys=67, without_rls=0, forced=0, policies=0.
+          # Delta tras add_delivery_offer_link_expand (PR I3C1A, aditivo expand; columna nullable):
+          #   columns     440 → 441 (+1: deliveries.offer_id)
+          #   foreign_keys 67 → 68  (+1: deliveries.offer_id → offers, ON DELETE NO ACTION)
+          #   indexes     113 → 115 (+2: deliveries_offer_id_idx + deliveries_active_vehicle_key parcial)
+          # Sin cambio: tables=31, enums=51, enum_values=269, without_rls=0, forced=0, policies=0.
           assert tables "$tables" 31
-          assert columns "$columns" 440
+          assert columns "$columns" 441
           assert enums "$enums" 51
           assert enum_values "$enum_values" 269
-          assert foreign_keys "$fks" 67
-          assert indexes "$indexes" 113
+          assert foreign_keys "$fks" 68
+          assert indexes "$indexes" 115
           assert tables_without_rls "$without_rls" 0
           assert tables_forced_rls "$forced" 0
           assert policies "$policies" 0
