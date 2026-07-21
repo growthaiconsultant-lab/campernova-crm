@@ -18,6 +18,7 @@ import {
   createDeliveryTx,
   buildDeliveryCreationRoots,
   isDeliveryCreationError,
+  isActiveDeliveryUniqueViolation,
   ACTIVE_DELIVERY_UNIQUE_INDEX,
   type CreateDeliveryHooks,
 } from '@/lib/delivery-creation'
@@ -418,15 +419,90 @@ describe('FK Delivery.offer_id · NoAction y cascada convergente', () => {
   })
 })
 
-describe('compatibilidad expand: schema acepta INSERT sin offer_id (código anterior)', () => {
+describe('compatibilidad expand: la columna nullable acepta INSERT sin offer_id (prueba física)', () => {
+  // NOTA: esto solo prueba que PostgreSQL acepta el insert (nullability). La compatibilidad del
+  // Prisma Client desplegado se demuestra aparte en `old-client-compat.test.ts`, ejecutando el
+  // cliente generado desde ca6015e contra este mismo schema expandido.
   it('un INSERT que omite offer_id persiste con NULL', async () => {
     const f = await seed()
-    // Simula el createDelivery anterior (no envía offer_id). La columna es nullable en I3C1A.
     const rows = await prismaA.$queryRaw<Array<{ id: string; offer_id: string | null }>>`
       INSERT INTO "deliveries" ("id","vehicle_id","buyer_lead_id","scheduled_at","status","created_at","updated_at")
       VALUES (${'legacy_' + uniqueSuffix()}, ${f.vehicleId}, ${f.buyerId}, ${new Date()}, 'PROGRAMADA'::"DeliveryStatus", ${new Date()}, ${new Date()})
       RETURNING "id", "offer_id"`
     expect(rows).toHaveLength(1)
     expect(rows[0].offer_id).toBeNull()
+  })
+})
+
+describe('traductor P2002 real del índice parcial', () => {
+  async function insertActive(f: Fixture, client: PrismaClient) {
+    return client.delivery.create({
+      data: {
+        vehicleId: f.vehicleId,
+        buyerLeadId: f.buyerId,
+        offerId: f.offerId,
+        status: 'PROGRAMADA',
+        scheduledAt: new Date(),
+      },
+    })
+  }
+
+  it('un P2002 REAL del índice parcial → el traductor de producción lo reconoce', async () => {
+    const f = await seed()
+    await insertActive(f, prismaA)
+    let captured: unknown
+    try {
+      await insertActive(f, prismaA)
+      throw new Error('se esperaba un P2002 y no se produjo')
+    } catch (e) {
+      captured = e
+    }
+    const err = captured as { constructor: { name: string }; code?: string; meta?: unknown }
+    // eslint-disable-next-line no-console
+    console.log('[P2002-real]', {
+      name: err.constructor.name,
+      code: err.code,
+      metaKeys: err.meta && typeof err.meta === 'object' ? Object.keys(err.meta) : [],
+      target: (err.meta as { target?: unknown } | undefined)?.target,
+    })
+    expect(isActiveDeliveryUniqueViolation(captured)).toBe(true)
+    expect((await counts(f)).activas).toBe(1)
+  })
+
+  it('un P2002 REAL de OTRO índice (users.email) NO se traduce', async () => {
+    const s = uniqueSuffix()
+    const email = `dup_${s}@integ.test`
+    await prismaA.user.create({ data: { name: 'A', email, role: 'AGENTE' } })
+    cleanups.push(async () => {
+      await prismaA.user.deleteMany({ where: { email } })
+    })
+    let captured: unknown
+    try {
+      await prismaA.user.create({ data: { name: 'B', email, role: 'AGENTE' } })
+      throw new Error('se esperaba un P2002 y no se produjo')
+    } catch (e) {
+      captured = e
+    }
+    expect(isActiveDeliveryUniqueViolation(captured)).toBe(false)
+  })
+})
+
+describe('recreación tras COMPLETADA (regla de aplicación, no del índice)', () => {
+  it('con una Delivery COMPLETADA previa → VEHICLE_ALREADY_DELIVERED', async () => {
+    // FIXTURE ARTIFICIAL: en el flujo real, completar dejaría el vehículo VENDIDO (I3C3, aún no
+    // coordinado). Aquí se fuerza el vehículo a RESERVADO con una Delivery COMPLETADA para
+    // ejercitar SOLO la regla de aplicación: no se recrea sobre una entrega completada. El índice
+    // parcial por sí solo lo permitiría (COMPLETADA no es activa); la aplicación lo veta.
+    const f = await seed()
+    const first = await create(f, prismaA)
+    await prismaA.delivery.update({
+      where: { id: first.deliveryId },
+      data: { status: 'COMPLETADA' },
+    })
+    const before = await counts(f)
+    const err = await create(f, prismaA).catch((e) => e)
+    expect(codeOf(err)).toBe('VEHICLE_ALREADY_DELIVERED')
+    const after = await counts(f)
+    expect(after.deliveries).toBe(before.deliveries)
   })
 })

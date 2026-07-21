@@ -17,7 +17,8 @@
  *
  * `DELIVERY COMPLETION REMAINS UNCOORDINATED UNTIL I3C3`
  */
-import type { DeliveryChecklistCategory, DeliveryStatus, Prisma } from '@prisma/client'
+import { Prisma } from '@prisma/client'
+import type { DeliveryChecklistCategory, DeliveryStatus } from '@prisma/client'
 import type { LockRoot } from '@/lib/locking'
 
 export type DeliveryCreationErrorCode =
@@ -68,6 +69,19 @@ export const ACTIVE_DELIVERY_STATUSES: DeliveryStatus[] = ['PROGRAMADA', 'EN_CUR
 
 /** Nombre del índice único parcial (segunda barrera de unicidad en BD). */
 export const ACTIVE_DELIVERY_UNIQUE_INDEX = 'deliveries_active_vehicle_key'
+
+/**
+ * Traductor del P2002: solo la violación del índice único parcial de Delivery activa se considera
+ * un conflicto de negocio (`DELIVERY_ALREADY_ACTIVE`). Cualquier otro P2002 (target distinto) se
+ * propaga como error técnico. `meta.target` de Prisma puede venir como string o array; se compara
+ * de forma robusta contra el nombre del índice. Verificado contra un P2002 REAL en integración.
+ */
+export function isActiveDeliveryUniqueViolation(err: unknown): boolean {
+  if (!(err instanceof Prisma.PrismaClientKnownRequestError) || err.code !== 'P2002') return false
+  const target = err.meta?.target
+  const targetStr = Array.isArray(target) ? target.join(',') : String(target ?? '')
+  return targetStr.includes(ACTIVE_DELIVERY_UNIQUE_INDEX)
+}
 
 /**
  * Raíces a bloquear para crear una entrega: `Vehicle → SellerLead → BuyerLead`. El vendedor solo si

@@ -7,13 +7,12 @@ import { db } from '@/lib/db'
 import { requireAdmin, requireCanEditEntregas } from '@/lib/auth'
 import { completeDeliveryTx, DeliveryConflictError } from '@/lib/delivery-completion'
 import { withLockedRoots, isLockError } from '@/lib/locking'
-import { Prisma } from '@prisma/client'
 import {
   createDeliveryTx,
   buildDeliveryCreationRoots,
   isDeliveryCreationError,
+  isActiveDeliveryUniqueViolation,
   DELIVERY_CREATION_ERROR_MESSAGES,
-  ACTIVE_DELIVERY_UNIQUE_INDEX,
 } from '@/lib/delivery-creation'
 // Documentos privados de entrega: bucket DENY-ALL para anon/authenticated (PR5B2). Storage se
 // opera con el cliente service_role SOLO servidor, tras autorizar con Prisma en la Server Action.
@@ -54,17 +53,6 @@ const VALID_TRANSITIONS: Partial<Record<DeliveryStatus, DeliveryStatus[]>> = {
 
 function isValidDeliveryTransition(from: DeliveryStatus, to: DeliveryStatus) {
   return VALID_TRANSITIONS[from]?.includes(to) ?? false
-}
-
-/**
- * Solo la violación del índice único parcial de Delivery activa se traduce a un conflicto de
- * negocio. Cualquier otro P2002 (target distinto) se propaga como error técnico.
- */
-function isActiveDeliveryUniqueViolation(err: unknown): boolean {
-  if (!(err instanceof Prisma.PrismaClientKnownRequestError) || err.code !== 'P2002') return false
-  const target = err.meta?.target
-  const targetStr = Array.isArray(target) ? target.join(',') : String(target ?? '')
-  return targetStr.includes(ACTIVE_DELIVERY_UNIQUE_INDEX)
 }
 
 // 14-item checklist created with every delivery

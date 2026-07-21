@@ -78,6 +78,10 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          # Historial completo: old-client-compat.test.ts genera el Prisma Client de ca6015e
+          # (git show ca6015e:prisma/schema.prisma) para probar la compatibilidad del rollout.
+          fetch-depth: 0
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
