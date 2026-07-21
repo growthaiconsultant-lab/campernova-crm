@@ -67,20 +67,28 @@ export function isDeliveryCreationError(err: unknown): err is DeliveryCreationEr
 /** Estados en los que una Delivery ocupa el vehículo. Solo una activa por vehículo. */
 export const ACTIVE_DELIVERY_STATUSES: DeliveryStatus[] = ['PROGRAMADA', 'EN_CURSO']
 
-/** Nombre del índice único parcial (segunda barrera de unicidad en BD). */
+/** Nombre del índice único parcial (segunda barrera de unicidad en BD). Solo para tests de BD. */
 export const ACTIVE_DELIVERY_UNIQUE_INDEX = 'deliveries_active_vehicle_key'
 
 /**
- * Traductor del P2002: solo la violación del índice único parcial de Delivery activa se considera
- * un conflicto de negocio (`DELIVERY_ALREADY_ACTIVE`). Cualquier otro P2002 (target distinto) se
- * propaga como error técnico. `meta.target` de Prisma puede venir como string o array; se compara
- * de forma robusta contra el nombre del índice. Verificado contra un P2002 REAL en integración.
+ * Detección **preliminar** de un P2002 que *podría* ser la violación del índice único parcial de
+ * Delivery activa. Prisma NO devuelve el nombre del índice parcial; para esta violación devuelve
+ * (verificado con un P2002 REAL en integración):
+ *
+ *     code = 'P2002' · meta.modelName = 'Delivery' · meta.target = ['vehicle_id']
+ *
+ * Este helper solo dice «candidato»: no decide el error de dominio. La causa comercial se confirma
+ * con una lectura post-rollback (ver `createDelivery`), de modo que la clasificación NO depende de
+ * que `vehicle_id` pertenezca a un único índice — si mañana hubiera otro unique sobre esa columna,
+ * la confirmación por consulta evita un falso `DELIVERY_ALREADY_ACTIVE`.
  */
-export function isActiveDeliveryUniqueViolation(err: unknown): boolean {
+export function isPotentialActiveDeliveryVehicleConflict(err: unknown): boolean {
   if (!(err instanceof Prisma.PrismaClientKnownRequestError) || err.code !== 'P2002') return false
-  const target = err.meta?.target
-  const targetStr = Array.isArray(target) ? target.join(',') : String(target ?? '')
-  return targetStr.includes(ACTIVE_DELIVERY_UNIQUE_INDEX)
+  const meta = err.meta as { modelName?: unknown; target?: unknown } | undefined
+  if (meta?.modelName !== 'Delivery') return false
+  const target = meta?.target
+  const cols = Array.isArray(target) ? target.map((c) => String(c)) : [String(target ?? '')]
+  return cols.includes('vehicle_id')
 }
 
 /**

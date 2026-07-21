@@ -499,29 +499,48 @@ describe('createDelivery · coordinación y contrato (I3C1A)', () => {
     expect(mockDb.delivery.create).not.toHaveBeenCalled()
   })
 
-  it('traduce la violación del índice único parcial a DELIVERY_ALREADY_ACTIVE', async () => {
+  // La metadata real de Prisma para el índice parcial: modelName='Delivery', target=['vehicle_id'].
+  function realPartialIndexP2002() {
+    return new Prisma.PrismaClientKnownRequestError('unique', {
+      code: 'P2002',
+      clientVersion: 'x',
+      meta: { modelName: 'Delivery', target: ['vehicle_id'] },
+    })
+  }
+
+  it('P2002 candidato + confirmación encuentra una activa → DELIVERY_ALREADY_ACTIVE', async () => {
     happyPath()
-    mockDb.delivery.create.mockRejectedValue(
-      new Prisma.PrismaClientKnownRequestError('unique', {
-        code: 'P2002',
-        clientVersion: 'x',
-        meta: { target: 'deliveries_active_vehicle_key' },
-      })
-    )
+    mockDb.delivery.create.mockRejectedValue(realPartialIndexP2002())
+    // count dentro del núcleo: activa=0, completada=0 (pasa al create); confirmación post-rollback=1.
+    mockDb.delivery.count.mockReset()
+    mockDb.delivery.count.mockResolvedValueOnce(0).mockResolvedValueOnce(0).mockResolvedValue(1)
     const res = await createDelivery(validInput)
     expect(res).toEqual({
       ok: false,
       error: DELIVERY_CREATION_ERROR_MESSAGES.DELIVERY_ALREADY_ACTIVE,
     })
+    // La confirmación consultó por el vehículo y estados activos, fuera de la transacción.
+    const confirmCall = mockDb.delivery.count.mock.calls.at(-1)?.[0]
+    expect(confirmCall.where.vehicleId).toBe('veh-1')
   })
 
-  it('propaga un P2002 de OTRO índice como error técnico', async () => {
+  it('P2002 candidato pero la confirmación NO encuentra activa → propaga error técnico', async () => {
+    happyPath()
+    mockDb.delivery.create.mockRejectedValue(realPartialIndexP2002())
+    // Caso futuro ambiguo: otro unique sobre vehicle_id sin Delivery activa real → no traducir.
+    mockDb.delivery.count.mockResolvedValue(0)
+    await expect(createDelivery(validInput)).rejects.toBeInstanceOf(
+      Prisma.PrismaClientKnownRequestError
+    )
+  })
+
+  it('propaga un P2002 de OTRO modelo como error técnico (ni siquiera candidato)', async () => {
     happyPath()
     mockDb.delivery.create.mockRejectedValue(
       new Prisma.PrismaClientKnownRequestError('unique', {
         code: 'P2002',
         clientVersion: 'x',
-        meta: { target: 'algun_otro_indice' },
+        meta: { modelName: 'User', target: ['email'] },
       })
     )
     await expect(createDelivery(validInput)).rejects.toBeInstanceOf(

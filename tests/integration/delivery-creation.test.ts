@@ -18,7 +18,7 @@ import {
   createDeliveryTx,
   buildDeliveryCreationRoots,
   isDeliveryCreationError,
-  isActiveDeliveryUniqueViolation,
+  isPotentialActiveDeliveryVehicleConflict,
   ACTIVE_DELIVERY_UNIQUE_INDEX,
   type CreateDeliveryHooks,
 } from '@/lib/delivery-creation'
@@ -447,7 +447,7 @@ describe('traductor P2002 real del índice parcial', () => {
     })
   }
 
-  it('un P2002 REAL del índice parcial → el traductor de producción lo reconoce', async () => {
+  it('un P2002 REAL del índice parcial es CANDIDATO y la confirmación encuentra una activa', async () => {
     const f = await seed()
     await insertActive(f, prismaA)
     let captured: unknown
@@ -457,19 +457,17 @@ describe('traductor P2002 real del índice parcial', () => {
     } catch (e) {
       captured = e
     }
-    const err = captured as { constructor: { name: string }; code?: string; meta?: unknown }
-    // eslint-disable-next-line no-console
-    console.log('[P2002-real]', {
-      name: err.constructor.name,
-      code: err.code,
-      metaKeys: err.meta && typeof err.meta === 'object' ? Object.keys(err.meta) : [],
-      target: (err.meta as { target?: unknown } | undefined)?.target,
+    // Metadata REAL: Prisma da modelName='Delivery', target=['vehicle_id'] (NO el nombre del índice).
+    expect(isPotentialActiveDeliveryVehicleConflict(captured)).toBe(true)
+    // Confirmación post-rollback (fuera de la tx abortada): hay una activa real → traducible.
+    const active = await prismaA.delivery.count({
+      where: { vehicleId: f.vehicleId, status: { in: ['PROGRAMADA', 'EN_CURSO'] } },
     })
-    expect(isActiveDeliveryUniqueViolation(captured)).toBe(true)
+    expect(active).toBeGreaterThan(0)
     expect((await counts(f)).activas).toBe(1)
   })
 
-  it('un P2002 REAL de OTRO índice (users.email) NO se traduce', async () => {
+  it('un P2002 REAL de OTRO índice (users.email) NO es candidato', async () => {
     const s = uniqueSuffix()
     const email = `dup_${s}@integ.test`
     await prismaA.user.create({ data: { name: 'A', email, role: 'AGENTE' } })
@@ -483,7 +481,8 @@ describe('traductor P2002 real del índice parcial', () => {
     } catch (e) {
       captured = e
     }
-    expect(isActiveDeliveryUniqueViolation(captured)).toBe(false)
+    // modelName='User' → ni siquiera candidato; el traductor lo deja pasar como técnico.
+    expect(isPotentialActiveDeliveryVehicleConflict(captured)).toBe(false)
   })
 })
 

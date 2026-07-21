@@ -13,7 +13,7 @@
  */
 import { describe, it, expect, beforeAll, afterAll } from 'vitest'
 import { execSync } from 'node:child_process'
-import { writeFileSync, mkdtempSync, rmSync, existsSync } from 'node:fs'
+import { writeFileSync, mkdtempSync, rmSync, existsSync, mkdirSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { pathToFileURL } from 'node:url'
@@ -24,6 +24,7 @@ const OLD_COMMIT = 'ca6015e'
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 let tmpDir: string
+let outDir: string
 let oldClient: any
 let newClient: ReturnType<typeof createGuardedTestPrisma>
 let generated = false
@@ -34,19 +35,23 @@ beforeAll(async () => {
   newClient = createGuardedTestPrisma({ requireReset: false })
 
   tmpDir = mkdtempSync(join(tmpdir(), 'old-client-'))
-  const outDir = join(tmpDir, 'client')
+  // El cliente generado hace `require('@prisma/client/runtime')`; debe vivir bajo el node_modules
+  // del workspace para resolverlo. Un dir bajo node_modules está gitignored y no contamina el árbol.
+  outDir = join(process.cwd(), 'node_modules', '.old-client-i3c1a')
   try {
     // 1) Schema de ca6015e (Delivery sin offer_id).
     let schema = execSync(`git show ${OLD_COMMIT}:prisma/schema.prisma`, { encoding: 'utf8' })
     // 2) Redirige el cliente generado a un directorio aislado (no pisa el cliente de la rama).
+    mkdirSync(outDir, { recursive: true })
     schema = schema.replace(
       /generator\s+client\s*\{[\s\S]*?\}/,
       `generator client {\n  provider = "prisma-client-js"\n  output   = "${outDir.replace(/\\/g, '/')}"\n}`
     )
     const schemaPath = join(tmpDir, 'old.prisma')
     writeFileSync(schemaPath, schema)
-    // 3) Genera el cliente antiguo con el binario Prisma actual (misma versión 6.19.3).
-    execSync(`npx prisma generate --schema "${schemaPath}"`, { stdio: 'pipe' })
+    // 3) Genera el cliente antiguo con el binario LOCAL de Prisma (misma versión 6.19.3). `pnpm exec`
+    //    resuelve el binario del proyecto; NO usar `npx` (intentaría instalar Prisma).
+    execSync(`pnpm exec prisma generate --schema "${schemaPath}"`, { stdio: 'pipe' })
     const entry = join(outDir, 'index.js')
     if (!existsSync(entry)) throw new Error(`no se generó el cliente antiguo en ${entry}`)
     // 4) Carga el cliente antiguo (CJS generado por Prisma) y conéctalo SOLO a la base de test.
@@ -67,6 +72,7 @@ afterAll(async () => {
   if (oldClient) await oldClient.$disconnect().catch(() => {})
   if (newClient) await newClient.$disconnect().catch(() => {})
   if (tmpDir) rmSync(tmpDir, { recursive: true, force: true })
+  if (outDir) rmSync(outDir, { recursive: true, force: true })
 })
 
 describe('compatibilidad del Prisma Client de ca6015e con el schema expandido', () => {

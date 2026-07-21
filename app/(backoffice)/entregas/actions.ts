@@ -11,7 +11,8 @@ import {
   createDeliveryTx,
   buildDeliveryCreationRoots,
   isDeliveryCreationError,
-  isActiveDeliveryUniqueViolation,
+  isPotentialActiveDeliveryVehicleConflict,
+  ACTIVE_DELIVERY_STATUSES,
   DELIVERY_CREATION_ERROR_MESSAGES,
 } from '@/lib/delivery-creation'
 // Documentos privados de entrega: bucket DENY-ALL para anon/authenticated (PR5B2). Storage se
@@ -131,11 +132,20 @@ export async function createDelivery(formData: unknown): Promise<ActionResult<{ 
   } catch (err) {
     if (isDeliveryCreationError(err)) return { ok: false, error: err.message }
     if (isLockError(err)) return { ok: false, error: err.message }
-    // La violación del índice único parcial (dos activas por vehículo) → conflicto de negocio.
-    if (isActiveDeliveryUniqueViolation(err)) {
-      return { ok: false, error: DELIVERY_CREATION_ERROR_MESSAGES.DELIVERY_ALREADY_ACTIVE }
+    // P2002 del índice único parcial de Delivery activa. Prisma NO devuelve el nombre del índice
+    // (solo `modelName='Delivery'` + `target=['vehicle_id']`), así que la metadata identifica el
+    // ÁREA probable y una lectura post-rollback CONFIRMA la causa comercial real. La consulta corre
+    // FUERA de la transacción ya revertida (cliente global) — la transacción abortada no es usable.
+    // Si no se confirma una activa real, se propaga el error técnico (no se inventa el conflicto).
+    if (isPotentialActiveDeliveryVehicleConflict(err)) {
+      const active = await db.delivery.count({
+        where: { vehicleId, status: { in: ACTIVE_DELIVERY_STATUSES } },
+      })
+      if (active > 0) {
+        return { ok: false, error: DELIVERY_CREATION_ERROR_MESSAGES.DELIVERY_ALREADY_ACTIVE }
+      }
     }
-    // Error técnico inesperado → propágalo.
+    // Error técnico inesperado (o P2002 no confirmado) → propágalo.
     throw err
   }
 
