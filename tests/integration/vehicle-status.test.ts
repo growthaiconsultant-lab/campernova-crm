@@ -15,10 +15,15 @@ import type { PrismaClient, VehicleStatus } from '@prisma/client'
 import { withLockedRoots } from '@/lib/locking'
 import { applyOfferTransitionTx, buildOfferTransitionRoots } from '@/lib/offers-transition'
 import {
+  applyManualVehicleUpdateTx,
   applyVehicleUpdateTx,
+  buildVehicleUpdateRoots,
   isVehicleStatusConflict,
+  isVehicleUpdateError,
+  type ManualVehicleUpdateHooks,
   type VehicleUpdateHooks,
 } from '@/lib/vehicle-status'
+import { LockError } from '@/lib/locking'
 import { createGuardedTestPrisma, uniqueSuffix } from './db'
 
 let prismaA: PrismaClient
@@ -134,6 +139,59 @@ function manualUpdate(
       },
       hooks
     )
+  )
+}
+
+/** Edición manual COORDINADA (I3B): `withLockedRoots` + relectura + CAS, como en `updateVehicle`. */
+function coordinatedUpdate(
+  f: Fixture,
+  nextStatus: VehicleStatus,
+  client: PrismaClient,
+  opts: {
+    resolvedSellerLeadId?: string | null
+    hooks?: ManualVehicleUpdateHooks
+    lockTimeoutMs?: number
+    actorId?: string
+  } = {}
+) {
+  const resolved = opts.resolvedSellerLeadId === undefined ? f.sellerId : opts.resolvedSellerLeadId
+  const roots = buildVehicleUpdateRoots({ vehicleId: f.vehicleId, sellerLeadId: resolved })
+  return withLockedRoots(
+    roots,
+    (tx) =>
+      applyManualVehicleUpdateTx(
+        tx,
+        {
+          vehicleId: f.vehicleId,
+          resolvedSellerLeadId: resolved,
+          nextStatus,
+          actorId: opts.actorId ?? f.userId,
+          activityContent: (from) => `Vehículo: ${from} → ${nextStatus}`,
+          data: { status: nextStatus, km: 1234 },
+        },
+        opts.hooks
+      ),
+    { client, lockTimeoutMs: opts.lockTimeoutMs ?? 8_000 }
+  )
+}
+
+/** Archivado del vendedor con el protocolo futuro (I4/B2), sin importar código de PR #117. */
+function archiveSeller(
+  f: Fixture,
+  client: PrismaClient,
+  hooks: { beforeWrite?: () => Promise<void> } = {}
+) {
+  const roots = buildVehicleUpdateRoots({ vehicleId: f.vehicleId, sellerLeadId: f.sellerId })
+  return withLockedRoots(
+    roots,
+    async (tx) => {
+      await hooks.beforeWrite?.()
+      await tx.sellerLead.updateMany({
+        where: { id: f.sellerId, archivedAt: null },
+        data: { archivedAt: new Date() },
+      })
+    },
+    { client, lockTimeoutMs: 8_000 }
   )
 }
 
@@ -337,5 +395,192 @@ describe('edición manual vs dominio de ofertas', () => {
     expect(st.vehicleStatus).toBe('RESERVADO')
     expect(st.offerStatus).toBe('ACEPTADA')
     expect(st.aceptadaSinReserva).toBe(false)
+  })
+})
+
+describe('edición manual coordinada por raíces (I3B)', () => {
+  it('publicación TASADO → PUBLICADO bajo el protocolo de raíces', async () => {
+    const f = await seed('TASADO')
+
+    const res = await coordinatedUpdate(f, 'PUBLICADO', prismaA)
+
+    expect(res.statusChanged).toBe(true)
+    const st = await finalState(f)
+    expect(st.vehicleStatus).toBe('PUBLICADO')
+    expect(st.km).toBe(1234)
+    expect(st.cambiosEstado).toBe(1)
+  })
+
+  it('el vehículo cambió de vendedor entre resolución y relectura → VEHICLE_ROOT_CHANGED', async () => {
+    const f = await seed('TASADO')
+    // Otro vendedor toma el vehículo tras resolver las raíces con el original.
+    const s2 = uniqueSuffix()
+    const otro = await prismaA.sellerLead.create({
+      data: { name: `S2 ${s2}`, email: `s2_${s2}@integ.test`, phone: '600000002' },
+    })
+    cleanups.push(async () => {
+      await prismaA.sellerLead.deleteMany({ where: { id: otro.id } })
+    })
+    await prismaA.vehicle.update({ where: { id: f.vehicleId }, data: { sellerLeadId: otro.id } })
+
+    const err = await coordinatedUpdate(f, 'PUBLICADO', prismaA, {
+      resolvedSellerLeadId: f.sellerId,
+    }).catch((e) => e)
+
+    expect(isVehicleUpdateError(err) && err.code).toBe('VEHICLE_ROOT_CHANGED')
+    const st = await finalState(f)
+    expect(st.vehicleStatus).toBe('TASADO')
+    expect(st.km).not.toBe(1234)
+    expect(st.cambiosEstado).toBe(0)
+  })
+
+  it('vendedor archivado antes de publicar → LEAD_ARCHIVED, sin escribir', async () => {
+    const f = await seed('TASADO')
+    await prismaA.sellerLead.update({ where: { id: f.sellerId }, data: { archivedAt: new Date() } })
+
+    const err = await coordinatedUpdate(f, 'PUBLICADO', prismaA).catch((e) => e)
+
+    expect(isVehicleUpdateError(err) && err.code).toBe('LEAD_ARCHIVED')
+    const st = await finalState(f)
+    expect(st.vehicleStatus).toBe('TASADO')
+    expect(st.cambiosEstado).toBe(0)
+  })
+
+  it('publicación vs creación de oferta: se serializan sobre el vehículo sin estado parcial', async () => {
+    const f = await seed('TASADO')
+
+    // Ambas son válidas sobre TASADO: publicar (TASADO→PUBLICADO) y crear una oferta (nace
+    // PROPUESTA, no toca el estado). El lock del vehículo las serializa.
+    const [pubRes] = await Promise.all([
+      coordinatedUpdate(f, 'PUBLICADO', prismaA).catch((e) => e),
+      prismaB.offer
+        .create({
+          data: {
+            vehicleId: f.vehicleId,
+            buyerLeadId: f.buyerId,
+            amount: 30000,
+            createdById: f.userId,
+          },
+        })
+        .catch((e) => e),
+    ])
+
+    expect(pubRes).not.toBeInstanceOf(Error)
+    const st = await finalState(f)
+    expect(st.vehicleStatus).toBe('PUBLICADO')
+    expect(st.cambiosEstado).toBe(1)
+    // La oferta creada por B no depende del estado; el vehículo queda coherente en cualquier orden.
+    const ofertas = await prismaA.offer.count({ where: { vehicleId: f.vehicleId } })
+    expect(ofertas).toBeGreaterThanOrEqual(1)
+  })
+
+  it('publicación vs archivado del vendedor: nunca queda PUBLICADO con el vendedor archivado', async () => {
+    const f = await seed('TASADO')
+
+    const archiveLocked = barrier()
+    const releaseArchive = barrier()
+
+    // El archivado retiene las raíces (Vehicle → SellerLead) y se pausa antes de escribir.
+    const archive = archiveSeller(f, prismaA, {
+      beforeWrite: async () => {
+        archiveLocked.open()
+        await releaseArchive.wait
+      },
+    })
+    await archiveLocked.wait
+
+    // La publicación intenta las mismas raíces: espera al lock del vendedor.
+    const publish = coordinatedUpdate(f, 'PUBLICADO', prismaB).catch((e) => e)
+    await waitUntilBlocked()
+
+    releaseArchive.open()
+    await archive
+    const publishRes = await publish
+
+    // El archivado ganó: la publicación revalida y ve archivedAt ≠ null → LEAD_ARCHIVED.
+    expect(isVehicleUpdateError(publishRes) && publishRes.code).toBe('LEAD_ARCHIVED')
+    const seller = await prismaA.sellerLead.findUniqueOrThrow({ where: { id: f.sellerId } })
+    const vehicle = await prismaA.vehicle.findUniqueOrThrow({ where: { id: f.vehicleId } })
+    expect(seller.archivedAt).not.toBeNull()
+    expect(vehicle.status).toBe('TASADO')
+  })
+
+  it('doble edición coordinada: A publica, B revalida sobre el estado nuevo y falla limpio', async () => {
+    const f = await seed('TASADO')
+
+    const aLocked = barrier()
+    const releaseA = barrier()
+
+    // A publica (TASADO → PUBLICADO) reteniendo las raíces, pausada antes del CAS.
+    const a = coordinatedUpdate(f, 'PUBLICADO', prismaA, {
+      hooks: {
+        beforeCas: async () => {
+          aLocked.open()
+          await releaseA.wait
+        },
+      },
+    }).catch((e) => e)
+    await aLocked.wait
+
+    // B quiere editar el vehículo creyéndolo TASADO (nextStatus = TASADO). Contiende por el lock.
+    const b = coordinatedUpdate(f, 'TASADO', prismaB).catch((e) => e)
+    await waitUntilBlocked()
+
+    releaseA.open()
+    const aRes = await a
+    const bRes = await b
+
+    // A gana; B, ya desbloqueado, relee PUBLICADO: su edición «como TASADO» (PUBLICADO → TASADO) ya
+    // no es una transición válida → error de dominio, sin segunda escritura. La relectura dentro del
+    // lock hace imposible el estado obsoleto: por eso B falla por transición, no por CAS.
+    expect(aRes).not.toBeInstanceOf(Error)
+    expect(isVehicleUpdateError(bRes) && bRes.code).toBe('INVALID_VEHICLE_TRANSITION')
+    const st = await finalState(f)
+    expect(st.vehicleStatus).toBe('PUBLICADO')
+    expect(st.cambiosEstado).toBe(1)
+  })
+
+  it('lock timeout: no deja el vehículo a medias', async () => {
+    const f = await seed('TASADO')
+
+    const held = barrier()
+    const release = barrier()
+
+    // A retiene el lock del vehículo dentro de su transacción.
+    const holder = archiveSeller(f, prismaA, {
+      beforeWrite: async () => {
+        held.open()
+        await release.wait
+      },
+    })
+    await held.wait
+
+    // B pide el lock con un timeout muy corto → LockError, sin tocar el vehículo.
+    const err = await coordinatedUpdate(f, 'PUBLICADO', prismaB, { lockTimeoutMs: 250 }).catch(
+      (e) => e
+    )
+    expect(err).toBeInstanceOf(LockError)
+
+    release.open()
+    await holder
+    const vehicle = await prismaA.vehicle.findUniqueOrThrow({ where: { id: f.vehicleId } })
+    expect(vehicle.status).toBe('TASADO')
+    expect(vehicle.km).not.toBe(1234)
+  })
+
+  it('rollback coordinado: si la traza falla, el vehículo revierte', async () => {
+    const f = await seed('TASADO')
+
+    // actorId inválido → la FK de Activity falla tras el CAS del vehículo.
+    const err = await coordinatedUpdate(f, 'PUBLICADO', prismaA, {
+      actorId: 'usuario-inexistente',
+    }).catch((e) => e)
+    expect(err).toBeInstanceOf(Error)
+    expect(isVehicleStatusConflict(err)).toBe(false)
+    expect(isVehicleUpdateError(err)).toBe(false)
+    const st = await finalState(f)
+    expect(st.vehicleStatus).toBe('TASADO')
+    expect(st.km).not.toBe(1234)
+    expect(st.cambiosEstado).toBe(0)
   })
 })

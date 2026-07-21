@@ -110,11 +110,30 @@ Helpers: `isValidOfferTransition`, `isTerminalOfferStatus`, `isReservation` (ACE
 > I3A REMOVES MANUAL RESERVATION, RELEASE AND SALE TRANSITIONS FROM updateVehicle
 > OFFER OWNS PUBLICADO ↔ RESERVADO
 > DELIVERY OWNS THE TRANSITION TO VENDIDO
-> DISCARD BLOCKERS AND ROOT LOCK COORDINATION REMAIN PENDING UNTIL I3B
 > ```
 >
-> I3 **no** está completo: I3B (publicación y descarte con raíces y blockers), I3C (Delivery) e I3D
-> (tasación) siguen pendientes, y el resto de escritores de `VehicleStatus` sigue sin coordinar.
+> ✅ **I3B — `I3B COORDINATES MANUAL VEHICLE UPDATES AND PUBLICATION`.** `updateVehicle` adopta el
+> protocolo de raíces (`MANUAL VEHICLE UPDATES USE THE ROOT LOCK PROTOCOL`): bloquea
+> `Vehicle → SellerLead`, relee dentro de la transacción, rechaza `VEHICLE_ROOT_CHANGED` y
+> `LEAD_ARCHIVED`, revalida la transición y conserva el CAS. La publicación `TASADO → PUBLICADO`
+> queda coordinada con la creación/transición de ofertas y con el archivado futuro del vendedor; el
+> guard legal se releé bajo el lock (los documentos del expediente son tabla aparte, límite
+> documentado). **I3B retira todas las transiciones manuales a `DESCARTADO`**: quedan solo
+> `NUEVO → TASADO` y `TASADO → PUBLICADO`.
+>
+> ```
+> I3B COORDINATES MANUAL VEHICLE UPDATES AND PUBLICATION
+> MANUAL VEHICLE UPDATES USE THE ROOT LOCK PROTOCOL
+> TEMPORARY MANUAL DISCARD REMOVAL IS A SAFETY MEASURE UNTIL I3D
+> DELIVERY CREATION AND COMPLETION REMAIN UNCOORDINATED UNTIL I3C
+> FINAL DISCARD COORDINATION REMAINS PENDING UNTIL DELIVERY IS COORDINATED
+> ```
+>
+> Coordinar el descarte ahora daría una garantía falsa: `createDelivery` sigue sin coordinar y podría
+> crear una entrega **después** del descarte. Núcleo en `lib/vehicle-status.ts`.
+>
+> I3 **no** está completo: I3C (Delivery), I3D (descarte coordinado) e I3E (tasación) siguen
+> pendientes, y el resto de escritores de `VehicleStatus` sigue sin coordinar.
 >
 > ⚠️ **`DELIVERY, VEHICLE AND VALUATION WRITERS REMAIN UNCOORDINATED UNTIL I3`** — el invariante
 > global del archivado **todavía no está garantizado**.

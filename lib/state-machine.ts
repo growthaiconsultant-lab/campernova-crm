@@ -24,14 +24,16 @@ export const SELLER_LEAD_TRANSITIONS: Partial<Record<SellerLeadStatus, SellerLea
  * o completando la entrega. `isValidTransition` admite `from === to`, de modo que los campos de un
  * vehículo reservado siguen siendo editables.
  *
- * `DISCARD BLOCKERS AND ROOT LOCK COORDINATION REMAIN PENDING UNTIL I3B` — el descarte desde
- * `NUEVO`, `TASADO` y `PUBLICADO` conserva su comportamiento actual y todavía no comprueba ofertas
- * ni entregas activas.
+ * `TEMPORARY MANUAL DISCARD REMOVAL IS A SAFETY MEASURE UNTIL I3D` — I3B retira todas las
+ * transiciones manuales a `DESCARTADO`. Descartar un vehículo debe bloquear ofertas y entregas
+ * activas, pero `createDelivery` sigue sin coordinar y puede crear una entrega **después** del
+ * descarte; coordinar el descarte ahora daría una garantía falsa. Se reintroducirá en I3D, ya
+ * coordinado, cuando I3C haya puesto Delivery bajo el protocolo.
+ * `FINAL DISCARD COORDINATION REMAINS PENDING UNTIL DELIVERY IS COORDINATED`.
  */
 export const VEHICLE_TRANSITIONS: Partial<Record<VehicleStatus, VehicleStatus[]>> = {
-  NUEVO: ['TASADO', 'DESCARTADO'],
-  TASADO: ['PUBLICADO', 'DESCARTADO'],
-  PUBLICADO: ['DESCARTADO'],
+  NUEVO: ['TASADO'],
+  TASADO: ['PUBLICADO'],
 }
 
 export const BUYER_LEAD_TRANSITIONS: Partial<Record<BuyerLeadStatus, BuyerLeadStatus[]>> = {
