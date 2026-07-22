@@ -189,19 +189,40 @@ Helpers: `isValidOfferTransition`, `isTerminalOfferStatus`, `isReservation` (ACE
 > `THE PRISMA CLIENT GENERATED FROM aa739cc WORKS AGAINST THE I3C1B CONTRACT SCHEMA`
 > `I3C1B DOES NOT COORDINATE DELIVERY CANCELLATION OR COMPLETION`
 > `I3C1B REQUIRES ZERO NULL offer_id ROWS BEFORE REMOTE APPLICATION`
+> `I3C1B FAILURE WITH NULL DATA WAS VERIFIED USING REAL prisma migrate deploy`
+> `A FAILED I3C1B CONTRACT MIGRATION LEAVES THE OBSERVED _prisma_migrations STATE DOCUMENTED`
+> `THE I3C1B REMOTE PREFLIGHT VALIDATES DATA AND EXPAND-SCHEMA STRUCTURE`
 >
-> **Pruebas PostgreSQL 17 reales (solo CI):** el cliente genuino de `aa739cc` (código desplegado)
-> crea/lee/actualiza/borra una Delivery **con** `offerId` contra el schema contract, sin `P2022`
-> (`old-client-compat.test.ts`); el contract con **cero nulls** aplica `SET NOT NULL` y conserva la
-> fila válida y el índice parcial; el contract con **un `offer_id = NULL` deliberado** es rechazado
-> por PostgreSQL, la fila permanece intacta, la columna sigue nullable y no hay aplicación parcial
-> (`contract-migration.test.ts`); un `INSERT` que omite `offer_id` es rechazado tras el contract
-> (`delivery-creation.test.ts`). El cliente **pre-I3C1A** ya no puede crear Deliveries tras el
-> contract: incompatibilidad histórica **esperada**, no un fallo de I3C1B.
+> **Failure mode real con `prisma migrate deploy` (solo CI, `contract-migration-deploy.test.ts`):**
+> sobre una **base efímera INDEPENDIENTE** creada en el mismo servidor (nunca la compartida), se
+> aplican las 5 primeras migraciones con Prisma Migrate real, se inserta una Delivery con
+> `offer_id = NULL` y se ejecuta la 6ª migración versionada. Observado: `migrate deploy` **falla**
+> (exit≠0, error NOT NULL/23502 sobre la 6ª migración); **sin DDL parcial** (`offer_id` sigue
+> nullable, FK e índices intactos); la fila NULL permanece; **`_prisma_migrations` registra un
+> intento fallido activo** de la 6ª migración (`finished_at NULL`, `rolled_back_at NULL`,
+> `applied_steps_count = 0`, con `logs`); y un **segundo `migrate deploy` queda bloqueado (P3009)**.
+> **Consecuencia operativa:** si el contract se aplicara con un NULL presente, el entorno queda
+> bloqueado hasta intervención explícita — corregir/eliminar el dato NULL y `prisma migrate resolve
+--rolled-back <6ª>` antes de reintentar. Por eso el **preflight de cero-nulls es obligatorio antes**
+> de aplicar el contract en cada entorno remoto. (`prisma migrate resolve` **no** se ejecuta de forma
+> automática ni en remoto en esta tarea.)
+>
+> **Otras pruebas PostgreSQL 17 reales (solo CI):** el cliente genuino de `aa739cc` (código
+> desplegado) crea/lee/actualiza/borra una Delivery **con** `offerId` contra el schema contract, sin
+> `P2022` (`old-client-compat.test.ts`); atomicidad DDL del motor PostgreSQL con la SQL exacta sobre
+> una tabla clonada (`contract-migration.test.ts` — **no** es prueba de Prisma Migrate); un `INSERT`
+> que omite `offer_id` es rechazado tras el contract (`delivery-creation.test.ts`). El cliente
+> **pre-I3C1A** ya no puede crear Deliveries tras el contract: incompatibilidad histórica
+> **esperada**, no un fallo de I3C1B.
 >
 > **Preflight read-only obligatorio antes de cada aplicación remota:** `scripts/check-delivery-offer-nulls`
-> (0 nulls, 0 huérfanas, coherencia Offer↔Delivery, 0 activas duplicadas, 0 migraciones fallidas).
-> No escribe ni repara nada; no está cableado a ningún build.
+> (`pnpm check:delivery-offer-nulls`). Verifica **datos** (0 nulls, 0 huérfanas, coherencia
+> Offer↔Delivery, 0 activas duplicadas, 0 migraciones fallidas) **y estructura del expand schema**
+> (tabla/columna `offer_id`, tipo text sin default, FK `NoAction`/`Cascade` validada, índice normal +
+> índice único parcial con predicado PROGRAMADA/EN_CURSO, I3C1A aplicada). Contrato de nullability por
+> `CHECK_DELIVERY_OFFER_EXPECT_NULLABLE` (`1` preflight → nullable + I3C1B no aplicada; `0` postflight
+> → NOT NULL + I3C1B aplicada). La decisión (código de salida) es pura y testeada
+> (`lib/deploy/delivery-offer-preflight`). No escribe ni repara nada; no cableado a ningún build.
 >
 > **Rollback documentado (procedimiento NO ejecutado, requiere autorización):**
 > `ALTER TABLE "deliveries" ALTER COLUMN "offer_id" DROP NOT NULL;` — no elimina datos, FK ni

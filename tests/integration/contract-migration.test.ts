@@ -1,17 +1,17 @@
 /**
- * Tests de integración con PostgreSQL REAL (PR I3C1B) — seguridad de la migración contract
- * `SET NOT NULL` sobre `deliveries.offer_id`.
+ * Tests de integración con PostgreSQL REAL (PR I3C1B) — ATOMICIDAD DDL de PostgreSQL para la SQL
+ * `SET NOT NULL` sobre `deliveries.offer_id`. **No es una prueba de Prisma Migrate.**
  *
- * `I3C1B REQUIRES ZERO NULL offer_id ROWS BEFORE REMOTE APPLICATION`
+ * Alcance ACOTADO: se ejerce la SQL EXACTA de la migración (leída del fichero) contra una tabla
+ * `deliveries` clonada con `LIKE public.deliveries INCLUDING ALL` en un esquema efímero, en estado
+ * I3C1A (`offer_id` nullable), envuelta en una transacción. Demuestra el comportamiento del MOTOR
+ * PostgreSQL: con cero nulls la columna pasa a NOT NULL; con un NULL, PostgreSQL rechaza el DDL y la
+ * transacción revierte todo (nullability y filas intactas). Nunca toca `public.deliveries`.
  *
- * Se ejerce la SQL EXACTA de la migración (leída del fichero) contra una tabla `deliveries` clonada
- * con `LIKE public.deliveries INCLUDING ALL` en un esquema efímero, puesta en estado I3C1A
- * (`offer_id` nullable). Nunca se toca la tabla `public.deliveries` compartida.
- *
- * La migración es una única sentencia y Prisma aplica cada migración dentro de una transacción; por
- * eso aquí se envuelve la SQL exacta en una transacción interactiva de Prisma: si falla, PostgreSQL
- * revierte el DDL por completo (nullability y filas intactas) y la migración NO puede quedar
- * registrada como finalizada ni aplicada a medias.
+ * El comportamiento OPERATIVO real de `prisma migrate deploy` (exit code, registro en
+ * `_prisma_migrations`, bloqueo del siguiente deploy, ausencia de DDL parcial) se demuestra aparte
+ * en `contract-migration-deploy.test.ts` con la maquinaria real de Prisma Migrate. Este fichero NO
+ * afirma nada sobre `_prisma_migrations` ni sobre el proceso de Prisma Migrate.
  */
 import { describe, it, expect, beforeAll, afterAll } from 'vitest'
 import { readFileSync } from 'node:fs'
