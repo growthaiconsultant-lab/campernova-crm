@@ -197,3 +197,66 @@ describe('transitionDeliveryTx — caminos felices', () => {
     expect(res).toEqual({ previousStatus: 'EN_CURSO', newStatus: 'CANCELADA' })
   })
 })
+
+describe('archivado: bloquea INICIAR, no CANCELAR', () => {
+  it('INICIAR con vendedor archivado → LEAD_ARCHIVED', async () => {
+    const { tx, updateMany } = makeTx({ seller: { archivedAt: new Date('2026-01-01') } })
+    await expectCode(transitionDeliveryTx(tx, base), 'LEAD_ARCHIVED')
+    expect(updateMany).not.toHaveBeenCalled()
+  })
+
+  it('INICIAR con comprador archivado → LEAD_ARCHIVED', async () => {
+    const { tx, updateMany } = makeTx({ buyer: { archivedAt: new Date('2026-01-01') } })
+    await expectCode(transitionDeliveryTx(tx, base), 'LEAD_ARCHIVED')
+    expect(updateMany).not.toHaveBeenCalled()
+  })
+
+  it('CANCELAR con vendedor archivado → éxito (no bloquea)', async () => {
+    const { tx, updateMany, activityCreate } = makeTx({
+      seller: { archivedAt: new Date('2026-01-01') },
+    })
+    const res = await transitionDeliveryTx(tx, {
+      ...base,
+      targetStatus: 'CANCELADA',
+      cancellationReason: 'incidencia',
+    })
+    expect(res.newStatus).toBe('CANCELADA')
+    expect(updateMany.mock.calls[0][0].data.cancellationReason).toBe('incidencia')
+    expect(activityCreate.mock.calls[0][0].data.type).toBe('ENTREGA_CANCELADA')
+  })
+
+  it('CANCELAR con comprador archivado → éxito (no bloquea)', async () => {
+    const { tx } = makeTx({ buyer: { archivedAt: new Date('2026-01-01') } })
+    const res = await transitionDeliveryTx(tx, {
+      ...base,
+      targetStatus: 'CANCELADA',
+      cancellationReason: 'incidencia',
+    })
+    expect(res.newStatus).toBe('CANCELADA')
+  })
+
+  it('CANCELAR con ambos archivados → éxito', async () => {
+    const { tx } = makeTx({
+      seller: { archivedAt: new Date('2026-01-01') },
+      buyer: { archivedAt: new Date('2026-01-01') },
+    })
+    const res = await transitionDeliveryTx(tx, {
+      ...base,
+      targetStatus: 'CANCELADA',
+      cancellationReason: 'incidencia',
+    })
+    expect(res.newStatus).toBe('CANCELADA')
+  })
+
+  it('la clasificación terminal precede al archivado: COMPLETADA archivada → ALREADY_COMPLETED', async () => {
+    const { tx } = makeTx({
+      delivery: { status: 'COMPLETADA', vehicleId: 'v1', buyerLeadId: 'b1' },
+      seller: { archivedAt: new Date('2026-01-01') },
+      buyer: { archivedAt: new Date('2026-01-01') },
+    })
+    await expectCode(
+      transitionDeliveryTx(tx, { ...base, targetStatus: 'CANCELADA', cancellationReason: 'x' }),
+      'DELIVERY_ALREADY_COMPLETED'
+    )
+  })
+})

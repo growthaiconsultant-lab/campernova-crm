@@ -61,7 +61,8 @@ export function CancelDeliveryButton({ deliveryId, currentStatus }: Props) {
         Cancelar entrega
       </button>
 
-      <Dialog open={open} onOpenChange={setOpen}>
+      {/* No permitir cerrar el diálogo mientras se está enviando (evita perder el resultado). */}
+      <Dialog open={open} onOpenChange={(next) => !isPending && setOpen(next)}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Cancelar entrega</DialogTitle>

@@ -41,7 +41,7 @@ export const DELIVERY_TRANSITION_ERROR_MESSAGES: Record<DeliveryTransitionErrorC
   DELIVERY_NOT_FOUND: 'Entrega no encontrada',
   DELIVERY_ROOT_CHANGED:
     'Los datos de la entrega han cambiado mientras se procesaba. Inténtalo de nuevo.',
-  LEAD_ARCHIVED: 'No se puede operar sobre una entrega de un lead archivado. Reactívalo primero.',
+  LEAD_ARCHIVED: 'No se puede iniciar la entrega de un lead archivado. Reactívalo primero.',
   INVALID_DELIVERY_TRANSITION: 'Esa transición de la entrega no está permitida.',
   DELIVERY_STATUS_CHANGED:
     'El estado de la entrega cambió mientras se procesaba. Vuelve a intentarlo.',
@@ -138,23 +138,27 @@ export async function transitionDeliveryTx(
     throw new DeliveryTransitionError('DELIVERY_ROOT_CHANGED')
   }
 
-  // (3) Vendedor (si existe) y comprador: existen y no archivados.
+  // (3) Vendedor (si existe) y comprador: deben EXISTIR (relectura de raíz). El bloqueo por
+  //     archivado se decide más abajo según el destino: iniciar lo exige, cancelar no.
+  let sellerArchived = false
   if (vehicle.sellerLeadId) {
     const seller = await tx.sellerLead.findUnique({
       where: { id: vehicle.sellerLeadId },
       select: { archivedAt: true },
     })
     if (!seller) throw new DeliveryTransitionError('DELIVERY_ROOT_CHANGED')
-    if (seller.archivedAt != null) throw new DeliveryTransitionError('LEAD_ARCHIVED')
+    sellerArchived = seller.archivedAt != null
   }
   const buyer = await tx.buyerLead.findUnique({
     where: { id: p.buyerLeadId },
     select: { archivedAt: true },
   })
   if (!buyer) throw new DeliveryTransitionError('DELIVERY_ROOT_CHANGED')
-  if (buyer.archivedAt != null) throw new DeliveryTransitionError('LEAD_ARCHIVED')
+  const buyerArchived = buyer.archivedAt != null
 
-  // (4) El estado releído debe coincidir con la expectativa del llamante (cliente no obsoleto).
+  // (4) El estado releído debe coincidir con la expectativa del llamante (cliente no obsoleto). Se
+  //     evalúa ANTES que el archivado para que la clasificación terminal (ALREADY_*/STATUS_CHANGED)
+  //     sea determinista y no quede oculta por un lead archivado.
   if (delivery.status !== p.expectedCurrentStatus) {
     if (delivery.status === 'CANCELADA')
       throw new DeliveryTransitionError('DELIVERY_ALREADY_CANCELLED')
@@ -168,7 +172,15 @@ export async function transitionDeliveryTx(
     throw new DeliveryTransitionError('INVALID_DELIVERY_TRANSITION')
   }
 
-  // (6) Motivo de cancelación: obligatorio, no vacío, acotado.
+  // (6) Archivado: bloquea INICIAR una entrega (avanzar el proceso) pero NO cancelarla. Cancelar es
+  //     un cierre administrativo ante una incidencia; no reactiva ni modifica leads, no libera el
+  //     vehículo y no toca la oferta. `ARCHIVED LEADS BLOCK STARTING A DELIVERY` ·
+  //     `ARCHIVED LEADS DO NOT BLOCK CANCELLING A DELIVERY`.
+  if (p.targetStatus === 'EN_CURSO' && (sellerArchived || buyerArchived)) {
+    throw new DeliveryTransitionError('LEAD_ARCHIVED')
+  }
+
+  // (7) Motivo de cancelación: obligatorio, no vacío, acotado.
   let reason: string | null = null
   if (p.targetStatus === 'CANCELADA') {
     reason = (p.cancellationReason ?? '').trim()

@@ -27,6 +27,7 @@ import { createGuardedTestPrisma, uniqueSuffix } from './db'
 
 let prismaA: PrismaClient
 let prismaB: PrismaClient
+let prismaObs: PrismaClient
 const cleanups: Array<() => Promise<void>> = []
 
 function barrier() {
@@ -35,6 +36,21 @@ function barrier() {
     open = resolve
   })
   return { wait, open }
+}
+
+/** Espera hasta que alguna otra sesión esté BLOQUEADA esperando un lock (contención real). */
+async function waitUntilBlocked(timeoutMs = 8_000): Promise<void> {
+  const deadline = Date.now() + timeoutMs
+  for (;;) {
+    const rows = await prismaObs.$queryRaw<Array<{ n: number }>>`
+      SELECT count(*)::int AS n FROM pg_stat_activity
+      WHERE datname = current_database() AND pid <> pg_backend_pid() AND wait_event_type = 'Lock'`
+    if ((rows[0]?.n ?? 0) > 0) return
+    if (Date.now() > deadline) {
+      throw new Error('la operación nunca llegó a esperar un lock: contención no demostrada')
+    }
+    await new Promise((r) => setTimeout(r, 25))
+  }
 }
 
 type Fixture = {
@@ -196,12 +212,13 @@ async function state(f: Fixture) {
 beforeAll(() => {
   prismaA = createGuardedTestPrisma()
   prismaB = createGuardedTestPrisma()
+  prismaObs = createGuardedTestPrisma()
 })
 afterEach(async () => {
   while (cleanups.length) await cleanups.pop()!()
 })
 afterAll(async () => {
-  await Promise.all([prismaA.$disconnect(), prismaB.$disconnect()])
+  await Promise.all([prismaA.$disconnect(), prismaB.$disconnect(), prismaObs.$disconnect()])
 })
 
 describe('transiciones coordinadas', () => {
@@ -287,6 +304,70 @@ describe('transiciones coordinadas', () => {
   })
 })
 
+describe('archivado: bloquea INICIAR, no CANCELAR', () => {
+  it('CANCELAR con BuyerLead archivado → CANCELADA; lead sigue archivado; Vehicle/Offer intactos', async () => {
+    const f = await seed('PROGRAMADA')
+    const archivedAt = new Date('2026-07-01T00:00:00Z')
+    await prismaA.buyerLead.update({ where: { id: f.buyerId }, data: { archivedAt } })
+    await transition(f, prismaA, {
+      expected: 'PROGRAMADA',
+      target: 'CANCELADA',
+      reason: 'incidencia',
+    })
+    const st = await state(f)
+    expect(st.d.status).toBe('CANCELADA')
+    expect(st.d.cancellationReason).toBe('incidencia')
+    expect(st.cancelActs).toBe(1)
+    expect(st.v.status).toBe('RESERVADO')
+    expect(st.o.status).toBe('CONVERTIDA')
+    const buyer = await prismaA.buyerLead.findUniqueOrThrow({
+      where: { id: f.buyerId },
+      select: { archivedAt: true },
+    })
+    expect(buyer.archivedAt).not.toBeNull() // no se reactiva
+  })
+
+  it('CANCELAR con SellerLead archivado → CANCELADA; lead sigue archivado', async () => {
+    const f = await seed('EN_CURSO')
+    await prismaA.sellerLead.update({
+      where: { id: f.sellerId },
+      data: { archivedAt: new Date('2026-07-01T00:00:00Z') },
+    })
+    await transition(f, prismaA, {
+      expected: 'EN_CURSO',
+      target: 'CANCELADA',
+      reason: 'incidencia',
+    })
+    const st = await state(f)
+    expect(st.d.status).toBe('CANCELADA')
+    const seller = await prismaA.sellerLead.findUniqueOrThrow({
+      where: { id: f.sellerId },
+      select: { archivedAt: true },
+    })
+    expect(seller.archivedAt).not.toBeNull()
+  })
+
+  it('INICIAR con lead archivado → LEAD_ARCHIVED; sigue PROGRAMADA; sin startedAt ni Activity', async () => {
+    const f = await seed('PROGRAMADA')
+    await prismaA.buyerLead.update({
+      where: { id: f.buyerId },
+      data: { archivedAt: new Date('2026-07-01T00:00:00Z') },
+    })
+    const err = await transition(f, prismaA, {
+      expected: 'PROGRAMADA',
+      target: 'EN_CURSO',
+    }).catch((e) => e)
+    expect(codeOf(err)).toBe('LEAD_ARCHIVED')
+    const st = await state(f)
+    expect(st.d.status).toBe('PROGRAMADA')
+    expect(st.d.startedAt).toBeNull()
+    const acts = await prismaA.activity.count({
+      where: { buyerLeadId: f.buyerId, type: 'CAMBIO_ESTADO' },
+    })
+    expect(acts).toBe(0)
+  })
+})
+
 describe('concurrencia cancelación ↔ compleción (ambas intercalaciones)', () => {
   it('gana la CANCELACIÓN: la compleción falla y revierte; Vehicle NO vendido, sin Warranty', async () => {
     const f = await seed('EN_CURSO')
@@ -335,6 +416,8 @@ describe('concurrencia cancelación ↔ compleción (ambas intercalaciones)', ()
       target: 'CANCELADA',
       reason: 'pierde',
     }).catch((e) => e)
+    // Contención OBSERVADA: la cancelación queda realmente esperando el lock antes de liberar.
+    await waitUntilBlocked()
     release.open()
     const compRes = await completion
     const cancelRes = await cancel
