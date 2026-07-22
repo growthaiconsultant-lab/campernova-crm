@@ -200,3 +200,109 @@ separados (regla 7); el guard no sustituye ese diseño ni automatiza nada destru
 - **Engineering (revisión):** verifica aditividad, invariantes de CI y checklist.
 - **Operaciones:** ejecuta el despliegue remoto (staging → prod) con backup y `project_ref`
   confirmado, sólo tras CI verde.
+
+---
+
+## Expand–contract, preflight y recuperación de fallos (runbook operativo)
+
+Runbook **reusable** para cambios de nullability/restricción sobre columnas con datos. La ejecución
+concreta de I3C1A/I3C1B queda en su historial ([`docs/Ofertas-Reservas-Plan.md`](../Ofertas-Reservas-Plan.md),
+[`docs/roadmap/i3-status.md`](../roadmap/i3-status.md)); aquí queda el **procedimiento estable**.
+
+### 1. Patrón expand–contract
+
+```
+expand schema (aditivo, columna nullable) → desplegar código compatible
+→ contract schema (SET NOT NULL) → desplegar código que exige la restricción
+```
+
+- La columna es **nullable solo durante el rollout**; el código nuevo persiste siempre el valor.
+- **Backfill solo si hace falta y está autorizado.** I3C1 **no** necesitó backfill porque había
+  **cero filas** afectadas (cero Deliveries): el contract fue seguro sin tocar datos.
+- **Compatibilidad de rollback de código** debe verificarse antes de contraer (el cliente antiguo
+  debe seguir funcionando contra el schema expandido).
+
+### 2. Identificación inequívoca del entorno (obligatoria antes de conectar)
+
+- Declarar entorno + **marcador de proyecto** (`project ref`) que la URL efectiva **debe contener**;
+  fail-closed si no coincide (ver «Guard de despliegue»).
+- Comprobar los **valores efectivos** de `DATABASE_URL`/`DIRECT_URL` (los exportados prevalecen sobre
+  `.env`; recuerda que `.env` apunta a **producción**).
+- Nunca imprimir credenciales, URLs completas ni tokens. Usar **placeholders** en la documentación.
+
+### 3. Preflight (solo lectura)
+
+Antes de aplicar un contract, verificar **datos** y **estructura** del schema expandido:
+cero filas que violarían la restricción, cero huérfanas, coherencia referencial, cero migraciones
+fallidas activas, y la estructura esperada (columna/tipo/FK/índices, fase previa aplicada, fase
+contract aún no aplicada). Para el caso Delivery↔Offer existe un preflight versionado y testeado:
+
+```bash
+# placeholders — nunca secretos en claro
+CHECK_DELIVERY_OFFER_NULLS=1 CHECK_DELIVERY_OFFER_EXPECT_NULLABLE=1 \
+REMOTE_MIGRATION_GUARD_ENV=<staging|production> \
+REMOTE_MIGRATION_GUARD_EXPECT_URL_CONTAINS=<project-ref> \
+pnpm check:delivery-offer-nulls   # exit 0 = seguro aplicar
+```
+
+(`EXPECT_NULLABLE=0` = **postflight**: espera la restricción ya aplicada.) El helper es **read-only**;
+no repara ni hace backfill.
+
+### 4. Orden de aplicación
+
+```
+preflight → prisma migrate deploy → inspección de resultado → postflight
+→ guard (check:remote-migrations) → merge → deployment
+```
+
+El orden puede variar por compatibilidad (a veces la migración remota va **antes** del merge para que
+el guard del build no bloquee el deploy), pero **cada variación debe estar auditada y autorizada**.
+
+### 5. Failure mode real de un contract sobre datos que lo violan
+
+Evidencia estable (probada con `prisma migrate deploy` real, ver
+[`docs/quality/delivery-test-matrix.md`](../quality/delivery-test-matrix.md)):
+
+- PostgreSQL **rechaza** el `SET NOT NULL` si existe una fila que lo viola;
+- **no** deja el DDL aplicado a medias (la columna sigue como antes);
+- Prisma deja un **intento fallido activo** en `_prisma_migrations`:
+  `finished_at IS NULL`, `rolled_back_at IS NULL`, `applied_steps_count = 0`, con `logs`;
+- el **siguiente** `migrate deploy` **falla con `P3009`** (found failed migration) hasta intervención.
+
+### 6. Recuperación autorizada (nunca automática)
+
+1. **Detener** despliegues.
+2. Inspeccionar (solo lectura) datos, schema y la fila de `_prisma_migrations`.
+3. Obtener **autorización explícita**.
+4. Reconciliar el dato **solo** con un plan autorizado (nunca backfill silencioso).
+5. Marcar la migración fallida como revertida:
+   ```bash
+   prisma migrate resolve --rolled-back <migration_name>
+   ```
+6. Re-ejecutar el **preflight**.
+7. Reintentar **solo** con nueva autorización.
+
+Aclaraciones:
+
+- `migrate resolve` **no** arregla datos ni schema; solo actualiza `_prisma_migrations`.
+- `--rolled-back` (recuperación de un intento fallido) **no** es `--applied` (marcar baseline como
+  aplicada); no confundirlos.
+- Nunca ejecutar `resolve` sin investigar el estado real.
+
+### 7. Rollback (distinguir tres niveles)
+
+- **Código:** revertir el deploy; el cliente anterior debe seguir siendo compatible con el schema.
+- **Schema:** ejemplo histórico seguro y **autorizado** (no automático): `ALTER TABLE "deliveries"
+ALTER COLUMN "offer_id" DROP NOT NULL;` — no elimina datos, FK ni índices.
+- **Datos:** requiere plan y autorización propios; jamás como efecto colateral.
+
+### 8. Postflight (solo lectura)
+
+Historial + checksums, catálogo (los conteos **autoritativos** los fija CI en
+`.github/workflows/ci.yml`), nullability, FK, índices, datos, **comparación entre entornos** (el
+cambio aparece solo donde se aplicó) y observabilidad inmediata.
+
+### 9. Seguridad
+
+No incluir en documentación ni logs: credenciales, URLs completas, passwords, tokens, comandos
+destructivos sin guardas, ni instrucciones que ignoren un `P3009`.
