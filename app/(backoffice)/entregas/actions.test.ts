@@ -27,7 +27,13 @@ vi.mock('@/lib/locking', async (importOriginal) => {
 
 const { mockDb } = vi.hoisted(() => {
   const mockDb = {
-    delivery: { create: vi.fn(), findUnique: vi.fn(), update: vi.fn(), count: vi.fn() },
+    delivery: {
+      create: vi.fn(),
+      findUnique: vi.fn(),
+      update: vi.fn(),
+      updateMany: vi.fn(),
+      count: vi.fn(),
+    },
     deliveryDocument: { create: vi.fn(), findUnique: vi.fn(), delete: vi.fn(), update: vi.fn() },
     documentVersion: { create: vi.fn(), findMany: vi.fn() },
     vehicle: { findUnique: vi.fn() },
@@ -52,6 +58,7 @@ import { DELIVERY_CREATION_ERROR_MESSAGES } from '@/lib/delivery-creation'
 import {
   createDelivery,
   updateDeliveryStatus,
+  cancelDelivery,
   signDelivery,
   uploadDeliveryDocument,
   deleteDeliveryDocument,
@@ -282,24 +289,57 @@ describe('updateDeliveryStatus · finalización atómica (COMPLETADA)', () => {
   })
 })
 
-describe('updateDeliveryStatus · transiciones sin garantía (EN_CURSO / CANCELADA)', () => {
-  it('EN_CURSO actualiza la entrega y no invoca el servicio de finalización', async () => {
-    mockDb.delivery.findUnique.mockResolvedValue({ ...signedComplete, status: 'PROGRAMADA' })
-    const res = await updateDeliveryStatus('d1', 'EN_CURSO')
+describe('I3C2 · transiciones coordinadas (EN_CURSO / CANCELADA)', () => {
+  // El núcleo real corre contra mockDb dentro del withLockedRoots mockeado.
+  const coordinatedShape = {
+    status: 'PROGRAMADA' as const,
+    vehicleId: 'veh-1',
+    buyerLeadId: 'buyer-1',
+    vehicle: { sellerLeadId: 'seller-1' },
+  }
+  function primeCoordinated(status: 'PROGRAMADA' | 'EN_CURSO' = 'PROGRAMADA') {
+    mockDb.delivery.findUnique.mockResolvedValue({ ...coordinatedShape, status })
+    mockDb.vehicle.findUnique.mockResolvedValue({ sellerLeadId: 'seller-1' })
+    mockDb.sellerLead.findUnique.mockResolvedValue({ archivedAt: null })
+    mockDb.buyerLead.findUnique.mockResolvedValue({ archivedAt: null })
+    mockDb.delivery.updateMany.mockResolvedValue({ count: 1 })
+    mockDb.activity.create.mockResolvedValue({})
+  }
+
+  it('EN_CURSO pasa por el núcleo coordinado (CAS) y no invoca la finalización', async () => {
+    primeCoordinated('PROGRAMADA')
+    const res = await updateDeliveryStatus('d1', 'EN_CURSO', 'PROGRAMADA')
     expect(res).toEqual({ ok: true })
     expect(completeDeliveryTx).not.toHaveBeenCalled()
-    expect(mockDb.delivery.update).toHaveBeenCalledWith(
-      expect.objectContaining({ where: { id: 'd1' } })
-    )
+    const cas = mockDb.delivery.updateMany.mock.calls[0][0]
+    expect(cas.where).toEqual({ id: 'd1', status: 'PROGRAMADA' })
+    expect(cas.data.status).toBe('EN_CURSO')
   })
 
-  it('CANCELADA registra la actividad de cancelación sin garantía', async () => {
-    mockDb.delivery.findUnique.mockResolvedValue({ ...signedComplete })
+  it('updateDeliveryStatus(CANCELADA) exige motivo → se enruta por cancelDelivery', async () => {
+    mockDb.delivery.findUnique.mockResolvedValue({ ...coordinatedShape })
     const res = await updateDeliveryStatus('d1', 'CANCELADA')
+    expect(res.ok).toBe(false)
+    if (!res.ok) expect(res.error).toMatch(/motivo/i)
+    expect(mockDb.delivery.updateMany).not.toHaveBeenCalled()
+  })
+
+  it('cancelDelivery escribe estado + motivo + Activity de forma atómica (una sola tx)', async () => {
+    primeCoordinated('PROGRAMADA')
+    const res = await cancelDelivery('d1', 'el comprador aplaza', 'PROGRAMADA')
     expect(res).toEqual({ ok: true })
-    expect(completeDeliveryTx).not.toHaveBeenCalled()
+    const cas = mockDb.delivery.updateMany.mock.calls[0][0]
+    expect(cas.data.status).toBe('CANCELADA')
+    expect(cas.data.cancellationReason).toBe('el comprador aplaza')
     const types = mockDb.activity.create.mock.calls.map((c) => c[0].data.type)
     expect(types).toContain('ENTREGA_CANCELADA')
+  })
+
+  it('cancelDelivery sin motivo → CANCELLATION_REASON_REQUIRED, sin escribir', async () => {
+    primeCoordinated('PROGRAMADA')
+    const res = await cancelDelivery('d1', '   ', 'PROGRAMADA')
+    expect(res.ok).toBe(false)
+    expect(mockDb.delivery.updateMany).not.toHaveBeenCalled()
   })
 })
 
