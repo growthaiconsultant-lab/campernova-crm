@@ -79,8 +79,23 @@ async function seedDelivery(): Promise<DeliveryGraph> {
   const buyer = await prisma.buyerLead.create({
     data: { name: `Buyer ${s}`, email: `buyer_${s}@integ.test`, phone: '600000001' },
   })
+  // I3C1B: Delivery.offerId es obligatorio → Offer coherente para el fixture de documentos.
+  const offer = await prisma.offer.create({
+    data: {
+      vehicleId: base.vehicleId,
+      buyerLeadId: buyer.id,
+      amount: 25000,
+      createdById: base.agentId,
+      status: 'CONVERTIDA',
+    },
+  })
   const delivery = await prisma.delivery.create({
-    data: { vehicleId: base.vehicleId, buyerLeadId: buyer.id, scheduledAt: new Date() },
+    data: {
+      vehicleId: base.vehicleId,
+      buyerLeadId: buyer.id,
+      offerId: offer.id,
+      scheduledAt: new Date(),
+    },
   })
   cleanups.push(async () => {
     await prisma.deliveryDocument.updateMany({
@@ -89,6 +104,7 @@ async function seedDelivery(): Promise<DeliveryGraph> {
     })
     await prisma.deliveryDocument.deleteMany({ where: { deliveryId: delivery.id } })
     await prisma.delivery.deleteMany({ where: { id: delivery.id } })
+    await prisma.offer.deleteMany({ where: { vehicleId: base.vehicleId } })
     await prisma.buyerLead.deleteMany({ where: { id: buyer.id } })
   })
   return { ...base, buyerId: buyer.id, deliveryId: delivery.id }

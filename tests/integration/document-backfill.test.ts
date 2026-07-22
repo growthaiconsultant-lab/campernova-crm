@@ -75,8 +75,26 @@ async function seedDeliveryLegacyDoc(url: string): Promise<{ docId: string }> {
   const buyer = await prisma.buyerLead.create({
     data: { name: `B ${s}`, email: `b_${s}@integ.test`, phone: '600000001' },
   })
+  // I3C1B: Delivery.offerId es obligatorio → Offer coherente para el fixture de documentos.
+  const user = await prisma.user.create({
+    data: { name: `U ${s}`, email: `u_${s}@integ.test`, role: 'AGENTE' },
+  })
+  const offer = await prisma.offer.create({
+    data: {
+      vehicleId: vehicle.id,
+      buyerLeadId: buyer.id,
+      amount: 25000,
+      createdById: user.id,
+      status: 'CONVERTIDA',
+    },
+  })
   const delivery = await prisma.delivery.create({
-    data: { vehicleId: vehicle.id, buyerLeadId: buyer.id, scheduledAt: new Date() },
+    data: {
+      vehicleId: vehicle.id,
+      buyerLeadId: buyer.id,
+      offerId: offer.id,
+      scheduledAt: new Date(),
+    },
   })
   const doc = await prisma.deliveryDocument.create({
     data: { deliveryId: delivery.id, category: 'CONTRATO_FINAL', name: 'Legacy', url },
@@ -88,9 +106,11 @@ async function seedDeliveryLegacyDoc(url: string): Promise<{ docId: string }> {
     })
     await prisma.deliveryDocument.deleteMany({ where: { deliveryId: delivery.id } })
     await prisma.delivery.deleteMany({ where: { id: delivery.id } })
+    await prisma.offer.deleteMany({ where: { vehicleId: vehicle.id } })
     await prisma.buyerLead.deleteMany({ where: { id: buyer.id } })
     await prisma.vehicle.deleteMany({ where: { id: vehicle.id } })
     await prisma.sellerLead.deleteMany({ where: { id: seller.id } })
+    await prisma.user.deleteMany({ where: { id: user.id } })
   })
   return { docId: doc.id }
 }

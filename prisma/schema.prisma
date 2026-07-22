@@ -1032,9 +1032,9 @@ model Delivery {
   id                 String         @id @default(cuid())
   vehicleId          String         @map("vehicle_id")
   buyerLeadId        String         @map("buyer_lead_id")
-  // offerId is nullable only during I3C1 expand–contract.
-  // Application writers must always persist an Offer. Becomes NOT NULL in I3C1B after zero-null validation.
-  offerId            String?        @map("offer_id")
+  // I3C1B makes offerId physically required (SET NOT NULL). Every Delivery is linked to the Offer
+  // (CONVERTIDA) it fulfils; all productive writers persist offerId.
+  offerId            String         @map("offer_id")
   responsableId      String?        @map("responsable_id")
   scheduledAt        DateTime       @map("scheduled_at")
   startedAt          DateTime?      @map("started_at")
@@ -1052,7 +1052,7 @@ model Delivery {
   buyerLead   BuyerLead               @relation(fields: [buyerLeadId], references: [id])
   // NoAction (no Restrict): borrar la Offer directamente falla si tiene Delivery, pero borrar el
   // Vehicle padre puede eliminar Offer y Delivery en cascada convergente (verificación diferida).
-  offer       Offer?                  @relation("OfferDeliveries", fields: [offerId], references: [id], onDelete: NoAction, onUpdate: Cascade)
+  offer       Offer                   @relation("OfferDeliveries", fields: [offerId], references: [id], onDelete: NoAction, onUpdate: Cascade)
   responsable User?                   @relation("ResponsableDeliveries", fields: [responsableId], references: [id])
   checklist   DeliveryChecklistItem[]
   documents   DeliveryDocument[]
