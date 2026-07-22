@@ -236,6 +236,37 @@ Helpers: `isValidOfferTransition`, `isTerminalOfferStatus`, `isReservation` (ACE
 > → **preflight + migración contract en staging** → **preflight + migración contract en producción**
 > → merge → deployment. La migración remota (staging/producción) y el merge **no** están hechos.
 
+> 🔶 **I3C2 — transiciones y cancelación coordinadas** (rama `feat/coordinate-delivery-transitions`,
+> PR abierto; **sin migración**). Coordina EXCLUSIVAMENTE `PROGRAMADA → EN_CURSO`,
+> `PROGRAMADA → CANCELADA` y `EN_CURSO → CANCELADA` bajo el protocolo de raíces
+> (`Vehicle → SellerLead → BuyerLead`) con compare-and-swap y Activity atómica. Núcleo puro en
+> `lib/delivery-transitions.ts` (`transitionDeliveryTx`), invocado por un **único** caller de
+> `withLockedRoots` compartido por `updateDeliveryStatus` (EN_CURSO) y `cancelDelivery` (5 callers en
+> total). UI mínima: botón "Cancelar entrega" con confirmación + **motivo obligatorio**.
+>
+> `I3C2 COORDINATES PROGRAMADA TO EN_CURSO`
+> `I3C2 COORDINATES DELIVERY CANCELLATION`
+> `DELIVERY CANCELLATION DOES NOT RELEASE THE VEHICLE`
+> `DELIVERY CANCELLATION DOES NOT MODIFY THE OFFER`
+> `CANCELLATION REASON AND ACTIVITY ARE ATOMIC`
+> `I3C2 USES CAS AND THE ROOT LOCK PROTOCOL`
+> `DELIVERY COMPLETION REMAINS IN I3C3`
+> `ARCHIVED LEADS BLOCK STARTING A DELIVERY`
+> `ARCHIVED LEADS DO NOT BLOCK CANCELLING A DELIVERY`
+> `CANCELLING A DELIVERY DOES NOT REACTIVATE OR MODIFY LEADS`
+> `CHECKLIST AND SIGNATURE TERMINAL-STATE GUARDS REMAIN PENDING`
+>
+> **Corrección de un defecto latente ALTO:** la cancelación anterior escribía el estado **sin CAS ni
+> locks** y el motivo en una segunda escritura fire-and-forget; el CAS ahora impide que una
+> cancelación sobrescriba una compleción concurrente. Carrera cancelación↔compleción (la compleción
+> `completeDeliveryTx` aún NO usa locks — I3C3): gane quien gane, hay **un único estado terminal** y el
+> perdedor **revierte por completo**; nunca queda `CANCELADA` junto a Vehicle `VENDIDO`/Warranty
+> (probado con las dos intercalaciones en PostgreSQL 17 real). `updateDeliveryStatus(CANCELADA)` sin
+> motivo se enruta a `cancelDelivery` (motivo obligatorio). **COMPLETADA permanece en la ruta de
+> `completeDeliveryTx` (I3C3), sin cambios.** Sin migración: reutiliza `cancellationReason` y
+> `withLockedRoots`; catálogo y nº de migraciones intactos. **No** coordina compleción/venta,
+> Warranty, follow-ups, Vehicle→VENDIDO ni el guard de checklist/firma en estados terminales (I3C3).
+
 ## UI
 
 - **`components/offers-section.tsx`** (cliente, reutilizable en ambas fichas): lista de ofertas con badge de estado, importe, señal, "Reserva", enlace al otro lado; alta inline (elige contraparte de los **matches** + importe + notas); transiciones por botón con diálogos para aceptar (señal + fecha) y rechazar (motivo `LostReason`).
