@@ -128,9 +128,11 @@ function transition(
     hooks?: TransitionDeliveryHooks
   }
 ) {
+  // Las raíces se bloquean siempre sobre el vendedor REAL (existe → FOR UPDATE OK). El parámetro
+  // `resolvedSellerLeadId` del núcleo se controla aparte para simular un cambio de raíz.
   const roots = buildDeliveryCreationRoots({
     vehicleId: f.vehicleId,
-    sellerLeadId: opts.resolvedSellerLeadId === undefined ? f.sellerId : opts.resolvedSellerLeadId,
+    sellerLeadId: f.sellerId,
     buyerLeadId: f.buyerId,
   })
   return withLockedRoots(
@@ -317,23 +319,26 @@ describe('concurrencia cancelación ↔ compleción (ambas intercalaciones)', ()
     const f = await seed('EN_CURSO')
     const paused = barrier()
     const release = barrier()
-    // Cancelación pausada DENTRO de su tx (con locks), antes de su CAS.
+    // Compleción pausada DESPUÉS de sus CAS (entrega→COMPLETADA, vehículo→VENDIDO), reteniendo los
+    // row-locks de esas filas dentro de su transacción, antes de crear la garantía.
+    const completion = complete(f, prismaB, {
+      beforeWarrantyWrite: async () => {
+        paused.open()
+        await release.wait
+      },
+    }).catch((e) => e)
+    await paused.wait
+    // La cancelación arranca: `withLockedRoots` pide FOR UPDATE del vehículo → BLOQUEA (lo retiene la
+    // compleción sin commitear). No hay deadlock: la compleción no espera a la cancelación.
     const cancel = transition(f, prismaA, {
       expected: 'EN_CURSO',
       target: 'CANCELADA',
       reason: 'pierde',
-      hooks: {
-        beforeWrite: async () => {
-          paused.open()
-          await release.wait
-        },
-      },
     }).catch((e) => e)
-    await paused.wait
-    // La compleción corre entera y confirma COMPLETADA + VENDIDO + Warranty.
-    await complete(f, prismaB)
     release.open()
+    const compRes = await completion
     const cancelRes = await cancel
+    expect(compRes).not.toBeInstanceOf(Error) // la compleción confirma
     expect(codeOf(cancelRes)).toBe('DELIVERY_ALREADY_COMPLETED')
     const st = await state(f)
     expect(st.d.status).toBe('COMPLETADA')
