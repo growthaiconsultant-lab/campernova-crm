@@ -212,8 +212,8 @@ existe y no se inventa aquí.
 
 ### Callers productivos (verificado en código)
 
-Exactamente **5** puntos de llamada productivos de `withLockedRoots` (`grep` sobre `app/`+`lib/`, sin
-tests, en `687eae1`):
+Exactamente **6** puntos de llamada productivos de `withLockedRoots` (`grep` sobre `app/`+`lib/`, sin
+tests):
 
 1. `createOffer` — `app/(backoffice)/ofertas/actions.ts` (I2B).
 2. `updateOfferStatus` — `app/(backoffice)/ofertas/actions.ts` (I2C).
@@ -222,6 +222,8 @@ tests, en `687eae1`):
 5. **Transición/cancelación coordinada de Delivery** — `app/(backoffice)/entregas/actions.ts` →
    `runCoordinatedDeliveryTransition` → `transitionDeliveryTx` (I3C2), compartida por
    `updateDeliveryStatus` (EN_CURSO) y `cancelDelivery`.
+6. **Compleción coordinada de Delivery** — `app/(backoffice)/entregas/actions.ts` →
+   `completeDeliveryTx` (I3C3), invocada por `updateDeliveryStatus` (COMPLETADA).
 
 > El número **debe verificarse contra el código**, no copiarse: cualquier fase futura que añada o
 > retire un caller debe actualizar esta lista.
@@ -240,9 +242,9 @@ tests, en `687eae1`):
 ### Por qué los locks NO sustituyen al CAS
 
 El row lock serializa a los callers **que adoptan el protocolo**; el CAS protege además frente a:
-clientes obsoletos, doble submit, writers futuros, y **fronteras aún no coordinadas** (p. ej.
-`completeDeliveryTx`, que todavía no usa `withLockedRoots`). El CAS es la segunda barrera que hace que
-la carrera cancelación↔compleción sea segura hoy.
+clientes obsoletos, doble submit, writers futuros, y fronteras aún no coordinadas. El CAS es la
+segunda barrera que hace que la carrera cancelación↔compleción sea segura: ambos núcleos toman los
+mismos root locks y, además, cada uno reescribe con CAS sobre `EN_CURSO`, de modo que solo uno gana.
 
 ### Conflictos y errores
 
@@ -261,8 +263,19 @@ la carrera cancelación↔compleción sea segura hoy.
 
 Detalle y cobertura en [`docs/quality/delivery-test-matrix.md`](../quality/delivery-test-matrix.md).
 
+### Compleción coordinada (I3C3)
+
+`completeDeliveryTx` (`EN_CURSO → COMPLETADA` + Vehicle→VENDIDO + `soldAt` + Match/Buyer→CERRADO +
+Warranty + follow-ups) **adopta** este protocolo: la server action toma una lectura preliminar mínima,
+construye las raíces (`Vehicle → SellerLead → BuyerLead`) y ejecuta el núcleo dentro de
+`withLockedRoots`. Relee Delivery/Vehicle/Offer/leads y **valida checklist y firma bajo el lock**
+antes de escribir; conserva el CAS de Delivery y de Vehicle como segunda barrera; todos los efectos
+(incluidos Warranty y los 2 follow-ups, únicos por `@unique`) son atómicos en la transacción. La
+compleción **admite leads archivados** (no los reactiva) y **no es reversible**. Además,
+`updateDeliveryChecklistItem` bloquea la edición del checklist en estados terminales; queda una ventana
+teórica de sub-transacción sobre datos de auditoría, descrita en el ciclo de vida (§6).
+
 ### Pendiente
 
-`completeDeliveryTx` (`EN_CURSO → COMPLETADA` + Vehicle→VENDIDO + Warranty + follow-ups) **todavía no
-adopta** este protocolo: pertenece a **I3C3**. Hasta entonces, la seguridad de la carrera con la
-cancelación descansa en el CAS + el row-lock de PostgreSQL (ver DOC-1 §6).
+Coordinación de descarte de Vehicle (I3D) y de tasación (I3E). Ver
+[`docs/roadmap/i3-status.md`](../roadmap/i3-status.md).
