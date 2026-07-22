@@ -121,7 +121,7 @@ function completeParams(seeded: Seeded, now: Date) {
     deliveryId: seeded.deliveryId,
     vehicleId: seeded.vehicleId,
     buyerLeadId: seeded.buyerId,
-    sellerLeadId: seeded.sellerId,
+    resolvedSellerLeadId: seeded.sellerId,
     actorId: seeded.agentId,
     now,
   }

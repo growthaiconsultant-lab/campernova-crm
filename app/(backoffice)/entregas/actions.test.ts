@@ -51,7 +51,11 @@ import type { User } from '@prisma/client'
 import { requireCanEditEntregas, requireAdmin } from '@/lib/auth'
 import { revalidatePath } from 'next/cache'
 import { getSupabaseAdminClient } from '@/lib/supabase/admin'
-import { completeDeliveryTx, DeliveryConflictError } from '@/lib/delivery-completion'
+import {
+  completeDeliveryTx,
+  DeliveryConflictError,
+  DeliveryCompletionError,
+} from '@/lib/delivery-completion'
 import { withLockedRoots, LockError } from '@/lib/locking'
 import { Prisma } from '@prisma/client'
 import { DELIVERY_CREATION_ERROR_MESSAGES } from '@/lib/delivery-creation'
@@ -212,31 +216,18 @@ describe('updateDeliveryStatus · validaciones previas', () => {
     expect(completeDeliveryTx).not.toHaveBeenCalled()
   })
 
-  it('rechaza transición inválida (PROGRAMADA → COMPLETADA)', async () => {
-    mockDb.delivery.findUnique.mockResolvedValue({ ...signedComplete, status: 'PROGRAMADA' })
+  // I3C3: la validación de estado, checklist y firma se hace BAJO el lock dentro de
+  // `completeDeliveryTx` (unit-tested en delivery-completion.test.ts). La action solo delega y
+  // traduce el error de dominio a un mensaje de UI.
+  it('traduce DeliveryCompletionError (checklist/firma/estado) a { ok:false } y NO revalida', async () => {
+    mockDb.delivery.findUnique.mockResolvedValue({ ...signedComplete })
+    vi.mocked(completeDeliveryTx).mockRejectedValue(
+      new DeliveryCompletionError('CHECKLIST_INCOMPLETE')
+    )
     const res = await updateDeliveryStatus('d1', 'COMPLETADA')
     expect(res.ok).toBe(false)
-    if (!res.ok) expect(res.error).toContain('no permitida')
-    expect(completeDeliveryTx).not.toHaveBeenCalled()
-  })
-
-  it('bloquea COMPLETADA si hay ítems de checklist pendientes', async () => {
-    mockDb.delivery.findUnique.mockResolvedValue({
-      ...signedComplete,
-      checklist: [{ result: 'OK' }, { result: 'PENDIENTE' }],
-    })
-    const res = await updateDeliveryStatus('d1', 'COMPLETADA')
-    expect(res.ok).toBe(false)
-    if (!res.ok) expect(res.error).toContain('pendientes')
-    expect(completeDeliveryTx).not.toHaveBeenCalled()
-  })
-
-  it('bloquea COMPLETADA si falta la firma', async () => {
-    mockDb.delivery.findUnique.mockResolvedValue({ ...signedComplete, signedByName: null })
-    const res = await updateDeliveryStatus('d1', 'COMPLETADA')
-    expect(res.ok).toBe(false)
-    if (!res.ok) expect(res.error).toContain('firma')
-    expect(completeDeliveryTx).not.toHaveBeenCalled()
+    if (!res.ok) expect(res.error).toMatch(/checklist/i)
+    expect(revalidatePath).not.toHaveBeenCalled()
   })
 })
 
@@ -252,7 +243,7 @@ describe('updateDeliveryStatus · finalización atómica (COMPLETADA)', () => {
       deliveryId: 'd1',
       vehicleId: 'veh-1',
       buyerLeadId: 'buyer-1',
-      sellerLeadId: 'seller-1',
+      resolvedSellerLeadId: 'seller-1',
       actorId: 'user-1',
     })
     expect(params.now).toBeInstanceOf(Date)

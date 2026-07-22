@@ -5,7 +5,11 @@ import { revalidatePath } from 'next/cache'
 import { z } from 'zod'
 import { db } from '@/lib/db'
 import { requireAdmin, requireCanEditEntregas } from '@/lib/auth'
-import { completeDeliveryTx, DeliveryConflictError } from '@/lib/delivery-completion'
+import {
+  completeDeliveryTx,
+  DeliveryConflictError,
+  isDeliveryCompletionError,
+} from '@/lib/delivery-completion'
 import { withLockedRoots, isLockError } from '@/lib/locking'
 import {
   createDeliveryTx,
@@ -53,15 +57,6 @@ const DELIVERY_DOC_CATEGORIES: readonly string[] = [
 ]
 
 type ActionResult<T = undefined> = { ok: true; data?: T } | { ok: false; error: string }
-
-const VALID_TRANSITIONS: Partial<Record<DeliveryStatus, DeliveryStatus[]>> = {
-  PROGRAMADA: ['EN_CURSO', 'CANCELADA'],
-  EN_CURSO: ['COMPLETADA', 'CANCELADA'],
-}
-
-function isValidDeliveryTransition(from: DeliveryStatus, to: DeliveryStatus) {
-  return VALID_TRANSITIONS[from]?.includes(to) ?? false
-}
 
 // 14-item checklist created with every delivery
 const INITIAL_CHECKLIST = [
@@ -271,57 +266,45 @@ export async function updateDeliveryStatus(
     return { ok: false, error: DELIVERY_TRANSITION_ERROR_MESSAGES.INVALID_DELIVERY_TRANSITION }
   }
 
-  // COMPLETADA → permanece en la ruta de I3C3 (`completeDeliveryTx`), SIN cambios en esta fase.
-  const delivery = await db.delivery.findUnique({
+  // COMPLETADA → I3C3: compleción COORDINADA bajo `withLockedRoots`. Estado, checklist y firma se
+  // validan BAJO el lock dentro de `completeDeliveryTx` (la lectura preliminar solo resuelve raíces).
+  const prelim = await db.delivery.findUnique({
     where: { id: deliveryId },
     select: {
-      status: true,
       vehicleId: true,
       buyerLeadId: true,
-      signedByName: true,
-      signedByDni: true,
-      signatureUrl: true,
       vehicle: { select: { sellerLeadId: true } },
-      checklist: { select: { result: true } },
     },
   })
-  if (!delivery) return { ok: false, error: 'Entrega no encontrada' }
+  if (!prelim) return { ok: false, error: 'Entrega no encontrada' }
 
-  if (!isValidDeliveryTransition(delivery.status, newStatus)) {
-    return { ok: false, error: `Transición ${delivery.status} → ${newStatus} no permitida.` }
-  }
-
-  const pending = delivery.checklist.filter((c) => c.result === 'PENDIENTE')
-  if (pending.length > 0) {
-    return { ok: false, error: `Hay ${pending.length} ítems pendientes en el checklist.` }
-  }
-  if (!delivery.signedByName || !delivery.signedByDni || !delivery.signatureUrl) {
-    return { ok: false, error: 'La entrega requiere firma antes de completarse.' }
-  }
-
-  const now = new Date()
-  // Finalización ATÓMICA: entrega + vehículo + comprador + match + garantía + seguimientos + trazas
-  // en una única transacción, con compare-and-swap (I3C3 añadirá el protocolo de locks).
+  const roots = buildDeliveryCreationRoots({
+    vehicleId: prelim.vehicleId,
+    sellerLeadId: prelim.vehicle.sellerLeadId,
+    buyerLeadId: prelim.buyerLeadId,
+  })
   try {
-    await db.$transaction((tx) =>
+    await withLockedRoots(roots, (tx) =>
       completeDeliveryTx(tx, {
         deliveryId,
-        vehicleId: delivery.vehicleId,
-        buyerLeadId: delivery.buyerLeadId,
-        sellerLeadId: delivery.vehicle.sellerLeadId,
+        vehicleId: prelim.vehicleId,
+        buyerLeadId: prelim.buyerLeadId,
+        resolvedSellerLeadId: prelim.vehicle.sellerLeadId,
         actorId: actor.id,
-        now,
+        now: new Date(),
       })
     )
   } catch (err) {
+    if (isDeliveryCompletionError(err)) return { ok: false, error: err.message }
     if (err instanceof DeliveryConflictError) return { ok: false, error: err.message }
+    if (isLockError(err)) return { ok: false, error: err.message }
     throw err
   }
 
   revalidatePath('/entregas')
   revalidatePath(`/entregas/${deliveryId}`)
-  revalidatePath(`/vendedores/${delivery.vehicle.sellerLeadId}`)
-  revalidatePath(`/compradores/${delivery.buyerLeadId}`)
+  revalidatePath(`/vendedores/${prelim.vehicle.sellerLeadId}`)
+  revalidatePath(`/compradores/${prelim.buyerLeadId}`)
   return { ok: true }
 }
 
