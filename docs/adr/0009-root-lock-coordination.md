@@ -201,3 +201,68 @@ y B2 final lo usen. No debe leerse como que el sistema ya está protegido.
 La emisión de `INFRA_ERROR` y `DEADLOCK` a Sentry queda marcada en `lib/locking/errors.ts` y se
 añadirá cuando el repositorio tenga un patrón claro de reporte para helpers de dominio; hoy no
 existe y no se inventa aquí.
+
+---
+
+## Actualización de adopción (vigente en `main`, `687eae1`)
+
+> La sección «Estado y limitaciones» describe el momento en que I1 era **infraestructura inerte**.
+> Eso **ya no es cierto**: I2 (ofertas) e I3 (entregas/vehículo) adoptaron el protocolo. Esta sección
+> refleja el estado real; la parte histórica se conserva como registro de la decisión original.
+
+### Callers productivos (verificado en código)
+
+Exactamente **5** puntos de llamada productivos de `withLockedRoots` (`grep` sobre `app/`+`lib/`, sin
+tests, en `687eae1`):
+
+1. `createOffer` — `app/(backoffice)/ofertas/actions.ts` (I2B).
+2. `updateOfferStatus` — `app/(backoffice)/ofertas/actions.ts` (I2C).
+3. `updateVehicle` — `app/(backoffice)/vendedores/[id]/actions.ts` (I3B).
+4. `createDelivery` — `app/(backoffice)/entregas/actions.ts` → `createDeliveryTx` (I3C1A).
+5. **Transición/cancelación coordinada de Delivery** — `app/(backoffice)/entregas/actions.ts` →
+   `runCoordinatedDeliveryTransition` → `transitionDeliveryTx` (I3C2), compartida por
+   `updateDeliveryStatus` (EN_CURSO) y `cancelDelivery`.
+
+> El número **debe verificarse contra el código**, no copiarse: cualquier fase futura que añada o
+> retire un caller debe actualizar esta lista.
+
+### Patrón completo que siguen los callers
+
+1. **lectura preliminar** solo para resolver los ids de las raíces (no decide negocio);
+2. adquisición de **row locks** en el orden global (`Vehicle → SellerLead → BuyerLead`);
+3. **relectura** dentro del `TransactionClient`;
+4. **validación fail-closed** (raíz cambiada → `*_ROOT_CHANGED`; lead archivado cuando la operación lo
+   exija → `LEAD_ARCHIVED`);
+5. **CAS** sobre el estado esperado;
+6. escritura atómica (entidad + `Activity`) en la misma transacción;
+7. **efectos post-commit** (revalidate, KPIs, notificaciones) **fuera** de la transacción.
+
+### Por qué los locks NO sustituyen al CAS
+
+El row lock serializa a los callers **que adoptan el protocolo**; el CAS protege además frente a:
+clientes obsoletos, doble submit, writers futuros, y **fronteras aún no coordinadas** (p. ej.
+`completeDeliveryTx`, que todavía no usa `withLockedRoots`). El CAS es la segunda barrera que hace que
+la carrera cancelación↔compleción sea segura hoy.
+
+### Conflictos y errores
+
+`ROOT_NOT_FOUND` (raíz inexistente, fail-closed), `*_ROOT_CHANGED` (la raíz cambió bajo el lock),
+`LEAD_ARCHIVED` (según la operación), `LOCK_TIMEOUT`/`DEADLOCK` (traducidos a mensaje seguro), y la
+**clasificación posterior a un CAS de 0 filas** (`ALREADY_*`/`STATUS_CHANGED`), determinista.
+
+### Carreras demostradas (garantías, no detalles frágiles)
+
+- dos cancelaciones concurrentes → exactamente una gana; una sola `Activity`;
+- **cancelación gana** frente a compleción → la compleción falla su CAS y **revierte** por completo;
+- **compleción gana** frente a cancelación → la cancelación observa `DELIVERY_ALREADY_COMPLETED` sin
+  escribir nada; **contención de lock observada** con `waitUntilBlocked`/`pg_stat_activity`;
+- creación concurrente de Delivery → el índice único parcial garantiza **una sola activa** por
+  vehículo.
+
+Detalle y cobertura en [`docs/quality/delivery-test-matrix.md`](../quality/delivery-test-matrix.md).
+
+### Pendiente
+
+`completeDeliveryTx` (`EN_CURSO → COMPLETADA` + Vehicle→VENDIDO + Warranty + follow-ups) **todavía no
+adopta** este protocolo: pertenece a **I3C3**. Hasta entonces, la seguridad de la carrera con la
+cancelación descansa en el CAS + el row-lock de PostgreSQL (ver DOC-1 §6).
