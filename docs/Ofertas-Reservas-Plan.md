@@ -162,6 +162,12 @@ Helpers: `isValidOfferTransition`, `isTerminalOfferStatus`, `isReservation` (ACE
 > LEAD_ARCHIVED REMAINS PREPARATORY UNTIL PR #117 IS MERGED
 > ```
 >
+> **[Actualización — superado; ver [`roadmap/i3-status.md`](roadmap/i3-status.md)]** Los tres últimos
+> marcadores del bloque anterior son **históricos de I3C1A** y ya **no** describen el estado actual:
+> `offerId` **ya es `NOT NULL`** (I3C1B); la **compleción** sigue en I3C3 (ese marcador sí sigue
+> vigente); y **`LEAD_ARCHIVED` ya es productivo** en I2/I3, **no** depende de PR #117 (que solo añade
+> las _acciones_ de archivar/reactivar).
+>
 > **Asimetría del rollout expand–contract** (demostrada con tests PostgreSQL 17 reales):
 > `old code + expand schema = compatible` (el Prisma Client de `ca6015e` se ejecuta contra el schema
 > expandido: create/read/update/delete de Delivery sin `offerId`, `offer_id` queda `NULL`, sin
