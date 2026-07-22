@@ -176,8 +176,8 @@ jobs:
           count=$(psql "$PSQL_URL" -tAc "SELECT count(*) FROM _prisma_migrations WHERE finished_at IS NOT NULL")
           names=$(psql "$PSQL_URL" -tAc "SELECT string_agg(migration_name, ',' ORDER BY migration_name) FROM _prisma_migrations WHERE finished_at IS NOT NULL")
           echo "migraciones aplicadas: $count · nombres: $names"
-          test "$count" = "5" || { echo "esperado 5 migraciones aplicadas (baseline + PR5B1 + archivado + commitment + delivery_offer_link)"; exit 1; }
-          test "$names" = "000000000000_squashed_migrations,20260712000000_add_versioned_document_model,20260719120000_add_lead_archiving_model,20260720000000_add_calendar_event_commitment,20260721100000_add_delivery_offer_link_expand" || { echo "conjunto u orden de migraciones inesperado"; exit 1; }
+          test "$count" = "6" || { echo "esperado 6 migraciones aplicadas (baseline + PR5B1 + archivado + commitment + delivery_offer_link_expand + delivery_offer_link_required)"; exit 1; }
+          test "$names" = "000000000000_squashed_migrations,20260712000000_add_versioned_document_model,20260719120000_add_lead_archiving_model,20260720000000_add_calendar_event_commitment,20260721100000_add_delivery_offer_link_expand,20260721200000_make_delivery_offer_link_required" || { echo "conjunto u orden de migraciones inesperado"; exit 1; }
 
       - name: Prisma migrate status (must be up to date)
         run: pnpm prisma migrate status
@@ -226,7 +226,11 @@ jobs:
           #   columns     440 → 441 (+1: deliveries.offer_id)
           #   foreign_keys 67 → 68  (+1: deliveries.offer_id → offers, ON DELETE NO ACTION)
           #   indexes     113 → 115 (+2: deliveries_offer_id_idx + deliveries_active_vehicle_key parcial)
-          # Sin cambio: tables=31, enums=51, enum_values=269, without_rls=0, forced=0, policies=0.
+          # Delta tras make_delivery_offer_link_required (PR I3C1B, contract; SOLO nullability):
+          #   deliveries.offer_id NULL → NOT NULL. Ningún conteo de catálogo cambia.
+          #   columns=441, foreign_keys=68, indexes=115 (idénticos); tables=31, enums=51,
+          #   enum_values=269, without_rls=0, forced=0, policies=0 (sin cambio).
+          assert offer_id_not_null "$(psql "$PSQL_URL" -tAc "SELECT is_nullable FROM information_schema.columns WHERE table_schema='public' AND table_name='deliveries' AND column_name='offer_id'")" NO
           assert tables "$tables" 31
           assert columns "$columns" 441
           assert enums "$enums" 51
