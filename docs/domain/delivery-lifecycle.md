@@ -5,10 +5,10 @@
 > `SellerLead`. Marketplace, SaaS multiempresa y otras expansiones **no** forman parte del alcance
 > activo (ver `docs/architecture/fase-1-evolution-roadmap.md`).
 >
-> **Documentos relacionados:** protocolo de concurrencia → [`docs/adr/0009-root-lock-coordination.md`](adr/0009-root-lock-coordination.md);
-> operación de migraciones → [`docs/governance/database-migrations.md`](governance/database-migrations.md);
-> garantías de test → [`docs/quality/delivery-test-matrix.md`](quality/delivery-test-matrix.md);
-> estado del programa → [`docs/roadmap/i3-status.md`](roadmap/i3-status.md).
+> **Documentos relacionados:** protocolo de concurrencia → [`adr/0009-root-lock-coordination.md`](../adr/0009-root-lock-coordination.md);
+> operación de migraciones → [`governance/database-migrations.md`](../governance/database-migrations.md);
+> garantías de test → [`quality/delivery-test-matrix.md`](../quality/delivery-test-matrix.md);
+> estado del programa → [`roadmap/i3-status.md`](../roadmap/i3-status.md).
 >
 > **Terminología de fase:** _preparado / fusionado / migrado / desplegado / validado_ no son
 > sinónimos. Una entidad puede estar desplegada sin que su flujo autenticado esté validado
