@@ -314,6 +314,16 @@ export async function updateDeliveryChecklistItem(
 ): Promise<ActionResult> {
   await requireCanEditEntregas()
 
+  // I3C3 — guarda terminal: el checklist NO puede editarse en estados terminales de la entrega.
+  const item = await db.deliveryChecklistItem.findUnique({
+    where: { id: itemId },
+    select: { deliveryId: true, delivery: { select: { status: true } } },
+  })
+  if (!item) return { ok: false, error: 'Ítem de checklist no encontrado' }
+  if (item.delivery.status === 'COMPLETADA' || item.delivery.status === 'CANCELADA') {
+    return { ok: false, error: 'No se puede editar el checklist de una entrega finalizada.' }
+  }
+
   await db.deliveryChecklistItem.update({
     where: { id: itemId },
     data: {
@@ -322,11 +332,7 @@ export async function updateDeliveryChecklistItem(
     },
   })
 
-  const item = await db.deliveryChecklistItem.findUnique({
-    where: { id: itemId },
-    select: { deliveryId: true },
-  })
-  if (item) revalidatePath(`/entregas/${item.deliveryId}`)
+  revalidatePath(`/entregas/${item.deliveryId}`)
   return { ok: true }
 }
 

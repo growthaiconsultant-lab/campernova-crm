@@ -35,6 +35,7 @@ const { mockDb } = vi.hoisted(() => {
       count: vi.fn(),
     },
     deliveryDocument: { create: vi.fn(), findUnique: vi.fn(), delete: vi.fn(), update: vi.fn() },
+    deliveryChecklistItem: { findUnique: vi.fn(), update: vi.fn() },
     documentVersion: { create: vi.fn(), findMany: vi.fn() },
     vehicle: { findUnique: vi.fn() },
     offer: { findUnique: vi.fn() },
@@ -66,6 +67,7 @@ import {
   signDelivery,
   uploadDeliveryDocument,
   deleteDeliveryDocument,
+  updateDeliveryChecklistItem,
 } from './actions'
 
 const storageBucket = {
@@ -591,5 +593,37 @@ describe('createDelivery · coordinación y contrato (I3C1A)', () => {
     for (const msg of Object.values(DELIVERY_CREATION_ERROR_MESSAGES)) {
       expect(msg).not.toMatch(/prisma|select|update |veh-1|offer-1|[0-9a-f]{20,}/i)
     }
+  })
+})
+
+describe('updateDeliveryChecklistItem · guarda terminal (I3C3)', () => {
+  it('permite editar en EN_CURSO', async () => {
+    mockDb.deliveryChecklistItem.findUnique.mockResolvedValue({
+      deliveryId: 'd1',
+      delivery: { status: 'EN_CURSO' },
+    })
+    mockDb.deliveryChecklistItem.update.mockResolvedValue({})
+    const res = await updateDeliveryChecklistItem('item-1', { result: 'OK' })
+    expect(res).toEqual({ ok: true })
+    expect(mockDb.deliveryChecklistItem.update).toHaveBeenCalledOnce()
+  })
+
+  for (const status of ['COMPLETADA', 'CANCELADA'] as const) {
+    it(`rechaza editar cuando la entrega está ${status}; no muta`, async () => {
+      mockDb.deliveryChecklistItem.findUnique.mockResolvedValue({
+        deliveryId: 'd1',
+        delivery: { status },
+      })
+      const res = await updateDeliveryChecklistItem('item-1', { result: 'PENDIENTE' })
+      expect(res.ok).toBe(false)
+      if (!res.ok) expect(res.error).toMatch(/finalizada/i)
+      expect(mockDb.deliveryChecklistItem.update).not.toHaveBeenCalled()
+    })
+  }
+
+  it('error si el ítem no existe', async () => {
+    mockDb.deliveryChecklistItem.findUnique.mockResolvedValue(null)
+    const res = await updateDeliveryChecklistItem('nope', { result: 'OK' })
+    expect(res.ok).toBe(false)
   })
 })
