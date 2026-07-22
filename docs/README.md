@@ -23,6 +23,19 @@
 - [`architecture/architecture-decisions.md`](architecture/architecture-decisions.md) — decisiones
   estables: Fase 0 (AD-001…AD-008) + **Fase 0→1 (AD-009…AD-016)**.
 
+## Programa I3 — entregas y coordinación de estado (vigente)
+
+- [`domain/delivery-lifecycle.md`](domain/delivery-lifecycle.md) — **fuente de verdad funcional** del
+  ciclo de `Delivery`: máquina de estados, invariantes, cancelación/inicio, compleción pendiente.
+- [`roadmap/i3-status.md`](roadmap/i3-status.md) — **fuente de verdad del estado del programa I3**
+  (I3A/B/C1A/C1B/C2 cerrados; I3C3/D/E pendientes; PR #117).
+- [`adr/0009-root-lock-coordination.md`](adr/0009-root-lock-coordination.md) — protocolo de locks,
+  CAS y **inventario de callers (5)**.
+- [`quality/delivery-test-matrix.md`](quality/delivery-test-matrix.md) — **garantías** de test (no
+  conteos) y deuda de validación autenticada.
+- Operación de migraciones (expand–contract, P3009, recuperación) →
+  [`governance/database-migrations.md`](governance/database-migrations.md).
+
 ## Fase 1 — diseño de dominio (dirección aprobada; **entidades no implementadas**, salvo Fase 1A-1)
 
 La **Fase 1A-1 (fact de venta canónico)** está **IMPLEMENTED / DEPLOYED** (PR #111, squash `2f1e436`):

@@ -1,9 +1,16 @@
 # Tests de integración (PostgreSQL real)
 
+> **Nota (histórico + infraestructura).** Este documento describe la **infraestructura** de tests de
+> integración (PR0, Fase 0) — que sigue vigente y en uso. La referencia a «PR2/PR3/PR4 añadirán…» es
+> **histórica**: esos tests de concurrencia/atomicidad/rollback ya existen y han crecido mucho
+> (creación/transición/cancelación de entregas, contract migration, cliente antiguo, etc.). Las
+> **garantías vigentes** del programa de entregas están en
+> [`quality/delivery-test-matrix.md`](quality/delivery-test-matrix.md); la estrategia general en
+> [`governance/testing-strategy.md`](governance/testing-strategy.md).
+
 Infraestructura introducida en **PR0** (Fase 0). Permite ejecutar tests contra una base de
 datos **PostgreSQL real y efímera** (no mocks), con las **migraciones reales** del proyecto
-aplicadas. Es la base sobre la que PR2/PR3/PR4 añadirán tests de concurrencia, atomicidad,
-rollback e idempotencia.
+aplicadas.
 
 > ⚠️ **Nunca** ejecutes estos tests contra staging ni producción. Un guard obligatorio
 > rechaza cualquier URL que apunte a las bases de datos gestionadas del proyecto.

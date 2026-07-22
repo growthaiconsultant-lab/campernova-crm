@@ -1,5 +1,16 @@
 # Block 18 — Ofertas y Reservas (Transaction & Financing Layer)
 
+> 📌 **Este documento es una NARRATIVA HISTÓRICA de implementación** (B18 → I2 → I3). Las frases de
+> estado dentro de cada bloque ("PR abierto", "pendiente", "migración remota pendiente") reflejan el
+> **momento en que se escribió cada bloque** y **no** el estado operativo actual.
+>
+> - **Contrato funcional vigente:** [`domain/delivery-lifecycle.md`](domain/delivery-lifecycle.md).
+> - **Estado vigente del programa I3:** [`roadmap/i3-status.md`](roadmap/i3-status.md) — I3A/B/C1A/C1B/C2
+>   **cerrados**; I3C3/D/E pendientes.
+> - **Locking:** [`adr/0009-root-lock-coordination.md`](adr/0009-root-lock-coordination.md) ·
+>   **Migraciones:** [`governance/database-migrations.md`](governance/database-migrations.md) ·
+>   **Tests:** [`quality/delivery-test-matrix.md`](quality/delivery-test-matrix.md).
+
 Captura estructurada de **ofertas** y **reservas** comprador→vehículo. El valor de negocio: registrar los **precios reales de cierre** y las **señales**, el dato más difícil de replicar por un competidor. Es la primera pieza de la capa transaccional; el cierre completo (contratos, pagos, financiación, gestoría) llega en fases posteriores.
 
 ## Decisión de modelado
@@ -151,6 +162,12 @@ Helpers: `isValidOfferTransition`, `isTerminalOfferStatus`, `isReservation` (ACE
 > LEAD_ARCHIVED REMAINS PREPARATORY UNTIL PR #117 IS MERGED
 > ```
 >
+> **[Actualización — superado; ver [`roadmap/i3-status.md`](roadmap/i3-status.md)]** Los tres últimos
+> marcadores del bloque anterior son **históricos de I3C1A** y ya **no** describen el estado actual:
+> `offerId` **ya es `NOT NULL`** (I3C1B); la **compleción** sigue en I3C3 (ese marcador sí sigue
+> vigente); y **`LEAD_ARCHIVED` ya es productivo** en I2/I3, **no** depende de PR #117 (que solo añade
+> las _acciones_ de archivar/reactivar).
+>
 > **Asimetría del rollout expand–contract** (demostrada con tests PostgreSQL 17 reales):
 > `old code + expand schema = compatible` (el Prisma Client de `ca6015e` se ejecuta contra el schema
 > expandido: create/read/update/delete de Delivery sin `offerId`, `offer_id` queda `NULL`, sin
@@ -176,8 +193,8 @@ Helpers: `isValidOfferTransition`, `isTerminalOfferStatus`, `isReservation` (ACE
 > seguir ofreciendo un vehículo `VENDIDO` o `DESCARTADO`. El servidor ya lo rechaza; limpiar la
 > lista es una mejora de UI aparte.
 
-> 🔶 **I3C1B — contract `Delivery.offerId` NOT NULL** (rama `feat/require-delivery-offer-link`, PR
-> abierto; **migración remota y merge pendientes**). Cierra el patrón expand–contract iniciado en
+> ✅ **I3C1B — contract `Delivery.offerId` NOT NULL** (rama `feat/require-delivery-offer-link`;
+> **fusionado y desplegado; migración contract aplicada en staging y producción**). Cierra el patrón expand–contract iniciado en
 > I3C1A. Sexta migración `20260721200000_make_delivery_offer_link_required` con una única sentencia
 > `ALTER TABLE "deliveries" ALTER COLUMN "offer_id" SET NOT NULL;` (sin backfill, default, UPDATE,
 > DELETE, FK, índices ni cambios de enum). Schema Prisma: `offerId String` + `offer Offer` (relación
@@ -236,8 +253,8 @@ Helpers: `isValidOfferTransition`, `isTerminalOfferStatus`, `isReservation` (ACE
 > → **preflight + migración contract en staging** → **preflight + migración contract en producción**
 > → merge → deployment. La migración remota (staging/producción) y el merge **no** están hechos.
 
-> 🔶 **I3C2 — transiciones y cancelación coordinadas** (rama `feat/coordinate-delivery-transitions`,
-> PR abierto; **sin migración**). Coordina EXCLUSIVAMENTE `PROGRAMADA → EN_CURSO`,
+> ✅ **I3C2 — transiciones y cancelación coordinadas** (rama `feat/coordinate-delivery-transitions`;
+> **fusionado (squash `687eae1`) y desplegado; sin migración**). Coordina EXCLUSIVAMENTE `PROGRAMADA → EN_CURSO`,
 > `PROGRAMADA → CANCELADA` y `EN_CURSO → CANCELADA` bajo el protocolo de raíces
 > (`Vehicle → SellerLead → BuyerLead`) con compare-and-swap y Activity atómica. Núcleo puro en
 > `lib/delivery-transitions.ts` (`transitionDeliveryTx`), invocado por un **único** caller de
