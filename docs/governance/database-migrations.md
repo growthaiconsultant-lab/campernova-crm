@@ -16,10 +16,14 @@
 
 1. **Prisma es la fuente de verdad** del esquema `public` de aplicación (`prisma/schema.prisma` +
    `prisma/migrations/`).
-2. **Hoy existen exactamente 3 migraciones:** `000000000000_squashed_migrations` (baseline) +
+2. **Hoy existen exactamente 6 migraciones:** `000000000000_squashed_migrations` (baseline) +
    `20260712000000_add_versioned_document_model` (PR5B1) +
-   `20260719120000_add_lead_archiving_model` (PR B1 · archivado de leads). El job CI
-   `migration-replay` lo verifica por nombre y conteo.
+   `20260719120000_add_lead_archiving_model` (B1 · archivado) +
+   `20260720000000_add_calendar_event_commitment` (I0) +
+   `20260721100000_add_delivery_offer_link_expand` (I3C1A · expand) +
+   `20260721200000_make_delivery_offer_link_required` (I3C1B · contract). El job CI
+   `migration-replay` lo verifica por nombre y conteo (fuente autoritativa:
+   [`.github/workflows/ci.yml`](../../.github/workflows/ci.yml)).
 3. **La baseline es inmutable.** No se edita, no se renombra, no se restaura el historial antiguo
    dentro de `prisma/migrations/` (reintroduciría el defecto de orden). El historial previo vive en
    Git (commit `5ce93d6`, retirado del directorio activo).
@@ -35,23 +39,27 @@
 
 ---
 
-## Conteos de catálogo (estado actual, tras PR5B1)
+## Conteos de catálogo (vigente en `main`, tras I3C1B)
+
+> **Fuente autoritativa y siempre vigente:** el paso _Catalog verifications_ del job
+> `migration-replay` en [`.github/workflows/ci.yml`](../../.github/workflows/ci.yml) (falla si el
+> catálogo no coincide). Esta tabla es un reflejo; ante discrepancia, **manda CI**.
 
 | Métrica                | Valor            |
 | ---------------------- | ---------------- |
 | Tablas (`public`)      | **31**           |
-| Columnas               | **439**          |
-| Enums                  | **50**           |
-| Valores de enum        | **266**          |
-| Claves foráneas        | **67**           |
-| Índices                | **113**          |
+| Columnas               | **441**          |
+| Enums                  | **51**           |
+| Valores de enum        | **269**          |
+| Claves foráneas        | **68**           |
+| Índices                | **115**          |
 | Tablas sin RLS         | **0**            |
 | Tablas con `FORCE RLS` | **0**            |
 | Políticas en `public`  | **0** (deny-all) |
 
-> El conteo de la **baseline sola** (antes de PR5B1) era 30/412/48/255/60/101; es un dato histórico
-> documentado en [`../migration-history-baseline.md`](../migration-history-baseline.md). El valor
-> **vigente** es el de esta tabla (baseline + PR5B1).
+> Deltas históricos: baseline sola 30/412/48/255/60/101; tras PR5B1 31/431/49/258/65/111 (ver
+> [`../migration-history-baseline.md`](../migration-history-baseline.md)). El valor **vigente** (tras
+> commitment + I3C1A/B) es el de esta tabla; los conteos por migración están comentados en `ci.yml`.
 
 ### Cómo actualizar los conteos de catálogo
 
