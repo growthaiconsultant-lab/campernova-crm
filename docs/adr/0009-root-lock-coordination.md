@@ -15,8 +15,8 @@
 Archivar un lead debe ser imposible mientras mantenga operativa abierta: vehículo en
 comercialización, oferta activa, reserva con señal, entrega activa o compromiso externo futuro.
 
-El backend de archivado (PR #117, sin fusionar) intentó garantizarlo ejecutando sus lecturas y su
-escritura en una transacción `Serializable`. **No es suficiente.** PostgreSQL solo detecta
+El backend de archivado (PR #117, en su versión inicial) intentó garantizarlo ejecutando sus lecturas
+y su escritura en una transacción `Serializable`. **No es suficiente.** PostgreSQL solo detecta
 anomalías de serialización entre transacciones que **también** son serializables: los _predicate
 locks_ que toma una transacción serializable no generan conflicto si quien escribe corre en otro
 nivel de aislamiento. Todos los escritores del CRM —ofertas, entregas, calendario, próxima acción,
@@ -238,7 +238,7 @@ tests):
     referencia un lead: bloquea la fila del `sellerLead`/`buyerLead`, relee `archivedAt` y rechaza si
     está archivado. Eventos pasados/terminales o sin lead se crean sin lock (no son blockers).
 
-> **Archivado (PR #117, sin fusionar).** Bloquear **la fila del lead** basta para serializar el
+> **Archivado (PR #117, fusionado `fb501ef`; deployment de producción no verificado).** Bloquear **la fila del lead** basta para serializar el
 > archivado con TODOS los writers que pueden crear una dependencia bloqueante para él. Los **seis**
 > blockers están serializados: `createOffer`/`updateOfferStatus`/`createDelivery`/transición-cancelación
 > de Delivery y `updateVehicle` bloquean la fila del lead; `setNextAction` **escribe** la fila del lead;
