@@ -58,7 +58,7 @@ I3C3:  MERGED (ae88e31), DEPLOYED, TECHNICALLY VALIDATED (no migration)
 AUTHENTICATED I3C3 END-TO-END VALIDATION: LIMITED BY NO DELIVERY DATA
 I3D:   NOT STARTED
 I3E:   NOT STARTED
-PR #117: OPEN, SEPARATE, REQUIRES INDEPENDENT AUDIT
+PR #117 (lead archiving, SEPARATE from I3): MERGED (fb501ef); PRODUCTION DEPLOYMENT NOT VERIFIED (prod serves 02f9766); UI/mutating validation pending
 ```
 
 ## Deuda de validación (operativa, no automática)
@@ -74,24 +74,46 @@ VALIDATE AUTHENTICATED DELIVERY COMPLETION WITH THE FIRST SAFE REAL DELIVERY
 - Observar logs y datos después de la primera compleción real.
 - Ejecutar con **autorización explícita**; es una comprobación manual, no una tarea automática.
 
-## PR #117 (relación documental, sin auditar su código)
+### Deudas operativas de archivado (PR #117, distintas entre sí)
 
-- `feat(crm): add lead archiving actions` — **OPEN** e intacto.
-- **No** forma parte implícita del siguiente trabajo ni de I3C3.
-- **No** es una dependencia del `LEAD_ARCHIVED` que ya usan I2/I3 en producción: la columna
-  `archivedAt` y su enforcement en el protocolo de locks **ya son productivos**; #117 añade las
-  **acciones** de archivar/reactivar.
-- Requiere una **auditoría independiente** antes de decidir su destino. **No** se recomienda merge
-  aquí y **no** se ha auditado su código.
+```
+VERIFY AND DEPLOY ARCHIVING BACKEND SHA fb501ef TO PRODUCTION
+```
+
+- Deployment todavía **no creado/verificado**; producción sirve `02f9766`.
+- **No** ejecutar manualmente sin autorización; verificar SHA, `target=production`, alias, build y
+  health-check; después, postflight read-only.
+
+```
+VALIDATE ARCHIVE AND REACTIVATE WITH THE FIRST SAFE REAL LEAD
+```
+
+- Validación **mutante** con un lead real y seguro; requiere **autorización aparte** (posterior al
+  deployment). Comprobar archivar/reactivar, motivo/notas, Activity, blockers, CalendarEvent, métricas
+  y postflight; sin datos ficticios; sin bloquear el CRM.
+
+## PR #117 (archivado de leads — SEPARADO de I3)
+
+- `feat(crm): add lead archiving actions` — **MERGED** (squash `fb501ef`), tras auditoría
+  independiente y corrección (adopta `withLockedRoots`; **6/6 blockers serializados**; eventos de
+  calendario futuros coordinados; **11 callers** productivos en `main`; sin migración).
+- **No** forma parte de I3C3 ni de I3D/I3E.
+- **No** es dependencia del `LEAD_ARCHIVED` que ya usan I2/I3 en producción: la columna `archivedAt` y
+  su enforcement **ya eran productivos**; #117 añade las **acciones** de archivar/reactivar.
+- **Deployment de producción NO verificado:** tras el merge, Vercel **no** creó deployment para
+  `fb501ef`; producción sigue sirviendo `02f9766`. **Fusionado ≠ desplegado.** Sin impacto de usuario
+  (backend sin UX consumidora). Ver las deudas operativas abajo.
+- **UX de visibilidad de archivados y validación mutante en producción: pendientes.**
 
 ## Pendientes (con propietario/fase)
 
-| Pendiente                                        | Estado                       | Fase candidata     | Decisión necesaria       |
-| ------------------------------------------------ | ---------------------------- | ------------------ | ------------------------ |
-| Compleción coordinada + checklist/firma (I3C3)   | fusionado y desplegado       | I3C3               | — (cerrado)              |
-| Validación autenticada end-to-end de una entrega | deuda (limitada por 0 datos) | transversal        | esperar 1ª Delivery real |
-| Descarte coordinado                              | pendiente                    | I3D                | —                        |
-| Tasación coordinada                              | pendiente                    | I3E                | —                        |
-| UI loading «Iniciar entrega»                     | pulido                       | opcional           | —                        |
-| Tests concurrentes frontera-específicos          | gap                          | opcional           | —                        |
-| Destino de PR #117                               | abierto                      | auditoría separada | —                        |
+| Pendiente                                          | Estado                          | Fase candidata | Decisión necesaria                |
+| -------------------------------------------------- | ------------------------------- | -------------- | --------------------------------- |
+| Compleción coordinada + checklist/firma (I3C3)     | fusionado y desplegado          | I3C3           | — (cerrado)                       |
+| Validación autenticada end-to-end de una entrega   | deuda (limitada por 0 datos)    | transversal    | esperar 1ª Delivery real          |
+| Descarte coordinado                                | pendiente                       | I3D            | —                                 |
+| Tasación coordinada                                | pendiente                       | I3E            | —                                 |
+| UI loading «Iniciar entrega»                       | pulido                          | opcional       | —                                 |
+| Tests concurrentes frontera-específicos            | gap                             | opcional       | —                                 |
+| Verificar/desplegar backend de archivado `fb501ef` | deployment no creado/verificado | operativo      | diagnóstico Vercel + autorización |
+| Validar archivar/reactivar con 1er lead real       | deuda (no automática)           | operativo      | autorización explícita            |

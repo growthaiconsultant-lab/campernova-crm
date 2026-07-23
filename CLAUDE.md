@@ -111,9 +111,12 @@ claude mcp add-json linear '{\"command\":\"npx\",\"args\":[\"-y\",\"mcp-linear@l
 > PostgreSQL real). **Validación autenticada END-TO-END del flujo: LIMITADA POR 0 DELIVERIES** en prod
 > (no se crearon datos ficticios; deuda registrada en `docs/roadmap/i3-status.md`). **I3D** (descarte)
 > e **I3E** (tasación) siguen **pendientes** — **I3 NO está completo**. Con I3C3 hay **8 callers
-> productivos** de `withLockedRoots` (verificar contra código). `LEAD_ARCHIVED` **ya es
-> productivo** (no depende de PR #117; #117 solo añade las _acciones_ de archivar/reactivar y sigue
-> OPEN, a auditar por separado). **Fuente de verdad navegable:** dominio →
+> productivos** de `withLockedRoots` (verificar contra código; PR #117 añade 3 callers más de
+> archivado/calendario → 11 en `main`). `LEAD_ARCHIVED` **ya es
+> productivo** (no depende de PR #117; #117 solo añade las _acciones_ de archivar/reactivar, **ya
+> FUSIONADO** por squash `fb501ef` tras auditoría+corrección — 6/6 blockers serializados; **pero su
+> deployment de producción NO está verificado**: Vercel no creó deployment para `fb501ef` y producción
+> sirve `02f9766`; fusionado ≠ desplegado; sin impacto de usuario). **Fuente de verdad navegable:** dominio →
 > `docs/domain/delivery-lifecycle.md`; estado del programa → `docs/roadmap/i3-status.md`; locking →
 > `docs/adr/0009-root-lock-coordination.md`; migraciones → `docs/governance/database-migrations.md`.
 > Las notas técnicas de los bloques inferiores son un **log histórico por fase** y no reflejan
