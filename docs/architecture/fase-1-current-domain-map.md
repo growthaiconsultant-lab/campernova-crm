@@ -91,10 +91,35 @@ Clasificación: **A** activo · **P** parcial/soporte · **L** legacy · **M** m
   DEPOSITO_VENTA / COMPRA_DIRECTA / PARTE_PAGO / INDECISO), no en el vehículo.
 - **Autorización** por **rol global** (`UserRole`) en las server actions (`requireAgente/Admin`); no
   hay checks de ownership por entidad.
-- **No existe archivado.** Lo que hay son decisiones **comerciales** terminales: `discardSellerLead`
-  (→ `DESCARTADO`) y `markBuyerLeadLost` (→ `PERDIDO`), con motivo obligatorio y `Activity`. No
-  ocultan el registro de las bandejas, no eliminan datos y no son reversibles. No hay soft-delete
-  genérico. El prefijo `archive*` queda **reservado** para el archivado real (no implementado).
+- **Dos ejes independientes en los leads:**
+  - **Estado comercial** (terminal, irreversible): `discardSellerLead` (→ `DESCARTADO`) y
+    `markBuyerLeadLost` (→ `PERDIDO`), con motivo obligatorio y `Activity`. No eliminan datos.
+  - **Archivado** (organizativo, **reversible**): `archiveSellerLead`/`reactivateSellerLead` y
+    `archiveBuyerLead`/`reactivateBuyerLead` (`app/(backoffice)/lead-archiving-actions.ts`).
+    `archivedAt == null` ⇔ activo. No cambia el estado comercial, ni vehículo, ofertas, entregas,
+    documentos o KPIs; solo escribe los 4 campos de archivado + una `Activity`
+    (`LEAD_ARCHIVADO`/`LEAD_REACTIVADO`, no borrables con `deleteNote`). **PR #117, sin fusionar.**
+  - **Bloqueos:** archivar se **bloquea** si hay operativa abierta (vehículo en stock, oferta o
+    reserva viva, entrega programada/en curso, próxima acción pendiente, evento futuro). No se
+    cancela ni reasigna nada automáticamente: el operador debe resolverlo antes.
+  - **Integridad concurrente:** archivar/reactivar adoptan el **protocolo de root locks**
+    (`withLockedRoots` sobre la fila del lead), igual que ofertas/entregas
+    (ver `adr/0009-root-lock-coordination.md`): la lectura del lead, la de **todas** las
+    dependencias, la clasificación de bloqueos, el compare-and-swap sobre `archivedAt` y la
+    `Activity` ocurren **bajo el lock**, en una única transacción. **Los seis blockers están
+    serializados**: oferta/reserva/entrega (los writers bloquean la fila del lead), vehículo en stock
+    (`updateVehicle` bloquea el vendedor), próxima acción (`setNextAction` escribe la fila del lead) y
+    **evento futuro** (`createCalendarEvent` vinculado a un lead adopta el mismo protocolo y rechaza si
+    el lead está archivado). Así no puede quedar un lead archivado con una dependencia bloqueante
+    creada en carrera; ambas intercalaciones están demostradas con PostgreSQL real.
+  - **Efecto aceptado:** Prisma actualiza `updatedAt` (`@updatedAt`) al archivar y al reactivar.
+    Es inevitable; puede alterar el orden de las vistas que ordenan por `sort=updatedAt`. **No**
+    afecta a los KPIs canónicos (`getSalesInRange`, `getMonthlyNetMargin`, `getFlowKpis`), que
+    leen `Vehicle.status`/`soldAt` — verificado ejecutándolos antes/después en integración.
+  - ⚠️ **`ARCHIVED LEAD VISIBILITY UX REMAINS OUT OF SCOPE`**: las bandejas y la búsqueda todavía
+    **no** filtran por archivado. Ese filtrado (ocultar de bandejas + filtro explícito para
+    incluirlos) llega en un PR de UI posterior.
+- No hay soft-delete genérico, ni hard delete, ni anonimización, ni fusión de duplicados.
 - **`CalendarEvent.commitment`** (`EventCommitment`: EXTERNO / INTERNO / INDETERMINADO) — el tipo de
   evento **no** basta para saber si romperlo afecta a un cliente: una `LLAMADA` puede ser una
   llamada concertada o un recordatorio para llamar. La clasificación es explícita y la impone el
@@ -105,11 +130,11 @@ Clasificación: **A** activo · **P** parcial/soporte · **L** legacy · **M** m
     y `SEGUIMIENTO` quedaron `INDETERMINADO` **a propósito** — suponerlos internos podría ocultar un
     compromiso real con un cliente. Se clasifican a mano desde la ficha del evento
     (`setEventCommitment`), sin posibilidad de volver a `INDETERMINADO`.
-  - **Uso previsto — todavía NO implementado:** el archivado de leads bloqueará ante un evento
-    futuro no terminal `EXTERNO` **o** `INDETERMINADO` (no puede demostrarse que sea interno), y
-    solo advertirá ante `INTERNO`. Esa regla llega en I4/B2 final; **hoy este campo no gobierna
-    ningún comportamiento**: solo se guarda y se muestra.
-  - **Sin índice propio:** la consulta futura de archivado filtra primero por `seller_lead_id` /
+  - **Refinamiento por compromiso — todavía NO implementado:** hoy el archivado bloquea ante
+    **cualquier** evento futuro no terminal. La regla afinada (bloquear solo ante `EXTERNO` o
+    `INDETERMINADO` y advertir ante `INTERNO`) llega en I4/B2 final; el archivado de PR #117 aún
+    **no** discrimina por `commitment`.
+  - **Sin índice propio:** la consulta de archivado filtra primero por `seller_lead_id` /
     `buyer_lead_id` / `vehicle_id` (ya indexados), lo que deja pocas filas por lead; `commitment`
     tiene 3 valores y no aportaría selectividad.
   - Las órdenes de taller que el calendario **agrega** no son `CalendarEvent`, no tienen
