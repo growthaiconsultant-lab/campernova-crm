@@ -69,10 +69,21 @@ async function seed(
   const buyer = await prisma.buyerLead.create({
     data: { name: `Buyer ${s}`, email: `buyer_${s}@integ.test`, phone: '600000001' },
   })
+  // I3C1B: toda Delivery está ligada a una Offer CONVERTIDA coherente (mismo vehículo + comprador).
+  const offer = await prisma.offer.create({
+    data: {
+      vehicleId: vehicle.id,
+      buyerLeadId: buyer.id,
+      amount: 25000,
+      createdById: agent.id,
+      status: 'CONVERTIDA',
+    },
+  })
   const delivery = await prisma.delivery.create({
     data: {
       vehicleId: vehicle.id,
       buyerLeadId: buyer.id,
+      offerId: offer.id,
       responsableId: agent.id,
       scheduledAt: new Date('2026-06-01T09:00:00Z'),
       status: opts.deliveryStatus ?? 'EN_CURSO',
@@ -83,12 +94,13 @@ async function seed(
   })
 
   cleanups.push(async () => {
-    // Orden FK-safe: garantía (cascada a seguimientos/tickets) → trazas → entrega → vehículo → leads → user.
+    // Orden FK-safe: garantía → trazas → entrega → oferta → vehículo → leads → user.
     await prisma.warranty.deleteMany({ where: { deliveryId: delivery.id } })
     await prisma.activity.deleteMany({
       where: { OR: [{ sellerLeadId: seller.id }, { buyerLeadId: buyer.id }] },
     })
     await prisma.delivery.deleteMany({ where: { id: delivery.id } })
+    await prisma.offer.deleteMany({ where: { vehicleId: vehicle.id } })
     await prisma.vehicle.deleteMany({ where: { id: vehicle.id } })
     await prisma.buyerLead.deleteMany({ where: { id: buyer.id } })
     await prisma.sellerLead.deleteMany({ where: { id: seller.id } })
@@ -109,7 +121,7 @@ function completeParams(seeded: Seeded, now: Date) {
     deliveryId: seeded.deliveryId,
     vehicleId: seeded.vehicleId,
     buyerLeadId: seeded.buyerId,
-    sellerLeadId: seeded.sellerId,
+    resolvedSellerLeadId: seeded.sellerId,
     actorId: seeded.agentId,
     now,
   }

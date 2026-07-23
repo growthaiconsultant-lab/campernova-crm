@@ -283,6 +283,16 @@ enum CalendarEventType {
   OTRO
 }
 
+/// Naturaleza del compromiso que representa un evento de calendario.
+/// EXTERNO: acordado con un cliente o tercero — incumplirlo tiene consecuencias comerciales.
+/// INTERNO: tarea, recordatorio u operación propia.
+/// INDETERMINADO: sin evidencia suficiente para clasificarlo (histórico previo a esta distinción).
+enum EventCommitment {
+  EXTERNO
+  INTERNO
+  INDETERMINADO
+}
+
 enum CalendarEventStatus {
   PROGRAMADO
   CONFIRMADO
@@ -837,10 +847,11 @@ model Offer {
   createdAt       DateTime    @default(now()) @map("created_at")
   updatedAt       DateTime    @updatedAt @map("updated_at")
 
-  vehicle   Vehicle   @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
-  buyerLead BuyerLead @relation(fields: [buyerLeadId], references: [id], onDelete: Cascade)
-  match     Match?    @relation(fields: [matchId], references: [id], onDelete: SetNull)
-  createdBy User      @relation("CreatedOffers", fields: [createdById], references: [id])
+  vehicle    Vehicle    @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+  buyerLead  BuyerLead  @relation(fields: [buyerLeadId], references: [id], onDelete: Cascade)
+  match      Match?     @relation(fields: [matchId], references: [id], onDelete: SetNull)
+  createdBy  User       @relation("CreatedOffers", fields: [createdById], references: [id])
+  deliveries Delivery[] @relation("OfferDeliveries")
 
   @@index([vehicleId, status])
   @@index([buyerLeadId, status])
@@ -1021,6 +1032,9 @@ model Delivery {
   id                 String         @id @default(cuid())
   vehicleId          String         @map("vehicle_id")
   buyerLeadId        String         @map("buyer_lead_id")
+  // I3C1B makes offerId physically required (SET NOT NULL). Every Delivery is linked to the Offer
+  // (CONVERTIDA) it fulfils; all productive writers persist offerId.
+  offerId            String         @map("offer_id")
   responsableId      String?        @map("responsable_id")
   scheduledAt        DateTime       @map("scheduled_at")
   startedAt          DateTime?      @map("started_at")
@@ -1036,6 +1050,9 @@ model Delivery {
 
   vehicle     Vehicle                 @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
   buyerLead   BuyerLead               @relation(fields: [buyerLeadId], references: [id])
+  // NoAction (no Restrict): borrar la Offer directamente falla si tiene Delivery, pero borrar el
+  // Vehicle padre puede eliminar Offer y Delivery en cascada convergente (verificación diferida).
+  offer       Offer                   @relation("OfferDeliveries", fields: [offerId], references: [id], onDelete: NoAction, onUpdate: Cascade)
   responsable User?                   @relation("ResponsableDeliveries", fields: [responsableId], references: [id])
   checklist   DeliveryChecklistItem[]
   documents   DeliveryDocument[]
@@ -1043,8 +1060,11 @@ model Delivery {
 
   @@index([vehicleId])
   @@index([buyerLeadId])
+  @@index([offerId])
   @@index([responsableId, status])
   @@index([status, scheduledAt])
+  // At most one PROGRAMADA or EN_CURSO Delivery per Vehicle is enforced by the
+  // deliveries_active_vehicle_key partial unique index in the SQL migration (Prisma no lo expresa).
   @@map("deliveries")
 }
 
@@ -1239,6 +1259,7 @@ model CalendarEvent {
   title           String
   description     String?
   status          CalendarEventStatus   @default(PROGRAMADO)
+  commitment      EventCommitment       @default(INDETERMINADO)
   priority        CalendarEventPriority @default(MEDIA)
   startAt         DateTime              @map("start_at")
   endAt           DateTime?             @map("end_at")

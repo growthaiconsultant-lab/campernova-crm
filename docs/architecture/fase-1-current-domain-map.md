@@ -98,22 +98,44 @@ Clasificación: **A** activo · **P** parcial/soporte · **L** legacy · **M** m
     `archiveBuyerLead`/`reactivateBuyerLead` (`app/(backoffice)/lead-archiving-actions.ts`).
     `archivedAt == null` ⇔ activo. No cambia el estado comercial, ni vehículo, ofertas, entregas,
     documentos o KPIs; solo escribe los 4 campos de archivado + una `Activity`
-    (`LEAD_ARCHIVADO`/`LEAD_REACTIVADO`, no borrables con `deleteNote`).
+    (`LEAD_ARCHIVADO`/`LEAD_REACTIVADO`, no borrables con `deleteNote`). **PR #117, sin fusionar.**
   - **Bloqueos:** archivar se **bloquea** si hay operativa abierta (vehículo en stock, oferta o
     reserva viva, entrega programada/en curso, próxima acción pendiente, evento futuro). No se
     cancela ni reasigna nada automáticamente: el operador debe resolverlo antes.
-  - **Integridad concurrente:** la lectura del lead, la de **todas** las dependencias, la
-    clasificación, el compare-and-swap y la `Activity` van en **una única transacción
-    `Serializable`**, con reintentos acotados (3 intentos) solo ante conflicto de serialización
-    (`P2034`). Al agotarlos se devuelve un error de negocio sin detalles de Prisma. Así no puede
-    archivarse un lead cuya dependencia se creó entre la comprobación y la escritura.
+  - **Integridad concurrente:** archivar/reactivar adoptan el **protocolo de root locks**
+    (`withLockedRoots`, orden `Vehicle → SellerLead → BuyerLead`), igual que ofertas/entregas
+    (ver `adr/0009-root-lock-coordination.md`): la lectura del lead, la de **todas** las
+    dependencias, la clasificación de bloqueos, el compare-and-swap sobre `archivedAt` y la
+    `Activity` ocurren **bajo el lock**, en una única transacción. Así no puede archivarse un lead
+    cuya oferta/entrega se está creando concurrentemente: el writer coordinado y el archivado se
+    serializan por las mismas raíces.
   - **Efecto aceptado:** Prisma actualiza `updatedAt` (`@updatedAt`) al archivar y al reactivar.
     Es inevitable; puede alterar el orden de las vistas que ordenan por `sort=updatedAt`. **No**
     afecta a los KPIs canónicos (`getSalesInRange`, `getMonthlyNetMargin`, `getFlowKpis`), que
     leen `Vehicle.status`/`soldAt` — verificado ejecutándolos antes/después en integración.
-  - ⚠️ **`ARCHIVED LEADS REMAIN VISIBLE UNTIL PR C`**: las bandejas y la búsqueda todavía **no**
-    filtran por archivado. Ese filtrado llega en PR C.
+  - ⚠️ **`ARCHIVED LEAD VISIBILITY UX REMAINS OUT OF SCOPE`**: las bandejas y la búsqueda todavía
+    **no** filtran por archivado. Ese filtrado (ocultar de bandejas + filtro explícito para
+    incluirlos) llega en un PR de UI posterior.
 - No hay soft-delete genérico, ni hard delete, ni anonimización, ni fusión de duplicados.
+- **`CalendarEvent.commitment`** (`EventCommitment`: EXTERNO / INTERNO / INDETERMINADO) — el tipo de
+  evento **no** basta para saber si romperlo afecta a un cliente: una `LLAMADA` puede ser una
+  llamada concertada o un recordatorio para llamar. La clasificación es explícita y la impone el
+  servidor (`lib/calendar/commitment.ts`): `CITA → EXTERNO`, `LIMPIEZA → INTERNO`; `LLAMADA` y
+  `OTRO` **exigen elección** del usuario. `SEGUIMIENTO` no es creable desde la UI (fuera de
+  `NATIVE_EVENT_TYPES`) y queda `INDETERMINADO`.
+  - **Histórico:** el backfill solo clasificó lo inequívoco (`CITA`, `LIMPIEZA`); `LLAMADA`, `OTRO`
+    y `SEGUIMIENTO` quedaron `INDETERMINADO` **a propósito** — suponerlos internos podría ocultar un
+    compromiso real con un cliente. Se clasifican a mano desde la ficha del evento
+    (`setEventCommitment`), sin posibilidad de volver a `INDETERMINADO`.
+  - **Refinamiento por compromiso — todavía NO implementado:** hoy el archivado bloquea ante
+    **cualquier** evento futuro no terminal. La regla afinada (bloquear solo ante `EXTERNO` o
+    `INDETERMINADO` y advertir ante `INTERNO`) llega en I4/B2 final; el archivado de PR #117 aún
+    **no** discrimina por `commitment`.
+  - **Sin índice propio:** la consulta de archivado filtra primero por `seller_lead_id` /
+    `buyer_lead_id` / `vehicle_id` (ya indexados), lo que deja pocas filas por lead; `commitment`
+    tiene 3 valores y no aportaría selectividad.
+  - Las órdenes de taller que el calendario **agrega** no son `CalendarEvent`, no tienen
+    `commitment` y siguen gobernadas por el estado del vehículo y de la orden.
 
 ## 7.4. Riesgos del dominio actual
 

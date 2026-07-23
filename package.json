@@ -22,6 +22,7 @@
     "check:rls": "tsx scripts/check-rls.ts",
     "check:migration-history": "tsx scripts/check-migration-history.ts",
     "check:remote-migrations": "tsx scripts/check-remote-migrations.ts",
+    "check:delivery-offer-nulls": "tsx scripts/check-delivery-offer-nulls.ts",
     "test:integration:prepare": "tsx scripts/integration-prepare.ts",
     "test:integration": "vitest run --config vitest.integration.config.ts",
     "test:integration:ci": "pnpm test:integration:prepare && pnpm check:rls && pnpm test:integration",

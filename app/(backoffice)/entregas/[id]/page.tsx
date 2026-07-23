@@ -9,6 +9,7 @@ import { DeliveryTabs, TabPanel } from './delivery-tabs'
 import { ChecklistSection } from './checklist-section'
 import { DocumentsSection } from './documents-section'
 import { SignForm } from './sign-form'
+import { CancelDeliveryButton } from './cancel-delivery-button'
 import type { DeliveryStatus } from '@prisma/client'
 
 const STATUS_LABELS: Record<DeliveryStatus, string> = {
@@ -158,22 +159,27 @@ export default async function EntregaDetailPage({ params }: { params: { id: stri
             </span>
           </div>
         </div>
-        {delivery.status === 'PROGRAMADA' && (
-          <form
-            action={async () => {
-              'use server'
-              const { updateDeliveryStatus } = await import('../actions')
-              await updateDeliveryStatus(delivery.id, 'EN_CURSO')
-            }}
-          >
-            <button
-              type="submit"
-              className="inline-flex h-10 items-center rounded-[10px] bg-brand px-[15px] font-hanken text-[13px] font-semibold text-white transition-colors hover:bg-brand2"
+        <div className="flex items-center gap-2.5">
+          {delivery.status === 'PROGRAMADA' && (
+            <form
+              action={async () => {
+                'use server'
+                const { updateDeliveryStatus } = await import('../actions')
+                // I3C2: envía el estado esperado (defensa anti-obsoleto + CAS en el servidor).
+                await updateDeliveryStatus(delivery.id, 'EN_CURSO', 'PROGRAMADA')
+              }}
             >
-              Iniciar entrega
-            </button>
-          </form>
-        )}
+              <button
+                type="submit"
+                className="inline-flex h-10 items-center rounded-[10px] bg-brand px-[15px] font-hanken text-[13px] font-semibold text-white transition-colors hover:bg-brand2"
+              >
+                Iniciar entrega
+              </button>
+            </form>
+          )}
+          {/* I3C2: cancelación con confirmación + motivo obligatorio (PROGRAMADA/EN_CURSO). */}
+          <CancelDeliveryButton deliveryId={delivery.id} currentStatus={delivery.status} />
+        </div>
       </div>
 
       {/* Panel «al completar» (mockup ENT2): la garantía se activa sola */}

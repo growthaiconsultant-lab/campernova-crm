@@ -4,7 +4,14 @@ import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { createCalendarEvent } from '../actions'
 import { EVENT_PRIORITY_OPTIONS, EVENT_TYPE_OPTIONS } from '@/lib/calendar/event-meta'
-import type { CalendarEventType } from '@prisma/client'
+import {
+  COMMITMENT_CHOICES,
+  COMMITMENT_HINTS,
+  COMMITMENT_LABELS,
+  FORCED_COMMITMENT_BY_TYPE,
+  requiresExplicitCommitment,
+} from '@/lib/calendar/commitment'
+import type { CalendarEventType, EventCommitment } from '@prisma/client'
 
 type Option = { id: string; label: string }
 
@@ -46,13 +53,27 @@ export function EventForm({ agents, buyers, vehicles, defaults }: Props) {
   const [phone, setPhone] = useState('')
   const [goal, setGoal] = useState('')
 
+  const [commitment, setCommitment] = useState<EventCommitment | null>(null)
+
   const isCita = type === 'CITA'
   const isLlamada = type === 'LLAMADA'
+  const eventType = type as CalendarEventType
+  const forcedCommitment = FORCED_COMMITMENT_BY_TYPE[eventType]
+  const needsCommitment = requiresExplicitCommitment(eventType)
+
+  /** Al cambiar de tipo la clasificación anterior puede dejar de ser válida: se descarta. */
+  function selectType(next: string) {
+    setType(next)
+    setCommitment(null)
+  }
 
   function submit() {
     setError(null)
     if (!title.trim()) return setError('El título es obligatorio')
     if (!date) return setError('Indica fecha y hora')
+    if (needsCommitment && !commitment) {
+      return setError('Indica si es un compromiso con el cliente o una tarea interna')
+    }
 
     const specificData = isCita
       ? {
@@ -66,7 +87,8 @@ export function EventForm({ agents, buyers, vehicles, defaults }: Props) {
 
     startTransition(async () => {
       const result = await createCalendarEvent({
-        type: type as CalendarEventType,
+        type: eventType,
+        commitment,
         title: title.trim(),
         description: description.trim() || null,
         startAt: new Date(date).toISOString(),
@@ -96,7 +118,7 @@ export function EventForm({ agents, buyers, vehicles, defaults }: Props) {
           <button
             key={o.value}
             type="button"
-            onClick={() => setType(o.value)}
+            onClick={() => selectType(o.value)}
             className={`rounded-lg border px-3 py-1.5 text-[13px] font-medium transition-colors ${
               type === o.value
                 ? 'border-foreground bg-foreground text-background'
@@ -107,6 +129,44 @@ export function EventForm({ agents, buyers, vehicles, defaults }: Props) {
           </button>
         ))}
       </div>
+
+      {/* Naturaleza del compromiso */}
+      {needsCommitment ? (
+        <div className="rounded-xl border border-border bg-card p-5">
+          <p className="mb-1.5 font-mono text-[10px] uppercase tracking-[0.12em] text-muted-foreground">
+            Naturaleza *
+          </p>
+          <p className="mb-3 text-[13px] text-muted-foreground">
+            ¿Está acordado con el cliente? Lo usamos para no archivar un lead que mantiene un
+            compromiso pendiente.
+          </p>
+          <div className="flex flex-wrap gap-2">
+            {COMMITMENT_CHOICES.map((c) => (
+              <button
+                key={c}
+                type="button"
+                onClick={() => setCommitment(c)}
+                className={`rounded-lg border px-3 py-1.5 text-left text-[13px] font-medium transition-colors ${
+                  commitment === c
+                    ? 'border-foreground bg-foreground text-background'
+                    : 'border-border text-muted-foreground hover:border-foreground/40'
+                }`}
+              >
+                {COMMITMENT_LABELS[c]}
+                <span className="ml-2 font-normal opacity-70">{COMMITMENT_HINTS[c]}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+      ) : forcedCommitment ? (
+        <p className="text-[13px] text-muted-foreground">
+          Este tipo se clasifica automáticamente como{' '}
+          <span className="font-medium text-foreground">
+            {COMMITMENT_LABELS[forcedCommitment].toLowerCase()}
+          </span>
+          .
+        </p>
+      ) : null}
 
       <div className="rounded-xl border border-border bg-card p-5">
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">

@@ -7,11 +7,33 @@ export const SELLER_LEAD_TRANSITIONS: Partial<Record<SellerLeadStatus, SellerLea
   EN_NEGOCIACION: ['CERRADO', 'DESCARTADO'],
 }
 
+/**
+ * Transiciones de `Vehicle.status` que puede ejecutar la **edición manual** (`updateVehicle`).
+ *
+ * No es el catálogo de transiciones posibles del vehículo: es el subconjunto del que la edición
+ * manual es propietaria. Las demás pertenecen a su dominio y se ejecutan allí:
+ *
+ * `OFFER OWNS PUBLICADO ↔ RESERVADO`
+ * `DELIVERY OWNS THE TRANSITION TO VENDIDO`
+ *
+ * `I3A REMOVES MANUAL RESERVATION, RELEASE AND SALE TRANSITIONS FROM updateVehicle`
+ *
+ * `RESERVADO` no tiene salidas manuales: un vehículo reservado tiene una oferta `ACEPTADA` viva
+ * (invariante de I2C), así que liberarlo, venderlo o descartarlo a mano invadiría el dominio de
+ * ofertas o dejaría esa oferta huérfana. Se sale de `RESERVADO` cancelando o convirtiendo la oferta,
+ * o completando la entrega. `isValidTransition` admite `from === to`, de modo que los campos de un
+ * vehículo reservado siguen siendo editables.
+ *
+ * `TEMPORARY MANUAL DISCARD REMOVAL IS A SAFETY MEASURE UNTIL I3D` — I3B retira todas las
+ * transiciones manuales a `DESCARTADO`. Descartar un vehículo debe bloquear ofertas y entregas
+ * activas, pero `createDelivery` sigue sin coordinar y puede crear una entrega **después** del
+ * descarte; coordinar el descarte ahora daría una garantía falsa. Se reintroducirá en I3D, ya
+ * coordinado, cuando I3C haya puesto Delivery bajo el protocolo.
+ * `FINAL DISCARD COORDINATION REMAINS PENDING UNTIL DELIVERY IS COORDINATED`.
+ */
 export const VEHICLE_TRANSITIONS: Partial<Record<VehicleStatus, VehicleStatus[]>> = {
-  NUEVO: ['TASADO', 'DESCARTADO'],
-  TASADO: ['PUBLICADO', 'DESCARTADO'],
-  PUBLICADO: ['RESERVADO', 'DESCARTADO'],
-  RESERVADO: ['VENDIDO', 'PUBLICADO', 'DESCARTADO'],
+  NUEVO: ['TASADO'],
+  TASADO: ['PUBLICADO'],
 }
 
 export const BUYER_LEAD_TRANSITIONS: Partial<Record<BuyerLeadStatus, BuyerLeadStatus[]>> = {

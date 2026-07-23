@@ -4,8 +4,33 @@ import { randomUUID } from 'node:crypto'
 import { revalidatePath } from 'next/cache'
 import { z } from 'zod'
 import { db } from '@/lib/db'
-import { requireAdmin, requireCanViewEntregas, requireCanEditEntregas } from '@/lib/auth'
-import { completeDeliveryTx, DeliveryConflictError } from '@/lib/delivery-completion'
+import { requireAdmin, requireCanEditEntregas } from '@/lib/auth'
+import {
+  completeDeliveryTx,
+  DeliveryConflictError,
+  isDeliveryCompletionError,
+} from '@/lib/delivery-completion'
+import {
+  updateChecklistItemTx,
+  writeSignatureTx,
+  isDeliveryPreconditionError,
+} from '@/lib/delivery-precondition'
+import { withLockedRoots, isLockError } from '@/lib/locking'
+import {
+  createDeliveryTx,
+  buildDeliveryCreationRoots,
+  isDeliveryCreationError,
+  isPotentialActiveDeliveryVehicleConflict,
+  ACTIVE_DELIVERY_STATUSES,
+  DELIVERY_CREATION_ERROR_MESSAGES,
+} from '@/lib/delivery-creation'
+import {
+  transitionDeliveryTx,
+  isDeliveryTransitionError,
+  DELIVERY_TRANSITION_ERROR_MESSAGES,
+  type DeliveryTransitionSource,
+  type DeliveryTransitionTarget,
+} from '@/lib/delivery-transitions'
 // Documentos privados de entrega: bucket DENY-ALL para anon/authenticated (PR5B2). Storage se
 // opera con el cliente service_role SOLO servidor, tras autorizar con Prisma en la Server Action.
 import { getSupabaseAdminClient } from '@/lib/supabase/admin'
@@ -38,15 +63,6 @@ const DELIVERY_DOC_CATEGORIES: readonly string[] = [
 
 type ActionResult<T = undefined> = { ok: true; data?: T } | { ok: false; error: string }
 
-const VALID_TRANSITIONS: Partial<Record<DeliveryStatus, DeliveryStatus[]>> = {
-  PROGRAMADA: ['EN_CURSO', 'CANCELADA'],
-  EN_CURSO: ['COMPLETADA', 'CANCELADA'],
-}
-
-function isValidDeliveryTransition(from: DeliveryStatus, to: DeliveryStatus) {
-  return VALID_TRANSITIONS[from]?.includes(to) ?? false
-}
-
 // 14-item checklist created with every delivery
 const INITIAL_CHECKLIST = [
   { category: 'PRE_ENTREGA' as const, item: 'Limpieza final OK' },
@@ -68,6 +84,9 @@ const INITIAL_CHECKLIST = [
 const createDeliverySchema = z.object({
   vehicleId: z.string().min(1),
   buyerLeadId: z.string().min(1),
+  // I3C1A: obligatorio. La columna es nullable solo para compatibilidad de rollout, pero el código
+  // nuevo NUNCA crea una entrega sin una Offer CONVERTIDA.
+  offerId: z.string().min(1),
   scheduledAt: z.string().min(1),
   responsableId: z.string().optional().nullable(),
   notes: z.string().trim().optional().nullable(),
@@ -80,144 +99,217 @@ const signDeliverySchema = z.object({
 })
 
 export async function createDelivery(formData: unknown): Promise<ActionResult<{ id: string }>> {
-  const actor = await requireCanViewEntregas()
+  // I3C1A: pasa de permiso de LECTURA a permiso de EDICIÓN (era una escalada de privilegios).
+  const actor = await requireCanEditEntregas()
 
   const parsed = createDeliverySchema.safeParse(formData)
   if (!parsed.success) return { ok: false, error: 'Datos inválidos' }
 
-  const { vehicleId, buyerLeadId, scheduledAt, responsableId, notes } = parsed.data
+  const { vehicleId, buyerLeadId, offerId, scheduledAt, responsableId, notes } = parsed.data
 
-  const delivery = await db.delivery.create({
-    data: {
-      vehicleId,
-      buyerLeadId,
-      responsableId: responsableId ?? null,
-      scheduledAt: new Date(scheduledAt),
-      notes: notes ?? null,
-      checklist: {
-        create: INITIAL_CHECKLIST.map((c) => ({ ...c, result: 'PENDIENTE' as const })),
-      },
-    },
-    include: {
-      buyerLead: { select: { name: true, email: true } },
-      vehicle: { select: { brand: true, model: true } },
-    },
-  })
-
+  // Lectura preliminar: solo resuelve identidades para las raíces. Ninguna decisión de negocio se
+  // toma sobre estos datos; todo se relee dentro de la transacción.
   const vehicle = await db.vehicle.findUnique({
     where: { id: vehicleId },
     select: { sellerLeadId: true },
   })
+  if (!vehicle) return { ok: false, error: DELIVERY_CREATION_ERROR_MESSAGES.VEHICLE_NOT_FOUND }
 
-  await db.activity.create({
-    data: {
-      type: 'ENTREGA_PROGRAMADA',
-      content: `Entrega programada para el ${new Date(scheduledAt).toLocaleDateString('es-ES')}`,
-      agentId: actor.id,
-      sellerLeadId: vehicle?.sellerLeadId ?? null,
-      buyerLeadId,
-    },
+  const roots = buildDeliveryCreationRoots({
+    vehicleId,
+    sellerLeadId: vehicle.sellerLeadId,
+    buyerLeadId,
   })
 
-  // Non-blocking confirmation email to buyer
-  sendDeliveryConfirmation({
-    buyerName: delivery.buyerLead.name,
-    buyerEmail: delivery.buyerLead.email,
-    vehicleLabel: `${delivery.vehicle.brand} ${delivery.vehicle.model}`,
-    scheduledAt: new Date(scheduledAt),
-    deliveryId: delivery.id,
-  }).catch(console.error)
+  let created: { deliveryId: string }
+  try {
+    created = await withLockedRoots(roots, (tx) =>
+      createDeliveryTx(tx, {
+        vehicleId,
+        buyerLeadId,
+        offerId,
+        resolvedSellerLeadId: vehicle.sellerLeadId,
+        scheduledAt: new Date(scheduledAt),
+        responsableId: responsableId ?? null,
+        notes: notes ?? null,
+        actorId: actor.id,
+        checklist: INITIAL_CHECKLIST.map((c) => ({ category: c.category, item: c.item })),
+      })
+    )
+  } catch (err) {
+    if (isDeliveryCreationError(err)) return { ok: false, error: err.message }
+    if (isLockError(err)) return { ok: false, error: err.message }
+    // P2002 del índice único parcial de Delivery activa. Prisma NO devuelve el nombre del índice
+    // (solo `modelName='Delivery'` + `target=['vehicle_id']`), así que la metadata identifica el
+    // ÁREA probable y una lectura post-rollback CONFIRMA la causa comercial real. La consulta corre
+    // FUERA de la transacción ya revertida (cliente global) — la transacción abortada no es usable.
+    // Si no se confirma una activa real, se propaga el error técnico (no se inventa el conflicto).
+    if (isPotentialActiveDeliveryVehicleConflict(err)) {
+      const active = await db.delivery.count({
+        where: { vehicleId, status: { in: ACTIVE_DELIVERY_STATUSES } },
+      })
+      if (active > 0) {
+        return { ok: false, error: DELIVERY_CREATION_ERROR_MESSAGES.DELIVERY_ALREADY_ACTIVE }
+      }
+    }
+    // Error técnico inesperado (o P2002 no confirmado) → propágalo.
+    throw err
+  }
+
+  // Efectos post-commit: email de confirmación (no bloqueante) + revalidación.
+  const detail = await db.delivery.findUnique({
+    where: { id: created.deliveryId },
+    select: {
+      buyerLead: { select: { name: true, email: true } },
+      vehicle: { select: { brand: true, model: true } },
+    },
+  })
+  if (detail) {
+    sendDeliveryConfirmation({
+      buyerName: detail.buyerLead.name,
+      buyerEmail: detail.buyerLead.email,
+      vehicleLabel: `${detail.vehicle.brand} ${detail.vehicle.model}`,
+      scheduledAt: new Date(scheduledAt),
+      deliveryId: created.deliveryId,
+    }).catch(console.error)
+  }
 
   revalidatePath('/entregas')
-  return { ok: true, data: { id: delivery.id } }
+  return { ok: true, data: { id: created.deliveryId } }
 }
 
-export async function updateDeliveryStatus(
-  deliveryId: string,
-  newStatus: DeliveryStatus
-): Promise<ActionResult> {
-  const actor = await requireCanEditEntregas()
+/**
+ * I3C2 — núcleo compartido de transición coordinada (EN_CURSO / CANCELADA). Lectura preliminar solo
+ * para resolver raíces → `withLockedRoots` (Vehicle → SellerLead → BuyerLead) → `transitionDeliveryTx`
+ * (relee, valida, CAS, Activity atómica) → efectos post-commit. Un ÚNICO caller de `withLockedRoots`
+ * para ambas acciones (no se duplica el protocolo). La COMPLECIÓN NO pasa por aquí (I3C3).
+ */
+async function runCoordinatedDeliveryTransition(params: {
+  deliveryId: string
+  targetStatus: DeliveryTransitionTarget
+  expectedCurrentStatus?: DeliveryStatus
+  cancellationReason?: string | null
+  actorId: string
+}): Promise<ActionResult> {
+  const { deliveryId, targetStatus } = params
 
-  const delivery = await db.delivery.findUnique({
+  const prelim = await db.delivery.findUnique({
     where: { id: deliveryId },
     select: {
       status: true,
       vehicleId: true,
       buyerLeadId: true,
-      signedByName: true,
-      signedByDni: true,
-      signatureUrl: true,
       vehicle: { select: { sellerLeadId: true } },
-      checklist: { select: { result: true } },
     },
   })
-  if (!delivery) return { ok: false, error: 'Entrega no encontrada' }
+  if (!prelim) return { ok: false, error: DELIVERY_TRANSITION_ERROR_MESSAGES.DELIVERY_NOT_FOUND }
 
-  if (!isValidDeliveryTransition(delivery.status, newStatus)) {
-    return { ok: false, error: `Transición ${delivery.status} → ${newStatus} no permitida.` }
+  // Estado esperado: el enviado por el cliente (defensa anti-obsoleto) o el observado ahora.
+  const expected = params.expectedCurrentStatus ?? prelim.status
+  if (expected !== 'PROGRAMADA' && expected !== 'EN_CURSO') {
+    if (prelim.status === 'CANCELADA')
+      return { ok: false, error: DELIVERY_TRANSITION_ERROR_MESSAGES.DELIVERY_ALREADY_CANCELLED }
+    if (prelim.status === 'COMPLETADA')
+      return { ok: false, error: DELIVERY_TRANSITION_ERROR_MESSAGES.DELIVERY_ALREADY_COMPLETED }
+    return { ok: false, error: DELIVERY_TRANSITION_ERROR_MESSAGES.INVALID_DELIVERY_TRANSITION }
   }
 
-  if (newStatus === 'COMPLETADA') {
-    const pending = delivery.checklist.filter((c) => c.result === 'PENDIENTE')
-    if (pending.length > 0) {
-      return { ok: false, error: `Hay ${pending.length} ítems pendientes en el checklist.` }
-    }
-    if (!delivery.signedByName || !delivery.signedByDni || !delivery.signatureUrl) {
-      return { ok: false, error: 'La entrega requiere firma antes de completarse.' }
-    }
-  }
+  const roots = buildDeliveryCreationRoots({
+    vehicleId: prelim.vehicleId,
+    sellerLeadId: prelim.vehicle.sellerLeadId,
+    buyerLeadId: prelim.buyerLeadId,
+  })
 
-  const now = new Date()
-
-  if (newStatus === 'COMPLETADA') {
-    // Finalización ATÓMICA: entrega + vehículo + comprador + match + garantía + seguimientos
-    // + trazas en una única transacción. La disponibilidad se decide con compare-and-swap
-    // dentro de la transacción (no con la lectura previa), evitando estados parciales.
-    try {
-      await db.$transaction((tx) =>
-        completeDeliveryTx(tx, {
-          deliveryId,
-          vehicleId: delivery.vehicleId,
-          buyerLeadId: delivery.buyerLeadId,
-          sellerLeadId: delivery.vehicle.sellerLeadId,
-          actorId: actor.id,
-          now,
-        })
-      )
-    } catch (err) {
-      // Conflicto de negocio esperado (concurrencia / estado incompatible) → mensaje claro.
-      if (err instanceof DeliveryConflictError) return { ok: false, error: err.message }
-      // Error técnico inesperado → propágalo (no ocultarlo como conflicto).
-      throw err
-    }
-  } else {
-    // EN_CURSO / CANCELADA: transiciones sin garantía asociada.
-    await db.$transaction(async (tx) => {
-      await tx.delivery.update({
-        where: { id: deliveryId },
-        data: {
-          status: newStatus,
-          ...(newStatus === 'EN_CURSO' && { startedAt: now }),
-        },
+  try {
+    await withLockedRoots(roots, (tx) =>
+      transitionDeliveryTx(tx, {
+        deliveryId,
+        vehicleId: prelim.vehicleId,
+        buyerLeadId: prelim.buyerLeadId,
+        resolvedSellerLeadId: prelim.vehicle.sellerLeadId,
+        expectedCurrentStatus: expected as DeliveryTransitionSource,
+        targetStatus,
+        actorId: params.actorId,
+        cancellationReason: params.cancellationReason ?? null,
+        now: new Date(),
       })
-      if (newStatus === 'CANCELADA') {
-        await tx.activity.create({
-          data: {
-            type: 'ENTREGA_CANCELADA',
-            content: 'Entrega cancelada.',
-            agentId: actor.id,
-            sellerLeadId: delivery.vehicle.sellerLeadId,
-            buyerLeadId: delivery.buyerLeadId,
-          },
-        })
-      }
-    })
+    )
+  } catch (err) {
+    if (isDeliveryTransitionError(err)) return { ok: false, error: err.message }
+    if (isLockError(err)) return { ok: false, error: err.message }
+    throw err
   }
 
   revalidatePath('/entregas')
   revalidatePath(`/entregas/${deliveryId}`)
-  revalidatePath(`/vendedores/${delivery.vehicle.sellerLeadId}`)
-  revalidatePath(`/compradores/${delivery.buyerLeadId}`)
+  revalidatePath(`/vendedores/${prelim.vehicle.sellerLeadId}`)
+  revalidatePath(`/compradores/${prelim.buyerLeadId}`)
+  return { ok: true }
+}
+
+export async function updateDeliveryStatus(
+  deliveryId: string,
+  newStatus: DeliveryStatus,
+  expectedCurrentStatus?: DeliveryStatus
+): Promise<ActionResult> {
+  const actor = await requireCanEditEntregas()
+
+  // EN_CURSO → transición coordinada I3C2. La cancelación va por `cancelDelivery` (exige motivo).
+  if (newStatus === 'EN_CURSO') {
+    return runCoordinatedDeliveryTransition({
+      deliveryId,
+      targetStatus: 'EN_CURSO',
+      expectedCurrentStatus,
+      actorId: actor.id,
+    })
+  }
+  if (newStatus === 'CANCELADA') {
+    // La cancelación requiere motivo: se enruta por la acción dedicada.
+    return { ok: false, error: DELIVERY_TRANSITION_ERROR_MESSAGES.CANCELLATION_REASON_REQUIRED }
+  }
+  if (newStatus !== 'COMPLETADA') {
+    return { ok: false, error: DELIVERY_TRANSITION_ERROR_MESSAGES.INVALID_DELIVERY_TRANSITION }
+  }
+
+  // COMPLETADA → I3C3: compleción COORDINADA bajo `withLockedRoots`. Estado, checklist y firma se
+  // validan BAJO el lock dentro de `completeDeliveryTx` (la lectura preliminar solo resuelve raíces).
+  const prelim = await db.delivery.findUnique({
+    where: { id: deliveryId },
+    select: {
+      vehicleId: true,
+      buyerLeadId: true,
+      vehicle: { select: { sellerLeadId: true } },
+    },
+  })
+  if (!prelim) return { ok: false, error: 'Entrega no encontrada' }
+
+  const roots = buildDeliveryCreationRoots({
+    vehicleId: prelim.vehicleId,
+    sellerLeadId: prelim.vehicle.sellerLeadId,
+    buyerLeadId: prelim.buyerLeadId,
+  })
+  try {
+    await withLockedRoots(roots, (tx) =>
+      completeDeliveryTx(tx, {
+        deliveryId,
+        vehicleId: prelim.vehicleId,
+        buyerLeadId: prelim.buyerLeadId,
+        resolvedSellerLeadId: prelim.vehicle.sellerLeadId,
+        actorId: actor.id,
+        now: new Date(),
+      })
+    )
+  } catch (err) {
+    if (isDeliveryCompletionError(err)) return { ok: false, error: err.message }
+    if (err instanceof DeliveryConflictError) return { ok: false, error: err.message }
+    if (isLockError(err)) return { ok: false, error: err.message }
+    throw err
+  }
+
+  revalidatePath('/entregas')
+  revalidatePath(`/entregas/${deliveryId}`)
+  revalidatePath(`/vendedores/${prelim.vehicle.sellerLeadId}`)
+  revalidatePath(`/compradores/${prelim.buyerLeadId}`)
   return { ok: true }
 }
 
@@ -227,19 +319,48 @@ export async function updateDeliveryChecklistItem(
 ): Promise<ActionResult> {
   await requireCanEditEntregas()
 
-  await db.deliveryChecklistItem.update({
+  // I3C3 (corrección) — edición COORDINADA: se serializa con la compleción por el mismo protocolo de
+  // raíces. La lectura preliminar solo resuelve las raíces; estado terminal y pertenencia se validan
+  // BAJO el lock dentro de `updateChecklistItemTx`.
+  const prelim = await db.deliveryChecklistItem.findUnique({
     where: { id: itemId },
-    data: {
-      result: data.result as 'PENDIENTE' | 'OK' | 'INCIDENCIA' | 'NO_APLICA',
-      notes: data.notes ?? null,
+    select: {
+      deliveryId: true,
+      delivery: {
+        select: {
+          vehicleId: true,
+          buyerLeadId: true,
+          vehicle: { select: { sellerLeadId: true } },
+        },
+      },
     },
   })
+  if (!prelim) return { ok: false, error: 'Ítem de checklist no encontrado' }
 
-  const item = await db.deliveryChecklistItem.findUnique({
-    where: { id: itemId },
-    select: { deliveryId: true },
+  const roots = buildDeliveryCreationRoots({
+    vehicleId: prelim.delivery.vehicleId,
+    sellerLeadId: prelim.delivery.vehicle.sellerLeadId,
+    buyerLeadId: prelim.delivery.buyerLeadId,
   })
-  if (item) revalidatePath(`/entregas/${item.deliveryId}`)
+  try {
+    await withLockedRoots(roots, (tx) =>
+      updateChecklistItemTx(tx, {
+        itemId,
+        deliveryId: prelim.deliveryId,
+        vehicleId: prelim.delivery.vehicleId,
+        buyerLeadId: prelim.delivery.buyerLeadId,
+        resolvedSellerLeadId: prelim.delivery.vehicle.sellerLeadId,
+        result: data.result as 'PENDIENTE' | 'OK' | 'INCIDENCIA' | 'NO_APLICA',
+        notes: data.notes ?? null,
+      })
+    )
+  } catch (err) {
+    if (isDeliveryPreconditionError(err)) return { ok: false, error: err.message }
+    if (isLockError(err)) return { ok: false, error: err.message }
+    throw err
+  }
+
+  revalidatePath(`/entregas/${prelim.deliveryId}`)
   return { ok: true }
 }
 
@@ -249,37 +370,62 @@ export async function signDelivery(deliveryId: string, formData: unknown): Promi
   const parsed = signDeliverySchema.safeParse(formData)
   if (!parsed.success) return { ok: false, error: 'Datos de firma inválidos' }
 
-  const delivery = await db.delivery.findUnique({
+  // I3C3 (corrección) — firma COORDINADA: mismo protocolo de raíces que la compleción, para que una
+  // firma iniciada en EN_CURSO no pueda aterrizar tras un estado terminal. Estado y autorización se
+  // validan BAJO el lock dentro de `writeSignatureTx`; la lectura preliminar solo resuelve raíces.
+  const prelim = await db.delivery.findUnique({
     where: { id: deliveryId },
-    select: { status: true, responsableId: true },
+    select: {
+      vehicleId: true,
+      buyerLeadId: true,
+      vehicle: { select: { sellerLeadId: true } },
+    },
   })
-  if (!delivery) return { ok: false, error: 'Entrega no encontrada' }
-  if (delivery.status === 'COMPLETADA' || delivery.status === 'CANCELADA') {
-    return { ok: false, error: 'La entrega ya está cerrada.' }
-  }
-  if (actor.role !== 'ADMIN' && delivery.responsableId !== actor.id) {
-    return { ok: false, error: 'Solo el responsable de la entrega o un admin puede firmar.' }
-  }
+  if (!prelim) return { ok: false, error: 'Entrega no encontrada' }
 
   const { signedByName, signedByDni, signatureUrl } = parsed.data
-
-  await db.delivery.update({
-    where: { id: deliveryId },
-    data: { signedByName, signedByDni, signatureUrl },
+  const roots = buildDeliveryCreationRoots({
+    vehicleId: prelim.vehicleId,
+    sellerLeadId: prelim.vehicle.sellerLeadId,
+    buyerLeadId: prelim.buyerLeadId,
   })
+  try {
+    await withLockedRoots(roots, (tx) =>
+      writeSignatureTx(tx, {
+        deliveryId,
+        vehicleId: prelim.vehicleId,
+        buyerLeadId: prelim.buyerLeadId,
+        resolvedSellerLeadId: prelim.vehicle.sellerLeadId,
+        actorId: actor.id,
+        actorIsAdmin: actor.role === 'ADMIN',
+        signedByName,
+        signedByDni,
+        signatureUrl,
+      })
+    )
+  } catch (err) {
+    if (isDeliveryPreconditionError(err)) return { ok: false, error: err.message }
+    if (isLockError(err)) return { ok: false, error: err.message }
+    throw err
+  }
 
   revalidatePath(`/entregas/${deliveryId}`)
   return { ok: true }
 }
 
-export async function cancelDelivery(deliveryId: string, reason?: string): Promise<ActionResult> {
-  return updateDeliveryStatus(deliveryId, 'CANCELADA').then((res) => {
-    if (res.ok && reason) {
-      db.delivery
-        .update({ where: { id: deliveryId }, data: { cancellationReason: reason } })
-        .catch(console.error)
-    }
-    return res
+export async function cancelDelivery(
+  deliveryId: string,
+  reason: string,
+  expectedCurrentStatus?: DeliveryStatus
+): Promise<ActionResult> {
+  const actor = await requireCanEditEntregas()
+  // El motivo se valida (no vacío) dentro del núcleo y se escribe ATÓMICO con estado + Activity.
+  return runCoordinatedDeliveryTransition({
+    deliveryId,
+    targetStatus: 'CANCELADA',
+    expectedCurrentStatus,
+    cancellationReason: reason,
+    actorId: actor.id,
   })
 }
 

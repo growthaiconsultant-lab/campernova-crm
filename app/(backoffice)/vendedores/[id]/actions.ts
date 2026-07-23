@@ -9,13 +9,35 @@ import { runAndSaveAutoValuation } from '@/lib/valuation/save'
 import { recalculateMatchesForVehicle } from '@/lib/matching'
 import {
   SELLER_LEAD_TRANSITIONS,
-  VEHICLE_TRANSITIONS,
   SELLER_LEAD_STATUS_LABELS,
   VEHICLE_STATUS_LABELS,
   isValidTransition,
 } from '@/lib/state-machine'
 import type { SellerLeadStatus } from '@prisma/client'
 import { isValidLostReason, LOST_REASON_LABELS } from '@/lib/lost-reason'
+import {
+  applyManualVehicleUpdateTx,
+  buildVehicleUpdateRoots,
+  isVehicleStatusConflict,
+  isVehicleUpdateError,
+  VEHICLE_STATUS_CONFLICT_MESSAGE,
+} from '@/lib/vehicle-status'
+import { withLockedRoots, isLockError } from '@/lib/locking'
+import type { VehicleStatus } from '@prisma/client'
+
+/**
+ * El expediente legal no permite pasar a `TASADO`/`PUBLICADO`. Se lanza dentro de la transacción
+ * (bajo el lock) para abortarla; el registro de auditoría `PUBLICACION_BLOQUEADA` se escribe fuera.
+ */
+class VehiclePublicationBlockedError extends Error {
+  constructor(
+    readonly targetStatus: VehicleStatus,
+    readonly lines: string[]
+  ) {
+    super('VEHICLE_PUBLICATION_BLOCKED')
+    this.name = 'VehiclePublicationBlockedError'
+  }
+}
 import {
   getVehicleLegalInput,
   getVehicleDocumentSummary,
@@ -157,132 +179,111 @@ export async function updateVehicle(vehicleId: string, data: unknown) {
     bathroom: bathroomType != null ? bathroomType !== 'NINGUNO' : equipment.bathroom,
   }
 
+  // Lectura preliminar: solo resuelve identidades para las raíces del lock. Ninguna decisión de
+  // negocio se toma sobre estos datos; todo se relee dentro de la transacción.
   const vehicle = await db.vehicle.findUnique({
     where: { id: vehicleId },
-    select: { sellerLeadId: true, status: true, soldAt: true },
+    select: { sellerLeadId: true },
   })
   if (!vehicle) return { error: { formErrors: ['Vehículo no encontrado'], fieldErrors: {} } }
 
-  if (!isValidTransition(VEHICLE_TRANSITIONS, vehicle.status, status)) {
-    return {
-      error: {
-        formErrors: [
-          `Transición no permitida: ${VEHICLE_STATUS_LABELS[vehicle.status]} → ${VEHICLE_STATUS_LABELS[status]}`,
-        ],
-        fieldErrors: {},
-      },
-    }
-  }
+  const roots = buildVehicleUpdateRoots({ vehicleId, sellerLeadId: vehicle.sellerLeadId })
 
-  // ── Legal guards for TASADO and PUBLICADO ──────────────────────────────────
-  const isTransitioningTo = (s: string) => status === s && vehicle.status !== s
-
-  if (isTransitioningTo('TASADO') || isTransitioningTo('PUBLICADO')) {
-    const targetStatus = status as 'TASADO' | 'PUBLICADO'
-    const [legalInput, docs] = await Promise.all([
-      getVehicleLegalInput(db, vehicleId),
-      getVehicleDocumentSummary(db, vehicleId),
-    ])
-
-    // Merge desiredPrice from the incoming form data (not yet saved)
-    const merged = legalInput
-      ? { ...legalInput, desiredPrice: desiredPrice ?? legalInput.desiredPrice }
-      : null
-
-    if (!merged || !isReadyForStatus(merged, targetStatus, docs)) {
-      const missing = merged ? listMissingRequirements(merged, targetStatus, docs) : []
-      const lines = missing.filter((r) => r.severity === 'error').map((r) => `- ${r.message}`)
-
-      // Log the blocked attempt as an activity
+  // La venta y la reserva ya no son alcanzables desde aquí (I3A): `VEHICLE_TRANSITIONS` solo ofrece
+  // `NUEVO → TASADO` y `TASADO → PUBLICADO`. `soldAt` lo fija el propietario de la venta,
+  // `completeDeliveryTx`. I3B mete la edición manual bajo `withLockedRoots`.
+  try {
+    await withLockedRoots(roots, (tx) =>
+      applyManualVehicleUpdateTx(
+        tx,
+        {
+          vehicleId,
+          resolvedSellerLeadId: vehicle.sellerLeadId,
+          nextStatus: status,
+          actorId: actor.id,
+          activityContent: (from) =>
+            `Vehículo: ${VEHICLE_STATUS_LABELS[from]} → ${VEHICLE_STATUS_LABELS[status]}`,
+          data: {
+            type,
+            brand,
+            model,
+            year,
+            km,
+            seats,
+            length: length ?? null,
+            conservationState,
+            location: location ?? null,
+            desiredPrice: desiredPrice ?? null,
+            equipment: equipmentResolved,
+            status,
+            category: category ?? null,
+            bedLayout: bedLayout ?? null,
+            sleepingPlaces: sleepingPlaces ?? null,
+            bathroomType: bathroomType ?? null,
+            heatingType: heatingType ?? null,
+            winterized: winterized ?? null,
+            hasGarage: hasGarage ?? null,
+            maxMassKg: maxMassKg ?? null,
+            heightM: heightM ?? null,
+            offGrid: offGrid ?? null,
+          },
+        },
+        {
+          // Guard legal para TASADO/PUBLICADO, releído con `tx` bajo el lock del vehículo. Las
+          // columnas del vehículo son estables (lock); los documentos son tabla aparte (límite
+          // documentado, DELIVERY/expediente se cierran fuera de I3B).
+          beforeWrite: async ({ fromStatus, tx }) => {
+            const isTransitioningTo = (s: string) => status === s && fromStatus !== s
+            if (!isTransitioningTo('TASADO') && !isTransitioningTo('PUBLICADO')) return
+            const targetStatus = status as 'TASADO' | 'PUBLICADO'
+            const txDb = tx as unknown as typeof db
+            const [legalInput, docs] = await Promise.all([
+              getVehicleLegalInput(txDb, vehicleId),
+              getVehicleDocumentSummary(txDb, vehicleId),
+            ])
+            const merged = legalInput
+              ? { ...legalInput, desiredPrice: desiredPrice ?? legalInput.desiredPrice }
+              : null
+            if (!merged || !isReadyForStatus(merged, targetStatus, docs)) {
+              const missing = merged ? listMissingRequirements(merged, targetStatus, docs) : []
+              const lines = missing
+                .filter((r) => r.severity === 'error')
+                .map((r) => `- ${r.message}`)
+              throw new VehiclePublicationBlockedError(targetStatus, lines)
+            }
+          },
+        }
+      )
+    )
+  } catch (err) {
+    // Publicación bloqueada por el expediente legal: se registra la auditoría FUERA de la
+    // transacción (ya revertida) y se devuelve el detalle, como antes.
+    if (err instanceof VehiclePublicationBlockedError) {
       await db.activity.create({
         data: {
           type: 'PUBLICACION_BLOQUEADA',
-          content: `Intento de pasar a ${VEHICLE_STATUS_LABELS[targetStatus]} bloqueado.\n${lines.join('\n')}`,
+          content: `Intento de pasar a ${VEHICLE_STATUS_LABELS[err.targetStatus]} bloqueado.\n${err.lines.join('\n')}`,
           agentId: actor.id,
           sellerLeadId: vehicle.sellerLeadId,
         },
       })
-
       return {
         error: {
           formErrors: [
-            `El vehículo no puede pasar a ${VEHICLE_STATUS_LABELS[targetStatus]}. Faltan:\n${lines.join('\n')}\n\nCompleta el expediente legal en la sección 'Expediente' de la ficha del vehículo antes de reintentar.`,
+            `El vehículo no puede pasar a ${VEHICLE_STATUS_LABELS[err.targetStatus]}. Faltan:\n${err.lines.join('\n')}\n\nCompleta el expediente legal en la sección 'Expediente' de la ficha del vehículo antes de reintentar.`,
           ],
           fieldErrors: {},
         },
       }
     }
-  }
-
-  if (status === 'VENDIDO' && vehicle.status !== 'VENDIDO') {
-    const delivery = await db.delivery.findFirst({
-      where: {
-        vehicleId,
-        status: 'COMPLETADA',
-        signedByName: { not: null },
-        signedByDni: { not: null },
-        signatureUrl: { not: null },
-      },
-    })
-    if (!delivery) {
-      return {
-        error: {
-          formErrors: [
-            'El vehículo no puede marcarse como VENDIDO sin una entrega completada y firmada. Crea la entrega desde /entregas.',
-          ],
-          fieldErrors: {},
-        },
-      }
+    if (isVehicleStatusConflict(err)) {
+      return { error: { formErrors: [VEHICLE_STATUS_CONFLICT_MESSAGE], fieldErrors: {} } }
     }
+    if (isVehicleUpdateError(err)) return { error: { formErrors: [err.message], fieldErrors: {} } }
+    if (isLockError(err)) return { error: { formErrors: [err.message], fieldErrors: {} } }
+    // Error técnico inesperado → propágalo; no se disfraza de conflicto de negocio.
+    throw err
   }
-
-  const statusChanging = status !== vehicle.status
-
-  await db.$transaction(async (tx) => {
-    await tx.vehicle.update({
-      where: { id: vehicleId },
-      data: {
-        type,
-        brand,
-        model,
-        year,
-        km,
-        seats,
-        length: length ?? null,
-        conservationState,
-        location: location ?? null,
-        desiredPrice: desiredPrice ?? null,
-        equipment: equipmentResolved,
-        status,
-        category: category ?? null,
-        bedLayout: bedLayout ?? null,
-        sleepingPlaces: sleepingPlaces ?? null,
-        bathroomType: bathroomType ?? null,
-        heatingType: heatingType ?? null,
-        winterized: winterized ?? null,
-        hasGarage: hasGarage ?? null,
-        maxMassKg: maxMassKg ?? null,
-        heightM: heightM ?? null,
-        offGrid: offGrid ?? null,
-        // Hecho canónico de venta: al transicionar a VENDIDO se fija `soldAt` (instante
-        // estructurado de la venta, fuente de los KPIs). Se preserva un `soldAt` existente
-        // (idempotente); VENDIDO es terminal, así que en la práctica se fija una sola vez.
-        ...(status === 'VENDIDO' && vehicle.status !== 'VENDIDO'
-          ? { soldAt: vehicle.soldAt ?? new Date() }
-          : {}),
-      },
-    })
-    if (statusChanging) {
-      await tx.activity.create({
-        data: {
-          type: 'CAMBIO_ESTADO',
-          content: `Vehículo: ${VEHICLE_STATUS_LABELS[vehicle.status]} → ${VEHICLE_STATUS_LABELS[status]}`,
-          agentId: actor.id,
-          sellerLeadId: vehicle.sellerLeadId,
-        },
-      })
-    }
-  })
 
   // Re-tasar automáticamente tras cualquier cambio de datos del vehículo
   await runAndSaveAutoValuation(vehicleId, {

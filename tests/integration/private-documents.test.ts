@@ -44,10 +44,21 @@ async function seed(): Promise<Seeded> {
   const buyer = await prisma.buyerLead.create({
     data: { name: `Buyer ${s}`, email: `buyer_${s}@integ.test`, phone: `b_${s}` },
   })
+  // I3C1B: Delivery.offerId es obligatorio → Offer coherente para el fixture de documentos.
+  const offer = await prisma.offer.create({
+    data: {
+      vehicleId: vehicle.id,
+      buyerLeadId: buyer.id,
+      amount: 25000,
+      createdById: user.id,
+      status: 'CONVERTIDA',
+    },
+  })
   const delivery = await prisma.delivery.create({
     data: {
       vehicleId: vehicle.id,
       buyerLeadId: buyer.id,
+      offerId: offer.id,
       scheduledAt: new Date('2026-06-01T09:00:00Z'),
     },
   })
@@ -56,6 +67,7 @@ async function seed(): Promise<Seeded> {
     await prisma.deliveryDocument.deleteMany({ where: { deliveryId: delivery.id } })
     await prisma.vehicleDocument.deleteMany({ where: { vehicleId: vehicle.id } })
     await prisma.delivery.deleteMany({ where: { id: delivery.id } })
+    await prisma.offer.deleteMany({ where: { vehicleId: vehicle.id } })
     await prisma.vehicle.deleteMany({ where: { id: vehicle.id } })
     await prisma.buyerLead.deleteMany({ where: { id: buyer.id } })
     await prisma.sellerLead.deleteMany({ where: { id: seller.id } })
