@@ -114,9 +114,12 @@ claude mcp add-json linear '{\"command\":\"npx\",\"args\":[\"-y\",\"mcp-linear@l
 > productivos** de `withLockedRoots` (verificar contra código; PR #117 añade 3 callers más de
 > archivado/calendario → 11 en `main`). `LEAD_ARCHIVED` **ya es
 > productivo** (no depende de PR #117; #117 solo añade las _acciones_ de archivar/reactivar, **ya
-> FUSIONADO** por squash `fb501ef` tras auditoría+corrección — 6/6 blockers serializados; **pero su
-> deployment de producción NO está verificado**: Vercel no creó deployment para `fb501ef` y producción
-> sirve `02f9766`; fusionado ≠ desplegado; sin impacto de usuario). **Fuente de verdad navegable:** dominio →
+> FUSIONADO** por squash `fb501ef` tras auditoría+corrección — 6/6 blockers serializados; **y
+> DESPLEGADO en producción vía `4382774`** (`4382774` ⊇ `fb501ef`, diff docs-only; `target=production`
+> READY, alias `campersnova.com`; sin migración; postflight read-only sin incoherencias, 0 archivados →
+> vacuo). El deployment específico de `fb501ef` fue un fallo transitorio puntual, resuelto por el
+> siguiente push de `main`. **Validación mutante en producción y UX de visibilidad: pendientes.**).
+> **Fuente de verdad navegable:** dominio →
 > `docs/domain/delivery-lifecycle.md`; estado del programa → `docs/roadmap/i3-status.md`; locking →
 > `docs/adr/0009-root-lock-coordination.md`; migraciones → `docs/governance/database-migrations.md`.
 > Las notas técnicas de los bloques inferiores son un **log histórico por fase** y no reflejan
