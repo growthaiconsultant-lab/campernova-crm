@@ -212,7 +212,7 @@ existe y no se inventa aquí.
 
 ### Callers productivos (verificado en código)
 
-Exactamente **8** puntos de llamada productivos de `withLockedRoots` (`grep` sobre `app/`+`lib/`, sin
+Exactamente **10** puntos de llamada productivos de `withLockedRoots` (`grep` sobre `app/`+`lib/`, sin
 tests):
 
 1. `createOffer` — `app/(backoffice)/ofertas/actions.ts` (I2B).
@@ -228,6 +228,20 @@ tests):
    `updateChecklistItemTx` (I3C3), invocada por `updateDeliveryChecklistItem`.
 8. **Firma coordinada** — `app/(backoffice)/entregas/actions.ts` → `writeSignatureTx` (I3C3),
    invocada por `signDelivery`.
+9. **Archivar lead** — `app/(backoffice)/lead-archiving-actions.ts` → `archiveLead` (PR #117),
+   invocada por `archiveSellerLead`/`archiveBuyerLead`. Bloquea la fila del propio lead
+   (`sellerLead`/`buyerLead`).
+10. **Reactivar lead** — `app/(backoffice)/lead-archiving-actions.ts` → `reactivateLead` (PR #117),
+    invocada por `reactivateSellerLead`/`reactivateBuyerLead`.
+
+> **Archivado (PR #117, sin fusionar).** Bloquear **la fila del lead** basta para serializar el
+> archivado con TODOS los writers coordinados que podrían crear una dependencia bloqueante para él:
+> `createOffer`, `updateOfferStatus`, `createDelivery`, la transición/cancelación de Delivery,
+> `updateVehicle` y `setNextAction` bloquean o escriben la fila del lead. Gane quien gane: el writer ve
+> `archivedAt` fijado (rechaza `LEAD_ARCHIVED`), o el archivado relee sus bloqueos bajo el lock y ve la
+> dependencia nueva (rechaza `blocked`). Límite conocido: los eventos de calendario futuros
+> (`CalendarEvent`) no escriben la fila del lead, así que su creación concurrente no se serializa por
+> este lock; es un bloqueo blando de UX (el evento no se pierde), no una incoherencia de venta.
 
 **Los writers de PRECONDICIÓN participan en el mismo protocolo.** La compleción valida checklist y
 firma bajo el lock, pero eso solo cierra el TOCTOU si los writers que producen esas precondiciones
