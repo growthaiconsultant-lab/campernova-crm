@@ -3,14 +3,45 @@
 import { revalidatePath } from 'next/cache'
 import { db } from '@/lib/db'
 import { requireAgente } from '@/lib/auth'
+import { withLockedRoots, isLockError, type LockRoot } from '@/lib/locking'
 import { createCalendarEventSchema } from '@/lib/validators/calendar-event'
 import { isValidEventTransition, EVENT_TYPE_LABELS } from '@/lib/calendar/event-meta'
 import { resolveCommitment, canReclassify } from '@/lib/calendar/commitment'
 import { sendCalendarEventAssigned } from '@/lib/email/send'
 import type { CalendarEventStatus, Prisma } from '@prisma/client'
 
+/**
+ * Un evento FUTURO no terminal vinculado a un lead es un "compromiso" que el archivado trata como
+ * blocker duro (`classifyBlockers` → `FUTURE_EVENT`). Para que ese blocker no se pueda saltar por una
+ * carrera, crear un evento futuro para un lead se serializa con archivar/reactivar mediante el mismo
+ * protocolo de root locks: se bloquea la fila del lead, se relee `archivedAt` BAJO el lock y se rechaza
+ * si está archivado. Los eventos sin lead, o pasados/terminales, no necesitan lock (no son blockers).
+ */
+class ArchivedLeadEventError extends Error {
+  constructor() {
+    super('ARCHIVED_LEAD_EVENT')
+    this.name = 'ArchivedLeadEventError'
+  }
+}
+
+function calendarLeadRoots(sellerLeadId: string | null, buyerLeadId: string | null): LockRoot[] {
+  const roots: LockRoot[] = []
+  if (sellerLeadId) roots.push({ type: 'sellerLead', id: sellerLeadId })
+  if (buyerLeadId) roots.push({ type: 'buyerLead', id: buyerLeadId })
+  return roots
+}
+
+/** Semilla de test para forzar solapamiento real de transacciones (sin efecto en producción). */
+export type CreateCalendarEventHooks = {
+  /** Se ejecuta bajo el lock, tras validar `archivedAt` y antes de insertar el evento. */
+  beforeWrite?: () => Promise<void>
+}
+
 /** F2: crea un evento de calendario (cita, limpieza, seguimiento, otro). */
-export async function createCalendarEvent(data: unknown): Promise<{ error?: string; id?: string }> {
+export async function createCalendarEvent(
+  data: unknown,
+  hooks: CreateCalendarEventHooks = {}
+): Promise<{ error?: string; id?: string }> {
   const actor = await requireAgente()
 
   const parsed = createCalendarEventSchema.safeParse(data)
@@ -34,26 +65,71 @@ export async function createCalendarEvent(data: unknown): Promise<{ error?: stri
   const endAt =
     d.durationMinutes != null ? new Date(start.getTime() + d.durationMinutes * 60000) : null
 
-  const event = await db.calendarEvent.create({
-    data: {
-      type: d.type,
-      commitment: commitment.value,
-      title: d.title,
-      description: d.description ?? null,
-      priority: d.priority,
-      startAt: start,
-      endAt,
-      durationMinutes: d.durationMinutes ?? null,
-      location: d.location ?? null,
-      createdById: actor.id,
-      assignedToId: d.assignedToId || null,
-      buyerLeadId: d.buyerLeadId || null,
-      sellerLeadId: d.sellerLeadId || null,
-      vehicleId: d.vehicleId || null,
-      matchId: d.matchId || null,
-      specificData: (d.specificData ?? undefined) as Prisma.InputJsonValue | undefined,
-    },
-  })
+  const sellerLeadId = d.sellerLeadId || null
+  const buyerLeadId = d.buyerLeadId || null
+  const eventData = {
+    type: d.type,
+    commitment: commitment.value,
+    title: d.title,
+    description: d.description ?? null,
+    priority: d.priority,
+    startAt: start,
+    endAt,
+    durationMinutes: d.durationMinutes ?? null,
+    location: d.location ?? null,
+    createdById: actor.id,
+    assignedToId: d.assignedToId || null,
+    buyerLeadId,
+    sellerLeadId,
+    vehicleId: d.vehicleId || null,
+    matchId: d.matchId || null,
+    specificData: (d.specificData ?? undefined) as Prisma.InputJsonValue | undefined,
+  }
+
+  const roots = calendarLeadRoots(sellerLeadId, buyerLeadId)
+  // Un evento futuro no terminal es un blocker de archivado. Solo entonces hace falta serializar con
+  // el lead; un evento pasado (o sin lead) no puede violar el blocker y se crea directamente.
+  const isFutureCommitment = start.getTime() > Date.now()
+
+  let event: { id: string }
+  if (roots.length > 0 && isFutureCommitment) {
+    try {
+      event = await withLockedRoots(roots, async (tx) => {
+        // Relectura de `archivedAt` BAJO el lock (la existencia del lead ya la garantiza el lock).
+        if (sellerLeadId) {
+          const s = await tx.sellerLead.findUnique({
+            where: { id: sellerLeadId },
+            select: { archivedAt: true },
+          })
+          if (s?.archivedAt != null) throw new ArchivedLeadEventError()
+        }
+        if (buyerLeadId) {
+          const b = await tx.buyerLead.findUnique({
+            where: { id: buyerLeadId },
+            select: { archivedAt: true },
+          })
+          if (b?.archivedAt != null) throw new ArchivedLeadEventError()
+        }
+        await hooks.beforeWrite?.()
+        return tx.calendarEvent.create({ data: eventData, select: { id: true } })
+      })
+    } catch (err) {
+      if (err instanceof ArchivedLeadEventError) {
+        return {
+          error: 'No se puede agendar un evento futuro para un lead archivado. Reactívalo primero.',
+        }
+      }
+      if (isLockError(err)) {
+        if (err.code === 'ROOT_NOT_FOUND') return { error: 'Lead no encontrado' }
+        return {
+          error: 'No se ha podido agendar por un conflicto de concurrencia. Inténtalo de nuevo.',
+        }
+      }
+      throw err
+    }
+  } else {
+    event = await db.calendarEvent.create({ data: eventData, select: { id: true } })
+  }
 
   // F6: aviso inmediato al responsable si se le asigna (y no es quien lo crea)
   if (d.assignedToId && d.assignedToId !== actor.id) {
