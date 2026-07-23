@@ -16,16 +16,16 @@ producción).
 
 ## Estado por fase
 
-| Fase      | Objeto                                                                                                    |           Fusionada            | Migrada (staging/prod) | Desplegada |                       Validada                       | Limitaciones                                                                                    |
-| --------- | --------------------------------------------------------------------------------------------------------- | :----------------------------: | :--------------------: | :--------: | :--------------------------------------------------: | ----------------------------------------------------------------------------------------------- |
-| **I3A**   | `updateVehicle`: retira transiciones manuales RESERVADO/VENDIDO/DESCARTADO; CAS                           |               ✓                |  n/a (sin migración)   |     ✓      |                          CI                          | —                                                                                               |
-| **I3B**   | `updateVehicle` adopta root locks + retira DESCARTADO manual                                              |               ✓                |          n/a           |     ✓      |                          CI                          | descarte final coordinado → I3D                                                                 |
-| **I3C1A** | Enlace `Delivery→Offer` (nullable, expand) + `createDelivery` coordinada                                  |               ✓                |       ✓ (expand)       |     ✓      |                          CI                          | —                                                                                               |
-| **I3C1B** | `offer_id NOT NULL` (contract)                                                                            |               ✓                |   ✓ (staging + prod)   |     ✓      |                 CI + postflight prod                 | —                                                                                               |
-| **I3C2**  | Transiciones `PROGRAMADA→EN_CURSO` + cancelación coordinadas                                              |               ✓                |  n/a (sin migración)   |     ✓      | CI técnico; **flujo autenticado en prod: pendiente** | guardas terminales checklist/firma → I3C3                                                       |
-| **I3C3**  | Compleción coordinada (Delivery→COMPLETADA, Vehicle→VENDIDO, `soldAt`, Match/Buyer, Warranty, follow-ups) | preparado en PR (sin fusionar) |  n/a (sin migración)   |     —      |                          —                           | checklist/firma validados bajo lock; guarda terminal de edición de checklist; **no reversible** |
-| **I3D**   | Descarte coordinado (`DESCARTADO` bloqueando ofertas/entregas activas)                                    |               —                |           —            |     —      |                          —                           | **no iniciado**                                                                                 |
-| **I3E**   | Tasación coordinada                                                                                       |               —                |           —            |     —      |                          —                           | **no iniciado**                                                                                 |
+| Fase      | Objeto                                                                                                                                                |           Fusionada            | Migrada (staging/prod) | Desplegada |                       Validada                       | Limitaciones                                                                          |
+| --------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- | :----------------------------: | :--------------------: | :--------: | :--------------------------------------------------: | ------------------------------------------------------------------------------------- |
+| **I3A**   | `updateVehicle`: retira transiciones manuales RESERVADO/VENDIDO/DESCARTADO; CAS                                                                       |               ✓                |  n/a (sin migración)   |     ✓      |                          CI                          | —                                                                                     |
+| **I3B**   | `updateVehicle` adopta root locks + retira DESCARTADO manual                                                                                          |               ✓                |          n/a           |     ✓      |                          CI                          | descarte final coordinado → I3D                                                       |
+| **I3C1A** | Enlace `Delivery→Offer` (nullable, expand) + `createDelivery` coordinada                                                                              |               ✓                |       ✓ (expand)       |     ✓      |                          CI                          | —                                                                                     |
+| **I3C1B** | `offer_id NOT NULL` (contract)                                                                                                                        |               ✓                |   ✓ (staging + prod)   |     ✓      |                 CI + postflight prod                 | —                                                                                     |
+| **I3C2**  | Transiciones `PROGRAMADA→EN_CURSO` + cancelación coordinadas                                                                                          |               ✓                |  n/a (sin migración)   |     ✓      | CI técnico; **flujo autenticado en prod: pendiente** | guardas terminales checklist/firma → I3C3                                             |
+| **I3C3**  | Compleción coordinada (Delivery→COMPLETADA, Vehicle→VENDIDO, `soldAt`, Match/Buyer, Warranty, follow-ups) + edición de checklist y firma serializadas | preparado en PR (sin fusionar) |  n/a (sin migración)   |     —      |                          —                           | checklist/firma validados y **escritos** bajo lock; TOCTOU cerrado; **no reversible** |
+| **I3D**   | Descarte coordinado (`DESCARTADO` bloqueando ofertas/entregas activas)                                                                                |               —                |           —            |     —      |                          —                           | **no iniciado**                                                                       |
+| **I3E**   | Tasación coordinada                                                                                                                                   |               —                |           —            |     —      |                          —                           | **no iniciado**                                                                       |
 
 ## Estado vigente (resumen)
 
@@ -33,15 +33,16 @@ producción).
 - **I3C3: preparado en rama/PR, sin fusionar, sin desplegar, sin validar.** Coordina la compleción
   `EN_CURSO→COMPLETADA` bajo root locks; sin migración.
 - **I3D, I3E: pendientes** (no iniciados).
-- **Guarda de edición de checklist en estados terminales: incluida en I3C3** (bloquea editar el
-  checklist de una entrega COMPLETADA/CANCELADA). La firma ya era obligatoria pre-compleción; I3C3
-  además revalida checklist y firma **bajo el lock**, cerrando el TOCTOU salvo una ventana teórica de
-  sub-transacción sobre datos de auditoría (documentada en el ciclo de vida).
+- **Writers de precondición serializados con la compleción: incluido en I3C3.** La edición de
+  checklist (`updateChecklistItemTx`) y la firma (`writeSignatureTx`) entran en el **mismo protocolo de
+  root locks** que la compleción: relean la entrega bajo el lock y rechazan en estados terminales. El
+  TOCTOU checklist/firma↔compleción queda **cerrado end-to-end** (sin ventana residual); ambas carreras
+  están demostradas con PostgreSQL real (`waitUntilBlocked`).
 - **Validación autenticada del flujo de entrega en producción: pendiente** (`AUTHENTICATED DELIVERY
 FLOW VALIDATION PENDING`).
-- **Callers productivos de `withLockedRoots`: 6** (createOffer, updateOfferStatus, updateVehicle,
-  createDelivery, transición/cancelación de Delivery, **compleción de Delivery**) — verificar contra
-  código al cambiar.
+- **Callers productivos de `withLockedRoots`: 8** (createOffer, updateOfferStatus, updateVehicle,
+  createDelivery, transición/cancelación de Delivery, compleción de Delivery, **edición de checklist**,
+  **firma**) — verificar contra código al cambiar.
 
 ## PR #117 (relación documental, sin auditar su código)
 

@@ -212,7 +212,7 @@ existe y no se inventa aquí.
 
 ### Callers productivos (verificado en código)
 
-Exactamente **6** puntos de llamada productivos de `withLockedRoots` (`grep` sobre `app/`+`lib/`, sin
+Exactamente **8** puntos de llamada productivos de `withLockedRoots` (`grep` sobre `app/`+`lib/`, sin
 tests):
 
 1. `createOffer` — `app/(backoffice)/ofertas/actions.ts` (I2B).
@@ -224,6 +224,17 @@ tests):
    `updateDeliveryStatus` (EN_CURSO) y `cancelDelivery`.
 6. **Compleción coordinada de Delivery** — `app/(backoffice)/entregas/actions.ts` →
    `completeDeliveryTx` (I3C3), invocada por `updateDeliveryStatus` (COMPLETADA).
+7. **Edición de checklist coordinada** — `app/(backoffice)/entregas/actions.ts` →
+   `updateChecklistItemTx` (I3C3), invocada por `updateDeliveryChecklistItem`.
+8. **Firma coordinada** — `app/(backoffice)/entregas/actions.ts` → `writeSignatureTx` (I3C3),
+   invocada por `signDelivery`.
+
+**Los writers de PRECONDICIÓN participan en el mismo protocolo.** La compleción valida checklist y
+firma bajo el lock, pero eso solo cierra el TOCTOU si los writers que producen esas precondiciones
+—edición de checklist y firma— también toman los mismos root locks. Si no, un writer que leyó
+`EN_CURSO` antes del commit de la compleción podría escribir después del terminal
+(`COMPLETADA + checklist incompleto`). Por eso (7) y (8) entran en el protocolo: se serializan con la
+compleción por los mismos row locks y relean el estado terminal bajo el lock antes de escribir.
 
 > El número **debe verificarse contra el código**, no copiarse: cualquier fase futura que añada o
 > retire un caller debe actualizar esta lista.
@@ -271,9 +282,18 @@ construye las raíces (`Vehicle → SellerLead → BuyerLead`) y ejecuta el núc
 `withLockedRoots`. Relee Delivery/Vehicle/Offer/leads y **valida checklist y firma bajo el lock**
 antes de escribir; conserva el CAS de Delivery y de Vehicle como segunda barrera; todos los efectos
 (incluidos Warranty y los 2 follow-ups, únicos por `@unique`) son atómicos en la transacción. La
-compleción **admite leads archivados** (no los reactiva) y **no es reversible**. Además,
-`updateDeliveryChecklistItem` bloquea la edición del checklist en estados terminales; queda una ventana
-teórica de sub-transacción sobre datos de auditoría, descrita en el ciclo de vida (§6).
+compleción **admite leads archivados** (no los reactiva) y **no es reversible**.
+
+**Serialización de los writers de precondición.** La validación de checklist/firma bajo el lock solo
+cierra el TOCTOU si los writers que producen esas precondiciones también toman los mismos root locks.
+Por eso `updateChecklistItemTx` y `writeSignatureTx` (núcleo en `lib/delivery-precondition.ts`,
+invocados por `updateDeliveryChecklistItem` y `signDelivery`) ejecutan dentro de `withLockedRoots`,
+relean la entrega bajo el lock y clasifican el estado terminal antes de escribir. Así, gane quien
+gane: si la compleción va primero, el writer se bloquea, relee el terminal y **rechaza**; si el writer
+va primero, la compleción se bloquea y, al releer el checklist incompleto, devuelve
+`CHECKLIST_INCOMPLETE`. **No queda ninguna ventana** en la que una entrega `COMPLETADA` conviva con un
+checklist incompleto o con una firma escrita tras el terminal. Ambas carreras están demostradas con
+PostgreSQL real y contención observada.
 
 ### Pendiente
 
