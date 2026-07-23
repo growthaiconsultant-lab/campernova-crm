@@ -212,7 +212,7 @@ existe y no se inventa aquí.
 
 ### Callers productivos (verificado en código)
 
-Exactamente **10** puntos de llamada productivos de `withLockedRoots` (`grep` sobre `app/`+`lib/`, sin
+Exactamente **11** puntos de llamada productivos de `withLockedRoots` (`grep` sobre `app/`+`lib/`, sin
 tests):
 
 1. `createOffer` — `app/(backoffice)/ofertas/actions.ts` (I2B).
@@ -233,15 +233,20 @@ tests):
    (`sellerLead`/`buyerLead`).
 10. **Reactivar lead** — `app/(backoffice)/lead-archiving-actions.ts` → `reactivateLead` (PR #117),
     invocada por `reactivateSellerLead`/`reactivateBuyerLead`.
+11. **Crear evento de calendario vinculado a un lead** — `app/(backoffice)/calendario/actions.ts` →
+    `createCalendarEvent` (PR #117). Solo cuando el evento es **futuro** (blocker `FUTURE_EVENT`) y
+    referencia un lead: bloquea la fila del `sellerLead`/`buyerLead`, relee `archivedAt` y rechaza si
+    está archivado. Eventos pasados/terminales o sin lead se crean sin lock (no son blockers).
 
 > **Archivado (PR #117, sin fusionar).** Bloquear **la fila del lead** basta para serializar el
-> archivado con TODOS los writers coordinados que podrían crear una dependencia bloqueante para él:
-> `createOffer`, `updateOfferStatus`, `createDelivery`, la transición/cancelación de Delivery,
-> `updateVehicle` y `setNextAction` bloquean o escriben la fila del lead. Gane quien gane: el writer ve
-> `archivedAt` fijado (rechaza `LEAD_ARCHIVED`), o el archivado relee sus bloqueos bajo el lock y ve la
-> dependencia nueva (rechaza `blocked`). Límite conocido: los eventos de calendario futuros
-> (`CalendarEvent`) no escriben la fila del lead, así que su creación concurrente no se serializa por
-> este lock; es un bloqueo blando de UX (el evento no se pierde), no una incoherencia de venta.
+> archivado con TODOS los writers que pueden crear una dependencia bloqueante para él. Los **seis**
+> blockers están serializados: `createOffer`/`updateOfferStatus`/`createDelivery`/transición-cancelación
+> de Delivery y `updateVehicle` bloquean la fila del lead; `setNextAction` **escribe** la fila del lead;
+> y **`createCalendarEvent`** (evento futuro vinculado a un lead) adopta el mismo protocolo (caller
+> 11). Gane quien gane: el writer ve `archivedAt` fijado (rechaza `LEAD_ARCHIVED`/mensaje de archivado),
+> o el archivado relee sus bloqueos bajo el lock y ve la dependencia nueva (rechaza `blocked`). Ambas
+> carreras están demostradas con PostgreSQL real (`waitUntilBlocked`), incluidas las de
+> `startDelivery`/`completeDelivery`. No queda ningún blocker sin serializar.
 
 **Los writers de PRECONDICIÓN participan en el mismo protocolo.** La compleción valida checklist y
 firma bajo el lock, pero eso solo cierra el TOCTOU si los writers que producen esas precondiciones

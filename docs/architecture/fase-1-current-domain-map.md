@@ -103,12 +103,15 @@ Clasificación: **A** activo · **P** parcial/soporte · **L** legacy · **M** m
     reserva viva, entrega programada/en curso, próxima acción pendiente, evento futuro). No se
     cancela ni reasigna nada automáticamente: el operador debe resolverlo antes.
   - **Integridad concurrente:** archivar/reactivar adoptan el **protocolo de root locks**
-    (`withLockedRoots`, orden `Vehicle → SellerLead → BuyerLead`), igual que ofertas/entregas
+    (`withLockedRoots` sobre la fila del lead), igual que ofertas/entregas
     (ver `adr/0009-root-lock-coordination.md`): la lectura del lead, la de **todas** las
     dependencias, la clasificación de bloqueos, el compare-and-swap sobre `archivedAt` y la
-    `Activity` ocurren **bajo el lock**, en una única transacción. Así no puede archivarse un lead
-    cuya oferta/entrega se está creando concurrentemente: el writer coordinado y el archivado se
-    serializan por las mismas raíces.
+    `Activity` ocurren **bajo el lock**, en una única transacción. **Los seis blockers están
+    serializados**: oferta/reserva/entrega (los writers bloquean la fila del lead), vehículo en stock
+    (`updateVehicle` bloquea el vendedor), próxima acción (`setNextAction` escribe la fila del lead) y
+    **evento futuro** (`createCalendarEvent` vinculado a un lead adopta el mismo protocolo y rechaza si
+    el lead está archivado). Así no puede quedar un lead archivado con una dependencia bloqueante
+    creada en carrera; ambas intercalaciones están demostradas con PostgreSQL real.
   - **Efecto aceptado:** Prisma actualiza `updatedAt` (`@updatedAt`) al archivar y al reactivar.
     Es inevitable; puede alterar el orden de las vistas que ordenan por `sort=updatedAt`. **No**
     afecta a los KPIs canónicos (`getSalesInRange`, `getMonthlyNetMargin`, `getFlowKpis`), que
