@@ -16,6 +16,13 @@ vi.mock('@/lib/lead-archiving', async (importOriginal) => {
   }
 })
 
+// `withLockedRoots` se mockea para inspeccionar las raíces y ejecutar el núcleo REAL contra mockDb.
+// `LockError`/`isLockError` se mantienen reales para que la traducción de errores funcione.
+vi.mock('@/lib/locking', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/lib/locking')>()
+  return { ...actual, withLockedRoots: vi.fn() }
+})
+
 const { mockDb } = vi.hoisted(() => {
   const mockDb = {
     sellerLead: { findUnique: vi.fn(), updateMany: vi.fn() },
@@ -28,9 +35,9 @@ const { mockDb } = vi.hoisted(() => {
 vi.mock('@/lib/db', () => ({ db: mockDb }))
 
 import type { User } from '@prisma/client'
-import { Prisma } from '@prisma/client'
 import { revalidatePath } from 'next/cache'
 import { requireAgente } from '@/lib/auth'
+import { withLockedRoots, LockError } from '@/lib/locking'
 import {
   loadSellerArchiveDependencies,
   loadBuyerArchiveDependencies,
@@ -65,6 +72,8 @@ beforeEach(() => {
   mockDb.$transaction.mockImplementation(async (fn: (tx: typeof mockDb) => Promise<unknown>) =>
     fn(mockDb)
   )
+  // Por defecto, el helper bloquea las raíces y ejecuta el núcleo contra mockDb.
+  vi.mocked(withLockedRoots).mockImplementation(async (_roots, op) => op(mockDb as never))
 })
 
 // ─── Archivar (vendedor) ──────────────────────────────────────────────────────
@@ -174,7 +183,7 @@ describe('archiveSellerLead', () => {
     expect(res).toMatchObject({ status: 'error' })
     if (res.status === 'error') expect(res.message).toContain('500')
     expect(mockDb.sellerLead.updateMany).not.toHaveBeenCalled()
-    expect(mockDb.$transaction).not.toHaveBeenCalled()
+    expect(withLockedRoots).not.toHaveBeenCalled()
   })
 
   it('acepta exactamente 500 caracteres', async () => {
@@ -184,69 +193,50 @@ describe('archiveSellerLead', () => {
     expect(mockDb.sellerLead.updateMany.mock.calls[0][0].data.archiveNotes).toHaveLength(500)
   })
 
-  it('usa aislamiento Serializable y ejecuta las lecturas DENTRO de la transacción', async () => {
+  it('bloquea la RAÍZ del lead y ejecuta las lecturas/escrituras BAJO el lock', async () => {
     mockDb.sellerLead.findUnique.mockResolvedValue({ status: 'NUEVO', archivedAt: null })
     await archiveSellerLead('s1', 'OTRO')
-    // Las dependencias se cargan con el cliente transaccional, no con el global.
+    // Root correcta: la fila del propio SellerLead.
+    const [roots] = vi.mocked(withLockedRoots).mock.calls[0]
+    expect(roots).toEqual([{ type: 'sellerLead', id: 's1' }])
+    // Las dependencias se cargan con el cliente transaccional (bajo el lock), no con el global.
     expect(vi.mocked(loadSellerArchiveDependencies).mock.calls[0][0]).toBe(mockDb)
-    expect(mockDb.$transaction.mock.calls[0][1]).toEqual({ isolationLevel: 'Serializable' })
+  })
+
+  it('el comprador bloquea la RAÍZ buyerLead', async () => {
+    mockDb.buyerLead.findUnique.mockResolvedValue({ status: 'NUEVO', archivedAt: null })
+    await archiveBuyerLead('b1', 'OTRO')
+    expect(vi.mocked(withLockedRoots).mock.calls[0][0]).toEqual([{ type: 'buyerLead', id: 'b1' }])
   })
 })
 
-// ─── Conflictos de serialización ──────────────────────────────────────────────
+// ─── Coordinación por locks (traducción de errores) ───────────────────────────
 
-function conflict() {
-  return new Prisma.PrismaClientKnownRequestError('write conflict', {
-    code: 'P2034',
-    clientVersion: 'test',
-  })
-}
-
-describe('conflictos de serialización', () => {
-  it('reintenta ante P2034 y acaba archivando', async () => {
-    mockDb.sellerLead.findUnique.mockResolvedValue({ status: 'NUEVO', archivedAt: null })
-    let calls = 0
-    mockDb.$transaction.mockImplementation(async (fn: (tx: typeof mockDb) => Promise<unknown>) => {
-      calls += 1
-      if (calls === 1) throw conflict()
-      return fn(mockDb)
-    })
-
+describe('coordinación por locks', () => {
+  it('ROOT_NOT_FOUND → error "no encontrado", sin revalidar', async () => {
+    vi.mocked(withLockedRoots).mockRejectedValueOnce(new LockError('ROOT_NOT_FOUND'))
     const res = await archiveSellerLead('s1', 'OTRO')
-    expect(res).toEqual({ status: 'archived' })
-    expect(calls).toBe(2)
-  })
-
-  it('al agotar los intentos devuelve error seguro, sin detalles de Prisma', async () => {
-    mockDb.sellerLead.findUnique.mockResolvedValue({ status: 'NUEVO', archivedAt: null })
-    mockDb.$transaction.mockImplementation(async () => {
-      throw conflict()
-    })
-
-    const res = await archiveSellerLead('s1', 'OTRO')
-    expect(res.status).toBe('error')
-    if (res.status === 'error') {
-      expect(res.message).toMatch(/concurrencia/i)
-      // Mensaje de negocio: sin código ni rastro técnico de Prisma.
-      expect(res.message).not.toMatch(/P2034/i)
-      expect(res.message).not.toMatch(/prisma/i)
-      expect(res.message).not.toMatch(/transaction|serializ/i)
-    }
-    // Acotado: 3 intentos totales, sin bucle infinito.
-    expect(mockDb.$transaction).toHaveBeenCalledTimes(3)
+    expect(res).toMatchObject({ status: 'error' })
+    if (res.status === 'error') expect(res.message).toMatch(/no se ha encontrado/i)
     expect(revalidatePath).not.toHaveBeenCalled()
   })
 
-  it('NO reintenta ante un error Prisma distinto: se propaga', async () => {
-    mockDb.sellerLead.findUnique.mockResolvedValue({ status: 'NUEVO', archivedAt: null })
-    mockDb.$transaction.mockImplementation(async () => {
-      throw new Prisma.PrismaClientKnownRequestError('otro', {
-        code: 'P2002',
-        clientVersion: 'test',
-      })
-    })
-    await expect(archiveSellerLead('s1', 'OTRO')).rejects.toMatchObject({ code: 'P2002' })
-    expect(mockDb.$transaction).toHaveBeenCalledTimes(1)
+  it('LOCK_TIMEOUT/DEADLOCK → error de concurrencia seguro, sin detalles técnicos', async () => {
+    for (const code of ['LOCK_TIMEOUT', 'DEADLOCK'] as const) {
+      vi.mocked(withLockedRoots).mockRejectedValueOnce(new LockError(code))
+      const res = await archiveSellerLead('s1', 'OTRO')
+      expect(res.status).toBe('error')
+      if (res.status === 'error') {
+        expect(res.message).toMatch(/concurrencia/i)
+        expect(res.message).not.toMatch(/prisma|lock|deadlock|P20/i)
+      }
+    }
+    expect(revalidatePath).not.toHaveBeenCalled()
+  })
+
+  it('un error NO-lock se propaga sin envolver', async () => {
+    vi.mocked(withLockedRoots).mockRejectedValueOnce(new Error('boom no-lock'))
+    await expect(archiveSellerLead('s1', 'OTRO')).rejects.toThrow('boom no-lock')
   })
 })
 

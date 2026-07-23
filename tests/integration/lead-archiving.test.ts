@@ -168,6 +168,7 @@ describe('archivar y reactivar no alteran el negocio', () => {
       data: {
         vehicleId: vehicleId!,
         buyerLeadId: buyer.leadId,
+        offerId: offer.id,
         scheduledAt: PAST,
         status: 'COMPLETADA',
       },
@@ -368,16 +369,27 @@ describe('dependencias activas bloquean el archivado', () => {
   it('entrega programada bloquea', async () => {
     const { vehicleId } = await makeSeller({ vehicleStatus: 'VENDIDO' })
     const buyer = await makeBuyer()
+    const offer = await prisma.offer.create({
+      data: {
+        vehicleId: vehicleId!,
+        buyerLeadId: buyer.leadId,
+        amount: 30_000,
+        status: 'CONVERTIDA',
+        createdById: authHolder.user.id,
+      },
+    })
     const delivery = await prisma.delivery.create({
       data: {
         vehicleId: vehicleId!,
         buyerLeadId: buyer.leadId,
+        offerId: offer.id,
         scheduledAt: FUTURE,
         status: 'PROGRAMADA',
       },
     })
     cleanups.push(async () => {
       await prisma.delivery.deleteMany({ where: { id: delivery.id } })
+      await prisma.offer.deleteMany({ where: { id: offer.id } })
     })
 
     const res = await archiveBuyerLead(buyer.leadId, 'OTRO')
@@ -440,15 +452,16 @@ describe('idempotencia y concurrencia', () => {
     expect(acts).toBe(1)
   })
 
-  it('reserva concurrente: nunca queda un estado roto ni una decisión incoherente', async () => {
-    // LIMITACIÓN: Prisma no permite pausar dentro de la transacción, así que la ventana de
-    // solapamiento no es determinista. Se repite el interleaving varias veces y se comprueba una
-    // INVARIANTE que debe cumplirse en cualquier orden de serialización:
+  it('reserva concurrente (insert directo): nunca queda un estado roto ni una decisión incoherente', async () => {
+    // Aquí la reserva se inserta con `prisma.offer.create` DIRECTO (no el writer coordinado), que
+    // no bloquea la fila del lead; el resultado del solapamiento no es determinista. Se comprueba la
+    // INVARIANTE que debe cumplirse en cualquier orden:
     //   · si devuelve `blocked` → el lead NO puede quedar archivado;
     //   · si devuelve `archived` → hay EXACTAMENTE una Activity de archivado (nunca 0 ni 2);
     //   · nunca hay estado roto (archivado sin Activity, o Activity sin archivar).
-    // Con `Serializable` se elimina además la anomalía de READ COMMITTED en la que la lectura de
-    // dependencias no ve una oferta ya confirmada y aun así el CAS se aplica.
+    // La serialización REAL frente a los writers coordinados (`createOfferTx`/`createDeliveryTx`,
+    // que sí bloquean el lead) se demuestra con contención observada en
+    // `lead-archiving-coordination.test.ts`.
     for (let i = 0; i < 6; i++) {
       const { leadId, vehicleId } = await makeSeller({ vehicleStatus: 'VENDIDO' })
       const buyer = await makeBuyer()
