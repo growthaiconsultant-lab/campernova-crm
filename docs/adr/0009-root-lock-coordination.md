@@ -204,7 +204,7 @@ existe y no se inventa aquí.
 
 ---
 
-## Actualización de adopción (vigente en `main`, `687eae1`)
+## Actualización de adopción (vigente en `main`, `ae88e31`)
 
 > La sección «Estado y limitaciones» describe el momento en que I1 era **infraestructura inerte**.
 > Eso **ya no es cierto**: I2 (ofertas) e I3 (entregas/vehículo) adoptaron el protocolo. Esta sección

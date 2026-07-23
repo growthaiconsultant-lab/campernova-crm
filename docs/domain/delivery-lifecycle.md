@@ -1,6 +1,6 @@
 # Ciclo de vida de la entrega (Delivery) — fuente de verdad funcional
 
-> **Estado:** vigente en `main` (verificado contra código, `687eae1`).
+> **Estado:** vigente en `main` (verificado contra código, `ae88e31`).
 > **Alcance:** contrato funcional de `Delivery` y su relación con `Offer`, `Vehicle`, `BuyerLead` y
 > `SellerLead`. Marketplace, SaaS multiempresa y otras expansiones **no** forman parte del alcance
 > activo (ver `docs/architecture/fase-1-evolution-roadmap.md`).
