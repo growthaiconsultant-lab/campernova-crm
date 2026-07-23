@@ -23,6 +23,11 @@ import {
   isDeliveryTransitionError,
   type TransitionDeliveryHooks,
 } from '@/lib/delivery-transitions'
+import {
+  updateChecklistItemTx,
+  writeSignatureTx,
+  isDeliveryPreconditionError,
+} from '@/lib/delivery-precondition'
 import { createGuardedTestPrisma, uniqueSuffix } from './db'
 
 let prismaA: PrismaClient
@@ -206,11 +211,106 @@ const codeOf = (err: unknown): string | null =>
     ? err.code
     : isDeliveryTransitionError(err)
       ? err.code
-      : err instanceof DeliveryConflictError
-        ? err.reason
-        : err instanceof Error
-          ? 'OTHER'
-          : null
+      : isDeliveryPreconditionError(err)
+        ? err.code
+        : err instanceof DeliveryConflictError
+          ? err.reason
+          : err instanceof Error
+            ? 'OTHER'
+            : null
+
+/**
+ * Edición de checklist COORDINADA (production-accurate): withLockedRoots + updateChecklistItemTx.
+ * `hold` (opcional) mantiene abierta la transacción tras escribir, para forzar contención real: la
+ * operación señala `onLocked` una vez ha escrito bajo el lock y espera `hold` antes de commitear.
+ */
+function editC(
+  f: Fixture,
+  client: PrismaClient,
+  itemId: string,
+  result: 'PENDIENTE' | 'OK' | 'INCIDENCIA' | 'NO_APLICA',
+  opts: { hold?: Promise<void>; onLocked?: () => void } = {}
+) {
+  const roots = buildDeliveryCreationRoots({
+    vehicleId: f.vehicleId,
+    sellerLeadId: f.sellerId,
+    buyerLeadId: f.buyerId,
+  })
+  return withLockedRoots(
+    roots,
+    async (tx) => {
+      await updateChecklistItemTx(tx, {
+        itemId,
+        deliveryId: f.deliveryId,
+        vehicleId: f.vehicleId,
+        buyerLeadId: f.buyerId,
+        resolvedSellerLeadId: f.sellerId,
+        result,
+        notes: null,
+      })
+      opts.onLocked?.()
+      if (opts.hold) await opts.hold
+    },
+    { client, lockTimeoutMs: 8_000 }
+  )
+}
+
+/** Firma COORDINADA (production-accurate): withLockedRoots + writeSignatureTx. */
+function signC(
+  f: Fixture,
+  client: PrismaClient,
+  opts: { hold?: Promise<void>; onLocked?: () => void; signatureUrl?: string } = {}
+) {
+  const roots = buildDeliveryCreationRoots({
+    vehicleId: f.vehicleId,
+    sellerLeadId: f.sellerId,
+    buyerLeadId: f.buyerId,
+  })
+  return withLockedRoots(
+    roots,
+    async (tx) => {
+      await writeSignatureTx(tx, {
+        deliveryId: f.deliveryId,
+        vehicleId: f.vehicleId,
+        buyerLeadId: f.buyerId,
+        resolvedSellerLeadId: f.sellerId,
+        actorId: f.userId,
+        actorIsAdmin: false,
+        signedByName: 'Cliente',
+        signedByDni: '12345678Z',
+        signatureUrl: opts.signatureUrl ?? 'sig.png',
+      })
+      opts.onLocked?.()
+      if (opts.hold) await opts.hold
+    },
+    { client, lockTimeoutMs: 8_000 }
+  )
+}
+
+/** id del ítem "Llaves" del checklist sembrado (el que puede quedar PENDIENTE). */
+async function keysItemId(f: Fixture): Promise<string> {
+  const item = await prismaA.deliveryChecklistItem.findFirstOrThrow({
+    where: { deliveryId: f.deliveryId, item: 'Llaves' },
+    select: { id: true },
+  })
+  return item.id
+}
+
+async function itemResult(itemId: string): Promise<string> {
+  const it = await prismaA.deliveryChecklistItem.findUniqueOrThrow({
+    where: { id: itemId },
+    select: { result: true },
+  })
+  return it.result
+}
+
+async function signatureUrlOf(f: Fixture): Promise<string | null> {
+  const d = await prismaA.delivery.findUniqueOrThrow({
+    where: { id: f.deliveryId },
+    select: { signatureUrl: true },
+  })
+  return d.signatureUrl
+}
 
 async function state(f: Fixture) {
   const [d, v, o, warranties, followups, cancelActs] = await Promise.all([
@@ -403,5 +503,137 @@ describe('compleción coordinada · concurrencia (contención observada)', () =>
     expect(aRes).not.toBeInstanceOf(Error)
     expect(codeOf(bRes)).toBe('DELIVERY_ALREADY_COMPLETED')
     expect((await state(f)).warranties).toBe(1)
+  })
+})
+
+// ─── Corrección I3C3: serialización de writers de precondición con la compleción ──────────────────
+
+describe('edición de checklist vs compleción (serializadas por el mismo lock)', () => {
+  it('gana la COMPLECIÓN: la edición se bloquea y luego observa ALREADY_COMPLETED; el ítem sigue OK', async () => {
+    const f = await seed({ pendingChecklist: false, signed: true })
+    const itemId = await keysItemId(f)
+    // La compleción valida checklist/firma y se pausa BAJO el lock (antes del CAS).
+    const paused = barrier()
+    const release = barrier()
+    const comp = completeC(f, prismaA, {
+      hooks: {
+        beforeDeliveryWrite: async () => {
+          paused.open()
+          await release.wait
+        },
+      },
+    }).catch((e) => e)
+    await paused.wait
+    // La edición intenta poner PENDIENTE y queda BLOQUEADA esperando las mismas raíces.
+    const edit = editC(f, prismaB, itemId, 'PENDIENTE').catch((e) => e)
+    await waitUntilBlocked()
+    release.open()
+    const compRes = await comp
+    const editRes = await edit
+    expect(compRes).not.toBeInstanceOf(Error)
+    expect(codeOf(editRes)).toBe('DELIVERY_ALREADY_COMPLETED')
+    expect(await itemResult(itemId)).toBe('OK') // la edición NO escribió
+    const st = await state(f)
+    expect(st.d.status).toBe('COMPLETADA')
+    expect(st.v.status).toBe('VENDIDO')
+    expect(st.warranties).toBe(1)
+  })
+
+  it('gana la EDICIÓN: la compleción se bloquea y luego observa CHECKLIST_INCOMPLETE; nada de venta', async () => {
+    const f = await seed({ pendingChecklist: false, signed: true })
+    const itemId = await keysItemId(f)
+    // La edición pone PENDIENTE y HOLD del lock; señala cuando ya escribió bajo el lock.
+    const locked = barrier()
+    const hold = barrier()
+    const edit = editC(f, prismaA, itemId, 'PENDIENTE', {
+      onLocked: () => locked.open(),
+      hold: hold.wait,
+    }).catch((e) => e)
+    await locked.wait
+    // La compleción queda BLOQUEADA esperando las mismas raíces.
+    const comp = completeC(f, prismaB).catch((e) => e)
+    await waitUntilBlocked()
+    hold.open()
+    const editRes = await edit
+    const compRes = await comp
+    expect(editRes).not.toBeInstanceOf(Error)
+    expect(codeOf(compRes)).toBe('CHECKLIST_INCOMPLETE')
+    expect(await itemResult(itemId)).toBe('PENDIENTE')
+    const st = await state(f)
+    expect(st.d.status).toBe('EN_CURSO')
+    expect(st.v.status).toBe('RESERVADO')
+    expect(st.warranties).toBe(0)
+    expect(st.followups).toBe(0)
+  })
+
+  it('estado terminal COMPLETADA: la edición se rechaza y no muta', async () => {
+    const f = await seed({ deliveryStatus: 'COMPLETADA' })
+    const itemId = await keysItemId(f)
+    const res = await editC(f, prismaA, itemId, 'PENDIENTE').catch((e) => e)
+    expect(codeOf(res)).toBe('DELIVERY_ALREADY_COMPLETED')
+    expect(await itemResult(itemId)).toBe('OK')
+  })
+
+  it('estado terminal CANCELADA: la edición se rechaza y no muta', async () => {
+    const f = await seed({ deliveryStatus: 'CANCELADA' })
+    const itemId = await keysItemId(f)
+    const res = await editC(f, prismaA, itemId, 'PENDIENTE').catch((e) => e)
+    expect(codeOf(res)).toBe('DELIVERY_ALREADY_CANCELLED')
+    expect(await itemResult(itemId)).toBe('OK')
+  })
+})
+
+describe('firma vs compleción (serializadas por el mismo lock)', () => {
+  it('gana la FIRMA: la compleción se bloquea y luego completa con la firma escrita', async () => {
+    // Sin firma inicial: si la compleción corriese primero fallaría SIGNATURE_REQUIRED.
+    const f = await seed({ signed: false })
+    const locked = barrier()
+    const hold = barrier()
+    const sign = signC(f, prismaA, {
+      signatureUrl: 'firma-nueva.png',
+      onLocked: () => locked.open(),
+      hold: hold.wait,
+    }).catch((e) => e)
+    await locked.wait
+    const comp = completeC(f, prismaB).catch((e) => e)
+    await waitUntilBlocked()
+    hold.open()
+    const signRes = await sign
+    const compRes = await comp
+    expect(signRes).not.toBeInstanceOf(Error)
+    expect(compRes).not.toBeInstanceOf(Error)
+    expect(await signatureUrlOf(f)).toBe('firma-nueva.png')
+    expect((await state(f)).d.status).toBe('COMPLETADA')
+  })
+
+  it('gana la COMPLECIÓN: la firma se bloquea y luego observa ALREADY_COMPLETED; firma intacta', async () => {
+    const f = await seed({ signed: true })
+    const paused = barrier()
+    const release = barrier()
+    const comp = completeC(f, prismaA, {
+      hooks: {
+        beforeDeliveryWrite: async () => {
+          paused.open()
+          await release.wait
+        },
+      },
+    }).catch((e) => e)
+    await paused.wait
+    const sign = signC(f, prismaB, { signatureUrl: 'no-debe-escribirse.png' }).catch((e) => e)
+    await waitUntilBlocked()
+    release.open()
+    const compRes = await comp
+    const signRes = await sign
+    expect(compRes).not.toBeInstanceOf(Error)
+    expect(codeOf(signRes)).toBe('DELIVERY_ALREADY_COMPLETED')
+    expect(await signatureUrlOf(f)).toBe('sig.png') // la firma NO se sobrescribió
+    expect((await state(f)).d.status).toBe('COMPLETADA')
+  })
+
+  it('estado terminal CANCELADA: la firma se rechaza', async () => {
+    const f = await seed({ deliveryStatus: 'CANCELADA', signed: false })
+    const res = await signC(f, prismaA).catch((e) => e)
+    expect(codeOf(res)).toBe('DELIVERY_ALREADY_CANCELLED')
+    expect(await signatureUrlOf(f)).toBeNull()
   })
 })
