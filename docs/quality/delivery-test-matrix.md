@@ -1,6 +1,6 @@
 # Matriz de tests y validación — programa de entregas (I3)
 
-> **Estado:** vigente en `main` (`687eae1`). Describe **garantías**, no conteos históricos (los
+> **Estado:** vigente en `main` (`ae88e31`). Describe **garantías**, no conteos históricos (los
 > números de tests cambian; las garantías son el contrato). Los conteos vivos los reporta CI.
 > **Relacionados:** [dominio](../domain/delivery-lifecycle.md) · [locking](../adr/0009-root-lock-coordination.md) ·
 > [migraciones](../governance/database-migrations.md) · [estado I3](../roadmap/i3-status.md).
