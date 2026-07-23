@@ -29,8 +29,8 @@
 
 import { revalidatePath } from 'next/cache'
 import { Prisma } from '@prisma/client'
-import { db } from '@/lib/db'
 import { requireAgente } from '@/lib/auth'
+import { withLockedRoots, isLockError, type LockRoot } from '@/lib/locking'
 import { SELLER_LEAD_STATUS_LABELS, BUYER_LEAD_STATUS_LABELS } from '@/lib/state-machine'
 import {
   ARCHIVE_REASON_LABELS,
@@ -46,38 +46,16 @@ import {
 
 type LeadKind = 'seller' | 'buyer'
 
-/** Código Prisma de conflicto de serialización / write conflict. */
-const SERIALIZATION_CONFLICT = 'P2034'
-/** Intentos TOTALES (1 inicial + 2 reintentos). Acotado: nunca hay bucle infinito. */
-const MAX_ATTEMPTS = 3
-
-function isSerializationConflict(err: unknown): boolean {
-  return err instanceof Prisma.PrismaClientKnownRequestError && err.code === SERIALIZATION_CONFLICT
-}
-
 /**
- * Ejecuta `run` en una transacción `Serializable`, reintentando SOLO ante conflicto de
- * serialización. Cualquier otro error (validación, permisos, Activity, Prisma distinto) se
- * propaga sin reintento. Al agotar los intentos devuelve `onExhausted()` — nunca detalles de
- * Prisma al cliente.
+ * Raíz del protocolo de locks para archivar/reactivar UN lead. Bloquear la fila del propio lead
+ * basta para serializar con TODOS los writers coordinados que podrían crear una dependencia
+ * bloqueante para él: `createOffer`, `updateOfferStatus`, `createDelivery`, la transición/
+ * cancelación de Delivery, `updateVehicle` (I3B) y `setNextAction` — todos bloquean o escriben la
+ * fila del lead. Así, gane quien gane, o el writer ve `archivedAt` fijado (rechaza `LEAD_ARCHIVED`),
+ * o el archivado relee sus bloqueos BAJO el lock y ve la dependencia nueva (rechaza).
  */
-async function withSerializableRetry<T>(
-  run: (tx: Prisma.TransactionClient) => Promise<T>,
-  onExhausted: () => T
-): Promise<T> {
-  for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
-    try {
-      return await db.$transaction(run, {
-        isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
-      })
-    } catch (err) {
-      if (!isSerializationConflict(err)) throw err
-      if (attempt === MAX_ATTEMPTS) return onExhausted()
-      // Espera mínima y acotada para no recolisionar de inmediato.
-      await new Promise((r) => setTimeout(r, 10 * attempt))
-    }
-  }
-  return onExhausted()
+function leadRoot(kind: LeadKind, leadId: string): LockRoot[] {
+  return [{ type: kind === 'seller' ? 'sellerLead' : 'buyerLead', id: leadId }]
 }
 
 function statusLabel(kind: LeadKind, status: string): string {
@@ -138,10 +116,13 @@ async function archiveLead(
   }
   const cleanNotes = notesResult.value
 
-  const outcome = await withSerializableRetry<ArchiveOutcome>(
-    async (tx) => {
-      // (1) lead, (2) dependencias, (3) clasificación, (4) CAS y (5) Activity: TODO dentro de
-      // la misma transacción Serializable, y re-ejecutado íntegro en cada reintento.
+  let outcome: ArchiveOutcome
+  try {
+    // Protocolo de root locks: la fila del lead se bloquea (`FOR UPDATE`) ANTES del callback.
+    // Dentro se relee el lead, se releen TODAS las dependencias, se clasifican los bloqueos, se
+    // hace el CAS y se escribe la Activity — todo BAJO el lock y en la misma transacción. La
+    // lectura preliminar (permiso/validación de entrada) no decide negocio.
+    outcome = await withLockedRoots(leadRoot(kind, leadId), async (tx) => {
       const lead =
         kind === 'seller'
           ? await tx.sellerLead.findUnique({
@@ -152,7 +133,7 @@ async function archiveLead(
               where: { id: leadId },
               select: { status: true, archivedAt: true },
             })
-
+      // El lock ya garantizó que la fila existe; el guard satisface el tipo.
       if (!lead) return { status: 'error', message: 'No se ha encontrado el lead' }
       if (lead.archivedAt != null) return { status: 'already_archived' }
 
@@ -195,12 +176,19 @@ async function archiveLead(
       })
 
       return { status: 'archived' }
-    },
-    () => ({
-      status: 'error',
-      message: 'No se ha podido archivar por un conflicto de concurrencia. Inténtalo de nuevo.',
     })
-  )
+  } catch (err) {
+    if (isLockError(err)) {
+      if (err.code === 'ROOT_NOT_FOUND') {
+        return { status: 'error', message: 'No se ha encontrado el lead' }
+      }
+      return {
+        status: 'error',
+        message: 'No se ha podido archivar por un conflicto de concurrencia. Inténtalo de nuevo.',
+      }
+    }
+    throw err
+  }
 
   // Revalidar SOLO tras una mutación real y siempre fuera de la transacción.
   if (outcome.status === 'archived') revalidateFor(kind, leadId)
@@ -213,8 +201,11 @@ async function reactivateLead(kind: LeadKind, leadId: string): Promise<Reactivat
   const actor = await requireAgente()
   if (!leadId) return { status: 'error', message: 'Falta el identificador del lead' }
 
-  const outcome = await withSerializableRetry<ReactivateOutcome>(
-    async (tx) => {
+  let outcome: ReactivateOutcome
+  try {
+    // Mismo protocolo de root locks. Reactivar solo retira la condición de archivado; no evalúa
+    // bloqueos (des-archivar nunca crea operativa) ni toca estado comercial ni relaciones.
+    outcome = await withLockedRoots(leadRoot(kind, leadId), async (tx) => {
       const lead =
         kind === 'seller'
           ? await tx.sellerLead.findUnique({
@@ -225,7 +216,6 @@ async function reactivateLead(kind: LeadKind, leadId: string): Promise<Reactivat
               where: { id: leadId },
               select: { status: true, archivedAt: true, archiveReason: true },
             })
-
       if (!lead) return { status: 'error', message: 'No se ha encontrado el lead' }
       if (lead.archivedAt == null) return { status: 'already_active' }
 
@@ -262,12 +252,19 @@ async function reactivateLead(kind: LeadKind, leadId: string): Promise<Reactivat
       })
 
       return { status: 'reactivated' }
-    },
-    () => ({
-      status: 'error',
-      message: 'No se ha podido reactivar por un conflicto de concurrencia. Inténtalo de nuevo.',
     })
-  )
+  } catch (err) {
+    if (isLockError(err)) {
+      if (err.code === 'ROOT_NOT_FOUND') {
+        return { status: 'error', message: 'No se ha encontrado el lead' }
+      }
+      return {
+        status: 'error',
+        message: 'No se ha podido reactivar por un conflicto de concurrencia. Inténtalo de nuevo.',
+      }
+    }
+    throw err
+  }
 
   if (outcome.status === 'reactivated') revalidateFor(kind, leadId)
   return outcome
