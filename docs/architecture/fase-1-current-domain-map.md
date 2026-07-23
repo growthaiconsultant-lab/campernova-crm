@@ -99,8 +99,9 @@ Clasificación: **A** activo · **P** parcial/soporte · **L** legacy · **M** m
     `archivedAt == null` ⇔ activo. No cambia el estado comercial, ni vehículo, ofertas, entregas,
     documentos o KPIs; solo escribe los 4 campos de archivado + una `Activity`
     (`LEAD_ARCHIVADO`/`LEAD_REACTIVADO`, no borrables con `deleteNote`). **PR #117 fusionado
-    (`fb501ef`); backend en `main` pero deployment de producción NO verificado — producción sirve
-    `02f9766`. UX de visibilidad y validación mutante en producción: pendientes.**
+    (`fb501ef`) y DESPLEGADO en producción vía `4382774` (READY, sin migración; postflight read-only
+    sin incoherencias, pero 0 leads archivados → vacuo). UX de visibilidad y validación MUTANTE en
+    producción: pendientes.**
   - **Bloqueos:** archivar se **bloquea** si hay operativa abierta (vehículo en stock, oferta o
     reserva viva, entrega programada/en curso, próxima acción pendiente, evento futuro). No se
     cancela ni reasigna nada automáticamente: el operador debe resolverlo antes.

@@ -58,7 +58,7 @@ I3C3:  MERGED (ae88e31), DEPLOYED, TECHNICALLY VALIDATED (no migration)
 AUTHENTICATED I3C3 END-TO-END VALIDATION: LIMITED BY NO DELIVERY DATA
 I3D:   NOT STARTED
 I3E:   NOT STARTED
-PR #117 (lead archiving, SEPARATE from I3): MERGED (fb501ef); PRODUCTION DEPLOYMENT NOT VERIFIED (prod serves 02f9766); UI/mutating validation pending
+PR #117 (lead archiving, SEPARATE from I3): MERGED (fb501ef); DEPLOYED IN PRODUCTION via 4382774 (READY, no migration); prod serves 4382774; UI/mutating validation pending
 ```
 
 ## Deuda de validación (operativa, no automática)
@@ -74,23 +74,24 @@ VALIDATE AUTHENTICATED DELIVERY COMPLETION WITH THE FIRST SAFE REAL DELIVERY
 - Observar logs y datos después de la primera compleción real.
 - Ejecutar con **autorización explícita**; es una comprobación manual, no una tarea automática.
 
-### Deudas operativas de archivado (PR #117, distintas entre sí)
+### Deudas operativas de archivado (PR #117)
 
 ```
-VERIFY AND DEPLOY ARCHIVING BACKEND SHA fb501ef TO PRODUCTION
+VERIFY AND DEPLOY ARCHIVING BACKEND SHA fb501ef TO PRODUCTION  ✅ CERRADA
 ```
 
-- Deployment todavía **no creado/verificado**; producción sirve `02f9766`.
-- **No** ejecutar manualmente sin autorización; verificar SHA, `target=production`, alias, build y
-  health-check; después, postflight read-only.
+- **Cerrada:** el backend de `fb501ef` está **desplegado en producción vía `4382774`** (`target=production`,
+  READY, alias `campersnova.com`; `4382774` ⊇ `fb501ef`, diff docs-only; **sin migración**). El
+  deployment específico de `fb501ef` fue un fallo transitorio puntual; el siguiente push de `main`
+  desplegó con normalidad. Postflight read-only de prod **sin incoherencias** (0 leads archivados → vacuo).
 
 ```
-VALIDATE ARCHIVE AND REACTIVATE WITH THE FIRST SAFE REAL LEAD
+VALIDATE ARCHIVE AND REACTIVATE WITH THE FIRST SAFE REAL LEAD  (abierta)
 ```
 
-- Validación **mutante** con un lead real y seguro; requiere **autorización aparte** (posterior al
-  deployment). Comprobar archivar/reactivar, motivo/notas, Activity, blockers, CalendarEvent, métricas
-  y postflight; sin datos ficticios; sin bloquear el CRM.
+- Validación **mutante** con un lead real y seguro; requiere **autorización aparte**. Comprobar
+  archivar/reactivar, motivo/notas, Activity, blockers, CalendarEvent, métricas y postflight; sin datos
+  ficticios; sin bloquear el CRM. **No ejecutada.**
 
 ## PR #117 (archivado de leads — SEPARADO de I3)
 
@@ -100,10 +101,13 @@ VALIDATE ARCHIVE AND REACTIVATE WITH THE FIRST SAFE REAL LEAD
 - **No** forma parte de I3C3 ni de I3D/I3E.
 - **No** es dependencia del `LEAD_ARCHIVED` que ya usan I2/I3 en producción: la columna `archivedAt` y
   su enforcement **ya eran productivos**; #117 añade las **acciones** de archivar/reactivar.
-- **Deployment de producción NO verificado:** tras el merge, Vercel **no** creó deployment para
-  `fb501ef`; producción sigue sirviendo `02f9766`. **Fusionado ≠ desplegado.** Sin impacto de usuario
-  (backend sin UX consumidora). Ver las deudas operativas abajo.
-- **UX de visibilidad de archivados y validación mutante en producción: pendientes.**
+- **Desplegado en producción vía `4382774`** (`target=production`, READY, alias `campersnova.com`;
+  `4382774` ⊇ `fb501ef`, diff docs-only; sin migración). El deployment específico de `fb501ef` fue un
+  fallo transitorio puntual, resuelto por el siguiente push de `main`. Postflight read-only sin
+  incoherencias (0 archivados → vacuo); health-check sano. Sin impacto de usuario (backend sin UX
+  consumidora).
+- **UX de visibilidad de archivados y validación MUTANTE en producción: pendientes** (esta última con
+  autorización aparte y el primer lead real seguro).
 
 ## Pendientes (con propietario/fase)
 
