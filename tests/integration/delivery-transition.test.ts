@@ -183,7 +183,7 @@ function complete(f: Fixture, client: PrismaClient, hooks: CompleteDeliveryHooks
           deliveryId: f.deliveryId,
           vehicleId: f.vehicleId,
           buyerLeadId: f.buyerId,
-          sellerLeadId: f.sellerId,
+          resolvedSellerLeadId: f.sellerId,
           actorId: f.userId,
           now: new Date('2026-08-02T10:00:00Z'),
         },

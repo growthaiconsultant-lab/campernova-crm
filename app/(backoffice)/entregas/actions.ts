@@ -5,7 +5,16 @@ import { revalidatePath } from 'next/cache'
 import { z } from 'zod'
 import { db } from '@/lib/db'
 import { requireAdmin, requireCanEditEntregas } from '@/lib/auth'
-import { completeDeliveryTx, DeliveryConflictError } from '@/lib/delivery-completion'
+import {
+  completeDeliveryTx,
+  DeliveryConflictError,
+  isDeliveryCompletionError,
+} from '@/lib/delivery-completion'
+import {
+  updateChecklistItemTx,
+  writeSignatureTx,
+  isDeliveryPreconditionError,
+} from '@/lib/delivery-precondition'
 import { withLockedRoots, isLockError } from '@/lib/locking'
 import {
   createDeliveryTx,
@@ -53,15 +62,6 @@ const DELIVERY_DOC_CATEGORIES: readonly string[] = [
 ]
 
 type ActionResult<T = undefined> = { ok: true; data?: T } | { ok: false; error: string }
-
-const VALID_TRANSITIONS: Partial<Record<DeliveryStatus, DeliveryStatus[]>> = {
-  PROGRAMADA: ['EN_CURSO', 'CANCELADA'],
-  EN_CURSO: ['COMPLETADA', 'CANCELADA'],
-}
-
-function isValidDeliveryTransition(from: DeliveryStatus, to: DeliveryStatus) {
-  return VALID_TRANSITIONS[from]?.includes(to) ?? false
-}
 
 // 14-item checklist created with every delivery
 const INITIAL_CHECKLIST = [
@@ -271,57 +271,45 @@ export async function updateDeliveryStatus(
     return { ok: false, error: DELIVERY_TRANSITION_ERROR_MESSAGES.INVALID_DELIVERY_TRANSITION }
   }
 
-  // COMPLETADA → permanece en la ruta de I3C3 (`completeDeliveryTx`), SIN cambios en esta fase.
-  const delivery = await db.delivery.findUnique({
+  // COMPLETADA → I3C3: compleción COORDINADA bajo `withLockedRoots`. Estado, checklist y firma se
+  // validan BAJO el lock dentro de `completeDeliveryTx` (la lectura preliminar solo resuelve raíces).
+  const prelim = await db.delivery.findUnique({
     where: { id: deliveryId },
     select: {
-      status: true,
       vehicleId: true,
       buyerLeadId: true,
-      signedByName: true,
-      signedByDni: true,
-      signatureUrl: true,
       vehicle: { select: { sellerLeadId: true } },
-      checklist: { select: { result: true } },
     },
   })
-  if (!delivery) return { ok: false, error: 'Entrega no encontrada' }
+  if (!prelim) return { ok: false, error: 'Entrega no encontrada' }
 
-  if (!isValidDeliveryTransition(delivery.status, newStatus)) {
-    return { ok: false, error: `Transición ${delivery.status} → ${newStatus} no permitida.` }
-  }
-
-  const pending = delivery.checklist.filter((c) => c.result === 'PENDIENTE')
-  if (pending.length > 0) {
-    return { ok: false, error: `Hay ${pending.length} ítems pendientes en el checklist.` }
-  }
-  if (!delivery.signedByName || !delivery.signedByDni || !delivery.signatureUrl) {
-    return { ok: false, error: 'La entrega requiere firma antes de completarse.' }
-  }
-
-  const now = new Date()
-  // Finalización ATÓMICA: entrega + vehículo + comprador + match + garantía + seguimientos + trazas
-  // en una única transacción, con compare-and-swap (I3C3 añadirá el protocolo de locks).
+  const roots = buildDeliveryCreationRoots({
+    vehicleId: prelim.vehicleId,
+    sellerLeadId: prelim.vehicle.sellerLeadId,
+    buyerLeadId: prelim.buyerLeadId,
+  })
   try {
-    await db.$transaction((tx) =>
+    await withLockedRoots(roots, (tx) =>
       completeDeliveryTx(tx, {
         deliveryId,
-        vehicleId: delivery.vehicleId,
-        buyerLeadId: delivery.buyerLeadId,
-        sellerLeadId: delivery.vehicle.sellerLeadId,
+        vehicleId: prelim.vehicleId,
+        buyerLeadId: prelim.buyerLeadId,
+        resolvedSellerLeadId: prelim.vehicle.sellerLeadId,
         actorId: actor.id,
-        now,
+        now: new Date(),
       })
     )
   } catch (err) {
+    if (isDeliveryCompletionError(err)) return { ok: false, error: err.message }
     if (err instanceof DeliveryConflictError) return { ok: false, error: err.message }
+    if (isLockError(err)) return { ok: false, error: err.message }
     throw err
   }
 
   revalidatePath('/entregas')
   revalidatePath(`/entregas/${deliveryId}`)
-  revalidatePath(`/vendedores/${delivery.vehicle.sellerLeadId}`)
-  revalidatePath(`/compradores/${delivery.buyerLeadId}`)
+  revalidatePath(`/vendedores/${prelim.vehicle.sellerLeadId}`)
+  revalidatePath(`/compradores/${prelim.buyerLeadId}`)
   return { ok: true }
 }
 
@@ -331,19 +319,48 @@ export async function updateDeliveryChecklistItem(
 ): Promise<ActionResult> {
   await requireCanEditEntregas()
 
-  await db.deliveryChecklistItem.update({
+  // I3C3 (corrección) — edición COORDINADA: se serializa con la compleción por el mismo protocolo de
+  // raíces. La lectura preliminar solo resuelve las raíces; estado terminal y pertenencia se validan
+  // BAJO el lock dentro de `updateChecklistItemTx`.
+  const prelim = await db.deliveryChecklistItem.findUnique({
     where: { id: itemId },
-    data: {
-      result: data.result as 'PENDIENTE' | 'OK' | 'INCIDENCIA' | 'NO_APLICA',
-      notes: data.notes ?? null,
+    select: {
+      deliveryId: true,
+      delivery: {
+        select: {
+          vehicleId: true,
+          buyerLeadId: true,
+          vehicle: { select: { sellerLeadId: true } },
+        },
+      },
     },
   })
+  if (!prelim) return { ok: false, error: 'Ítem de checklist no encontrado' }
 
-  const item = await db.deliveryChecklistItem.findUnique({
-    where: { id: itemId },
-    select: { deliveryId: true },
+  const roots = buildDeliveryCreationRoots({
+    vehicleId: prelim.delivery.vehicleId,
+    sellerLeadId: prelim.delivery.vehicle.sellerLeadId,
+    buyerLeadId: prelim.delivery.buyerLeadId,
   })
-  if (item) revalidatePath(`/entregas/${item.deliveryId}`)
+  try {
+    await withLockedRoots(roots, (tx) =>
+      updateChecklistItemTx(tx, {
+        itemId,
+        deliveryId: prelim.deliveryId,
+        vehicleId: prelim.delivery.vehicleId,
+        buyerLeadId: prelim.delivery.buyerLeadId,
+        resolvedSellerLeadId: prelim.delivery.vehicle.sellerLeadId,
+        result: data.result as 'PENDIENTE' | 'OK' | 'INCIDENCIA' | 'NO_APLICA',
+        notes: data.notes ?? null,
+      })
+    )
+  } catch (err) {
+    if (isDeliveryPreconditionError(err)) return { ok: false, error: err.message }
+    if (isLockError(err)) return { ok: false, error: err.message }
+    throw err
+  }
+
+  revalidatePath(`/entregas/${prelim.deliveryId}`)
   return { ok: true }
 }
 
@@ -353,24 +370,44 @@ export async function signDelivery(deliveryId: string, formData: unknown): Promi
   const parsed = signDeliverySchema.safeParse(formData)
   if (!parsed.success) return { ok: false, error: 'Datos de firma inválidos' }
 
-  const delivery = await db.delivery.findUnique({
+  // I3C3 (corrección) — firma COORDINADA: mismo protocolo de raíces que la compleción, para que una
+  // firma iniciada en EN_CURSO no pueda aterrizar tras un estado terminal. Estado y autorización se
+  // validan BAJO el lock dentro de `writeSignatureTx`; la lectura preliminar solo resuelve raíces.
+  const prelim = await db.delivery.findUnique({
     where: { id: deliveryId },
-    select: { status: true, responsableId: true },
+    select: {
+      vehicleId: true,
+      buyerLeadId: true,
+      vehicle: { select: { sellerLeadId: true } },
+    },
   })
-  if (!delivery) return { ok: false, error: 'Entrega no encontrada' }
-  if (delivery.status === 'COMPLETADA' || delivery.status === 'CANCELADA') {
-    return { ok: false, error: 'La entrega ya está cerrada.' }
-  }
-  if (actor.role !== 'ADMIN' && delivery.responsableId !== actor.id) {
-    return { ok: false, error: 'Solo el responsable de la entrega o un admin puede firmar.' }
-  }
+  if (!prelim) return { ok: false, error: 'Entrega no encontrada' }
 
   const { signedByName, signedByDni, signatureUrl } = parsed.data
-
-  await db.delivery.update({
-    where: { id: deliveryId },
-    data: { signedByName, signedByDni, signatureUrl },
+  const roots = buildDeliveryCreationRoots({
+    vehicleId: prelim.vehicleId,
+    sellerLeadId: prelim.vehicle.sellerLeadId,
+    buyerLeadId: prelim.buyerLeadId,
   })
+  try {
+    await withLockedRoots(roots, (tx) =>
+      writeSignatureTx(tx, {
+        deliveryId,
+        vehicleId: prelim.vehicleId,
+        buyerLeadId: prelim.buyerLeadId,
+        resolvedSellerLeadId: prelim.vehicle.sellerLeadId,
+        actorId: actor.id,
+        actorIsAdmin: actor.role === 'ADMIN',
+        signedByName,
+        signedByDni,
+        signatureUrl,
+      })
+    )
+  } catch (err) {
+    if (isDeliveryPreconditionError(err)) return { ok: false, error: err.message }
+    if (isLockError(err)) return { ok: false, error: err.message }
+    throw err
+  }
 
   revalidatePath(`/entregas/${deliveryId}`)
   return { ok: true }

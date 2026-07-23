@@ -18,6 +18,12 @@ vi.mock('@/lib/delivery-completion', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@/lib/delivery-completion')>()
   return { ...actual, completeDeliveryTx: vi.fn() }
 })
+// Los núcleos de precondición se mockean (delegación de la action). Su lógica se prueba en
+// lib/delivery-precondition.test.ts (unit) y en integración PG17. DeliveryPreconditionError REAL.
+vi.mock('@/lib/delivery-precondition', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/lib/delivery-precondition')>()
+  return { ...actual, updateChecklistItemTx: vi.fn(), writeSignatureTx: vi.fn() }
+})
 // `withLockedRoots` se mockea para inspeccionar raíces y ejecutar el callback con mockDb; el núcleo
 // `createDeliveryTx` corre REAL contra mockDb (flujo end-to-end).
 vi.mock('@/lib/locking', async (importOriginal) => {
@@ -35,6 +41,7 @@ const { mockDb } = vi.hoisted(() => {
       count: vi.fn(),
     },
     deliveryDocument: { create: vi.fn(), findUnique: vi.fn(), delete: vi.fn(), update: vi.fn() },
+    deliveryChecklistItem: { findUnique: vi.fn(), update: vi.fn() },
     documentVersion: { create: vi.fn(), findMany: vi.fn() },
     vehicle: { findUnique: vi.fn() },
     offer: { findUnique: vi.fn() },
@@ -51,7 +58,16 @@ import type { User } from '@prisma/client'
 import { requireCanEditEntregas, requireAdmin } from '@/lib/auth'
 import { revalidatePath } from 'next/cache'
 import { getSupabaseAdminClient } from '@/lib/supabase/admin'
-import { completeDeliveryTx, DeliveryConflictError } from '@/lib/delivery-completion'
+import {
+  completeDeliveryTx,
+  DeliveryConflictError,
+  DeliveryCompletionError,
+} from '@/lib/delivery-completion'
+import {
+  updateChecklistItemTx,
+  writeSignatureTx,
+  DeliveryPreconditionError,
+} from '@/lib/delivery-precondition'
 import { withLockedRoots, LockError } from '@/lib/locking'
 import { Prisma } from '@prisma/client'
 import { DELIVERY_CREATION_ERROR_MESSAGES } from '@/lib/delivery-creation'
@@ -62,6 +78,7 @@ import {
   signDelivery,
   uploadDeliveryDocument,
   deleteDeliveryDocument,
+  updateDeliveryChecklistItem,
 } from './actions'
 
 const storageBucket = {
@@ -212,31 +229,18 @@ describe('updateDeliveryStatus · validaciones previas', () => {
     expect(completeDeliveryTx).not.toHaveBeenCalled()
   })
 
-  it('rechaza transición inválida (PROGRAMADA → COMPLETADA)', async () => {
-    mockDb.delivery.findUnique.mockResolvedValue({ ...signedComplete, status: 'PROGRAMADA' })
+  // I3C3: la validación de estado, checklist y firma se hace BAJO el lock dentro de
+  // `completeDeliveryTx` (unit-tested en delivery-completion.test.ts). La action solo delega y
+  // traduce el error de dominio a un mensaje de UI.
+  it('traduce DeliveryCompletionError (checklist/firma/estado) a { ok:false } y NO revalida', async () => {
+    mockDb.delivery.findUnique.mockResolvedValue({ ...signedComplete })
+    vi.mocked(completeDeliveryTx).mockRejectedValue(
+      new DeliveryCompletionError('CHECKLIST_INCOMPLETE')
+    )
     const res = await updateDeliveryStatus('d1', 'COMPLETADA')
     expect(res.ok).toBe(false)
-    if (!res.ok) expect(res.error).toContain('no permitida')
-    expect(completeDeliveryTx).not.toHaveBeenCalled()
-  })
-
-  it('bloquea COMPLETADA si hay ítems de checklist pendientes', async () => {
-    mockDb.delivery.findUnique.mockResolvedValue({
-      ...signedComplete,
-      checklist: [{ result: 'OK' }, { result: 'PENDIENTE' }],
-    })
-    const res = await updateDeliveryStatus('d1', 'COMPLETADA')
-    expect(res.ok).toBe(false)
-    if (!res.ok) expect(res.error).toContain('pendientes')
-    expect(completeDeliveryTx).not.toHaveBeenCalled()
-  })
-
-  it('bloquea COMPLETADA si falta la firma', async () => {
-    mockDb.delivery.findUnique.mockResolvedValue({ ...signedComplete, signedByName: null })
-    const res = await updateDeliveryStatus('d1', 'COMPLETADA')
-    expect(res.ok).toBe(false)
-    if (!res.ok) expect(res.error).toContain('firma')
-    expect(completeDeliveryTx).not.toHaveBeenCalled()
+    if (!res.ok) expect(res.error).toMatch(/checklist/i)
+    expect(revalidatePath).not.toHaveBeenCalled()
   })
 })
 
@@ -252,7 +256,7 @@ describe('updateDeliveryStatus · finalización atómica (COMPLETADA)', () => {
       deliveryId: 'd1',
       vehicleId: 'veh-1',
       buyerLeadId: 'buyer-1',
-      sellerLeadId: 'seller-1',
+      resolvedSellerLeadId: 'seller-1',
       actorId: 'user-1',
     })
     expect(params.now).toBeInstanceOf(Date)
@@ -343,38 +347,9 @@ describe('I3C2 · transiciones coordinadas (EN_CURSO / CANCELADA)', () => {
   })
 })
 
-describe('signDelivery', () => {
-  const validSign = { signedByName: 'Cliente', signedByDni: '12345678Z', signatureUrl: 'sig.png' }
-
-  it('rechaza datos de firma inválidos', async () => {
-    mockDb.delivery.findUnique.mockResolvedValue({ status: 'EN_CURSO', responsableId: 'user-1' })
-    const res = await signDelivery('d1', { signedByName: '', signedByDni: '', signatureUrl: '' })
-    expect(res.ok).toBe(false)
-  })
-
-  it('no permite firmar una entrega ya cerrada', async () => {
-    mockDb.delivery.findUnique.mockResolvedValue({ status: 'COMPLETADA', responsableId: 'user-1' })
-    const res = await signDelivery('d1', validSign)
-    expect(res.ok).toBe(false)
-    if (!res.ok) expect(res.error).toContain('cerrada')
-  })
-
-  it('bloquea a quien no es responsable ni admin', async () => {
-    vi.mocked(requireCanEditEntregas).mockResolvedValue(editor) // user-1
-    mockDb.delivery.findUnique.mockResolvedValue({ status: 'EN_CURSO', responsableId: 'otro' })
-    const res = await signDelivery('d1', validSign)
-    expect(res.ok).toBe(false)
-    if (!res.ok) expect(res.error).toContain('responsable')
-  })
-
-  it('permite al admin firmar cualquier entrega', async () => {
-    vi.mocked(requireCanEditEntregas).mockResolvedValue(admin)
-    mockDb.delivery.findUnique.mockResolvedValue({ status: 'EN_CURSO', responsableId: 'otro' })
-    const res = await signDelivery('d1', validSign)
-    expect(res).toEqual({ ok: true })
-    expect(mockDb.delivery.update).toHaveBeenCalled()
-  })
-})
+// El contrato terminal/autorización de firma se prueba en su núcleo coordinado (writeSignatureTx,
+// lib/delivery-precondition.test.ts) e integración PG17; la action solo delega (ver el describe
+// «signDelivery · firma coordinada (I3C3)»).
 
 // ─── createDelivery coordinada (I3C1A) ────────────────────────────────────────
 
@@ -600,5 +575,100 @@ describe('createDelivery · coordinación y contrato (I3C1A)', () => {
     for (const msg of Object.values(DELIVERY_CREATION_ERROR_MESSAGES)) {
       expect(msg).not.toMatch(/prisma|select|update |veh-1|offer-1|[0-9a-f]{20,}/i)
     }
+  })
+})
+
+describe('updateDeliveryChecklistItem · edición coordinada (I3C3)', () => {
+  const prelim = {
+    deliveryId: 'd1',
+    delivery: { vehicleId: 'veh-1', buyerLeadId: 'buyer-1', vehicle: { sellerLeadId: 'seller-1' } },
+  }
+
+  it('resuelve raíces, bloquea y delega en updateChecklistItemTx; revalida al terminar', async () => {
+    mockDb.deliveryChecklistItem.findUnique.mockResolvedValue(prelim)
+    vi.mocked(updateChecklistItemTx).mockResolvedValue(undefined)
+    const res = await updateDeliveryChecklistItem('item-1', { result: 'OK', notes: 'x' })
+    expect(res).toEqual({ ok: true })
+    // raíces correctas Vehicle→SellerLead→BuyerLead
+    const [roots] = vi.mocked(withLockedRoots).mock.calls.at(-1)!
+    expect(roots.map((r) => r.type)).toEqual(['vehicle', 'sellerLead', 'buyerLead'])
+    expect(updateChecklistItemTx).toHaveBeenCalledOnce()
+    const [, params] = vi.mocked(updateChecklistItemTx).mock.calls[0]
+    expect(params).toMatchObject({
+      itemId: 'item-1',
+      deliveryId: 'd1',
+      vehicleId: 'veh-1',
+      buyerLeadId: 'buyer-1',
+      resolvedSellerLeadId: 'seller-1',
+      result: 'OK',
+      notes: 'x',
+    })
+    expect(revalidatePath).toHaveBeenCalledWith('/entregas/d1')
+  })
+
+  it('traduce DeliveryPreconditionError (terminal) a {ok:false} y NO revalida', async () => {
+    mockDb.deliveryChecklistItem.findUnique.mockResolvedValue(prelim)
+    vi.mocked(updateChecklistItemTx).mockRejectedValue(
+      new DeliveryPreconditionError('DELIVERY_ALREADY_COMPLETED')
+    )
+    vi.mocked(revalidatePath).mockClear()
+    const res = await updateDeliveryChecklistItem('item-1', { result: 'PENDIENTE' })
+    expect(res.ok).toBe(false)
+    if (!res.ok) expect(res.error).toMatch(/finalizada/i)
+    expect(revalidatePath).not.toHaveBeenCalled()
+  })
+
+  it('error si el ítem no existe (lectura preliminar); no bloquea', async () => {
+    mockDb.deliveryChecklistItem.findUnique.mockResolvedValue(null)
+    const res = await updateDeliveryChecklistItem('nope', { result: 'OK' })
+    expect(res.ok).toBe(false)
+    expect(updateChecklistItemTx).not.toHaveBeenCalled()
+  })
+
+  it('permiso primero (requireCanEditEntregas antes de leer)', async () => {
+    vi.mocked(requireCanEditEntregas).mockRejectedValueOnce(new Error('forbidden'))
+    await expect(updateDeliveryChecklistItem('item-1', { result: 'OK' })).rejects.toThrow()
+    expect(mockDb.deliveryChecklistItem.findUnique).not.toHaveBeenCalled()
+  })
+})
+
+describe('signDelivery · firma coordinada (I3C3)', () => {
+  const prelim = {
+    vehicleId: 'veh-1',
+    buyerLeadId: 'buyer-1',
+    vehicle: { sellerLeadId: 'seller-1' },
+  }
+  const validForm = { signedByName: 'Cliente', signedByDni: '12345678Z', signatureUrl: 'sig.png' }
+
+  it('resuelve raíces, bloquea y delega en writeSignatureTx', async () => {
+    mockDb.delivery.findUnique.mockResolvedValue(prelim)
+    vi.mocked(writeSignatureTx).mockResolvedValue(undefined)
+    const res = await signDelivery('d1', validForm)
+    expect(res).toEqual({ ok: true })
+    const [roots] = vi.mocked(withLockedRoots).mock.calls.at(-1)!
+    expect(roots.map((r) => r.type)).toEqual(['vehicle', 'sellerLead', 'buyerLead'])
+    const [, params] = vi.mocked(writeSignatureTx).mock.calls[0]
+    expect(params).toMatchObject({
+      deliveryId: 'd1',
+      vehicleId: 'veh-1',
+      resolvedSellerLeadId: 'seller-1',
+      actorIsAdmin: false,
+      ...validForm,
+    })
+  })
+
+  it('traduce DeliveryPreconditionError (terminal) a {ok:false}', async () => {
+    mockDb.delivery.findUnique.mockResolvedValue(prelim)
+    vi.mocked(writeSignatureTx).mockRejectedValue(
+      new DeliveryPreconditionError('DELIVERY_ALREADY_CANCELLED')
+    )
+    const res = await signDelivery('d1', validForm)
+    expect(res.ok).toBe(false)
+  })
+
+  it('rechaza datos de firma inválidos antes de leer/bloquear', async () => {
+    const res = await signDelivery('d1', { signedByName: '' })
+    expect(res.ok).toBe(false)
+    expect(writeSignatureTx).not.toHaveBeenCalled()
   })
 })

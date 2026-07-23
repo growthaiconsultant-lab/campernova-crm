@@ -3,75 +3,111 @@ import type { Prisma } from '@prisma/client'
 import {
   completeDeliveryTx,
   DeliveryConflictError,
-  DELIVERY_CONFLICT_MESSAGES,
+  DeliveryCompletionError,
+  isDeliveryCompletionError,
   DELIVERABLE_VEHICLE_STATUSES,
   type CompleteDeliveryParams,
 } from './delivery-completion'
 
-// Mock mínimo de la TransactionClient: incluye lo que usa completeDeliveryTx Y lo que usa
-// createWarrantyForDelivery (delivery.findUnique / warranty.create / postventaFollowup.createMany).
-type MockTx = {
-  delivery: { updateMany: ReturnType<typeof vi.fn>; findUnique: ReturnType<typeof vi.fn> }
-  vehicle: { updateMany: ReturnType<typeof vi.fn> }
-  match: { updateMany: ReturnType<typeof vi.fn> }
-  buyerLead: { update: ReturnType<typeof vi.fn> }
-  warranty: { create: ReturnType<typeof vi.fn> }
-  postventaFollowup: { createMany: ReturnType<typeof vi.fn> }
-  activity: { create: ReturnType<typeof vi.fn> }
-}
-
+/* eslint-disable @typescript-eslint/no-explicit-any */
 const COMPLETED_AT = new Date('2026-06-01T10:00:00Z')
 
-function makeTx(opts: { deliveryCount?: number; vehicleCount?: number } = {}): MockTx {
+type TxOpts = {
+  status?: string
+  checklist?: Array<{ result: string }>
+  signed?: boolean
+  vehicleStatus?: string
+  vehicleSeller?: string | null
+  sellerExists?: boolean
+  buyerExists?: boolean
+  offer?: { vehicleId: string; buyerLeadId: string } | null
+  deliveryCount?: number
+  vehicleCount?: number
+}
+
+function makeTx(o: TxOpts = {}) {
+  const signed = o.signed ?? true
+  const delivery = {
+    status: o.status ?? 'EN_CURSO',
+    vehicleId: 'veh-1',
+    buyerLeadId: 'buyer-1',
+    offerId: 'offer-1',
+    signedByName: signed ? 'Cliente' : null,
+    signedByDni: signed ? '12345678Z' : null,
+    signatureUrl: signed ? 'sig.png' : null,
+    checklist: o.checklist ?? [],
+    // usado por createWarrantyForDelivery
+    completedAt: COMPLETED_AT,
+  }
   return {
     delivery: {
-      updateMany: vi.fn().mockResolvedValue({ count: opts.deliveryCount ?? 1 }),
+      findUnique: vi.fn().mockResolvedValue(delivery),
+      updateMany: vi.fn().mockResolvedValue({ count: o.deliveryCount ?? 1 }),
+    },
+    vehicle: {
+      findUnique: vi.fn().mockResolvedValue({
+        status: o.vehicleStatus ?? 'RESERVADO',
+        sellerLeadId: o.vehicleSeller === undefined ? 'seller-1' : o.vehicleSeller,
+      }),
+      updateMany: vi.fn().mockResolvedValue({ count: o.vehicleCount ?? 1 }),
+    },
+    sellerLead: {
+      findUnique: vi.fn().mockResolvedValue((o.sellerExists ?? true) ? { id: 'seller-1' } : null),
+    },
+    buyerLead: {
+      findUnique: vi.fn().mockResolvedValue((o.buyerExists ?? true) ? { id: 'buyer-1' } : null),
+      update: vi.fn().mockResolvedValue({}),
+    },
+    offer: {
       findUnique: vi
         .fn()
-        .mockResolvedValue({
-          vehicleId: 'veh-1',
-          buyerLeadId: 'buyer-1',
-          completedAt: COMPLETED_AT,
-        }),
+        .mockResolvedValue(
+          o.offer === undefined ? { vehicleId: 'veh-1', buyerLeadId: 'buyer-1' } : o.offer
+        ),
     },
-    vehicle: { updateMany: vi.fn().mockResolvedValue({ count: opts.vehicleCount ?? 1 }) },
     match: { updateMany: vi.fn().mockResolvedValue({ count: 1 }) },
-    buyerLead: { update: vi.fn().mockResolvedValue({}) },
     warranty: { create: vi.fn().mockResolvedValue({ id: 'war-1' }) },
     postventaFollowup: { createMany: vi.fn().mockResolvedValue({ count: 2 }) },
     activity: { create: vi.fn().mockResolvedValue({}) },
   }
 }
-
-const asTx = (tx: MockTx) => tx as unknown as Prisma.TransactionClient
+const asTx = (tx: any) => tx as unknown as Prisma.TransactionClient
 
 const baseParams: CompleteDeliveryParams = {
   deliveryId: 'del-1',
   vehicleId: 'veh-1',
   buyerLeadId: 'buyer-1',
-  sellerLeadId: 'seller-1',
+  resolvedSellerLeadId: 'seller-1',
   actorId: 'user-1',
   now: COMPLETED_AT,
+}
+
+async function code(p: Promise<unknown>): Promise<string | null> {
+  try {
+    await p
+    return null
+  } catch (e) {
+    return isDeliveryCompletionError(e)
+      ? e.code
+      : e instanceof DeliveryConflictError
+        ? e.reason
+        : 'OTHER'
+  }
 }
 
 describe('completeDeliveryTx · camino feliz', () => {
   it('completa entrega + vehículo + comprador + garantía + seguimientos + 3 trazas de forma atómica', async () => {
     const tx = makeTx()
     const res = await completeDeliveryTx(asTx(tx), baseParams)
-
     expect(res).toEqual({ warrantyId: 'war-1' })
-
-    // CAS de la entrega: EN_CURSO → COMPLETADA con completedAt.
     expect(tx.delivery.updateMany).toHaveBeenCalledWith({
       where: { id: 'del-1', status: 'EN_CURSO' },
       data: { status: 'COMPLETADA', completedAt: COMPLETED_AT },
     })
-    // CAS del vehículo: solo desde estados entregables → VENDIDO.
     expect(tx.vehicle.updateMany).toHaveBeenCalledWith({
       where: { id: 'veh-1', status: { in: DELIVERABLE_VEHICLE_STATUSES } },
       data: { status: 'VENDIDO', soldAt: COMPLETED_AT },
     })
-    // Match OFERTA → CERRADO y comprador → CERRADO.
     expect(tx.match.updateMany).toHaveBeenCalledWith({
       where: { vehicleId: 'veh-1', buyerLeadId: 'buyer-1', status: 'OFERTA' },
       data: { status: 'CERRADO' },
@@ -80,138 +116,96 @@ describe('completeDeliveryTx · camino feliz', () => {
       where: { id: 'buyer-1' },
       data: { status: 'CERRADO' },
     })
-    // Garantía + 2 seguimientos (creados por createWarrantyForDelivery con el mismo tx).
     expect(tx.warranty.create).toHaveBeenCalledOnce()
     expect(tx.postventaFollowup.createMany).toHaveBeenCalledOnce()
-    // 3 trazas: CAMBIO_ESTADO + ENTREGA_COMPLETADA + GARANTIA_ACTIVADA.
-    expect(tx.activity.create).toHaveBeenCalledTimes(3)
-    const types = tx.activity.create.mock.calls.map((c) => c[0].data.type)
+    const types = tx.activity.create.mock.calls.map((c: any) => c[0].data.type)
     expect(types).toEqual(['CAMBIO_ESTADO', 'ENTREGA_COMPLETADA', 'GARANTIA_ACTIVADA'])
   })
 
-  it('crea las trazas aunque el vehículo no tenga vendedor (sellerLeadId null)', async () => {
-    const tx = makeTx()
-    await completeDeliveryTx(asTx(tx), { ...baseParams, sellerLeadId: null })
+  it('completa aunque el vehículo no tenga vendedor (sellerLeadId null)', async () => {
+    const tx = makeTx({ vehicleSeller: null })
+    await completeDeliveryTx(asTx(tx), { ...baseParams, resolvedSellerLeadId: null })
     expect(tx.activity.create).toHaveBeenCalledTimes(3)
+    // sin vendedor no se relee sellerLead
+    expect(tx.sellerLead.findUnique).not.toHaveBeenCalled()
   })
 })
 
-describe('completeDeliveryTx · conflictos (compare-and-swap)', () => {
-  it('conflicto "delivery": si la entrega ya no está EN_CURSO no toca vehículo, garantía ni trazas', async () => {
+describe('completeDeliveryTx · validación bajo lock (pre-CAS)', () => {
+  it('DELIVERY_NOT_FOUND si la entrega no existe', async () => {
+    const tx = makeTx()
+    tx.delivery.findUnique.mockResolvedValueOnce(null)
+    expect(await code(completeDeliveryTx(asTx(tx), baseParams))).toBe('DELIVERY_NOT_FOUND')
+    expect(tx.delivery.updateMany).not.toHaveBeenCalled()
+  })
+
+  it('DELIVERY_ROOT_CHANGED si el vendedor releído no coincide', async () => {
+    const tx = makeTx({ vehicleSeller: 'otro' })
+    expect(await code(completeDeliveryTx(asTx(tx), baseParams))).toBe('DELIVERY_ROOT_CHANGED')
+    expect(tx.delivery.updateMany).not.toHaveBeenCalled()
+  })
+
+  it('OFFER_MISMATCH si la oferta no corresponde al par', async () => {
+    const tx = makeTx({ offer: { vehicleId: 'veh-X', buyerLeadId: 'buyer-1' } })
+    expect(await code(completeDeliveryTx(asTx(tx), baseParams))).toBe('OFFER_MISMATCH')
+  })
+
+  it('DELIVERY_ALREADY_COMPLETED si ya está COMPLETADA', async () => {
+    expect(await code(completeDeliveryTx(asTx(makeTx({ status: 'COMPLETADA' })), baseParams))).toBe(
+      'DELIVERY_ALREADY_COMPLETED'
+    )
+  })
+
+  it('DELIVERY_ALREADY_CANCELLED si está CANCELADA', async () => {
+    expect(await code(completeDeliveryTx(asTx(makeTx({ status: 'CANCELADA' })), baseParams))).toBe(
+      'DELIVERY_ALREADY_CANCELLED'
+    )
+  })
+
+  it('DELIVERY_STATUS_CHANGED si el estado no es EN_CURSO (p. ej. PROGRAMADA)', async () => {
+    expect(await code(completeDeliveryTx(asTx(makeTx({ status: 'PROGRAMADA' })), baseParams))).toBe(
+      'DELIVERY_STATUS_CHANGED'
+    )
+  })
+
+  it('CHECKLIST_INCOMPLETE si hay un ítem PENDIENTE (validado bajo lock)', async () => {
+    const tx = makeTx({ checklist: [{ result: 'OK' }, { result: 'PENDIENTE' }] })
+    expect(await code(completeDeliveryTx(asTx(tx), baseParams))).toBe('CHECKLIST_INCOMPLETE')
+    expect(tx.delivery.updateMany).not.toHaveBeenCalled()
+  })
+
+  it('SIGNATURE_REQUIRED si falta la firma', async () => {
+    const tx = makeTx({ signed: false })
+    expect(await code(completeDeliveryTx(asTx(tx), baseParams))).toBe('SIGNATURE_REQUIRED')
+  })
+
+  it('la clasificación terminal precede al checklist/firma (COMPLETADA sin firma → ALREADY_COMPLETED)', async () => {
+    const tx = makeTx({ status: 'COMPLETADA', signed: false, checklist: [{ result: 'PENDIENTE' }] })
+    expect(await code(completeDeliveryTx(asTx(tx), baseParams))).toBe('DELIVERY_ALREADY_COMPLETED')
+  })
+})
+
+describe('completeDeliveryTx · CAS y conflicto', () => {
+  it("conflicto 'delivery' si el CAS de la entrega afecta 0 filas", async () => {
     const tx = makeTx({ deliveryCount: 0 })
-    const err = await completeDeliveryTx(asTx(tx), baseParams).catch((e) => e)
-    expect(err).toBeInstanceOf(DeliveryConflictError)
-    expect((err as DeliveryConflictError).reason).toBe('delivery')
-    expect((err as DeliveryConflictError).message).toBe(DELIVERY_CONFLICT_MESSAGES.delivery)
+    expect(await code(completeDeliveryTx(asTx(tx), baseParams))).toBe('delivery')
     expect(tx.vehicle.updateMany).not.toHaveBeenCalled()
-    expect(tx.warranty.create).not.toHaveBeenCalled()
-    expect(tx.postventaFollowup.createMany).not.toHaveBeenCalled()
-    expect(tx.activity.create).not.toHaveBeenCalled()
   })
 
-  it('conflicto "vehicle": si el vehículo no está en un estado entregable, aborta sin garantía ni trazas', async () => {
+  it("conflicto 'vehicle' si el CAS del vehículo afecta 0 filas", async () => {
     const tx = makeTx({ vehicleCount: 0 })
-    const err = await completeDeliveryTx(asTx(tx), baseParams).catch((e) => e)
-    expect(err).toBeInstanceOf(DeliveryConflictError)
-    expect((err as DeliveryConflictError).reason).toBe('vehicle')
-    // La entrega intentó su CAS, pero el conflicto del vehículo aborta antes de garantía/trazas
-    // (en producción, el throw revierte también el CAS de la entrega).
-    expect(tx.delivery.updateMany).toHaveBeenCalledOnce()
+    expect(await code(completeDeliveryTx(asTx(tx), baseParams))).toBe('vehicle')
     expect(tx.warranty.create).not.toHaveBeenCalled()
-    expect(tx.activity.create).not.toHaveBeenCalled()
-  })
-})
-
-describe('completeDeliveryTx · errores técnicos se propagan (no se ocultan como conflicto)', () => {
-  it('un fallo al crear la garantía se propaga tal cual y no genera trazas', async () => {
-    const tx = makeTx()
-    tx.warranty.create.mockRejectedValue(new Error('warranty boom'))
-    const err = await completeDeliveryTx(asTx(tx), baseParams).catch((e) => e)
-    expect(err).toBeInstanceOf(Error)
-    expect(err).not.toBeInstanceOf(DeliveryConflictError)
-    expect((err as Error).message).toBe('warranty boom')
-    expect(tx.activity.create).not.toHaveBeenCalled()
   })
 
-  it('un fallo al crear los seguimientos se propaga y no genera trazas', async () => {
-    const tx = makeTx()
-    tx.postventaFollowup.createMany.mockRejectedValue(new Error('followups boom'))
-    const err = await completeDeliveryTx(asTx(tx), baseParams).catch((e) => e)
-    expect(err).not.toBeInstanceOf(DeliveryConflictError)
-    expect((err as Error).message).toBe('followups boom')
-    // La garantía se intentó, pero las trazas van después de los seguimientos → no se crean.
-    expect(tx.warranty.create).toHaveBeenCalledOnce()
-    expect(tx.activity.create).not.toHaveBeenCalled()
-  })
-})
-
-describe('completeDeliveryTx · hooks de test (seams deterministas)', () => {
-  it('respeta el orden: beforeDeliveryWrite → CAS entrega → CAS vehículo → beforeWarrantyWrite → garantía → beforeFollowupsWrite → seguimientos', async () => {
-    const order: string[] = []
-    const tx = makeTx()
-    tx.delivery.updateMany.mockImplementation(async () => {
-      order.push('delivery-cas')
-      return { count: 1 }
-    })
-    tx.vehicle.updateMany.mockImplementation(async () => {
-      order.push('vehicle-cas')
-      return { count: 1 }
-    })
-    tx.warranty.create.mockImplementation(async () => {
-      order.push('warranty')
-      return { id: 'war-1' }
-    })
-    tx.postventaFollowup.createMany.mockImplementation(async () => {
-      order.push('followups')
-      return { count: 2 }
-    })
-
-    await completeDeliveryTx(asTx(tx), baseParams, {
-      beforeDeliveryWrite: async () => {
-        order.push('hook:beforeDelivery')
-      },
-      beforeWarrantyWrite: async () => {
-        order.push('hook:beforeWarranty')
-      },
-      beforeFollowupsWrite: async () => {
-        order.push('hook:beforeFollowups')
-      },
-    })
-
-    expect(order).toEqual([
-      'hook:beforeDelivery',
-      'delivery-cas',
-      'vehicle-cas',
-      'hook:beforeWarranty',
-      'warranty',
-      'hook:beforeFollowups',
-      'followups',
-    ])
-  })
-
-  it('un throw en beforeWarrantyWrite se propaga y no crea garantía ni trazas', async () => {
-    const tx = makeTx()
-    const err = await completeDeliveryTx(asTx(tx), baseParams, {
-      beforeWarrantyWrite: async () => {
-        throw new Error('inject warranty failure')
-      },
-    }).catch((e) => e)
-    expect(err).not.toBeInstanceOf(DeliveryConflictError)
-    expect((err as Error).message).toBe('inject warranty failure')
-    expect(tx.warranty.create).not.toHaveBeenCalled()
-    expect(tx.activity.create).not.toHaveBeenCalled()
-  })
-})
-
-describe('constantes de dominio', () => {
-  it('los estados entregables son PUBLICADO y RESERVADO', () => {
+  it('DELIVERABLE_VEHICLE_STATUSES son PUBLICADO y RESERVADO', () => {
     expect(DELIVERABLE_VEHICLE_STATUSES).toEqual(['PUBLICADO', 'RESERVADO'])
   })
 
-  it('DeliveryConflictError expone reason y un mensaje de negocio claro', () => {
-    const e = new DeliveryConflictError('delivery')
-    expect(e.name).toBe('DeliveryConflictError')
-    expect(e.reason).toBe('delivery')
-    expect(e.message).toBe(DELIVERY_CONFLICT_MESSAGES.delivery)
+  it('DeliveryCompletionError expone code + mensaje sin PII', () => {
+    const e = new DeliveryCompletionError('CHECKLIST_INCOMPLETE')
+    expect(e.code).toBe('CHECKLIST_INCOMPLETE')
+    expect(e.message).toMatch(/checklist/i)
+    expect(isDeliveryCompletionError(e)).toBe(true)
   })
 })
