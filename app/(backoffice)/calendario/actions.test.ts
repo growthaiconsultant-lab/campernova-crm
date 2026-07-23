@@ -6,12 +6,24 @@ vi.mock('@/lib/auth', () => ({ requireAgente: vi.fn() }))
 const { mockDb } = vi.hoisted(() => ({
   mockDb: {
     calendarEvent: { create: vi.fn(), findUnique: vi.fn(), update: vi.fn() },
+    sellerLead: { findUnique: vi.fn() },
+    buyerLead: { findUnique: vi.fn() },
   },
 }))
 vi.mock('@/lib/db', () => ({ db: mockDb }))
 
+// `withLockedRoots` se mockea para ejecutar el núcleo real contra mockDb; `LockError`/`isLockError`
+// reales para la traducción de errores.
+vi.mock('@/lib/locking', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/lib/locking')>()
+  return { ...actual, withLockedRoots: vi.fn() }
+})
+
 import { requireAgente } from '@/lib/auth'
+import { withLockedRoots, LockError } from '@/lib/locking'
 import { createCalendarEvent, updateCalendarEventStatus, setEventCommitment } from './actions'
+
+const FUTURE_ISO = new Date(Date.now() + 30 * 86_400_000).toISOString()
 
 const validInput = {
   type: 'CITA',
@@ -27,6 +39,69 @@ beforeEach(() => {
   vi.mocked(requireAgente).mockResolvedValue({ id: 'agent-1', role: 'AGENTE' } as never)
   mockDb.calendarEvent.create.mockResolvedValue({ id: 'ev1' })
   mockDb.calendarEvent.update.mockResolvedValue({})
+  mockDb.sellerLead.findUnique.mockResolvedValue({ archivedAt: null })
+  mockDb.buyerLead.findUnique.mockResolvedValue({ archivedAt: null })
+  vi.mocked(withLockedRoots).mockImplementation(async (_roots, op) => op(mockDb as never))
+})
+
+describe('createCalendarEvent · serialización con leads archivados (FUTURE_EVENT)', () => {
+  it('evento futuro + comprador ACTIVO: bloquea la raíz del lead y crea', async () => {
+    const res = await createCalendarEvent({ ...validInput, startAt: FUTURE_ISO })
+    expect(res.id).toBe('ev1')
+    expect(vi.mocked(withLockedRoots).mock.calls[0][0]).toEqual([{ type: 'buyerLead', id: 'b1' }])
+    expect(mockDb.calendarEvent.create).toHaveBeenCalledOnce()
+  })
+
+  it('evento futuro + comprador ARCHIVADO: rechaza, sin crear', async () => {
+    mockDb.buyerLead.findUnique.mockResolvedValue({ archivedAt: new Date() })
+    const res = await createCalendarEvent({ ...validInput, startAt: FUTURE_ISO })
+    expect(res.error).toMatch(/archivad/i)
+    expect(mockDb.calendarEvent.create).not.toHaveBeenCalled()
+  })
+
+  it('evento futuro + vendedor ARCHIVADO: rechaza (raíz sellerLead)', async () => {
+    mockDb.sellerLead.findUnique.mockResolvedValue({ archivedAt: new Date() })
+    const res = await createCalendarEvent({
+      type: 'CITA',
+      title: 'x',
+      startAt: FUTURE_ISO,
+      priority: 'MEDIA',
+      sellerLeadId: 's1',
+    })
+    expect(res.error).toMatch(/archivad/i)
+    expect(mockDb.calendarEvent.create).not.toHaveBeenCalled()
+  })
+
+  it('evento PASADO + comprador archivado: permitido, SIN lock (no es blocker)', async () => {
+    mockDb.buyerLead.findUnique.mockResolvedValue({ archivedAt: new Date() })
+    const res = await createCalendarEvent(validInput) // startAt en el pasado
+    expect(res.id).toBe('ev1')
+    expect(withLockedRoots).not.toHaveBeenCalled()
+  })
+
+  it('evento futuro SIN lead: no toma lock de lead', async () => {
+    const res = await createCalendarEvent({
+      type: 'LIMPIEZA',
+      title: 'x',
+      startAt: FUTURE_ISO,
+      priority: 'MEDIA',
+    })
+    expect(res.id).toBe('ev1')
+    expect(withLockedRoots).not.toHaveBeenCalled()
+  })
+
+  it('ROOT_NOT_FOUND → error "lead no encontrado", sin crear', async () => {
+    vi.mocked(withLockedRoots).mockRejectedValueOnce(new LockError('ROOT_NOT_FOUND'))
+    const res = await createCalendarEvent({ ...validInput, startAt: FUTURE_ISO })
+    expect(res.error).toMatch(/no encontrado/i)
+  })
+
+  it('LOCK_TIMEOUT → error de concurrencia seguro', async () => {
+    vi.mocked(withLockedRoots).mockRejectedValueOnce(new LockError('LOCK_TIMEOUT'))
+    const res = await createCalendarEvent({ ...validInput, startAt: FUTURE_ISO })
+    expect(res.error).toMatch(/concurrencia/i)
+    expect(res.error).not.toMatch(/prisma|lock/i)
+  })
 })
 
 describe('createCalendarEvent', () => {

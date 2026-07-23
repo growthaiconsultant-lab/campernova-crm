@@ -37,13 +37,16 @@ vi.mock('@/lib/db', async () => {
 import { db } from '@/lib/db'
 import { createGuardedTestPrisma, uniqueSuffix } from './db'
 import { archiveBuyerLead, reactivateBuyerLead } from '@/app/(backoffice)/lead-archiving-actions'
-import { withLockedRoots } from '@/lib/locking'
+import { createCalendarEvent } from '@/app/(backoffice)/calendario/actions'
+import { withLockedRoots, type LockRoot } from '@/lib/locking'
 import { createOfferTx, buildOfferCreationRoots, isOfferCreationError } from '@/lib/offers-creation'
 import {
   createDeliveryTx,
   buildDeliveryCreationRoots,
   isDeliveryCreationError,
 } from '@/lib/delivery-creation'
+import { transitionDeliveryTx } from '@/lib/delivery-transitions'
+import { completeDeliveryTx } from '@/lib/delivery-completion'
 
 const prismaA = db as PrismaClient // conexión del archivado (singleton mockeado)
 let prismaB: PrismaClient // conexión del writer coordinado
@@ -300,5 +303,202 @@ describe('archivar vs reactivar (mismo lead, deterministas)', () => {
       // terminó archivado ⇒ hubo exactamente un archivado y no un reactivado posterior efectivo
       expect(archivedActs).toBe(1)
     }
+  })
+})
+
+// ─── Serialización del writer de calendario (corrección del blocker FUTURE_EVENT) ─────────────────
+
+const FUTURE = new Date(Date.now() + 7 * 86_400_000)
+const PAST = new Date(Date.now() - 7 * 86_400_000)
+
+/** Retiene el lock de una fila raíz en prismaB para forzar contención observable. */
+function holdRoot(root: LockRoot, opts: { onLocked: () => void; hold: Promise<void> }) {
+  return withLockedRoots(
+    [root],
+    async () => {
+      opts.onLocked()
+      await opts.hold
+    },
+    { client: prismaB, lockTimeoutMs: 8_000 }
+  )
+}
+
+function futureEventInput(buyerId: string, startAt: Date) {
+  return {
+    type: 'CITA' as const,
+    commitment: 'EXTERNO' as const,
+    title: 'Cita',
+    priority: 'MEDIA' as const,
+    startAt: startAt.toISOString(),
+    buyerLeadId: buyerId,
+  }
+}
+
+describe('archivar comprador vs createCalendarEvent (blocker FUTURE_EVENT serializado)', () => {
+  it('createCalendarEvent de evento futuro ADQUIERE el lock del lead (contención observada)', async () => {
+    const f = await seed('RESERVADO')
+    const locked = barrier()
+    const hold = barrier()
+    const holder = holdRoot(
+      { type: 'buyerLead', id: f.buyerId },
+      { onLocked: () => locked.open(), hold: hold.wait }
+    )
+    await locked.wait
+    const create = createCalendarEvent(futureEventInput(f.buyerId, FUTURE)).then(
+      (r) => r,
+      (e) => e
+    )
+    await waitUntilBlocked() // createCalendarEvent espera el lock del comprador
+    hold.open()
+    await holder
+    const res = await create
+    expect(res).toMatchObject({ id: expect.any(String) })
+    await prismaA.calendarEvent.deleteMany({ where: { buyerLeadId: f.buyerId } })
+  })
+
+  it('gana el ARCHIVADO: createCalendarEvent(futuro) rechaza para lead archivado', async () => {
+    const f = await seed('RESERVADO')
+    expect((await archiveBuyerLead(f.buyerId, 'OTRO')).status).toBe('archived')
+    const res = await createCalendarEvent(futureEventInput(f.buyerId, FUTURE))
+    expect(res.error).toMatch(/archivad/i)
+    expect(await prismaA.calendarEvent.count({ where: { buyerLeadId: f.buyerId } })).toBe(0)
+  })
+
+  it('gana el EVENTO: archivar queda bloqueado por FUTURE_EVENT', async () => {
+    const f = await seed('RESERVADO')
+    const ev = await createCalendarEvent(futureEventInput(f.buyerId, FUTURE))
+    expect(ev.id).toBeTruthy()
+    const res = await archiveBuyerLead(f.buyerId, 'OTRO')
+    expect(res.status).toBe('blocked')
+    if (res.status === 'blocked') {
+      expect(res.blockers.some((b) => b.type === 'FUTURE_EVENT')).toBe(true)
+    }
+    expect(await buyerArchived(f.buyerId)).toBe(false)
+    await prismaA.calendarEvent.deleteMany({ where: { buyerLeadId: f.buyerId } })
+  })
+
+  it('evento PASADO para lead archivado: permitido (no es blocker)', async () => {
+    const f = await seed('RESERVADO')
+    expect((await archiveBuyerLead(f.buyerId, 'OTRO')).status).toBe('archived')
+    const res = await createCalendarEvent(futureEventInput(f.buyerId, PAST))
+    expect(res.id).toBeTruthy()
+    await prismaA.calendarEvent.deleteMany({ where: { buyerLeadId: f.buyerId } })
+  })
+})
+
+// ─── Carreras archive vs start/complete de Delivery ───────────────────────────────────────────────
+
+async function makeDelivery(f: Fx, status: 'PROGRAMADA' | 'EN_CURSO'): Promise<string> {
+  const d = await prismaA.delivery.create({
+    data: {
+      vehicleId: f.vehicleId,
+      buyerLeadId: f.buyerId,
+      offerId: f.offerId,
+      scheduledAt: new Date('2026-09-01T10:00:00Z'),
+      status,
+      signedByName: 'Cliente',
+      signedByDni: '12345678Z',
+      signatureUrl: 'sig.png',
+      checklist: { create: [{ category: 'PRE_ENTREGA', item: 'Doc', result: 'OK' }] },
+    },
+  })
+  return d.id
+}
+
+describe('archivar comprador vs startDelivery (serializados por el lock del lead)', () => {
+  it('gana el START: la entrega pasa EN_CURSO y el archivado queda bloqueado', async () => {
+    const f = await seed('RESERVADO')
+    const deliveryId = await makeDelivery(f, 'PROGRAMADA')
+    const paused = barrier()
+    const release = barrier()
+    const start = withLockedRoots(
+      buildDeliveryCreationRoots({
+        vehicleId: f.vehicleId,
+        sellerLeadId: f.sellerId,
+        buyerLeadId: f.buyerId,
+      }),
+      (tx) =>
+        transitionDeliveryTx(
+          tx,
+          {
+            deliveryId,
+            vehicleId: f.vehicleId,
+            buyerLeadId: f.buyerId,
+            resolvedSellerLeadId: f.sellerId,
+            expectedCurrentStatus: 'PROGRAMADA',
+            targetStatus: 'EN_CURSO',
+            actorId: authHolder.user.id,
+            cancellationReason: null,
+            now: new Date('2026-09-02T10:00:00Z'),
+          },
+          {
+            beforeWrite: async () => {
+              paused.open()
+              await release.wait
+            },
+          }
+        ),
+      { client: prismaB, lockTimeoutMs: 8_000 }
+    ).catch((e) => e)
+    await paused.wait
+    const arch = archiveBuyerLead(f.buyerId, 'OTRO').catch((e) => e)
+    await waitUntilBlocked()
+    release.open()
+    await start
+    const archRes = await arch
+    expect(archRes.status).toBe('blocked') // ve la entrega (PROGRAMADA→EN_CURSO)
+    expect(await buyerArchived(f.buyerId)).toBe(false)
+    const d = await prismaA.delivery.findUniqueOrThrow({ where: { id: deliveryId } })
+    expect(d.status).toBe('EN_CURSO')
+  })
+})
+
+describe('archivar comprador vs completeDelivery (nunca archivado + entrega EN_CURSO)', () => {
+  it('gana la COMPLECIÓN: la entrega termina y jamás queda archivado + EN_CURSO', async () => {
+    const f = await seed('RESERVADO')
+    const deliveryId = await makeDelivery(f, 'EN_CURSO')
+    const paused = barrier()
+    const release = barrier()
+    const complete = withLockedRoots(
+      buildDeliveryCreationRoots({
+        vehicleId: f.vehicleId,
+        sellerLeadId: f.sellerId,
+        buyerLeadId: f.buyerId,
+      }),
+      (tx) =>
+        completeDeliveryTx(
+          tx,
+          {
+            deliveryId,
+            vehicleId: f.vehicleId,
+            buyerLeadId: f.buyerId,
+            resolvedSellerLeadId: f.sellerId,
+            actorId: authHolder.user.id,
+            now: new Date('2026-09-02T10:00:00Z'),
+          },
+          {
+            beforeDeliveryWrite: async () => {
+              paused.open()
+              await release.wait
+            },
+          }
+        ),
+      { client: prismaB, lockTimeoutMs: 8_000 }
+    ).catch((e) => e)
+    await paused.wait
+    const arch = archiveBuyerLead(f.buyerId, 'OTRO').catch((e) => e)
+    await waitUntilBlocked()
+    release.open()
+    const completeRes = await complete
+    await arch
+    expect(completeRes).not.toBeInstanceOf(Error)
+    const d = await prismaA.delivery.findUniqueOrThrow({ where: { id: deliveryId } })
+    expect(d.status).toBe('COMPLETADA')
+    // Invariante clave: nunca "archivado + entrega EN_CURSO".
+    const archived = await buyerArchived(f.buyerId)
+    expect(archived && d.status === 'EN_CURSO').toBe(false)
+    // limpieza de garantía/seguimientos generados por la compleción
+    await prismaA.postventaFollowup.deleteMany({ where: { warranty: { deliveryId } } })
+    await prismaA.warranty.deleteMany({ where: { deliveryId } })
   })
 })
