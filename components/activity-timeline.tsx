@@ -70,6 +70,7 @@ const ACTIVITY_LABELS: Record<ActivityType, string> = {
   LLAVES_REGISTRADAS: 'Llaves registradas',
   ORDEN_INSPECCION_CREADA: 'Orden de inspección',
   DISPOSICION_DOCUMENTAL_ACTUALIZADA: 'Disposición documental',
+  LLEGADA_REGISTRADA: 'Llegada física',
 }
 
 const ICON_CLASSES: Record<ActivityType, string> = {
@@ -125,6 +126,7 @@ const ICON_CLASSES: Record<ActivityType, string> = {
     'bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-300',
   DISPOSICION_DOCUMENTAL_ACTUALIZADA:
     'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300',
+  LLEGADA_REGISTRADA: 'bg-teal-100 text-teal-700 dark:bg-teal-900/40 dark:text-teal-300',
 }
 
 function ActivityIcon({ type }: { type: ActivityType }) {

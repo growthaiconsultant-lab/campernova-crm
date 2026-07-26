@@ -11,6 +11,7 @@
  */
 import type { Prisma, EntryAnnulmentReason } from '@prisma/client'
 import { EntryError } from './errors'
+import { ACTIVE_WORKORDER_STATUSES } from './validate'
 
 export type AnnulEntryParams = {
   vehicleId: string
@@ -35,7 +36,7 @@ export async function annulEntryTx(
   tx: Prisma.TransactionClient,
   p: AnnulEntryParams,
   hooks: AnnulEntryHooks = {}
-): Promise<{ vehicleId: string }> {
+): Promise<{ vehicleId: string; inspectionOrdersClosed: number }> {
   // Notas obligatorias cuando el motivo es OTRO (se valida también en el server action; aquí es la
   // barrera de dominio definitiva, bajo el lock).
   if (p.reason === 'OTRO' && (p.notes == null || p.notes.trim().length === 0)) {
@@ -80,7 +81,19 @@ export async function annulEntryTx(
   })
   if (cas.count === 0) throw new EntryError('ENTRY_NOT_ACTIVE')
 
-  // (5) Traza (NO fuente de verdad).
+  // (5) Cierre de la orden de inspección de entrada (corrección 7.2): una entrada anulada NO debe
+  // dejar una inspección activa colgando en Taller. Se marca RECHAZADA (estado terminal) bajo el
+  // mismo lock/CAS. `AT MOST ONE ACTIVE INSPECTION PER VEHICLE` → como mucho una fila afectada.
+  const closed = await tx.workOrder.updateMany({
+    where: {
+      vehicleId: p.vehicleId,
+      kind: 'INSPECCION_ENTRADA',
+      status: { in: [...ACTIVE_WORKORDER_STATUSES] },
+    },
+    data: { status: 'RECHAZADA' },
+  })
+
+  // (6) Traza (NO fuente de verdad).
   await tx.activity.create({
     data: {
       type: 'ENTRADA_ANULADA',
@@ -89,6 +102,16 @@ export async function annulEntryTx(
       sellerLeadId: vehicle.sellerLeadId,
     },
   })
+  if (closed.count > 0) {
+    await tx.activity.create({
+      data: {
+        type: 'ORDEN_TALLER_RECHAZADA',
+        content: 'Orden de inspección de entrada rechazada por anulación de la entrada',
+        agentId: p.actorId,
+        sellerLeadId: vehicle.sellerLeadId,
+      },
+    })
+  }
 
-  return { vehicleId: p.vehicleId }
+  return { vehicleId: p.vehicleId, inspectionOrdersClosed: closed.count }
 }

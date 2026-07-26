@@ -241,16 +241,20 @@ jobs:
           #   indexes     115 → 117 (+2: PK + unique compuesto (vehicle_id, category))
           #   without_rls 0 (la tabla nueva habilita RLS en la propia migración)
           # Delta tras add_official_entry_activity_and_inspection_index (PR-A2, aditivo; sin DML):
-          #   enum_values 282 → 287 (+5: ENTRADA_VALIDADA, ENTRADA_ANULADA, LLAVES_REGISTRADAS,
-          #                          ORDEN_INSPECCION_CREADA, DISPOSICION_DOCUMENTAL_ACTUALIZADA)
+          #   enum_values 282 → 288 (+6: ENTRADA_VALIDADA, ENTRADA_ANULADA, LLAVES_REGISTRADAS,
+          #                          ORDEN_INSPECCION_CREADA, DISPOSICION_DOCUMENTAL_ACTUALIZADA,
+          #                          LLEGADA_REGISTRADA — corrección 7.1)
+          #   columns     460 → 462 (+2: vehicles.physical_arrival_at, physical_arrival_by_id — 7.1)
+          #   foreign_keys 73 → 74  (+1: physical_arrival_by_id→users SET NULL — 7.1)
           #   indexes     117 → 118 (+1: work_orders_active_inspection_key parcial único)
-          #   tables/columns/enums/foreign_keys sin cambio (no crea tablas ni columnas ni FK).
+          #   tables/enums sin cambio (no crea tablas ni enums; la columna FK no lleva índice
+          #                dedicado, igual que entry_validated_by_id).
           assert offer_id_not_null "$(psql "$PSQL_URL" -tAc "SELECT is_nullable FROM information_schema.columns WHERE table_schema='public' AND table_name='deliveries' AND column_name='offer_id'")" NO
           assert tables "$tables" 32
-          assert columns "$columns" 460
+          assert columns "$columns" 462
           assert enums "$enums" 53
-          assert enum_values "$enum_values" 287
-          assert foreign_keys "$fks" 73
+          assert enum_values "$enum_values" 288
+          assert foreign_keys "$fks" 74
           assert indexes "$indexes" 118
           assert tables_without_rls "$without_rls" 0
           assert tables_forced_rls "$forced" 0

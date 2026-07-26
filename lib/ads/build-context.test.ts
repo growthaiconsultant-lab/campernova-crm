@@ -55,6 +55,8 @@ function makeVehicle(overrides: Partial<VehicleWithRelations> = {}): VehicleWith
     entryAnnulledById: null,
     entryAnnulmentReason: null,
     entryAnnulmentNotes: null,
+    physicalArrivalAt: null,
+    physicalArrivalById: null,
     keysReceivedAt: null,
     keysReceivedById: null,
     keysCount: null,

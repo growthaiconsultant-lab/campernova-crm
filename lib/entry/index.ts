@@ -30,3 +30,8 @@ export {
   type ValidateEntryHooks,
 } from './validate'
 export { annulEntryTx, type AnnulEntryParams, type AnnulEntryHooks } from './annul'
+export {
+  registerPhysicalArrivalTx,
+  type RegisterArrivalParams,
+  type RegisterArrivalHooks,
+} from './arrival'

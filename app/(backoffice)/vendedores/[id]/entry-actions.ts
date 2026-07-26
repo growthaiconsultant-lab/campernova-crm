@@ -19,6 +19,7 @@ import { withLockedRoots, isLockError } from '@/lib/locking'
 import {
   validateEntryTx,
   annulEntryTx,
+  registerPhysicalArrivalTx,
   buildEntryRoots,
   isEntryError,
   isPotentialActiveInspectionConflict,
@@ -33,9 +34,12 @@ type ActionResult<T = undefined> =
 
 // ─── Schemas ──────────────────────────────────────────────────────────────────
 
+const registerArrivalSchema = z.object({
+  vehicleId: z.string().min(1),
+})
+
 const validateEntrySchema = z.object({
   vehicleId: z.string().min(1),
-  physicallyPresent: z.coerce.boolean(),
   parkingLocation: z.string().trim().min(1, 'Indica la ubicación de aparcamiento'),
   keysCount: z.coerce.number().int().positive('Registra al menos una llave'),
   keysLocation: z.string().trim().min(1, 'Indica dónde se guardan las llaves'),
@@ -77,6 +81,48 @@ function revalidateEntry(sellerLeadId: string | null) {
 
 // ─── Actions ──────────────────────────────────────────────────────────────────
 
+/**
+ * Registra la llegada física del vehículo a la nave (guard: Comercial / AGENTE). Hito persistido
+ * previo a la validación de la entrada (corrección 7.1). Idempotente.
+ */
+export async function registerPhysicalArrival(
+  formData: unknown
+): Promise<ActionResult<{ vehicleId: string; alreadyRegistered: boolean }>> {
+  const actor = await requireAgente()
+
+  const parsed = registerArrivalSchema.safeParse(formData)
+  if (!parsed.success) {
+    return { ok: false, error: 'Datos inválidos', fieldErrors: parsed.error.flatten().fieldErrors }
+  }
+  const input = parsed.data
+
+  const vehicle = await db.vehicle.findUnique({
+    where: { id: input.vehicleId },
+    select: { sellerLeadId: true },
+  })
+  if (!vehicle) return { ok: false, error: ENTRY_ERROR_MESSAGES.VEHICLE_NOT_FOUND }
+
+  const roots = buildEntryRoots({ vehicleId: input.vehicleId, sellerLeadId: vehicle.sellerLeadId })
+
+  let result: { vehicleId: string; alreadyRegistered: boolean }
+  try {
+    result = await withLockedRoots(roots, (tx) =>
+      registerPhysicalArrivalTx(tx, {
+        vehicleId: input.vehicleId,
+        resolvedSellerLeadId: vehicle.sellerLeadId,
+        actorId: actor.id,
+      })
+    )
+  } catch (err) {
+    if (isEntryError(err)) return { ok: false, error: err.message }
+    if (isLockError(err)) return { ok: false, error: err.message }
+    throw err
+  }
+
+  revalidateEntry(vehicle.sellerLeadId)
+  return { ok: true, data: result }
+}
+
 /** Valida la entrada oficial del vehículo (guard: Comercial / AGENTE). */
 export async function validateEntry(
   formData: unknown
@@ -104,7 +150,6 @@ export async function validateEntry(
         vehicleId: input.vehicleId,
         resolvedSellerLeadId: vehicle.sellerLeadId,
         actorId: actor.id,
-        physicallyPresent: input.physicallyPresent,
         parkingLocation: input.parkingLocation,
         keysCount: input.keysCount,
         keysLocation: input.keysLocation,

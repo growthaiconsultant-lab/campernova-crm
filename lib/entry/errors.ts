@@ -35,7 +35,7 @@ export const ENTRY_ERROR_MESSAGES: Record<EntryErrorCode, string> = {
   ENTRY_NOT_ACTIVE: 'No hay una entrada oficial activa para anular.',
   CONTRATO_GESTION_MISSING:
     'Falta el contrato de gestión vigente. Súbelo antes de validar la entrada.',
-  VEHICLE_NOT_PRESENT: 'Confirma que el vehículo está físicamente en la nave.',
+  VEHICLE_NOT_PRESENT: 'Registra primero la llegada física del vehículo a la nave.',
   EXPEDIENTE_INCOMPLETE: 'El expediente mínimo del vehículo está incompleto.',
   RESPONSIBLE_NOT_SET: 'Asigna un comercial responsable antes de validar la entrada.',
   PARKING_LOCATION_MISSING: 'Indica la ubicación de aparcamiento en la nave.',

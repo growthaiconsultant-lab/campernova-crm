@@ -186,6 +186,9 @@ enum ActivityType {
   LLAVES_REGISTRADAS
   ORDEN_INSPECCION_CREADA
   DISPOSICION_DOCUMENTAL_ACTUALIZADA
+  // Llegada física del vehículo a la nave (PR-A2, corrección 7.1). Hito persistido previo a la
+  // entrada oficial: la validación exige physicalArrivalAt != null (leído bajo el lock).
+  LLEGADA_REGISTRADA
 }
 
 /// Temperatura comercial del lead comprador (CAM-62).
@@ -542,6 +545,7 @@ model User {
   documentVersionsUploaded DocumentVersion[]
   entryValidations         Vehicle[]              @relation("EntryValidations")
   entryAnnulments          Vehicle[]              @relation("EntryAnnulments")
+  physicalArrivalsRecorded Vehicle[]              @relation("PhysicalArrivals")
   keysCustodyRecorded      Vehicle[]              @relation("KeysCustody")
 
   documentRequirementDispositions VehicleDocumentRequirementDisposition[]
@@ -677,6 +681,11 @@ model Vehicle {
   entryAnnulledById    String?               @map("entry_annulled_by_id")
   entryAnnulmentReason EntryAnnulmentReason? @map("entry_annulment_reason")
   entryAnnulmentNotes  String?               @map("entry_annulment_notes")
+  // ── Llegada física (PR-A2, corrección 7.1) — hito persistido previo a la entrada oficial ──
+  // "llegada física → entrada oficial validada": la validación exige physicalArrivalAt != null
+  // (leído bajo el lock). Aditivo y nullable; se escribe con registerPhysicalArrival (idempotente).
+  physicalArrivalAt    DateTime?             @map("physical_arrival_at")
+  physicalArrivalById  String?               @map("physical_arrival_by_id")
   // ── Custodia de llaves (PR-A1) — precondición de la entrada oficial (reglas en A2) ──
   keysReceivedAt       DateTime?             @map("keys_received_at")
   keysReceivedById     String?               @map("keys_received_by_id")
@@ -694,6 +703,7 @@ model Vehicle {
   trustVerifiedBy  User?             @relation("TrustVerifications", fields: [trustVerifiedById], references: [id])
   entryValidatedBy User?             @relation("EntryValidations", fields: [entryValidatedById], references: [id], onDelete: SetNull)
   entryAnnulledBy  User?             @relation("EntryAnnulments", fields: [entryAnnulledById], references: [id], onDelete: SetNull)
+  physicalArrivalBy User?            @relation("PhysicalArrivals", fields: [physicalArrivalById], references: [id], onDelete: SetNull)
   keysReceivedBy   User?             @relation("KeysCustody", fields: [keysReceivedById], references: [id], onDelete: SetNull)
   photos           VehiclePhoto[]
   valuations       Valuation[]

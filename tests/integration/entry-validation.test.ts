@@ -20,11 +20,13 @@ import { withLockedRoots, LockError } from '@/lib/locking'
 import {
   validateEntryTx,
   annulEntryTx,
+  registerPhysicalArrivalTx,
   buildEntryRoots,
   isEntryError,
   isPotentialActiveInspectionConflict,
   ACTIVE_INSPECTION_UNIQUE_INDEX,
   type ValidateEntryHooks,
+  type RegisterArrivalHooks,
 } from '@/lib/entry'
 import { PUBLICADO_REQUIRED_DOCS } from '@/lib/vehicle-legal'
 import { createGuardedTestPrisma, uniqueSuffix } from './db'
@@ -69,6 +71,7 @@ type SeedOpts = {
   withPlate?: boolean
   withDesiredPrice?: boolean
   withPhoto?: boolean
+  withArrival?: boolean // physical_arrival_at ya registrado (hito previo, corrección 7.1)
 }
 
 const FULL: Required<SeedOpts> = {
@@ -78,6 +81,7 @@ const FULL: Required<SeedOpts> = {
   withPlate: true,
   withDesiredPrice: true,
   withPhoto: true,
+  withArrival: true,
 }
 
 /** Siembra un vehículo TASADO con expediente/documentos según `opts`. */
@@ -107,6 +111,8 @@ async function seed(opts: SeedOpts = FULL): Promise<Fixture> {
       status: 'TASADO',
       plate: o.withPlate ? `1234-ABC-${s.slice(0, 3)}` : null,
       desiredPrice: o.withDesiredPrice ? 30000 : null,
+      physicalArrivalAt: o.withArrival ? new Date() : null,
+      physicalArrivalById: o.withArrival ? user.id : null,
     },
   })
   if (o.withPhoto) {
@@ -175,7 +181,6 @@ function validate(
           vehicleId: f.vehicleId,
           resolvedSellerLeadId: resolved,
           actorId: opts.actorId ?? f.userId,
-          physicallyPresent: true,
           parkingLocation: 'Nave A-3',
           keysCount: 2,
           keysLocation: 'Panel',
@@ -184,6 +189,28 @@ function validate(
         opts.hooks
       ),
     { client, lockTimeoutMs: opts.lockTimeoutMs ?? 8_000 }
+  )
+}
+
+function registerArrival(
+  f: Fixture,
+  client: PrismaClient,
+  opts: { actorId?: string; hooks?: RegisterArrivalHooks } = {}
+) {
+  const roots = buildEntryRoots({ vehicleId: f.vehicleId, sellerLeadId: f.sellerId })
+  return withLockedRoots(
+    roots,
+    (tx) =>
+      registerPhysicalArrivalTx(
+        tx,
+        {
+          vehicleId: f.vehicleId,
+          resolvedSellerLeadId: f.sellerId,
+          actorId: opts.actorId ?? f.userId,
+        },
+        opts.hooks
+      ),
+    { client }
   )
 }
 
@@ -208,6 +235,8 @@ async function entryState(vehicleId: string) {
   return prismaA.vehicle.findUniqueOrThrow({
     where: { id: vehicleId },
     select: {
+      physicalArrivalAt: true,
+      physicalArrivalById: true,
       entryValidatedAt: true,
       entryValidatedById: true,
       entryAnnulledAt: true,
@@ -231,6 +260,84 @@ afterEach(async () => {
 
 afterAll(async () => {
   await Promise.all([prismaA.$disconnect(), prismaB.$disconnect(), prismaObs.$disconnect()])
+})
+
+describe('registerPhysicalArrivalTx · hito previo persistido (corrección 7.1)', () => {
+  it('registra la llegada (fecha + actor) y habilita la validación', async () => {
+    const f = await seed({ withArrival: false })
+    // Sin llegada registrada, la validación se rechaza.
+    expect(codeOf(await validate(f, prismaA).catch((e) => e))).toBe('VEHICLE_NOT_PRESENT')
+
+    const res = await registerArrival(f, prismaA)
+    expect(res.alreadyRegistered).toBe(false)
+    const st = await entryState(f.vehicleId)
+    expect(st.physicalArrivalAt).not.toBeNull()
+    expect(st.physicalArrivalById).toBe(f.userId)
+    // Trazado con Activity dedicada, NO fuente de verdad.
+    expect(
+      await prismaA.activity.count({
+        where: { sellerLeadId: f.sellerId, type: 'LLEGADA_REGISTRADA' },
+      })
+    ).toBe(1)
+
+    // Ahora la validación pasa.
+    const done = await validate(f, prismaA)
+    expect(done.workOrderId).toBeTruthy()
+    // La validación NO reescribe physicalArrivalAt (hito distinto y anterior).
+    expect((await entryState(f.vehicleId)).physicalArrivalById).toBe(f.userId)
+  })
+
+  it('idempotente: re-registrar es no-op (no reescribe ni duplica Activity)', async () => {
+    const f = await seed({ withArrival: false })
+    const r1 = await registerArrival(f, prismaA)
+    expect(r1.alreadyRegistered).toBe(false)
+    const firstAt = (await entryState(f.vehicleId)).physicalArrivalAt
+
+    const r2 = await registerArrival(f, prismaA)
+    expect(r2.alreadyRegistered).toBe(true)
+    expect((await entryState(f.vehicleId)).physicalArrivalAt).toEqual(firstAt)
+    expect(
+      await prismaA.activity.count({
+        where: { sellerLeadId: f.sellerId, type: 'LLEGADA_REGISTRADA' },
+      })
+    ).toBe(1)
+  })
+
+  it('vendedor archivado → LEAD_ARCHIVED', async () => {
+    const f = await seed({ withArrival: false })
+    await prismaA.sellerLead.update({ where: { id: f.sellerId }, data: { archivedAt: new Date() } })
+    expect(codeOf(await registerArrival(f, prismaA).catch((e) => e))).toBe('LEAD_ARCHIVED')
+    expect((await entryState(f.vehicleId)).physicalArrivalAt).toBeNull()
+  })
+
+  it('dos registros concurrentes: exactamente uno escribe, una sola Activity', async () => {
+    const f = await seed({ withArrival: false })
+    const aLocked = barrier()
+    const releaseA = barrier()
+    const a = registerArrival(f, prismaA, {
+      hooks: {
+        beforeWrite: async () => {
+          aLocked.open()
+          await releaseA.wait
+        },
+      },
+    }).catch((e) => e)
+    await aLocked.wait
+    const b = registerArrival(f, prismaB).catch((e) => e)
+    await waitUntilBlocked()
+    releaseA.open()
+    const aRes = await a
+    const bRes = await b
+    expect(aRes).not.toBeInstanceOf(Error)
+    // El segundo, ya con la llegada registrada, es no-op idempotente.
+    expect(bRes).not.toBeInstanceOf(Error)
+    expect((bRes as { alreadyRegistered: boolean }).alreadyRegistered).toBe(true)
+    expect(
+      await prismaA.activity.count({
+        where: { sellerLeadId: f.sellerId, type: 'LLEGADA_REGISTRADA' },
+      })
+    ).toBe(1)
+  })
 })
 
 describe('validateEntryTx · camino feliz', () => {
@@ -280,26 +387,12 @@ describe('validateEntryTx · precondición por precondición (rechaza sin escrib
     expect((await entryState(f.vehicleId)).entryValidatedAt).toBeNull()
   })
 
-  it('vehículo físicamente ausente → VEHICLE_NOT_PRESENT', async () => {
-    const f = await seed()
-    const roots = buildEntryRoots({ vehicleId: f.vehicleId, sellerLeadId: f.sellerId })
-    const err = await withLockedRoots(
-      roots,
-      (tx) =>
-        validateEntryTx(tx, {
-          vehicleId: f.vehicleId,
-          resolvedSellerLeadId: f.sellerId,
-          actorId: f.userId,
-          physicallyPresent: false,
-          parkingLocation: 'Nave A-3',
-          keysCount: 2,
-          keysLocation: 'Panel',
-          keysNotes: null,
-        }),
-      { client: prismaA }
-    ).catch((e) => e)
+  it('sin llegada física registrada → VEHICLE_NOT_PRESENT (corrección 7.1)', async () => {
+    const f = await seed({ withArrival: false })
+    const err = await validate(f, prismaA).catch((e) => e)
     expect(codeOf(err)).toBe('VEHICLE_NOT_PRESENT')
     expect((await counts(f)).orders).toBe(0)
+    expect((await entryState(f.vehicleId)).entryValidatedAt).toBeNull()
   })
 
   it('sin llaves (cantidad 0) → KEYS_NOT_RECEIVED', async () => {
@@ -312,7 +405,6 @@ describe('validateEntryTx · precondición por precondición (rechaza sin escrib
           vehicleId: f.vehicleId,
           resolvedSellerLeadId: f.sellerId,
           actorId: f.userId,
-          physicallyPresent: true,
           parkingLocation: 'Nave A-3',
           keysCount: 0,
           keysLocation: 'Panel',
@@ -518,6 +610,29 @@ describe('annulEntryTx · terminal', () => {
     const st = await entryState(f.vehicleId)
     expect(st.entryAnnulledAt).not.toBeNull()
     expect(st.entryAnnulmentReason).toBe('DUPLICADO')
+  })
+
+  it('cierra la orden de inspección activa al anular (corrección 7.2)', async () => {
+    const f = await seed()
+    const done = await validate(f, prismaA)
+    // Antes de anular: una inspección activa.
+    expect((await counts(f)).activeOrders).toBe(1)
+
+    const res = await annul(f, prismaA, 'DUPLICADO')
+    expect(res.inspectionOrdersClosed).toBe(1)
+
+    // La orden de inspección queda RECHAZADA (terminal): 0 activas, la fila sigue existiendo.
+    const c = await counts(f)
+    expect(c.orders).toBe(1)
+    expect(c.activeOrders).toBe(0)
+    const order = await prismaA.workOrder.findUniqueOrThrow({ where: { id: done.workOrderId } })
+    expect(order.status).toBe('RECHAZADA')
+    // Traza del cierre.
+    expect(
+      await prismaA.activity.count({
+        where: { sellerLeadId: f.sellerId, type: 'ORDEN_TALLER_RECHAZADA' },
+      })
+    ).toBe(1)
   })
 
   it('doble anulación → ENTRY_NOT_ACTIVE (terminal)', async () => {

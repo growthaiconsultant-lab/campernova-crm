@@ -112,8 +112,6 @@ export type ValidateEntryParams = {
   /** `sellerLeadId` observado en la lectura preliminar; detecta que la raíz cambió. */
   resolvedSellerLeadId: string | null
   actorId: string
-  /** Confirmación de presencia física del vehículo en la nave. */
-  physicallyPresent: boolean
   /** Ubicación de aparcamiento en la nave (se persiste en `naveLocation`). */
   parkingLocation: string
   keysCount: number
@@ -138,7 +136,13 @@ export async function validateEntryTx(
   // (1) Relectura del vehículo + consistencia de raíz.
   const vehicle = await tx.vehicle.findUnique({
     where: { id: p.vehicleId },
-    select: { status: true, sellerLeadId: true, entryValidatedAt: true, entryAnnulledAt: true },
+    select: {
+      status: true,
+      sellerLeadId: true,
+      physicalArrivalAt: true,
+      entryValidatedAt: true,
+      entryAnnulledAt: true,
+    },
   })
   if (!vehicle) throw new EntryError('VEHICLE_NOT_FOUND')
   if (vehicle.sellerLeadId !== p.resolvedSellerLeadId) {
@@ -158,7 +162,9 @@ export async function validateEntryTx(
   if (vehicle.entryValidatedAt != null) throw new EntryError('ENTRY_ALREADY_VALIDATED')
 
   // (4) Preconditions de input.
-  if (p.physicallyPresent !== true) throw new EntryError('VEHICLE_NOT_PRESENT')
+  // La presencia física es ahora un HITO PERSISTIDO previo (corrección 7.1): se lee de la columna
+  // `physicalArrivalAt` bajo el lock, no de un booleano transitorio del formulario.
+  if (vehicle.physicalArrivalAt == null) throw new EntryError('VEHICLE_NOT_PRESENT')
   if (seller.agentId == null) throw new EntryError('RESPONSIBLE_NOT_SET')
   if (p.parkingLocation.trim().length === 0) throw new EntryError('PARKING_LOCATION_MISSING')
   if (!(Number.isInteger(p.keysCount) && p.keysCount > 0) || p.keysLocation.trim().length === 0) {

@@ -16,7 +16,12 @@ vi.mock('@/lib/locking', async (importOriginal) => {
 // El núcleo de entrada se mockea para controlar éxito/conflicto; EntryError y helpers REAL.
 vi.mock('@/lib/entry', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@/lib/entry')>()
-  return { ...actual, validateEntryTx: vi.fn(), annulEntryTx: vi.fn() }
+  return {
+    ...actual,
+    validateEntryTx: vi.fn(),
+    annulEntryTx: vi.fn(),
+    registerPhysicalArrivalTx: vi.fn(),
+  }
 })
 
 const { mockDb } = vi.hoisted(() => {
@@ -35,15 +40,25 @@ import type { User } from '@prisma/client'
 import { Prisma } from '@prisma/client'
 import { requireAgente, requireAdmin } from '@/lib/auth'
 import { withLockedRoots } from '@/lib/locking'
-import { validateEntryTx, annulEntryTx, EntryError, ENTRY_ERROR_MESSAGES } from '@/lib/entry'
-import { validateEntry, annulEntry, setDocumentDisposition } from './entry-actions'
+import {
+  validateEntryTx,
+  annulEntryTx,
+  registerPhysicalArrivalTx,
+  EntryError,
+  ENTRY_ERROR_MESSAGES,
+} from '@/lib/entry'
+import {
+  validateEntry,
+  annulEntry,
+  registerPhysicalArrival,
+  setDocumentDisposition,
+} from './entry-actions'
 
 const agente = { id: 'u-agente', role: 'AGENTE' } as User
 const admin = { id: 'u-admin', role: 'ADMIN' } as User
 
 const validForm = {
   vehicleId: 'v1',
-  physicallyPresent: true,
   parkingLocation: 'Nave A-3',
   keysCount: 2,
   keysLocation: 'Panel llaves',
@@ -58,8 +73,44 @@ beforeEach(() => {
   vi.mocked(withLockedRoots).mockImplementation((_roots, op) => op(mockDb as never))
   mockDb.vehicle.findUnique.mockResolvedValue({ sellerLeadId: 's1' })
   vi.mocked(validateEntryTx).mockResolvedValue({ vehicleId: 'v1', workOrderId: 'wo1' })
-  vi.mocked(annulEntryTx).mockResolvedValue({ vehicleId: 'v1' })
+  vi.mocked(annulEntryTx).mockResolvedValue({ vehicleId: 'v1', inspectionOrdersClosed: 0 })
+  vi.mocked(registerPhysicalArrivalTx).mockResolvedValue({
+    vehicleId: 'v1',
+    alreadyRegistered: false,
+  })
   mockDb.$transaction.mockImplementation((fn: (tx: unknown) => unknown) => fn(mockDb))
+})
+
+describe('registerPhysicalArrival', () => {
+  it('AGENTE registra la llegada → ok + revalida', async () => {
+    const res = await registerPhysicalArrival({ vehicleId: 'v1' })
+    expect(res.ok).toBe(true)
+    expect(requireAgente).toHaveBeenCalled()
+    expect(registerPhysicalArrivalTx).toHaveBeenCalledOnce()
+  })
+
+  it('vehículo inexistente → VEHICLE_NOT_FOUND, sin abrir la tx', async () => {
+    mockDb.vehicle.findUnique.mockResolvedValue(null)
+    const res = await registerPhysicalArrival({ vehicleId: 'v1' })
+    expect(res).toEqual({ ok: false, error: ENTRY_ERROR_MESSAGES.VEHICLE_NOT_FOUND })
+    expect(withLockedRoots).not.toHaveBeenCalled()
+  })
+
+  it('re-registrar (ya registrada) → ok idempotente (alreadyRegistered)', async () => {
+    vi.mocked(registerPhysicalArrivalTx).mockResolvedValue({
+      vehicleId: 'v1',
+      alreadyRegistered: true,
+    })
+    const res = await registerPhysicalArrival({ vehicleId: 'v1' })
+    expect(res.ok).toBe(true)
+    if (res.ok) expect(res.data?.alreadyRegistered).toBe(true)
+  })
+
+  it('LEAD_ARCHIVED del núcleo se traduce a su mensaje', async () => {
+    vi.mocked(registerPhysicalArrivalTx).mockRejectedValue(new EntryError('LEAD_ARCHIVED'))
+    const res = await registerPhysicalArrival({ vehicleId: 'v1' })
+    expect(res).toEqual({ ok: false, error: ENTRY_ERROR_MESSAGES.LEAD_ARCHIVED })
+  })
 })
 
 describe('validateEntry', () => {
