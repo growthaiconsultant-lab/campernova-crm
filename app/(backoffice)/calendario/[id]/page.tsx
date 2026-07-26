@@ -2,7 +2,7 @@ import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { ChevronLeft, Car, User as UserIcon, MapPin, Clock } from 'lucide-react'
 import { db } from '@/lib/db'
-import { requireAuth } from '@/lib/auth'
+import { requireCanViewCalendario } from '@/lib/auth'
 import {
   EVENT_PRIORITY_LABELS,
   EVENT_STATUS_LABELS,
@@ -23,7 +23,7 @@ const fmtDateTime = (d: Date) =>
   })
 
 export default async function EventoDetallePage({ params }: { params: { id: string } }) {
-  await requireAuth()
+  await requireCanViewCalendario()
 
   const event = await db.calendarEvent.findUnique({
     where: { id: params.id },

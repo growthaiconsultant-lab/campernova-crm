@@ -54,7 +54,7 @@ const NAV_SECTIONS: NavSection[] = [
         href: '/vehiculos',
         label: 'Vehículos',
         icon: Package,
-        roles: ['ADMIN', 'AGENTE', 'TALLER', 'MARKETING'],
+        roles: ['ADMIN', 'AGENTE'],
       },
       { href: '/captaciones', label: 'Captaciones', icon: ScanSearch, roles: ['ADMIN', 'AGENTE'] },
       { href: '/vendedores', label: 'Vendedores', icon: UserRound, roles: ['ADMIN', 'AGENTE'] },
