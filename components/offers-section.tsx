@@ -12,6 +12,7 @@ import {
   isReservation,
 } from '@/lib/offers'
 import { LOST_REASON_OPTIONS } from '@/lib/lost-reason'
+import { formatEur } from '@/lib/format/currency'
 import type { OfferStatus } from '@prisma/client'
 
 export type OfferRow = {
@@ -33,9 +34,6 @@ type Props = {
   candidates: Candidate[]
   offers: OfferRow[]
 }
-
-const EUR = (n: number) =>
-  n.toLocaleString('es-ES', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 })
 
 export function OffersSection({ side, fixedId, candidates, offers }: Props) {
   const router = useRouter()
@@ -204,7 +202,7 @@ function OfferCard({ offer, onDone }: { offer: OfferRow; onDone: () => void }) {
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <div className="flex items-center gap-2">
-            <span className="text-[15px] font-bold text-foreground">{EUR(offer.amount)}</span>
+            <span className="text-[15px] font-bold text-foreground">{formatEur(offer.amount)}</span>
             <span
               className="rounded-full px-2 py-0.5 text-[10px] font-semibold"
               style={{
@@ -228,7 +226,7 @@ function OfferCard({ offer, onDone }: { offer: OfferRow; onDone: () => void }) {
           </Link>
           {offer.depositAmount != null && (
             <p className="mt-0.5 text-[12px] text-muted-foreground">
-              Señal: {EUR(offer.depositAmount)}
+              Señal: {formatEur(offer.depositAmount)}
               {offer.reservedUntil &&
                 ` · reserva hasta ${new Date(offer.reservedUntil).toLocaleDateString('es-ES', {
                   day: 'numeric',
