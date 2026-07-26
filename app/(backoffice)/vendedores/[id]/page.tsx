@@ -42,8 +42,14 @@ import { VehicleDocumentsList } from '@/components/vehicle-legal/vehicle-documen
 import type { VehicleDocumentItem } from '@/components/vehicle-legal/vehicle-documents-list'
 import { MissingForPublishCard } from '@/components/vehicle-legal/missing-for-publish-card'
 import { CompletionBadge } from '@/components/vehicle-legal/completion-badge'
-import { calculateCompletionPercent } from '@/lib/vehicle-legal'
+import { calculateCompletionPercent, DOC_LABELS } from '@/lib/vehicle-legal'
 import type { VehicleLegalInput, DocumentSummary } from '@/lib/vehicle-legal'
+import {
+  getEntryChecklistSignals,
+  deriveDocumentChecklist,
+  ENTRY_SIGNAL_CATEGORIES,
+} from '@/lib/entry'
+import { EntryPanel } from './entry-panel'
 import type { VehicleDocumentCategory } from '@prisma/client'
 import { calculateLeadScore, calculateClosureProbability, leadScoreColor } from '@/lib/lead-score'
 import { sellerAcquisitionScore, ACTIVE_DEMAND_MATCH_THRESHOLD } from '@/lib/scoring'
@@ -136,11 +142,14 @@ export default async function FichaVendedorPage({
             },
             chargeCheckedBy: { select: { name: true } },
             trustVerifiedBy: { select: { name: true } },
+            physicalArrivalBy: { select: { name: true } },
+            entryValidatedBy: { select: { name: true } },
+            entryAnnulledBy: { select: { name: true } },
             workOrders: {
               where: {
                 status: { in: ['PENDIENTE', 'EN_DIAGNOSTICO', 'PRESUPUESTADA', 'EN_CURSO'] },
               },
-              select: { id: true },
+              select: { id: true, kind: true },
             },
           },
         },
@@ -298,6 +307,17 @@ export default async function FichaVendedorPage({
   // Block 20 — Trust Passport (agregación legal + taller)
   const trustInput = v ? await getTrustPassportInput(db, v.id) : null
   const trustPassport = trustInput ? buildTrustPassport(trustInput) : null
+
+  // PR-A2 (corrección 7.5) — datos del panel de entrada oficial (checklist documental derivado +
+  // orden de inspección activa para el enlace a Taller).
+  const entrySignals = v ? await getEntryChecklistSignals(db, v.id, ENTRY_SIGNAL_CATEGORIES) : []
+  const entryChecklist = deriveDocumentChecklist({ signals: entrySignals }).map((row) => ({
+    category: row.category as string,
+    label: DOC_LABELS[row.category],
+    state: row.state as string,
+    requiresDocument: row.category === 'CONTRATO_GESTION',
+  }))
+  const inspectionOrderId = v?.workOrders.find((w) => w.kind === 'INSPECCION_ENTRADA')?.id ?? null
 
   const insightInput = {
     daysSinceLastActivity: daysSinceActivity,
@@ -1092,6 +1112,40 @@ export default async function FichaVendedorPage({
                     Crear orden de taller
                   </a>
                 </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* ─────────────── ENTRADA OFICIAL (PR-A2, corrección 7.5) ─────────────── */}
+          {activeTab === 'preparacion' && v && isAgente && (
+            <Card className="mt-6">
+              <CardHeader>
+                <CardTitle className="text-base">Entrada oficial</CardTitle>
+                <CardDescription>
+                  Registra la llegada física, clasifica los documentos, valida la entrada en
+                  custodia (crea la orden de inspección) y, si procede, anúlala.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <EntryPanel
+                  vehicleId={v.id}
+                  isAdmin={isAdmin}
+                  responsibleName={lead.agent?.name ?? null}
+                  arrivalAt={v.physicalArrivalAt ? v.physicalArrivalAt.toISOString() : null}
+                  arrivalByName={v.physicalArrivalBy?.name ?? null}
+                  validatedAt={v.entryValidatedAt ? v.entryValidatedAt.toISOString() : null}
+                  validatedByName={v.entryValidatedBy?.name ?? null}
+                  annulledAt={v.entryAnnulledAt ? v.entryAnnulledAt.toISOString() : null}
+                  annulledByName={v.entryAnnulledBy?.name ?? null}
+                  annulmentReason={v.entryAnnulmentReason ?? null}
+                  annulmentNotes={v.entryAnnulmentNotes ?? null}
+                  keysCount={v.keysCount ?? null}
+                  keysLocation={v.keysLocation ?? null}
+                  keysNotes={v.keysNotes ?? null}
+                  parkingLocation={v.naveLocation ?? null}
+                  checklist={entryChecklist}
+                  inspectionOrderId={inspectionOrderId}
+                />
               </CardContent>
             </Card>
           )}
