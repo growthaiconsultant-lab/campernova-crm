@@ -2,7 +2,7 @@ import { notFound } from 'next/navigation'
 import { Suspense } from 'react'
 import Link from 'next/link'
 import { db } from '@/lib/db'
-import { requireAuth } from '@/lib/auth'
+import { requireAgente } from '@/lib/auth'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { VehiclePhotoUploader } from '@/components/vehicle-photo-uploader'
@@ -82,7 +82,7 @@ export default async function FichaVendedorPage({
   searchParams: { tab?: string }
 }) {
   const [currentUser, lead, agents, activities] = await Promise.all([
-    requireAuth(),
+    requireAgente(),
     db.sellerLead.findUnique({
       where: { id: params.id },
       include: {

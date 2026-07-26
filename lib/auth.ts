@@ -43,6 +43,20 @@ export function requireAgente() {
   return requireRole(['ADMIN', 'AGENTE'])
 }
 
+// Inventario comercial (/vehiculos): listado con matrícula, precio de venta y valoración.
+// ADMIN + AGENTE. TALLER/ENTREGAS llegan a los datos del vehículo por su propio módulo
+// (Taller/Entregas); MARKETING no tiene vista de preparación dedicada todavía → denegado.
+export function requireCanViewVehiculos() {
+  return requireRole(['ADMIN', 'AGENTE'])
+}
+
+// Calendario / agenda operativa compartida.
+// ADMIN + AGENTE + TALLER + ENTREGAS (flujo operativo documentado). MARKETING queda fuera:
+// la agenda expone nombres de comprador/vendedor y planificación interna.
+export function requireCanViewCalendario() {
+  return requireRole(['ADMIN', 'AGENTE', 'TALLER', 'ENTREGAS'])
+}
+
 // Taller: read
 // ADMIN + AGENTE + TALLER
 export function requireCanViewTaller() {

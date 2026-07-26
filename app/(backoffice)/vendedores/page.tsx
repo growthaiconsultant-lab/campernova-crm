@@ -1,7 +1,7 @@
 import Link from 'next/link'
 import { Plus, Clock } from 'lucide-react'
 import { db } from '@/lib/db'
-import { requireAuth } from '@/lib/auth'
+import { requireAgente } from '@/lib/auth'
 import { LeadsFilters } from './leads-filters'
 import { SELLER_DEAL_TYPE_LABELS } from '@/lib/deal-terms'
 import { NEXT_ACTION_LABELS, isNextActionOverdue } from '@/lib/next-action'
@@ -176,7 +176,7 @@ const VIEWS = [
 // ── Page ──────────────────────────────────────────────────────────────────────
 
 export default async function VendedoresPage({ searchParams }: { searchParams: SearchParams }) {
-  const currentUser = await requireAuth()
+  const currentUser = await requireAgente()
   const page = Math.max(1, parseInt(searchParams.page ?? '1', 10) || 1)
   const view = searchParams.view ?? 'todos'
 
