@@ -187,17 +187,21 @@ beforeAll(async () => {
     tempDb = `i3c1b_mig_${uniqueSuffix()}`
     tempUrl = urlFor(tempDb, true)
 
-    // Este test valida el ciclo expand→contract de I3C1B. Aplica las migraciones ANTERIORES a la
-    // de contract y luego la de contract por separado. Los nombres llevan prefijo de timestamp de
-    // ancho fijo, así que el orden lexicográfico coincide con el cronológico: `n < CONTRACT_MIGRATION`
-    // selecciona exactamente las que la preceden, con independencia de cuántas migraciones POSTERIORES
-    // existan en el repo (p. ej. `20260726000000_add_vehicle_entry_foundations`), que no intervienen aquí.
+    // Este test valida el ciclo expand→contract de I3C1B: reproduce el estado "TODO aplicado
+    // EXCEPTO la migración de contract" (offer_id aún nullable) y luego aplica contract, que debe
+    // fallar por el offer_id NULL. La base efímera debe incluir CUALQUIER otra migración —también
+    // las de timestamp POSTERIOR a contract, p. ej. `20260726000000_add_vehicle_entry_foundations`—
+    // porque el Prisma Client generado refleja el schema completo y sus columnas deben existir en la
+    // base (de lo contrario `c.vehicle.create` fallaría con P2022 al hacer RETURNING). Contract se
+    // aplica aparte en el paso (6). El guard no fija un número exacto de migraciones: solo exige que
+    // contract exista y que haya al menos las cinco previas, para seguir siendo válido al añadir
+    // migraciones futuras.
     const all = readdirSync(REPO_MIGRATIONS, { withFileTypes: true })
       .filter((e) => e.isDirectory())
       .map((e) => e.name)
       .sort()
-    firstFive = all.filter((n) => n < CONTRACT_MIGRATION)
-    if (firstFive.length !== 5 || !all.includes(CONTRACT_MIGRATION)) {
+    firstFive = all.filter((n) => n !== CONTRACT_MIGRATION)
+    if (firstFive.length < 5 || !all.includes(CONTRACT_MIGRATION)) {
       throw new Error(`estructura de migraciones inesperada: ${all.join(',')}`)
     }
 
