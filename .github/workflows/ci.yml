@@ -176,8 +176,8 @@ jobs:
           count=$(psql "$PSQL_URL" -tAc "SELECT count(*) FROM _prisma_migrations WHERE finished_at IS NOT NULL")
           names=$(psql "$PSQL_URL" -tAc "SELECT string_agg(migration_name, ',' ORDER BY migration_name) FROM _prisma_migrations WHERE finished_at IS NOT NULL")
           echo "migraciones aplicadas: $count · nombres: $names"
-          test "$count" = "6" || { echo "esperado 6 migraciones aplicadas (baseline + PR5B1 + archivado + commitment + delivery_offer_link_expand + delivery_offer_link_required)"; exit 1; }
-          test "$names" = "000000000000_squashed_migrations,20260712000000_add_versioned_document_model,20260719120000_add_lead_archiving_model,20260720000000_add_calendar_event_commitment,20260721100000_add_delivery_offer_link_expand,20260721200000_make_delivery_offer_link_required" || { echo "conjunto u orden de migraciones inesperado"; exit 1; }
+          test "$count" = "7" || { echo "esperado 7 migraciones aplicadas (baseline + PR5B1 + archivado + commitment + delivery_offer_link_expand + delivery_offer_link_required + vehicle_entry_foundations)"; exit 1; }
+          test "$names" = "000000000000_squashed_migrations,20260712000000_add_versioned_document_model,20260719120000_add_lead_archiving_model,20260720000000_add_calendar_event_commitment,20260721100000_add_delivery_offer_link_expand,20260721200000_make_delivery_offer_link_required,20260726000000_add_vehicle_entry_foundations" || { echo "conjunto u orden de migraciones inesperado"; exit 1; }
 
       - name: Prisma migrate status (must be up to date)
         run: pnpm prisma migrate status
@@ -230,13 +230,23 @@ jobs:
           #   deliveries.offer_id NULL → NOT NULL. Ningún conteo de catálogo cambia.
           #   columns=441, foreign_keys=68, indexes=115 (idénticos); tables=31, enums=51,
           #   enum_values=269, without_rls=0, forced=0, policies=0 (sin cambio).
+          # Delta tras add_vehicle_entry_foundations (PR-A1, aditivo; sin DML ni backfill):
+          #   tables      31 → 32   (+1: vehicle_document_requirement_dispositions)
+          #   columns     441 → 460 (+19: vehicles +11 de entrada/llaves, tabla nueva +8)
+          #   enums       51 → 53   (+2: EntryAnnulmentReason, DocumentRequirementDisposition)
+          #   enum_values 269 → 282 (+13: 8 de EntryAnnulmentReason + 3 de DocumentRequirement‐
+          #                          Disposition + CONTRATO_GESTION + INSPECCION_ENTRADA)
+          #   foreign_keys 68 → 73  (+5: 3 actores de vehicles→users ON DELETE SET NULL +
+          #                          vehicle_id→vehicles CASCADE + updated_by_id→users SET NULL)
+          #   indexes     115 → 117 (+2: PK + unique compuesto (vehicle_id, category))
+          #   without_rls 0 (la tabla nueva habilita RLS en la propia migración)
           assert offer_id_not_null "$(psql "$PSQL_URL" -tAc "SELECT is_nullable FROM information_schema.columns WHERE table_schema='public' AND table_name='deliveries' AND column_name='offer_id'")" NO
-          assert tables "$tables" 31
-          assert columns "$columns" 441
-          assert enums "$enums" 51
-          assert enum_values "$enum_values" 269
-          assert foreign_keys "$fks" 68
-          assert indexes "$indexes" 115
+          assert tables "$tables" 32
+          assert columns "$columns" 460
+          assert enums "$enums" 53
+          assert enum_values "$enum_values" 282
+          assert foreign_keys "$fks" 73
+          assert indexes "$indexes" 117
           assert tables_without_rls "$without_rls" 0
           assert tables_forced_rls "$forced" 0
           assert policies "$policies" 0

@@ -21,7 +21,10 @@ export type WorkOrderRow = {
   scheduledStart: Date
   scheduledEnd: Date | null
   status: string
-  kind: 'REPARACION' | 'MEJORA'
+  // PR-A1: se amplía a los valores del enum WorkOrderKind por compatibilidad de compilación.
+  // `INSPECCION_ENTRADA` no es creable hasta A2, así que hoy no puede llegar ninguna fila con
+  // ese valor; la etiqueta se define para que el día que exista no se muestre como "Reparación".
+  kind: 'REPARACION' | 'MEJORA' | 'INSPECCION_ENTRADA'
   description: string
   vehicle: { brand: string; model: string } | null
   assignedTo: { id: string; name: string } | null
@@ -118,12 +121,18 @@ const WORKORDER_TONE: Record<string, CalendarTone> = {
   RECHAZADA: 'muted',
 }
 
+const WORKORDER_KIND_LABEL: Record<WorkOrderRow['kind'], string> = {
+  REPARACION: 'Taller · Reparación',
+  MEJORA: 'Taller · Mejora',
+  INSPECCION_ENTRADA: 'Taller · Inspección de entrada',
+}
+
 export function workOrderToItem(r: WorkOrderRow): CalendarItem {
   const veh = r.vehicle ? `${r.vehicle.brand} ${r.vehicle.model}` : 'Vehículo'
   return {
     id: `workorder:${r.id}`,
     source: 'workorder',
-    kindLabel: r.kind === 'MEJORA' ? 'Taller · Mejora' : 'Taller · Reparación',
+    kindLabel: WORKORDER_KIND_LABEL[r.kind] ?? 'Taller · Reparación',
     title: `${veh} · ${r.description}`,
     start: r.scheduledStart,
     end: r.scheduledEnd,

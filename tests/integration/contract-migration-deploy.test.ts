@@ -187,13 +187,24 @@ beforeAll(async () => {
     tempDb = `i3c1b_mig_${uniqueSuffix()}`
     tempUrl = urlFor(tempDb, true)
 
-    // Migraciones locales: 6; las cinco primeras para el setup, la 6ª (contract) es la que falla.
+    // Este test reproduce el estado histórico INMEDIATAMENTE ANTERIOR a la migración de contract
+    // (offer_id aún nullable) y luego aplica contract, que debe fallar por el offer_id NULL.
+    //
+    // Selección: SOLO las migraciones anteriores a contract. Los nombres llevan prefijo de timestamp
+    // de ancho fijo (baseline `000000000000_…` o 14 dígitos), así que el orden lexicográfico coincide
+    // con el cronológico y `n < CONTRACT_MIGRATION` selecciona exactamente las que la preceden, con
+    // independencia de cuántas migraciones POSTERIORES existan en el repo. No se aplica ninguna
+    // migración posterior a contract: el fixture del paso (4) se crea con SQL directo (no con el
+    // Prisma Client) para no depender del schema actual contra esta base histórica.
+    //
+    // El guard no fija el número total de migraciones: solo exige que contract exista y que haya al
+    // menos una migración previa, para seguir siendo válido al añadir migraciones futuras.
     const all = readdirSync(REPO_MIGRATIONS, { withFileTypes: true })
       .filter((e) => e.isDirectory())
       .map((e) => e.name)
       .sort()
-    firstFive = all.filter((n) => n !== CONTRACT_MIGRATION)
-    if (firstFive.length !== 5 || !all.includes(CONTRACT_MIGRATION)) {
+    firstFive = all.filter((n) => n < CONTRACT_MIGRATION)
+    if (firstFive.length === 0 || !all.includes(CONTRACT_MIGRATION)) {
       throw new Error(`estructura de migraciones inesperada: ${all.join(',')}`)
     }
 
@@ -237,34 +248,49 @@ beforeAll(async () => {
     cap.preflightPassCode = runPreflight(true)
 
     // (4) Fixtures mínimos + Delivery con offer_id = NULL (estado inválido deliberado).
+    //
+    // Se crean con SQL DIRECTO, no con el Prisma Client. El cliente generado refleja el schema ACTUAL
+    // (con columnas posteriores a contract, p. ej. las de add_vehicle_entry_foundations) y su `create`
+    // haría RETURNING de columnas que NO existen en esta base histórica (solo tiene las migraciones
+    // anteriores a contract) → P2022. Cada INSERT toca únicamente columnas presentes en el schema
+    // inmediatamente anterior a contract, y las NOT NULL sin default de su tabla (id + updated_at, más
+    // los campos propios); el resto usa el DEFAULT del propio schema.
     await withClient(async (c) => {
       const s = uniqueSuffix()
-      const seller = await c.sellerLead.create({
-        data: { name: `S ${s}`, email: `s_${s}@integ.test`, phone: '600000000' },
-      })
-      const vehicle = await c.vehicle.create({
-        data: {
-          sellerLeadId: seller.id,
-          brand: 'Adria',
-          model: 'Coral',
-          year: 2020,
-          km: 1000,
-          seats: 4,
-          type: 'AUTOCARAVANA',
-          status: 'RESERVADO',
-        },
-      })
-      const buyer = await c.buyerLead.create({
-        data: { name: `B ${s}`, email: `b_${s}@integ.test`, phone: '600000001' },
-      })
-      // offer_id = NULL: solo posible en el estado expand (columna nullable). Raw evita el cliente.
+      const sellerId = `s_${s}`
+      const vehicleId = `v_${s}`
+      const buyerId = `b_${s}`
+      await c.$executeRawUnsafe(
+        `INSERT INTO "seller_leads" ("id","name","email","phone","updated_at")
+         VALUES ($1,$2,$3,$4, now())`,
+        sellerId,
+        `S ${s}`,
+        `s_${s}@integ.test`,
+        '600000000'
+      )
+      await c.$executeRawUnsafe(
+        `INSERT INTO "vehicles"
+           ("id","seller_lead_id","brand","model","year","km","seats","type","status","updated_at")
+         VALUES ($1,$2,'Adria','Coral',2020,1000,4,'AUTOCARAVANA'::"VehicleType",'RESERVADO'::"VehicleStatus", now())`,
+        vehicleId,
+        sellerId
+      )
+      await c.$executeRawUnsafe(
+        `INSERT INTO "buyer_leads" ("id","name","email","phone","updated_at")
+         VALUES ($1,$2,$3,$4, now())`,
+        buyerId,
+        `B ${s}`,
+        `b_${s}@integ.test`,
+        '600000001'
+      )
+      // offer_id = NULL: solo posible en el estado expand (columna nullable).
       await c.$executeRawUnsafe(
         `INSERT INTO "deliveries"
            ("id","vehicle_id","buyer_lead_id","offer_id","scheduled_at","status","created_at","updated_at")
          VALUES ($1,$2,$3, NULL, now(), 'PROGRAMADA'::"DeliveryStatus", now(), now())`,
         `d_${s}`,
-        vehicle.id,
-        buyer.id
+        vehicleId,
+        buyerId
       )
       const n = await c.$queryRawUnsafe<Array<{ n: number }>>(
         `SELECT count(*)::int AS n FROM "deliveries" WHERE "offer_id" IS NULL`

@@ -312,6 +312,9 @@ enum CalendarEventPriority {
 enum VehicleDocumentCategory {
   DNI_VENDEDOR
   CONTRATO_COMPRAVENTA
+  /// Contrato de gestión de venta (PR-A1). Distinto de CONTRATO_COMPRAVENTA: precede a la
+  /// entrada oficial. No se expone en uploaders ni selectores hasta A2.
+  CONTRATO_GESTION
   FICHA_TECNICA
   PERMISO_CIRCULACION
   ITV_VIGENTE
@@ -321,6 +324,28 @@ enum VehicleDocumentCategory {
   FACTURA_COMPRA_ORIGINAL
   CONTRATO_FINAL_VENTA
   OTRO
+}
+
+/// Motivo estructurado de la anulación de una entrada oficial (PR-A1).
+/// La anulación es terminal en la v1. `OTRO` exigirá notas en el writer de A2.
+enum EntryAnnulmentReason {
+  PROPIETARIO_DESISTE
+  VEHICULO_RETIRADO
+  CONTRATO_ANULADO
+  DATOS_DOCUMENTACION_INVALIDOS
+  VEHICULO_NO_ACEPTADO
+  DUPLICADO
+  ERROR_ADMINISTRATIVO
+  OTRO
+}
+
+/// Disposición registrada para un documento requerido que NO existe (PR-A1).
+/// `RECIBIDO` NO es un valor: se deriva de la existencia de una versión documental
+/// vigente. `SIN_CLASIFICAR` tampoco: es un estado derivado, nunca persistido.
+enum DocumentRequirementDisposition {
+  PENDIENTE
+  NO_DISPONIBLE
+  NO_APLICABLE
 }
 
 enum VehicleCostCategory {
@@ -344,9 +369,12 @@ enum WorkOrderStatus {
 }
 
 /// Naturaleza del trabajo de taller (F4): reparar un problema vs añadir valor.
+/// `INSPECCION_ENTRADA` (PR-A1) queda declarada pero NO es creable hasta A2:
+/// el validador Zod de creación sigue admitiendo solo REPARACION | MEJORA.
 enum WorkOrderKind {
   REPARACION
   MEJORA
+  INSPECCION_ENTRADA
 }
 
 enum WorkOrderApprovalLevel {
@@ -504,6 +532,11 @@ model User {
   createdOffers            Offer[]                @relation("CreatedOffers")
   kpiEvents                KpiEvent[]             @relation("KpiEventActor")
   documentVersionsUploaded DocumentVersion[]
+  entryValidations         Vehicle[]              @relation("EntryValidations")
+  entryAnnulments          Vehicle[]              @relation("EntryAnnulments")
+  keysCustodyRecorded      Vehicle[]              @relation("KeysCustody")
+
+  documentRequirementDispositions VehicleDocumentRequirementDisposition[]
 
   @@map("users")
 }
@@ -584,8 +617,8 @@ model SellerLead {
 /// Vehículo asociado 1:1 a un SellerLead.
 /// equipment es JSONB con flags booleanos: solar, kitchen, bathroom, shower, heating, etc.
 model Vehicle {
-  id                   String            @id @default(cuid())
-  sellerLeadId         String            @unique @map("seller_lead_id")
+  id                   String                @id @default(cuid())
+  sellerLeadId         String                @unique @map("seller_lead_id")
   brand                String
   model                String
   year                 Int
@@ -594,59 +627,79 @@ model Vehicle {
   length               Float? // largo en metros
   type                 VehicleType
   // ── Taxonomía RV (Fase #3 v1) — nullable / additivo ──
-  category             VehicleCategory?  @map("category")
-  bedLayout            BedLayout?        @map("bed_layout")
-  sleepingPlaces       Int?              @map("sleeping_places") // plazas para dormir
-  bathroomType         BathroomType?     @map("bathroom_type")
-  heatingType          HeatingType?      @map("heating_type")
-  winterized           Boolean?          @map("winterized") // preparado para invierno
-  hasGarage            Boolean?          @map("has_garage") // garaje para bici/moto
-  maxMassKg            Int?              @map("max_mass_kg") // MMA → determina carnet B/C1
-  heightM              Float?            @map("height_m") // altura en metros
-  offGrid              Boolean?          @map("off_grid") // autonomía real (litio + solar)
-  equipment            Json              @default("{}")
-  conservationState    ConservationState @default(NORMAL) @map("conservation_state")
+  category             VehicleCategory?      @map("category")
+  bedLayout            BedLayout?            @map("bed_layout")
+  sleepingPlaces       Int?                  @map("sleeping_places") // plazas para dormir
+  bathroomType         BathroomType?         @map("bathroom_type")
+  heatingType          HeatingType?          @map("heating_type")
+  winterized           Boolean?              @map("winterized") // preparado para invierno
+  hasGarage            Boolean?              @map("has_garage") // garaje para bici/moto
+  maxMassKg            Int?                  @map("max_mass_kg") // MMA → determina carnet B/C1
+  heightM              Float?                @map("height_m") // altura en metros
+  offGrid              Boolean?              @map("off_grid") // autonomía real (litio + solar)
+  equipment            Json                  @default("{}")
+  conservationState    ConservationState     @default(NORMAL) @map("conservation_state")
   location             String?
-  desiredPrice         Decimal?          @map("desired_price") @db.Decimal(10, 2)
-  valuationMin         Decimal?          @map("valuation_min") @db.Decimal(10, 2)
-  valuationRecommended Decimal?          @map("valuation_recommended") @db.Decimal(10, 2)
-  valuationMax         Decimal?          @map("valuation_max") @db.Decimal(10, 2)
-  publicNotes          String?           @map("public_notes")
-  purchasePrice        Decimal?          @map("purchase_price") @db.Decimal(10, 2)
-  salePrice            Decimal?          @map("sale_price") @db.Decimal(10, 2)
-  marginPercent        Decimal           @default(4.0) @map("margin_percent") @db.Decimal(5, 2)
-  entryDate            DateTime?         @map("entry_date")
-  naveLocation         String?           @map("nave_location")
-  plate                String?           @map("plate")
-  vin                  String?           @map("vin")
-  itvValidUntil        DateTime?         @map("itv_valid_until")
-  titleTransferredAt   DateTime?         @map("title_transferred_at")
-  chargeCheckedAt      DateTime?         @map("charge_checked_at")
-  chargeCheckedById    String?           @map("charge_checked_by_id")
+  desiredPrice         Decimal?              @map("desired_price") @db.Decimal(10, 2)
+  valuationMin         Decimal?              @map("valuation_min") @db.Decimal(10, 2)
+  valuationRecommended Decimal?              @map("valuation_recommended") @db.Decimal(10, 2)
+  valuationMax         Decimal?              @map("valuation_max") @db.Decimal(10, 2)
+  publicNotes          String?               @map("public_notes")
+  purchasePrice        Decimal?              @map("purchase_price") @db.Decimal(10, 2)
+  salePrice            Decimal?              @map("sale_price") @db.Decimal(10, 2)
+  marginPercent        Decimal               @default(4.0) @map("margin_percent") @db.Decimal(5, 2)
+  entryDate            DateTime?             @map("entry_date")
+  naveLocation         String?               @map("nave_location")
+  plate                String?               @map("plate")
+  vin                  String?               @map("vin")
+  itvValidUntil        DateTime?             @map("itv_valid_until")
+  titleTransferredAt   DateTime?             @map("title_transferred_at")
+  chargeCheckedAt      DateTime?             @map("charge_checked_at")
+  chargeCheckedById    String?               @map("charge_checked_by_id")
   // ── Trust Passport (Block 20) — sello "Verificado por CampersNova" ──
-  trustVerifiedAt      DateTime?         @map("trust_verified_at")
-  trustVerifiedById    String?           @map("trust_verified_by_id")
-  trustNotes           String?           @map("trust_notes")
-  status               VehicleStatus     @default(NUEVO)
-  publishedAt          DateTime?         @map("published_at")
-  soldAt               DateTime?         @map("sold_at")
-  createdAt            DateTime          @default(now()) @map("created_at")
-  updatedAt            DateTime          @updatedAt @map("updated_at")
+  trustVerifiedAt      DateTime?             @map("trust_verified_at")
+  trustVerifiedById    String?               @map("trust_verified_by_id")
+  trustNotes           String?               @map("trust_notes")
+  // ── Entrada oficial (PR-A1) — fundamentos aditivos, sin comportamiento en A1 ──
+  // Entrada oficial activa = entryValidatedAt != null AND entryAnnulledAt == null.
+  // La anulación es TERMINAL en la v1: no se limpia ni se revalida (A2 escribe estos campos).
+  entryValidatedAt     DateTime?             @map("entry_validated_at")
+  entryValidatedById   String?               @map("entry_validated_by_id")
+  entryAnnulledAt      DateTime?             @map("entry_annulled_at")
+  entryAnnulledById    String?               @map("entry_annulled_by_id")
+  entryAnnulmentReason EntryAnnulmentReason? @map("entry_annulment_reason")
+  entryAnnulmentNotes  String?               @map("entry_annulment_notes")
+  // ── Custodia de llaves (PR-A1) — precondición de la entrada oficial (reglas en A2) ──
+  keysReceivedAt       DateTime?             @map("keys_received_at")
+  keysReceivedById     String?               @map("keys_received_by_id")
+  keysCount            Int?                  @map("keys_count")
+  keysLocation         String?               @map("keys_location")
+  keysNotes            String?               @map("keys_notes")
+  status               VehicleStatus         @default(NUEVO)
+  publishedAt          DateTime?             @map("published_at")
+  soldAt               DateTime?             @map("sold_at")
+  createdAt            DateTime              @default(now()) @map("created_at")
+  updatedAt            DateTime              @updatedAt @map("updated_at")
 
-  sellerLead      SellerLead        @relation(fields: [sellerLeadId], references: [id], onDelete: Cascade)
-  chargeCheckedBy User?             @relation("ChargeChecks", fields: [chargeCheckedById], references: [id])
-  trustVerifiedBy User?             @relation("TrustVerifications", fields: [trustVerifiedById], references: [id])
-  photos          VehiclePhoto[]
-  valuations      Valuation[]
-  matches         Match[]
-  ads             VehicleAd[]
-  costs           VehicleCost[]
-  workOrders      WorkOrder[]
-  deliveries      Delivery[]
-  warranty        Warranty?
-  documents       VehicleDocument[]
-  calendarEvents  CalendarEvent[]
-  offers          Offer[]
+  sellerLead       SellerLead        @relation(fields: [sellerLeadId], references: [id], onDelete: Cascade)
+  chargeCheckedBy  User?             @relation("ChargeChecks", fields: [chargeCheckedById], references: [id])
+  trustVerifiedBy  User?             @relation("TrustVerifications", fields: [trustVerifiedById], references: [id])
+  entryValidatedBy User?             @relation("EntryValidations", fields: [entryValidatedById], references: [id], onDelete: SetNull)
+  entryAnnulledBy  User?             @relation("EntryAnnulments", fields: [entryAnnulledById], references: [id], onDelete: SetNull)
+  keysReceivedBy   User?             @relation("KeysCustody", fields: [keysReceivedById], references: [id], onDelete: SetNull)
+  photos           VehiclePhoto[]
+  valuations       Valuation[]
+  matches          Match[]
+  ads              VehicleAd[]
+  costs            VehicleCost[]
+  workOrders       WorkOrder[]
+  deliveries       Delivery[]
+  warranty         Warranty?
+  documents        VehicleDocument[]
+  calendarEvents   CalendarEvent[]
+  offers           Offer[]
+
+  documentRequirementDispositions VehicleDocumentRequirementDisposition[]
 
   @@index([brand, model])
   @@index([status])
@@ -1353,6 +1406,34 @@ model VehicleDocument {
   @@unique([id, currentVersionId])
   @@index([vehicleId, category])
   @@map("vehicle_documents")
+}
+
+/// Disposición explícita para un documento requerido que NO existe (PR-A1).
+///
+/// Fuente de verdad de "recibido" = la existencia de una versión documental vigente en
+/// `VehicleDocument`. Esta tabla NO la duplica: solo registra qué ocurre cuando el
+/// documento falta. El reader (A2) deriva:
+///   documento vigente            → RECIBIDO
+///   sin documento + disposición  → valor de la disposición
+///   sin documento + sin registro → SIN_CLASIFICAR (derivado, nunca persistido)
+///
+/// A1 crea únicamente la estructura: no hay writers, readers ni sincronización.
+model VehicleDocumentRequirementDisposition {
+  id          String                         @id @default(cuid())
+  vehicleId   String                         @map("vehicle_id")
+  category    VehicleDocumentCategory
+  disposition DocumentRequirementDisposition
+  notes       String?
+  updatedById String?                        @map("updated_by_id")
+  createdAt   DateTime                       @default(now()) @map("created_at")
+  updatedAt   DateTime                       @updatedAt @map("updated_at")
+
+  vehicle   Vehicle @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+  updatedBy User?   @relation(fields: [updatedById], references: [id], onDelete: SetNull)
+
+  // El unique compuesto empieza por vehicle_id: sirve también de índice de acceso por vehículo.
+  @@unique([vehicleId, category])
+  @@map("vehicle_document_requirement_dispositions")
 }
 
 /// Tabla de precios de referencia para el algoritmo de tasación.
