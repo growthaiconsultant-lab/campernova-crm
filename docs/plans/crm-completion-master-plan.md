@@ -35,7 +35,10 @@ como inventario/stock); **entrada oficial activa** = `entryValidatedAt!=null AND
 
 Estados por bloque: **IMPLEMENTADO / DESPLEGADO / VALIDADO / PLANIFICADO / PENDIENTE**.
 
-### A1 — Fundamentos de esquema de entrada oficial · **IMPLEMENTADO (PR #133, CI verde) · NO fusionado · NO desplegado · NO migrado (staging pendiente)**
+### A1 — Fundamentos de esquema de entrada oficial · **MIGRADO (staging + producción) + FUSIONADO (#133 → `7871fb0`) + DESPLEGADO · validación autenticada pendiente**
+
+> Ver `docs/releases/2026-07-26-a1-production.md`. Aditivo, sin backfill; cliente nuevo compatible (sin
+> `P2022`); comportamiento cero (la entrada oficial funcional es A2).
 
 Esquema aditivo, comportamiento cero (confirmado: solo referencias compile-compat). Campos de
 entrada/anulación/llaves en `Vehicle`, enums `EntryAnnulmentReason` y `DocumentRequirementDisposition`,
