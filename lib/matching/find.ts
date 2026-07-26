@@ -1,3 +1,4 @@
+import { isBuyerEligible, isVehicleEligible } from './eligibility'
 import { passesHardFilters } from './filters'
 import {
   scoreAgeKm,
@@ -64,6 +65,15 @@ export async function findMatchesForVehicle(
 ): Promise<ScoredMatch[]> {
   const vehicle = await deps.getVehicle(vehicleId)
   if (!vehicle) return []
+  // Guard M1: no se generan matches para un SUJETO no elegible (vehículo fuera de
+  // stock comercializable o de vendedor archivado). Solo se aplica cuando el adapter
+  // aporta el estado; los fixtures de scoring que lo omiten mantienen su comportamiento.
+  if (
+    vehicle.status !== undefined &&
+    !isVehicleEligible({ status: vehicle.status, sellerArchivedAt: vehicle.sellerArchivedAt ?? null })
+  ) {
+    return []
+  }
 
   const buyers = await deps.listEligibleBuyers()
   const matches: ScoredMatch[] = []
@@ -85,6 +95,14 @@ export async function findMatchesForBuyer(
 ): Promise<ScoredMatch[]> {
   const buyer = await deps.getBuyer(buyerLeadId)
   if (!buyer) return []
+  // Guard M1: no se generan matches para un SUJETO no elegible (comprador archivado
+  // o en estado terminal). Solo se aplica cuando el adapter aporta el estado.
+  if (
+    buyer.status !== undefined &&
+    !isBuyerEligible({ status: buyer.status, archivedAt: buyer.archivedAt ?? null })
+  ) {
+    return []
+  }
 
   const vehicles = await deps.listEligibleVehicles()
   const matches: ScoredMatch[] = []

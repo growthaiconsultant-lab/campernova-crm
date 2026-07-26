@@ -1,9 +1,7 @@
 import type { PrismaClient } from '@prisma/client'
 import type { EquipmentFlags } from '../valuation/types'
+import { eligibleBuyerWhere, eligibleVehicleWhere } from './eligibility'
 import type { MatchingBuyerInput, MatchingDeps, MatchingVehicleInput } from './types'
-
-const ELIGIBLE_VEHICLE_STATUSES = ['PUBLICADO', 'TASADO'] as const
-const INELIGIBLE_BUYER_STATUSES = ['CERRADO', 'PERDIDO'] as const
 
 const VEHICLE_SELECT = {
   id: true,
@@ -22,6 +20,8 @@ const VEHICLE_SELECT = {
   maxMassKg: true,
   length: true,
   heightM: true,
+  status: true,
+  sellerLead: { select: { archivedAt: true } },
 } as const
 
 const BUYER_SELECT = {
@@ -38,6 +38,8 @@ const BUYER_SELECT = {
   licenseType: true,
   maxLengthM: true,
   maxHeightM: true,
+  status: true,
+  archivedAt: true,
 } as const
 
 type VehicleRow = {
@@ -57,6 +59,8 @@ type VehicleRow = {
   maxMassKg: number | null
   length: number | null
   heightM: number | null
+  status: NonNullable<MatchingVehicleInput['status']>
+  sellerLead: { archivedAt: Date | null }
 }
 
 type BuyerRow = {
@@ -73,6 +77,8 @@ type BuyerRow = {
   licenseType: MatchingBuyerInput['licenseType']
   maxLengthM: number | null
   maxHeightM: number | null
+  status: NonNullable<MatchingBuyerInput['status']>
+  archivedAt: Date | null
 }
 
 function toEquipment(value: unknown): EquipmentFlags {
@@ -103,6 +109,8 @@ function vehicleRowToInput(row: VehicleRow): MatchingVehicleInput {
     maxMassKg: row.maxMassKg,
     length: row.length,
     heightM: row.heightM,
+    status: row.status,
+    sellerArchivedAt: row.sellerLead.archivedAt,
   }
 }
 
@@ -121,6 +129,8 @@ function buyerRowToInput(row: BuyerRow): MatchingBuyerInput {
     licenseType: row.licenseType,
     maxLengthM: row.maxLengthM,
     maxHeightM: row.maxHeightM,
+    status: row.status,
+    archivedAt: row.archivedAt,
   }
 }
 
@@ -145,7 +155,7 @@ export function prismaMatchingDeps(db: PrismaClient): MatchingDeps {
 
     async listEligibleVehicles() {
       const rows = await db.vehicle.findMany({
-        where: { status: { in: [...ELIGIBLE_VEHICLE_STATUSES] } },
+        where: eligibleVehicleWhere,
         select: VEHICLE_SELECT,
       })
       return rows.map(vehicleRowToInput)
@@ -153,7 +163,7 @@ export function prismaMatchingDeps(db: PrismaClient): MatchingDeps {
 
     async listEligibleBuyers() {
       const rows = await db.buyerLead.findMany({
-        where: { status: { notIn: [...INELIGIBLE_BUYER_STATUSES] } },
+        where: eligibleBuyerWhere,
         select: BUYER_SELECT,
       })
       return rows.map(buyerRowToInput)

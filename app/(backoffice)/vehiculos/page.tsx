@@ -3,6 +3,7 @@ import Image from 'next/image'
 import { Suspense } from 'react'
 import { Package } from 'lucide-react'
 import { db } from '@/lib/db'
+import { eligibleBuyerCounterpartMatchWhere, isVehicleEligible } from '@/lib/matching'
 import { VEHICLE_STATUS_LABELS } from '@/lib/state-machine'
 import { VehicleFilters } from './vehicle-filters'
 import { Eyebrow, EmptyState } from '@/components/redesign'
@@ -111,9 +112,10 @@ export default async function VehiculosPage({ searchParams }: { searchParams: Se
       skip: (page - 1) * PAGE_SIZE,
       take: PAGE_SIZE,
       include: {
-        sellerLead: { select: { id: true, name: true } },
+        sellerLead: { select: { id: true, name: true, archivedAt: true } },
         photos: { take: 1, orderBy: { order: 'asc' } },
-        _count: { select: { matches: true } },
+        // M1: solo cuenta matches cuya contraparte comprador es elegible.
+        _count: { select: { matches: { where: eligibleBuyerCounterpartMatchWhere } } },
       },
     }),
   ])
@@ -156,6 +158,14 @@ export default async function VehiculosPage({ searchParams }: { searchParams: Se
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
           {vehicles.map((v) => {
             const photo = v.photos[0]
+            // M1: un vehículo NO elegible (p.ej. NUEVO o de vendedor archivado) no
+            // muestra demanda compatible aunque conserve matches persistidos.
+            const compatibleCount = isVehicleEligible({
+              status: v.status,
+              sellerArchivedAt: v.sellerLead.archivedAt,
+            })
+              ? v._count.matches
+              : 0
             const priceN =
               (v.salePrice ? Number(v.salePrice) : null) ??
               (v.valuationRecommended ? Number(v.valuationRecommended) : null) ??
@@ -207,9 +217,9 @@ export default async function VehiculosPage({ searchParams }: { searchParams: Se
                     <span className="font-hanken text-[15px] font-bold text-ink">
                       {priceN != null ? EUR(priceN) : <span className="text-ink3">Sin tasar</span>}
                     </span>
-                    {v._count.matches > 0 && (
+                    {compatibleCount > 0 && (
                       <span className="rounded-[6px] bg-brand-tint px-2 py-[3px] font-hanken text-[11px] font-semibold text-brand">
-                        {v._count.matches} compatible{v._count.matches === 1 ? '' : 's'}
+                        {compatibleCount} compatible{compatibleCount === 1 ? '' : 's'}
                       </span>
                     )}
                   </div>
