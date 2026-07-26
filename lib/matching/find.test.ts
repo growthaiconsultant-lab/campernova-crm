@@ -284,3 +284,54 @@ describe('findMatchesForBuyer', () => {
     expect(results[0].vehicleId).toBe('v-nuevo')
   })
 })
+
+// M1 — guard de elegibilidad del SUJETO: no se generan matches si el sujeto
+// (vehículo o comprador) no es elegible, aunque haya contrapartes que casen.
+describe('guard de elegibilidad del sujeto (M1)', () => {
+  it('vehículo NUEVO (sujeto no elegible) → []', async () => {
+    const deps = makeDeps(
+      [makeVehicle({ status: 'NUEVO', sellerArchivedAt: null })],
+      [makeBuyer()]
+    )
+    expect(await findMatchesForVehicle('v-base', deps, NOW_YEAR)).toEqual([])
+  })
+
+  it('vehículo TASADO con vendedor no archivado (sujeto elegible) → genera matches', async () => {
+    const deps = makeDeps(
+      [makeVehicle({ status: 'TASADO', sellerArchivedAt: null })],
+      [makeBuyer()]
+    )
+    const results = await findMatchesForVehicle('v-base', deps, NOW_YEAR)
+    expect(results.map((m) => m.buyerLeadId)).toEqual(['b-base'])
+  })
+
+  it('vehículo PUBLICADO pero vendedor archivado (sujeto no elegible) → []', async () => {
+    const deps = makeDeps(
+      [makeVehicle({ status: 'PUBLICADO', sellerArchivedAt: new Date() })],
+      [makeBuyer()]
+    )
+    expect(await findMatchesForVehicle('v-base', deps, NOW_YEAR)).toEqual([])
+  })
+
+  it('comprador PERDIDO (sujeto no elegible) → []', async () => {
+    const deps = makeDeps([makeVehicle()], [makeBuyer({ status: 'PERDIDO', archivedAt: null })])
+    expect(await findMatchesForBuyer('b-base', deps, NOW_YEAR)).toEqual([])
+  })
+
+  it('comprador archivado (sujeto no elegible) → []', async () => {
+    const deps = makeDeps(
+      [makeVehicle()],
+      [makeBuyer({ status: 'CUALIFICADO', archivedAt: new Date() })]
+    )
+    expect(await findMatchesForBuyer('b-base', deps, NOW_YEAR)).toEqual([])
+  })
+
+  it('comprador CUALIFICADO no archivado (sujeto elegible) → genera matches', async () => {
+    const deps = makeDeps(
+      [makeVehicle()],
+      [makeBuyer({ status: 'CUALIFICADO', archivedAt: null })]
+    )
+    const results = await findMatchesForBuyer('b-base', deps, NOW_YEAR)
+    expect(results.map((m) => m.vehicleId)).toEqual(['v-base'])
+  })
+})

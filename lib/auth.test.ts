@@ -146,9 +146,12 @@ describe('require* server-side guards', () => {
     it('permite a ADMIN', async () => {
       await expectAllowed(requireAdmin, 'ADMIN')
     })
-    it.each(['AGENTE', 'TALLER', 'ENTREGAS', 'MARKETING'] as const)('deniega a %s', async (role) => {
-      await expectForbidden(requireAdmin, role)
-    })
+    it.each(['AGENTE', 'TALLER', 'ENTREGAS', 'MARKETING'] as const)(
+      'deniega a %s',
+      async (role) => {
+        await expectForbidden(requireAdmin, role)
+      }
+    )
   })
 
   describe('sesión ausente o inactiva → /login', () => {
