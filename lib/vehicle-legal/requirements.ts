@@ -29,6 +29,9 @@ export const TASADO_MIN_PHOTOS = 1
 export const DOC_LABELS: Record<VehicleDocumentCategory, string> = {
   DNI_VENDEDOR: 'DNI/NIE del vendedor',
   CONTRATO_COMPRAVENTA: 'Contrato de compraventa firmado',
+  // PR-A1: etiqueta necesaria por exhaustividad del Record. La categoría NO está en
+  // PUBLICADO_REQUIRED_DOCS ni se expone en uploaders/selectores hasta A2.
+  CONTRATO_GESTION: 'Contrato de gestión de venta firmado',
   FICHA_TECNICA: 'Ficha técnica / tarjeta ITV',
   PERMISO_CIRCULACION: 'Permiso de circulación',
   ITV_VIGENTE: 'Último informe ITV',

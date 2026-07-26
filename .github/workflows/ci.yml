@@ -176,8 +176,8 @@ jobs:
           count=$(psql "$PSQL_URL" -tAc "SELECT count(*) FROM _prisma_migrations WHERE finished_at IS NOT NULL")
           names=$(psql "$PSQL_URL" -tAc "SELECT string_agg(migration_name, ',' ORDER BY migration_name) FROM _prisma_migrations WHERE finished_at IS NOT NULL")
           echo "migraciones aplicadas: $count · nombres: $names"
-          test "$count" = "6" || { echo "esperado 6 migraciones aplicadas (baseline + PR5B1 + archivado + commitment + delivery_offer_link_expand + delivery_offer_link_required)"; exit 1; }
-          test "$names" = "000000000000_squashed_migrations,20260712000000_add_versioned_document_model,20260719120000_add_lead_archiving_model,20260720000000_add_calendar_event_commitment,20260721100000_add_delivery_offer_link_expand,20260721200000_make_delivery_offer_link_required" || { echo "conjunto u orden de migraciones inesperado"; exit 1; }
+          test "$count" = "7" || { echo "esperado 7 migraciones aplicadas (baseline + PR5B1 + archivado + commitment + delivery_offer_link_expand + delivery_offer_link_required + vehicle_entry_foundations)"; exit 1; }
+          test "$names" = "000000000000_squashed_migrations,20260712000000_add_versioned_document_model,20260719120000_add_lead_archiving_model,20260720000000_add_calendar_event_commitment,20260721100000_add_delivery_offer_link_expand,20260721200000_make_delivery_offer_link_required,20260726000000_add_vehicle_entry_foundations" || { echo "conjunto u orden de migraciones inesperado"; exit 1; }
 
       - name: Prisma migrate status (must be up to date)
         run: pnpm prisma migrate status
