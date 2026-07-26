@@ -6,6 +6,7 @@ import { ChevronDown, ChevronUp } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { updateMatchStatus } from '@/app/(backoffice)/matches/actions'
+import { formatEur } from '@/lib/format/currency'
 import type { MatchStatus } from '@prisma/client'
 
 // ─── Types (plain JS — sin Decimal de Prisma) ────────────────────────────────
@@ -99,14 +100,6 @@ function scoreBadgeClass(score: number): string {
   if (score >= 60) return 'bg-teal-100 text-teal-700'
   if (score >= 40) return 'bg-yellow-100 text-yellow-700'
   return 'bg-gray-100 text-gray-500'
-}
-
-function formatEur(value: number): string {
-  return value.toLocaleString('es-ES', {
-    style: 'currency',
-    currency: 'EUR',
-    maximumFractionDigits: 0,
-  })
 }
 
 // ─── Explicación del match (CAM-64) ───────────────────────────────────────────

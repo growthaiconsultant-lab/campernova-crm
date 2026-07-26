@@ -1,6 +1,9 @@
+import { requireAgente } from '@/lib/auth'
 import { BuyerLeadForm } from './buyer-lead-form'
 
-export default function NuevoCompradorPage() {
+export default async function NuevoCompradorPage() {
+  await requireAgente()
+
   return (
     <div className="max-w-2xl">
       <div className="mb-6">

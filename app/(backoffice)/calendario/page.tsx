@@ -1,6 +1,6 @@
 import Link from 'next/link'
 import { db } from '@/lib/db'
-import { requireAuth } from '@/lib/auth'
+import { requireCanViewCalendario } from '@/lib/auth'
 import { prismaCalendarDeps } from '@/lib/calendar/prisma-deps'
 import { getCalendarItems } from '@/lib/calendar/aggregate'
 import type { CalendarItem, CalendarSource, CalendarTone } from '@/lib/calendar/types'
@@ -95,7 +95,7 @@ export default async function CalendarioPage({
     assignee?: string
   }
 }) {
-  await requireAuth()
+  await requireCanViewCalendario()
 
   const view =
     searchParams.view === 'day' ? 'day' : searchParams.view === 'month' ? 'month' : 'week'

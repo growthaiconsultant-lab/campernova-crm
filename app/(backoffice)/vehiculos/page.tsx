@@ -3,6 +3,7 @@ import Image from 'next/image'
 import { Suspense } from 'react'
 import { Package } from 'lucide-react'
 import { db } from '@/lib/db'
+import { requireCanViewVehiculos } from '@/lib/auth'
 import { eligibleBuyerCounterpartMatchWhere, isVehicleEligible } from '@/lib/matching'
 import { VEHICLE_STATUS_LABELS } from '@/lib/state-machine'
 import { VehicleFilters } from './vehicle-filters'
@@ -100,6 +101,10 @@ function buildOrderBy(sp: SearchParams): Prisma.VehicleOrderByWithRelationInput 
 }
 
 export default async function VehiculosPage({ searchParams }: { searchParams: SearchParams }) {
+  // Guard server-side: el listado comercial expone matrícula, precio de venta y valoración
+  // → solo ADMIN + AGENTE. No se confía en el ocultamiento del sidebar.
+  await requireCanViewVehiculos()
+
   const page = Math.max(1, parseInt(searchParams.page ?? '1', 10) || 1)
   const where = buildWhere(searchParams)
   const orderBy = buildOrderBy(searchParams)

@@ -2,7 +2,7 @@ import { notFound } from 'next/navigation'
 import { Suspense } from 'react'
 import Link from 'next/link'
 import { db } from '@/lib/db'
-import { requireAuth } from '@/lib/auth'
+import { requireAgente } from '@/lib/auth'
 import { BuyerLeadEditForm } from './buyer-lead-edit-form'
 import { TradeInCard } from './trade-in-card'
 import { BuyerTopbarActions } from './buyer-topbar-actions'
@@ -81,7 +81,7 @@ export default async function FichaCompradorPage({
   const activeTab = searchParams.tab ?? 'ficha'
 
   const [currentUser, lead, agents, activities] = await Promise.all([
-    requireAuth(),
+    requireAgente(),
     db.buyerLead.findUnique({
       where: { id: params.id },
       include: {

@@ -1,4 +1,8 @@
-export default function AjustesPage() {
+import { requireAdmin } from '@/lib/auth'
+
+export default async function AjustesPage() {
+  await requireAdmin()
+
   return (
     <div>
       <h1 className="text-2xl font-bold">Ajustes</h1>

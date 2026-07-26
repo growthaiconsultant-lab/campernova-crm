@@ -1,7 +1,7 @@
 import Link from 'next/link'
 import { Plus, Clock } from 'lucide-react'
 import { db } from '@/lib/db'
-import { requireAuth } from '@/lib/auth'
+import { requireAgente } from '@/lib/auth'
 import { BuyerListFilters } from './buyer-list-filters'
 import { TEMPERATURE_LABELS } from '@/lib/lead-temperature'
 import { NEXT_ACTION_LABELS, isNextActionOverdue, formatNextActionDue } from '@/lib/next-action'
@@ -165,7 +165,7 @@ const VIEWS = [
 // ── Page ──────────────────────────────────────────────────────────────────────
 
 export default async function CompradoresPage({ searchParams }: { searchParams: SearchParams }) {
-  const currentUser = await requireAuth()
+  const currentUser = await requireAgente()
   const page = Math.max(1, parseInt(searchParams.page ?? '1', 10) || 1)
   const view = searchParams.view ?? 'todos'
 
