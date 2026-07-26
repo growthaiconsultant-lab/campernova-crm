@@ -35,7 +35,7 @@ como inventario/stock); **entrada oficial activa** = `entryValidatedAt!=null AND
 
 Estados por bloque: **IMPLEMENTADO / DESPLEGADO / VALIDADO / PLANIFICADO / PENDIENTE**.
 
-### A1 — Fundamentos de esquema de entrada oficial · **IMPLEMENTADO (local, CI verde) · NO desplegado · NO migrado**
+### A1 — Fundamentos de esquema de entrada oficial · **IMPLEMENTADO (PR #133, CI verde) · NO fusionado · NO desplegado · NO migrado (staging pendiente)**
 
 Esquema aditivo, comportamiento cero (confirmado: solo referencias compile-compat). Campos de
 entrada/anulación/llaves en `Vehicle`, enums `EntryAnnulmentReason` y `DocumentRequirementDisposition`,
@@ -45,7 +45,7 @@ tabla `VehicleDocumentRequirementDisposition`, `VehicleDocumentCategory += CONTR
 cliente nuevo** (el cliente antiguo tolera columnas nullable extra; el nuevo NO tolera que falten →
 `P2022`).
 
-### M1 — Elegibilidad de matching (interim) · **PLANIFICADO/EN CURSO (este ciclo) · sin migración**
+### M1 — Elegibilidad de matching (interim) · **FUSIONADO + DESPLEGADO + VALIDADO (inmediata) · sin migración** (PR #139)
 
 Política compartida: vehículo elegible = `status IN (TASADO,PUBLICADO) AND SellerLead.archivedAt==null`;
 comprador elegible = `archivedAt==null AND status no terminal`. A2 añadirá `entrada activa`. Reutilizada
@@ -53,7 +53,7 @@ en generación, recálculo (ambos sentidos), notificaciones, reads (ficha vended
 "compradores esperando"), conteos/KPIs, `_count.matches`. **No** se limpian datos históricos (quedan
 ocultos por la política de lectura; limpieza futura = DATA-1, con autorización).
 
-### PERM-1 — Guards de rol server-side · **PLANIFICADO/EN CURSO (este ciclo) · sin migración**
+### PERM-1 — Guards de rol server-side · **FUSIONADO + DESPLEGADO · validación inmediata (rutas 307, 0 runtime errors); smoke por rol en vivo NO ejercitado · sin migración** (PR #136)
 
 Matriz vinculante: **ADMIN** completo; **AGENTE** comercial completo; **TALLER** solo vía Taller (sin
 `purchasePrice`/margen/económico comercial/analytics completos); **ENTREGAS** solo vía Entregas (sin
@@ -63,7 +63,7 @@ comercial completo queda **denegado**. Guards server-side en `/vehiculos`, ficha
 ofertas, calendario, analytics/crm + acciones + URLs directas. Tests positivos y negativos por rol.
 Sin RLS remota.
 
-### HARD-1 — Estabilidad · **PLANIFICADO/EN CURSO (este ciclo) · sin migración**
+### HARD-1 — Estabilidad · **FUSIONADO + DESPLEGADO + VALIDADO (inmediata) · sin migración** (PR #137)
 
 Corregir de raíz el hydration error de `/vendedores/[id]?tab=compradores` (no solo ocultarlo con el
 error boundary). Boundaries específicos solo donde sean pequeños y necesarios.
@@ -154,10 +154,34 @@ A2→runbook entrada + dominio; A3→runbook tasación; PUB-1→runbook publicac
 - riesgos; todos→release/handoff. No documentar como implementado antes de merge (+migración/deploy/
   validación). Corregir la cifra obsoleta "8 callers" de `withLockedRoots` → **11**.
 
-## §12 — Estado del Project Brief (`CLAUDE.md`)
+## §12 — Estado de la documentación de gobierno (dos documentos distintos)
 
-**Materialmente desactualizado** respecto a: HEAD de `main` (fija un `main` de julio anterior), número de
-tests, número/lista de migraciones, PRs recientes y la entrega de 2026-07-26. Su **gobernanza sigue
-vigente**. Se actualizará **tras** consolidar A1 y el primer bloque funcional siguiente, para no
-reescribirlo varias veces en pocas horas. Hasta entonces, este documento y `docs/releases/2026-07-26-crm-delivery.md`
-son la fuente de estado más reciente.
+Son **dos ficheros diferentes** y ambos pueden estar desactualizados; no deben tratarse como el mismo:
+
+- **`CLAUDE.md`** (instrucciones del repo para el asistente): su **gobernanza sigue vigente**, pero el
+  registro de estado de bloques (HEAD de `main`, nº de tests, nº/lista de migraciones, PRs recientes)
+  está **materialmente desactualizado**.
+- **Project Brief de Campers Nova** (documento de negocio, fecha ~15 de julio): también **claramente
+  desactualizado** — `main` antiguo, cifras antiguas de tests y migraciones.
+
+Ambos se actualizarán **tras** consolidar A1 y el siguiente bloque funcional (A2), para no reescribirlos
+varias veces en pocas horas. Hasta entonces, este documento, `docs/releases/2026-07-26-crm-delivery.md`
+y `docs/runbooks/a1-entry-foundations-rollout.md` son la fuente de estado más reciente.
+
+## Actualización de integración — ciclo 2 (2026-07-26)
+
+Integración controlada del primer ciclo, **sin migraciones ni cambios de datos**:
+
+- **HARD-1 (#137)**, **PERM-1 (#136)** y **M1 (#139)** fusionados por squash a `main` y **desplegados a
+  producción**. Validación **inmediata** (deployment READY, 0 runtime errors, rutas públicas 200 /
+  privadas 307→login). HARD-1: observación de Sentry pendiente (no declarado resuelto). PERM-1: smoke
+  por rol en vivo **no ejercitado** (sin sesiones de prueba por rol) — cubierto por 30 tests de auth.
+  M1: bypass `status !== undefined` **demostrado seguro** (el único deps productivo `prismaMatchingDeps`
+  siempre aporta `status`+`archivedAt`; los predicados exigen `status` en su tipo). Los ~331 matches
+  históricos **no se borraron**: quedan ocultos por la política de lectura.
+- **Docs (#138)** — este documento + runbook A1.
+- **A1 (#133)**: sigue Draft; sincronización con el nuevo `main` + validación en **staging** pendientes;
+  producción de A1 **no autorizada** (gate humano tras staging).
+- **A2**: **no iniciado** en el momento de esta actualización.
+- Deuda registrada: breadcrumbs de Taller/Entregas/Postventa → ficha de vendedor/comprador ahora 403 para
+  esos roles (postura de seguridad correcta; sustituir por enlaces a vistas operativas permitidas).
