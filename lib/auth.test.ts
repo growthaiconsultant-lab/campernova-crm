@@ -1,6 +1,29 @@
-import { describe, it, expect } from 'vitest'
-import { userHasRole } from './auth'
+import { describe, it, expect, vi, beforeEach } from 'vitest'
 import type { User } from '@prisma/client'
+
+// ─── mocks para las guards que consultan sesión + BD ─────────────────────────
+// `redirect` lanza (como el NEXT_REDIRECT real) para cortar el flujo; el mensaje
+// transporta la URL destino para poder asertar sobre ella.
+vi.mock('next/navigation', () => ({
+  redirect: vi.fn((url: string) => {
+    throw new Error(`REDIRECT:${url}`)
+  }),
+}))
+
+const { mockAuth, mockDb } = vi.hoisted(() => ({
+  mockAuth: { getUser: vi.fn() },
+  mockDb: { user: { findUnique: vi.fn() } },
+}))
+vi.mock('@/lib/supabase/server', () => ({ createClient: () => ({ auth: mockAuth }) }))
+vi.mock('@/lib/db', () => ({ db: mockDb }))
+
+import {
+  userHasRole,
+  requireAgente,
+  requireAdmin,
+  requireCanViewVehiculos,
+  requireCanViewCalendario,
+} from './auth'
 
 function makeUser(role: User['role']): User {
   return {
@@ -64,5 +87,87 @@ describe('userHasRole', () => {
     expect(userHasRole(marketing, ['ADMIN', 'AGENTE'])).toBe(false) // commercial
     expect(userHasRole(marketing, ['ADMIN', 'ENTREGAS'])).toBe(false) // entregas
     expect(userHasRole(marketing, ['ADMIN', 'TALLER'])).toBe(false) // taller
+  })
+})
+
+// ─── Guards server-side por rol (PERM-1) ─────────────────────────────────────
+
+const ALL_ROLES: User['role'][] = ['ADMIN', 'AGENTE', 'TALLER', 'ENTREGAS', 'MARKETING']
+
+function loginAs(role: User['role']) {
+  mockAuth.getUser.mockResolvedValue({ data: { user: { id: 'auth-1' } } })
+  mockDb.user.findUnique.mockResolvedValue(makeUser(role))
+}
+
+async function expectAllowed(guard: () => Promise<User>, role: User['role']) {
+  loginAs(role)
+  const user = await guard()
+  expect(user.role).toBe(role)
+}
+
+async function expectForbidden(guard: () => Promise<User>, role: User['role']) {
+  loginAs(role)
+  await expect(guard()).rejects.toThrow('REDIRECT:/dashboard?error=forbidden')
+}
+
+describe('require* server-side guards', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
+
+  describe('requireCanViewVehiculos (inventario comercial → ADMIN + AGENTE)', () => {
+    it.each(['ADMIN', 'AGENTE'] as const)('permite a %s', async (role) => {
+      await expectAllowed(requireCanViewVehiculos, role)
+    })
+    it.each(['TALLER', 'ENTREGAS', 'MARKETING'] as const)('deniega a %s', async (role) => {
+      await expectForbidden(requireCanViewVehiculos, role)
+    })
+  })
+
+  describe('requireAgente (vendedores/compradores/ofertas → ADMIN + AGENTE)', () => {
+    it.each(['ADMIN', 'AGENTE'] as const)('permite a %s', async (role) => {
+      await expectAllowed(requireAgente, role)
+    })
+    it.each(['TALLER', 'ENTREGAS', 'MARKETING'] as const)('deniega a %s', async (role) => {
+      await expectForbidden(requireAgente, role)
+    })
+  })
+
+  describe('requireCanViewCalendario (agenda operativa → ADMIN + AGENTE + TALLER + ENTREGAS)', () => {
+    it.each(['ADMIN', 'AGENTE', 'TALLER', 'ENTREGAS'] as const)('permite a %s', async (role) => {
+      await expectAllowed(requireCanViewCalendario, role)
+    })
+    it('deniega a MARKETING', async () => {
+      await expectForbidden(requireCanViewCalendario, 'MARKETING')
+    })
+  })
+
+  describe('requireAdmin (ajustes / configuración → solo ADMIN)', () => {
+    it('permite a ADMIN', async () => {
+      await expectAllowed(requireAdmin, 'ADMIN')
+    })
+    it.each(['AGENTE', 'TALLER', 'ENTREGAS', 'MARKETING'] as const)(
+      'deniega a %s',
+      async (role) => {
+        await expectForbidden(requireAdmin, role)
+      }
+    )
+  })
+
+  describe('sesión ausente o inactiva → /login', () => {
+    it('sin usuario autenticado redirige a /login', async () => {
+      mockAuth.getUser.mockResolvedValue({ data: { user: null } })
+      await expect(requireCanViewVehiculos()).rejects.toThrow('REDIRECT:/login')
+    })
+
+    it('usuario inactivo redirige a /login (no cuenta como acceso)', async () => {
+      mockAuth.getUser.mockResolvedValue({ data: { user: { id: 'auth-1' } } })
+      mockDb.user.findUnique.mockResolvedValue({ ...makeUser('ADMIN'), active: false })
+      await expect(requireCanViewVehiculos()).rejects.toThrow('REDIRECT:/login')
+    })
+
+    it('cubre los 5 roles del sistema', () => {
+      expect(ALL_ROLES).toHaveLength(5)
+    })
   })
 })

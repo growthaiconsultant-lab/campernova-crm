@@ -1,6 +1,6 @@
 import Link from 'next/link'
 import { db } from '@/lib/db'
-import { requireAuth } from '@/lib/auth'
+import { requireAgente } from '@/lib/auth'
 import { TEMPERATURE_LABELS } from '@/lib/lead-temperature'
 import { Eyebrow, EmptyState } from '@/components/redesign'
 import { cn } from '@/lib/utils'
@@ -35,7 +35,7 @@ const COLUMNS: { key: ColumnKey; label: string; accent: string }[] = [
 ]
 
 export default async function PipelinePage() {
-  const currentUser = await requireAuth()
+  const currentUser = await requireAgente()
   const isAgente = currentUser.role === 'AGENTE'
   const now = new Date()
 

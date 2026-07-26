@@ -1,5 +1,6 @@
-import type { PrismaClient } from '@prisma/client'
+import type { Prisma, PrismaClient } from '@prisma/client'
 import type { DashboardFilter } from '@/lib/dashboard/queries'
+import { eligibleBuyerWhere, eligibleMatchWhere, eligibleVehicleWhere } from '@/lib/matching'
 import { ACTIVE_DEMAND_MATCH_THRESHOLD } from '@/lib/scoring'
 
 /**
@@ -29,7 +30,11 @@ export async function getMatchingKpis(
   db: PrismaClient,
   filter: DashboardFilter
 ): Promise<MatchingKpis> {
-  const matchWhere = filter.agentId ? { vehicle: { sellerLead: { agentId: filter.agentId } } } : {}
+  // M1: los KPIs solo cuentan matches con AMBAS partes elegibles (vehículo en stock
+  // comercializable + vendedor no archivado; comprador no terminal + no archivado).
+  const matchWhere: Prisma.MatchWhereInput = filter.agentId
+    ? { AND: [eligibleMatchWhere, { vehicle: { sellerLead: { agentId: filter.agentId } } }] }
+    : eligibleMatchWhere
 
   const [total, useful, rejected, avg, statusGroups, scoreRows, offersWithMatch, topDemand] =
     await Promise.all([
@@ -46,12 +51,13 @@ export async function getMatchingKpis(
       }),
       db.vehicle.findMany({
         where: {
-          ...(filter.agentId ? { sellerLead: { agentId: filter.agentId } } : {}),
-          status: { in: ['PUBLICADO', 'TASADO'] },
+          status: eligibleVehicleWhere.status,
+          // vendedor no archivado (M1) + filtro de agente
+          sellerLead: { archivedAt: null, ...(filter.agentId ? { agentId: filter.agentId } : {}) },
           matches: {
             some: {
               score: { gte: ACTIVE_DEMAND_MATCH_THRESHOLD },
-              buyerLead: { status: { notIn: ['CERRADO', 'PERDIDO'] } },
+              buyerLead: eligibleBuyerWhere,
             },
           },
         },
@@ -64,7 +70,7 @@ export async function getMatchingKpis(
           matches: {
             where: {
               score: { gte: ACTIVE_DEMAND_MATCH_THRESHOLD },
-              buyerLead: { status: { notIn: ['CERRADO', 'PERDIDO'] } },
+              buyerLead: eligibleBuyerWhere,
             },
             select: { id: true },
           },

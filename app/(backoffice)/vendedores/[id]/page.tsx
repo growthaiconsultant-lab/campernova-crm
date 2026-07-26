@@ -2,7 +2,7 @@ import { notFound } from 'next/navigation'
 import { Suspense } from 'react'
 import Link from 'next/link'
 import { db } from '@/lib/db'
-import { requireAuth } from '@/lib/auth'
+import { requireAgente } from '@/lib/auth'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { VehiclePhotoUploader } from '@/components/vehicle-photo-uploader'
@@ -13,7 +13,12 @@ import { ValuationOverrideForm } from './valuation-override-form'
 import { MatchesSection } from '@/components/matches-section'
 import type { VehicleMatchData } from '@/components/matches-section'
 import { OffersSection } from '@/components/offers-section'
-import { prismaMatchingDeps, buildMatchExplanation } from '@/lib/matching'
+import {
+  buildMatchExplanation,
+  isBuyerEligible,
+  isVehicleEligible,
+  prismaMatchingDeps,
+} from '@/lib/matching'
 import { ActivityTimeline } from '@/components/activity-timeline'
 import type { ActivityItem } from '@/components/activity-timeline'
 import { NoteForm } from '@/components/note-form'
@@ -82,7 +87,7 @@ export default async function FichaVendedorPage({
   searchParams: { tab?: string }
 }) {
   const [currentUser, lead, agents, activities] = await Promise.all([
-    requireAuth(),
+    requireAgente(),
     db.sellerLead.findUnique({
       where: { id: params.id },
       include: {
@@ -104,6 +109,8 @@ export default async function FichaVendedorPage({
                     minSeats: true,
                     maxBudget: true,
                     criticalEquipment: true,
+                    status: true,
+                    archivedAt: true,
                   },
                 },
               },
@@ -155,6 +162,18 @@ export default async function FichaVendedorPage({
   const isAdmin = currentUser.role === 'ADMIN'
   const isAgente = ['ADMIN', 'AGENTE'].includes(currentUser.role)
 
+  // M1 — re-filtrado de matches persistidos por elegibilidad (lectura):
+  // si el SUJETO (vehículo) no es elegible, no se muestran matches; y de los que
+  // haya, se ocultan aquellos cuya contraparte comprador no es elegible.
+  const subjectVehicleEligible = v
+    ? isVehicleEligible({ status: v.status, sellerArchivedAt: lead.archivedAt })
+    : false
+  const visibleMatches = subjectVehicleEligible
+    ? (v?.matches ?? []).filter((m) =>
+        isBuyerEligible({ status: m.buyerLead.status, archivedAt: m.buyerLead.archivedAt })
+      )
+    : []
+
   // ── Cálculos derivados ────────────────────────────────────────────────────
   const daysPipeline = daysSince(lead.createdAt)
   const lastActivity = activities[0]?.createdAt ?? null
@@ -162,19 +181,18 @@ export default async function FichaVendedorPage({
 
   // CAM-64: explicación determinista por match (motivos + riesgos)
   const matchDeps = prismaMatchingDeps(db)
-  const vehicleMatchInput =
-    v && (v.matches?.length ?? 0) > 0 ? await matchDeps.getVehicle(v.id) : null
+  const vehicleMatchInput = v && visibleMatches.length > 0 ? await matchDeps.getVehicle(v.id) : null
   const matchExplanations = new Map<string, { reasons: string[]; risks: string[] }>()
   if (vehicleMatchInput) {
     await Promise.all(
-      (v?.matches ?? []).map(async (m) => {
+      visibleMatches.map(async (m) => {
         const b = await matchDeps.getBuyer(m.buyerLead.id)
         if (b) matchExplanations.set(m.id, buildMatchExplanation(vehicleMatchInput, b))
       })
     )
   }
 
-  const vehicleMatches: VehicleMatchData[] = (v?.matches ?? []).map((m) => ({
+  const vehicleMatches: VehicleMatchData[] = visibleMatches.map((m) => ({
     id: m.id,
     score: m.score,
     status: m.status,
@@ -190,7 +208,7 @@ export default async function FichaVendedorPage({
   }))
 
   // Block 18 — ofertas por el vehículo + candidatos (compradores matcheados)
-  const offerCandidates = (v?.matches ?? []).map((m) => ({
+  const offerCandidates = visibleMatches.map((m) => ({
     id: m.buyerLead.id,
     label: m.buyerLead.name,
   }))

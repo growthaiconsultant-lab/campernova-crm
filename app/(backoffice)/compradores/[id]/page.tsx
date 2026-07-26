@@ -2,7 +2,7 @@ import { notFound } from 'next/navigation'
 import { Suspense } from 'react'
 import Link from 'next/link'
 import { db } from '@/lib/db'
-import { requireAuth } from '@/lib/auth'
+import { requireAgente } from '@/lib/auth'
 import { BuyerLeadEditForm } from './buyer-lead-edit-form'
 import { TradeInCard } from './trade-in-card'
 import { BuyerTopbarActions } from './buyer-topbar-actions'
@@ -12,7 +12,12 @@ import { OffersSection } from '@/components/offers-section'
 import { isActiveHold } from '@/lib/offers'
 import { buyerScore } from '@/lib/scoring'
 import { ScoreInfo } from '@/components/score-info'
-import { prismaMatchingDeps, buildMatchExplanation } from '@/lib/matching'
+import {
+  buildMatchExplanation,
+  isBuyerEligible,
+  isVehicleEligible,
+  prismaMatchingDeps,
+} from '@/lib/matching'
 import { classifyBuyerCriteria } from '@/lib/buyer-criteria'
 import type { BuyerMatchData } from '@/components/matches-section'
 import { ActivityTimeline } from '@/components/activity-timeline'
@@ -76,7 +81,7 @@ export default async function FichaCompradorPage({
   const activeTab = searchParams.tab ?? 'ficha'
 
   const [currentUser, lead, agents, activities] = await Promise.all([
-    requireAuth(),
+    requireAgente(),
     db.buyerLead.findUnique({
       where: { id: params.id },
       include: {
@@ -125,10 +130,11 @@ export default async function FichaCompradorPage({
                 model: true,
                 year: true,
                 km: true,
+                status: true,
                 desiredPrice: true,
                 valuationRecommended: true,
                 photos: { select: { url: true }, orderBy: { order: 'asc' }, take: 1 },
-                sellerLead: { select: { id: true } },
+                sellerLead: { select: { id: true, archivedAt: true } },
               },
             },
           },
@@ -164,6 +170,22 @@ export default async function FichaCompradorPage({
   const isTerminal = !BUYER_LEAD_TRANSITIONS[lead.status as BuyerLeadStatus]
   const statusLabel = BUYER_LEAD_STATUS_LABELS[lead.status as BuyerLeadStatus] ?? lead.status
 
+  // M1 — re-filtrado de matches persistidos por elegibilidad (lectura):
+  // si el SUJETO (comprador) no es elegible, no se muestran matches; y de los que
+  // haya, se ocultan aquellos cuya contraparte vehículo no es elegible.
+  const subjectBuyerEligible = isBuyerEligible({
+    status: lead.status,
+    archivedAt: lead.archivedAt,
+  })
+  const visibleMatches = subjectBuyerEligible
+    ? lead.matches.filter((m) =>
+        isVehicleEligible({
+          status: m.vehicle.status,
+          sellerArchivedAt: m.vehicle.sellerLead.archivedAt,
+        })
+      )
+    : []
+
   // Resumen de la necesidad — la unidad de trabajo del comprador
   const tipoLabel =
     lead.vehicleType === 'CAMPER'
@@ -179,7 +201,7 @@ export default async function FichaCompradorPage({
     .filter(Boolean)
     .join(' · ')
 
-  const bestMatch = lead.matches[0]
+  const bestMatch = visibleMatches[0]
   const bestMatchScore = bestMatch ? bestMatch.score : 0
   const hasActiveOffer = lead.offers.some((o) => isActiveHold(o.status))
   const scoreResult = buyerScore({
@@ -254,18 +276,18 @@ export default async function FichaCompradorPage({
 
   // CAM-64: explicación determinista por match (motivos + riesgos)
   const matchDeps = prismaMatchingDeps(db)
-  const buyerMatchInput = lead.matches.length > 0 ? await matchDeps.getBuyer(lead.id) : null
+  const buyerMatchInput = visibleMatches.length > 0 ? await matchDeps.getBuyer(lead.id) : null
   const matchExplanations = new Map<string, { reasons: string[]; risks: string[] }>()
   if (buyerMatchInput) {
     await Promise.all(
-      lead.matches.map(async (m) => {
+      visibleMatches.map(async (m) => {
         const v = await matchDeps.getVehicle(m.vehicle.id)
         if (v) matchExplanations.set(m.id, buildMatchExplanation(v, buyerMatchInput))
       })
     )
   }
 
-  const buyerMatches: BuyerMatchData[] = lead.matches.map((m) => {
+  const buyerMatches: BuyerMatchData[] = visibleMatches.map((m) => {
     const rawPrice = m.vehicle.desiredPrice ?? m.vehicle.valuationRecommended
     return {
       id: m.id,
@@ -286,7 +308,7 @@ export default async function FichaCompradorPage({
   })
 
   // Block 18 — ofertas del comprador + candidatos (vehículos matcheados)
-  const offerCandidates = lead.matches.map((m) => ({
+  const offerCandidates = visibleMatches.map((m) => ({
     id: m.vehicle.id,
     label: `${m.vehicle.brand} ${m.vehicle.model} (${m.vehicle.year})`,
   }))
@@ -353,7 +375,7 @@ export default async function FichaCompradorPage({
   const tabs: LeadTab[] = [
     { key: 'ficha', label: 'Ficha' },
     { key: 'actividad', label: 'Actividad', badge: activities.length },
-    { key: 'matches', label: 'Vehículos sugeridos', badge: lead.matches.length },
+    { key: 'matches', label: 'Vehículos sugeridos', badge: visibleMatches.length },
     { key: 'ofertas', label: 'Ofertas', badge: offerRows.length || undefined },
     ...(hasChat
       ? [{ key: 'conversacion', label: 'Conversación', badge: chatUserMsgCount } as LeadTab]
@@ -1088,7 +1110,7 @@ export default async function FichaCompradorPage({
                       warn: daysInPipeline > 60,
                     },
                     { label: 'Estado', value: statusLabel },
-                    { label: 'Matches activos', value: String(lead.matches.length) },
+                    { label: 'Matches activos', value: String(visibleMatches.length) },
                     lead.financingNeeded != null
                       ? {
                           label: 'Financiación',

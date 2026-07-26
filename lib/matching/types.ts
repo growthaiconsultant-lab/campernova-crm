@@ -4,6 +4,8 @@ import type {
   BedLayout,
   BathroomType,
   LicenseType,
+  VehicleStatus,
+  BuyerLeadStatus,
 } from '@prisma/client'
 import type { EquipmentFlags } from '../valuation/types'
 
@@ -26,6 +28,10 @@ export type MatchingVehicleInput = {
   maxMassKg: number | null
   length: number | null
   heightM: number | null
+  // Elegibilidad del SUJETO (M1) — el adapter real las rellena; opcionales para no
+  // romper fixtures de scoring. El guard de find.ts solo actúa si `status` está definido.
+  status?: VehicleStatus
+  sellerArchivedAt?: Date | null
 }
 
 /// Datos mínimos de un comprador para el matching.
@@ -44,6 +50,10 @@ export type MatchingBuyerInput = {
   licenseType: LicenseType | null
   maxLengthM: number | null
   maxHeightM: number | null
+  // Elegibilidad del SUJETO (M1) — el adapter real las rellena; opcionales para no
+  // romper fixtures de scoring. El guard de find.ts solo actúa si `status` está definido.
+  status?: BuyerLeadStatus
+  archivedAt?: Date | null
 }
 
 /// Desglose del score por eje (0-100 cada uno, antes de ponderar).
