@@ -178,6 +178,14 @@ enum ActivityType {
   // archivado/reactivación sin necesitar otra migración. Aún no se emiten.
   LEAD_ARCHIVADO
   LEAD_REACTIVADO
+  // Entrada oficial + custodia de llaves (PR-A2). Emitidos por el writer de entrada/anulación,
+  // la disposición documental y la creación de la orden de inspección. Trazabilidad, NO fuente de
+  // verdad: el estado de la entrada se lee de las columnas del vehículo, no parseando Activity.
+  ENTRADA_VALIDADA
+  ENTRADA_ANULADA
+  LLAVES_REGISTRADAS
+  ORDEN_INSPECCION_CREADA
+  DISPOSICION_DOCUMENTAL_ACTUALIZADA
 }
 
 /// Temperatura comercial del lead comprador (CAM-62).
@@ -1023,6 +1031,10 @@ model WorkOrder {
   @@index([assignedToId, status])
   @@index([status])
   @@index([assignedToId, scheduledStart])
+  // A LO SUMO una orden INSPECCION_ENTRADA activa (no COMPLETADA/RECHAZADA) por vehículo se hace
+  // cumplir con el índice único parcial work_orders_active_inspection_key de la migración SQL de A2
+  // (Prisma no expresa índices parciales declarativamente; se documenta aquí, igual que el índice
+  // parcial de Delivery).
   @@map("work_orders")
 }
 
