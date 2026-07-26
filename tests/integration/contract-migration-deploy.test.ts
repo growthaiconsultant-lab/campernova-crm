@@ -187,12 +187,16 @@ beforeAll(async () => {
     tempDb = `i3c1b_mig_${uniqueSuffix()}`
     tempUrl = urlFor(tempDb, true)
 
-    // Migraciones locales: 6; las cinco primeras para el setup, la 6ª (contract) es la que falla.
+    // Este test valida el ciclo expand→contract de I3C1B. Aplica las migraciones ANTERIORES a la
+    // de contract y luego la de contract por separado. Los nombres llevan prefijo de timestamp de
+    // ancho fijo, así que el orden lexicográfico coincide con el cronológico: `n < CONTRACT_MIGRATION`
+    // selecciona exactamente las que la preceden, con independencia de cuántas migraciones POSTERIORES
+    // existan en el repo (p. ej. `20260726000000_add_vehicle_entry_foundations`), que no intervienen aquí.
     const all = readdirSync(REPO_MIGRATIONS, { withFileTypes: true })
       .filter((e) => e.isDirectory())
       .map((e) => e.name)
       .sort()
-    firstFive = all.filter((n) => n !== CONTRACT_MIGRATION)
+    firstFive = all.filter((n) => n < CONTRACT_MIGRATION)
     if (firstFive.length !== 5 || !all.includes(CONTRACT_MIGRATION)) {
       throw new Error(`estructura de migraciones inesperada: ${all.join(',')}`)
     }
