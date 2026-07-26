@@ -168,6 +168,8 @@ export default async function VehiculosPage({ searchParams }: { searchParams: Se
             const compatibleCount = isVehicleEligible({
               status: v.status,
               sellerArchivedAt: v.sellerLead.archivedAt,
+              entryValidatedAt: v.entryValidatedAt,
+              entryAnnulledAt: v.entryAnnulledAt,
             })
               ? v._count.matches
               : 0

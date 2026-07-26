@@ -28,10 +28,13 @@ export type MatchingVehicleInput = {
   maxMassKg: number | null
   length: number | null
   heightM: number | null
-  // Elegibilidad del SUJETO (M1) — el adapter real las rellena; opcionales para no
+  // Elegibilidad del SUJETO (M1 + A2) — el adapter real las rellena; opcionales para no
   // romper fixtures de scoring. El guard de find.ts solo actúa si `status` está definido.
   status?: VehicleStatus
   sellerArchivedAt?: Date | null
+  // Entrada oficial (A2): elegible solo si validada y no anulada.
+  entryValidatedAt?: Date | null
+  entryAnnulledAt?: Date | null
 }
 
 /// Datos mínimos de un comprador para el matching.

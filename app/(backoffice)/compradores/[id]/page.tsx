@@ -131,6 +131,8 @@ export default async function FichaCompradorPage({
                 year: true,
                 km: true,
                 status: true,
+                entryValidatedAt: true,
+                entryAnnulledAt: true,
                 desiredPrice: true,
                 valuationRecommended: true,
                 photos: { select: { url: true }, orderBy: { order: 'asc' }, take: 1 },
@@ -182,6 +184,8 @@ export default async function FichaCompradorPage({
         isVehicleEligible({
           status: m.vehicle.status,
           sellerArchivedAt: m.vehicle.sellerLead.archivedAt,
+          entryValidatedAt: m.vehicle.entryValidatedAt,
+          entryAnnulledAt: m.vehicle.entryAnnulledAt,
         })
       )
     : []

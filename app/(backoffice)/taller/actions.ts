@@ -99,7 +99,10 @@ const partSchema = z.object({
 // ─── Actions ──────────────────────────────────────────────────────────────────
 
 export async function createWorkOrder(formData: unknown): Promise<ActionResult<{ id: string }>> {
-  const actor = await requireCanViewTaller()
+  // PR-A2: crear una orden es una MUTACIÓN → requiere permiso de edición (era `requireCanViewTaller`,
+  // una escalada de privilegios: un rol de solo lectura podía crear órdenes). El validador Zod sigue
+  // restringido a REPARACION|MEJORA; INSPECCION_ENTRADA solo se crea desde la transacción de entrada.
+  const actor = await requireCanEditTaller()
 
   const parsed = createWorkOrderSchema.safeParse(formData)
   if (!parsed.success) {

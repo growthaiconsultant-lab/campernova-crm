@@ -166,7 +166,12 @@ export default async function FichaVendedorPage({
   // si el SUJETO (vehículo) no es elegible, no se muestran matches; y de los que
   // haya, se ocultan aquellos cuya contraparte comprador no es elegible.
   const subjectVehicleEligible = v
-    ? isVehicleEligible({ status: v.status, sellerArchivedAt: lead.archivedAt })
+    ? isVehicleEligible({
+        status: v.status,
+        sellerArchivedAt: lead.archivedAt,
+        entryValidatedAt: v.entryValidatedAt,
+        entryAnnulledAt: v.entryAnnulledAt,
+      })
     : false
   const visibleMatches = subjectVehicleEligible
     ? (v?.matches ?? []).filter((m) =>

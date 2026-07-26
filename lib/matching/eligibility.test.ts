@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import type { VehicleStatus } from '@prisma/client'
 import {
   ELIGIBLE_VEHICLE_STATUSES,
   INELIGIBLE_BUYER_STATUSES,
@@ -9,28 +10,58 @@ import {
   isVehicleEligible,
 } from './eligibility'
 
+const ENTRY = new Date('2026-07-01T10:00:00Z')
+
+/** Vehículo con entrada oficial activa por defecto (validada, no anulada). */
+function vehicle(
+  status: VehicleStatus,
+  overrides: Partial<{
+    sellerArchivedAt: Date | null
+    entryValidatedAt: Date | null
+    entryAnnulledAt: Date | null
+  }> = {}
+) {
+  return {
+    status,
+    sellerArchivedAt: null,
+    entryValidatedAt: ENTRY,
+    entryAnnulledAt: null,
+    ...overrides,
+  }
+}
+
 describe('isVehicleEligible', () => {
   it('NUEVO → no elegible', () => {
-    expect(isVehicleEligible({ status: 'NUEVO', sellerArchivedAt: null })).toBe(false)
+    expect(isVehicleEligible(vehicle('NUEVO'))).toBe(false)
   })
 
-  it('TASADO con vendedor no archivado → elegible', () => {
-    expect(isVehicleEligible({ status: 'TASADO', sellerArchivedAt: null })).toBe(true)
+  it('TASADO con vendedor no archivado + entrada activa → elegible', () => {
+    expect(isVehicleEligible(vehicle('TASADO'))).toBe(true)
   })
 
-  it('PUBLICADO con vendedor no archivado → elegible', () => {
-    expect(isVehicleEligible({ status: 'PUBLICADO', sellerArchivedAt: null })).toBe(true)
+  it('PUBLICADO con vendedor no archivado + entrada activa → elegible', () => {
+    expect(isVehicleEligible(vehicle('PUBLICADO'))).toBe(true)
   })
 
   it('RESERVADO / VENDIDO / DESCARTADO → no elegibles', () => {
-    expect(isVehicleEligible({ status: 'RESERVADO', sellerArchivedAt: null })).toBe(false)
-    expect(isVehicleEligible({ status: 'VENDIDO', sellerArchivedAt: null })).toBe(false)
-    expect(isVehicleEligible({ status: 'DESCARTADO', sellerArchivedAt: null })).toBe(false)
+    expect(isVehicleEligible(vehicle('RESERVADO'))).toBe(false)
+    expect(isVehicleEligible(vehicle('VENDIDO'))).toBe(false)
+    expect(isVehicleEligible(vehicle('DESCARTADO'))).toBe(false)
   })
 
   it('vendedor archivado → no elegible aunque el estado sea comercializable', () => {
-    expect(isVehicleEligible({ status: 'PUBLICADO', sellerArchivedAt: new Date() })).toBe(false)
-    expect(isVehicleEligible({ status: 'TASADO', sellerArchivedAt: new Date() })).toBe(false)
+    expect(isVehicleEligible(vehicle('PUBLICADO', { sellerArchivedAt: new Date() }))).toBe(false)
+    expect(isVehicleEligible(vehicle('TASADO', { sellerArchivedAt: new Date() }))).toBe(false)
+  })
+
+  it('entrada NO validada → no elegible aunque el estado y el vendedor sean válidos (A2)', () => {
+    expect(isVehicleEligible(vehicle('PUBLICADO', { entryValidatedAt: null }))).toBe(false)
+    expect(isVehicleEligible(vehicle('TASADO', { entryValidatedAt: null }))).toBe(false)
+  })
+
+  it('entrada ANULADA → no elegible aunque estuviera validada (A2)', () => {
+    expect(isVehicleEligible(vehicle('PUBLICADO', { entryAnnulledAt: new Date() }))).toBe(false)
+    expect(isVehicleEligible(vehicle('TASADO', { entryAnnulledAt: new Date() }))).toBe(false)
   })
 })
 
@@ -52,10 +83,12 @@ describe('isBuyerEligible', () => {
 })
 
 describe('fragmentos where (misma política)', () => {
-  it('eligibleVehicleWhere filtra por estado comercializable + vendedor no archivado', () => {
+  it('eligibleVehicleWhere filtra por estado + vendedor no archivado + entrada activa', () => {
     expect(eligibleVehicleWhere).toEqual({
       status: { in: [...ELIGIBLE_VEHICLE_STATUSES] },
       sellerLead: { archivedAt: null },
+      entryValidatedAt: { not: null },
+      entryAnnulledAt: null,
     })
   })
 

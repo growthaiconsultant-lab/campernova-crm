@@ -70,7 +70,12 @@ export async function findMatchesForVehicle(
   // aporta el estado; los fixtures de scoring que lo omiten mantienen su comportamiento.
   if (
     vehicle.status !== undefined &&
-    !isVehicleEligible({ status: vehicle.status, sellerArchivedAt: vehicle.sellerArchivedAt ?? null })
+    !isVehicleEligible({
+      status: vehicle.status,
+      sellerArchivedAt: vehicle.sellerArchivedAt ?? null,
+      entryValidatedAt: vehicle.entryValidatedAt ?? null,
+      entryAnnulledAt: vehicle.entryAnnulledAt ?? null,
+    })
   ) {
     return []
   }

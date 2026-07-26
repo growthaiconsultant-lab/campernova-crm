@@ -13,13 +13,13 @@ import type { BuyerLeadStatus, Prisma, VehicleStatus } from '@prisma/client'
  *    ya cargadas en memoria (re-filtrado de lectura).
  *  - Fragmentos `where` de Prisma para filtrar en la query.
  *
- * ⚠️ REGLA PROVISIONAL (interina hasta A2): un vehículo es elegible por
- * `status ∈ {TASADO, PUBLICADO}` + vendedor no archivado. A2 AÑADIRÁ la condición
- * `entryValidatedAt != null AND entryAnnulledAt == null` cuando esos campos
- * existan en el schema. NO se añaden aquí (aún no existen en `main`).
+ * Un vehículo es elegible por `status ∈ {TASADO, PUBLICADO}` + vendedor no archivado
+ * + ENTRADA OFICIAL ACTIVA (`entryValidatedAt != null AND entryAnnulledAt == null`).
+ * La cláusula de entrada la añade A2: un vehículo cuya entrada no está validada, o cuya
+ * entrada fue anulada, NO participa en el matching (ni como sujeto ni como contraparte).
  */
 
-// Vehículo elegible: en stock comercializable. (Provisional hasta A2 — ver arriba.)
+// Vehículo elegible: en stock comercializable.
 export const ELIGIBLE_VEHICLE_STATUSES = ['TASADO', 'PUBLICADO'] as const
 
 // Comprador NO elegible: estados terminales/incompatibles. (Ver prisma-deps original.)
@@ -29,6 +29,10 @@ export type VehicleEligibilityInput = {
   status: VehicleStatus
   /** `SellerLead.archivedAt` del vendedor dueño del vehículo (null = no archivado). */
   sellerArchivedAt: Date | null
+  /** `Vehicle.entryValidatedAt` (null = entrada oficial no validada). */
+  entryValidatedAt: Date | null
+  /** `Vehicle.entryAnnulledAt` (no null = entrada anulada, terminal). */
+  entryAnnulledAt: Date | null
 }
 
 export type BuyerEligibilityInput = {
@@ -41,7 +45,9 @@ export type BuyerEligibilityInput = {
 export function isVehicleEligible(input: VehicleEligibilityInput): boolean {
   return (
     (ELIGIBLE_VEHICLE_STATUSES as readonly string[]).includes(input.status) &&
-    input.sellerArchivedAt == null
+    input.sellerArchivedAt == null &&
+    input.entryValidatedAt != null &&
+    input.entryAnnulledAt == null
   )
 }
 
@@ -55,10 +61,12 @@ export function isBuyerEligible(input: BuyerEligibilityInput): boolean {
 
 // ── Fragmentos `where` de Prisma (misma política, para filtrar en la query) ──
 
-/** Vehículos elegibles: stock comercializable + vendedor no archivado. */
+/** Vehículos elegibles: stock comercializable + vendedor no archivado + entrada oficial activa. */
 export const eligibleVehicleWhere: Prisma.VehicleWhereInput = {
   status: { in: [...ELIGIBLE_VEHICLE_STATUSES] },
   sellerLead: { archivedAt: null },
+  entryValidatedAt: { not: null },
+  entryAnnulledAt: null,
 }
 
 /** Compradores elegibles: estado no terminal + no archivado. */
