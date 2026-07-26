@@ -1,4 +1,8 @@
-export default function MatchesPage() {
+import { requireAgente } from '@/lib/auth'
+
+export default async function MatchesPage() {
+  await requireAgente()
+
   return (
     <div>
       <h1 className="text-2xl font-bold">Matches</h1>
