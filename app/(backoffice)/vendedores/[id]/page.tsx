@@ -449,7 +449,7 @@ export default async function FichaVendedorPage({
 
   // ── Layout ─────────────────────────────────────────────────────────────────
   return (
-    <div className="-mx-6 -mt-6 flex min-h-full flex-col">
+    <div className="-mx-6 -mt-6 flex min-h-[calc(100%_+_1.5rem)] flex-col lg:-mb-6 lg:min-h-[calc(100%_+_3rem)]">
       {/* ── Topbar sticky ── */}
       <header className="z-20 flex min-h-[56px] shrink-0 items-center justify-between gap-2 border-b border-border bg-card px-4 py-2 md:px-8 lg:sticky lg:top-0 lg:h-[60px] lg:py-0">
         <nav className="flex items-center gap-2 font-mono text-[11px] uppercase tracking-[0.12em] text-muted-foreground">
