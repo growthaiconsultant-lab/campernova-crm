@@ -24,10 +24,11 @@
 import { Prisma } from '@prisma/client'
 import type { ChecklistItemCategory, VehicleDocumentCategory } from '@prisma/client'
 import type { LockRoot } from '@/lib/locking'
-import { PUBLICADO_REQUIRED_DOCS, isReadyForStatus } from '@/lib/vehicle-legal'
+import { PUBLICADO_REQUIRED_DOCS } from '@/lib/vehicle-legal'
 import { areCategoriesClassified, isContratoGestionSatisfied } from './checklist'
+import { isReadyForOfficialEntry } from './entry-expediente'
 import { EntryError } from './errors'
-import { getEntryChecklistSignals, getEntryLegalInput } from './prisma-deps'
+import { getEntryChecklistSignals, getEntryExpedienteInput } from './prisma-deps'
 
 /** Estados de WorkOrder en los que una orden de inspección de entrada está ACTIVA (no terminal). */
 export const ACTIVE_WORKORDER_STATUSES = [
@@ -178,14 +179,13 @@ export async function validateEntryTx(
     throw new EntryError('CHECKLIST_NOT_CLASSIFIED')
   }
 
-  // (6) Expediente mínimo (requisitos de TASADO, vía lib/vehicle-legal).
-  const legal = await getEntryLegalInput(tx, p.vehicleId)
-  if (!legal) throw new EntryError('VEHICLE_NOT_FOUND')
-  const docSummary = signals.map((s) => ({
-    category: s.category,
-    exists: s.hasActiveVersion,
-  }))
-  if (!isReadyForStatus(legal, 'TASADO', docSummary)) {
+  // (6) Expediente mínimo de ENTRADA OFICIAL — política PROPIA (`isReadyForOfficialEntry`), NO
+  //     reutiliza `isReadyForStatus(..., 'TASADO')`. Solo exige identificación del vehículo
+  //     (matrícula); NO exige desiredPrice, fotografías, tasación ni datos comerciales (fases
+  //     posteriores). El contrato de gestión y el checklist ya se comprobaron en (5).
+  const expediente = await getEntryExpedienteInput(tx, p.vehicleId)
+  if (!expediente) throw new EntryError('VEHICLE_NOT_FOUND')
+  if (!isReadyForOfficialEntry(expediente)) {
     throw new EntryError('EXPEDIENTE_INCOMPLETE')
   }
 

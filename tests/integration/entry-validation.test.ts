@@ -376,8 +376,8 @@ describe('validateEntryTx · precondición por precondición (rechaza sin escrib
       'CHECKLIST_NOT_CLASSIFIED',
     ],
     ['sin comercial responsable', { withResponsible: false }, 'RESPONSIBLE_NOT_SET'],
+    // Expediente mínimo de entrada = identificación (matrícula). NO exige foto ni precio.
     ['expediente incompleto (sin matrícula)', { withPlate: false }, 'EXPEDIENTE_INCOMPLETE'],
-    ['expediente incompleto (sin foto)', { withPhoto: false }, 'EXPEDIENTE_INCOMPLETE'],
   ] as const)('%s → %s', async (_label, opts, expected) => {
     const f = await seed(opts)
     const err = await validate(f, prismaA).catch((e) => e)
@@ -385,6 +385,16 @@ describe('validateEntryTx · precondición por precondición (rechaza sin escrib
     const c = await counts(f)
     expect(c).toEqual({ orders: 0, activeOrders: 0, validatedActivities: 0 })
     expect((await entryState(f.vehicleId)).entryValidatedAt).toBeNull()
+  })
+
+  it('valida la entrada SIN desiredPrice y SIN fotografías (expediente de entrada ≠ TASADO)', async () => {
+    const f = await seed({ withDesiredPrice: false, withPhoto: false })
+    const res = await validate(f, prismaA)
+    expect(res.workOrderId).toBeTruthy()
+    const st = await entryState(f.vehicleId)
+    expect(st.entryValidatedAt).not.toBeNull()
+    expect(st.entryValidatedById).toBe(f.userId)
+    expect(await counts(f)).toEqual({ orders: 1, activeOrders: 1, validatedActivities: 1 })
   })
 
   it('sin llegada física registrada → VEHICLE_NOT_PRESENT (corrección 7.1)', async () => {

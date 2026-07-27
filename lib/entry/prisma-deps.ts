@@ -11,7 +11,7 @@
  * legal de `updateVehicle`/`delivery-precondition`).
  */
 import type { Prisma, VehicleDocumentCategory } from '@prisma/client'
-import type { VehicleLegalInput } from '@/lib/vehicle-legal'
+import type { OfficialEntryExpedienteInput } from './entry-expediente'
 import type { CategoryDocSignal } from './checklist'
 
 /** Cliente mínimo que necesita el lector: delegados de solo lectura. `tx` y `PrismaClient` valen. */
@@ -53,42 +53,18 @@ export async function getEntryChecklistSignals(
 }
 
 /**
- * Construye el `VehicleLegalInput` para reutilizar la validación pura de `lib/vehicle-legal`
- * (mínimo de expediente = requisitos de TASADO). Devuelve null si el vehículo no existe.
+ * Carga el expediente mínimo de ENTRADA OFICIAL (política propia `isReadyForOfficialEntry`, NO TASADO).
+ * Solo lee la identificación del vehículo (matrícula); no carga precio, fotos ni datos comerciales,
+ * porque la entrada no los exige. Devuelve null si el vehículo no existe.
  */
-export async function getEntryLegalInput(
+export async function getEntryExpedienteInput(
   client: EntryReadClient,
   vehicleId: string
-): Promise<VehicleLegalInput | null> {
+): Promise<OfficialEntryExpedienteInput | null> {
   const vehicle = await client.vehicle.findUnique({
     where: { id: vehicleId },
-    select: {
-      id: true,
-      plate: true,
-      vin: true,
-      itvValidUntil: true,
-      chargeCheckedAt: true,
-      desiredPrice: true,
-      purchasePrice: true,
-      salePrice: true,
-      photos: { select: { id: true } },
-      workOrders: {
-        where: { status: { in: ['PENDIENTE', 'EN_DIAGNOSTICO', 'PRESUPUESTADA', 'EN_CURSO'] } },
-        select: { id: true },
-      },
-    },
+    select: { plate: true },
   })
   if (!vehicle) return null
-  return {
-    id: vehicle.id,
-    plate: vehicle.plate,
-    vin: vehicle.vin,
-    itvValidUntil: vehicle.itvValidUntil,
-    chargeCheckedAt: vehicle.chargeCheckedAt,
-    desiredPrice: vehicle.desiredPrice,
-    purchasePrice: vehicle.purchasePrice,
-    salePrice: vehicle.salePrice,
-    photoCount: vehicle.photos.length,
-    workOrdersBlockingCount: vehicle.workOrders.length,
-  }
+  return { plate: vehicle.plate }
 }

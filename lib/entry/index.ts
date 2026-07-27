@@ -16,7 +16,17 @@ export {
   type CategoryDocSignal,
   type EntryChecklistInput,
 } from './checklist'
-export { getEntryChecklistSignals, getEntryLegalInput, type EntryReadClient } from './prisma-deps'
+export {
+  getEntryChecklistSignals,
+  getEntryExpedienteInput,
+  type EntryReadClient,
+} from './prisma-deps'
+export {
+  isReadyForOfficialEntry,
+  evaluateOfficialEntryExpediente,
+  type OfficialEntryExpedienteInput,
+  type OfficialEntryExpedienteResult,
+} from './entry-expediente'
 export {
   validateEntryTx,
   buildEntryRoots,
