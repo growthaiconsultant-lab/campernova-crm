@@ -3,7 +3,13 @@
  *
  * Política PROPIA de la entrada oficial — NO reutiliza `isReadyForStatus(..., 'TASADO')`. La entrada
  * oficial es la aceptación en custodia de un vehículo que llega físicamente a la nave; su expediente
- * mínimo es la IDENTIFICACIÓN del vehículo (matrícula), no datos comerciales ni de preparación.
+ * mínimo es la IDENTIFICACIÓN del vehículo, no datos comerciales ni de preparación.
+ *
+ * IDENTIFICACIÓN = **matrícula O VIN** (bastidor). Basta uno de los dos: `Vehicle.plate` y
+ * `Vehicle.vin` son ambos opcionales y un candidato legítimo puede llegar sin matrícula (captación de
+ * portales, parte de pago, vehículo aún no matriculado). Exigir solo matrícula bloquearía esas
+ * entradas legítimas; se acepta cualquiera de los dos identificadores estructurados. No se exigen los
+ * dos ni se añade un campo nuevo.
  *
  * NO exige, por diseño explícito:
  *   - `desiredPrice` (precio que pide el vendedor);
@@ -26,8 +32,10 @@
  */
 
 export type OfficialEntryExpedienteInput = {
-  /** Matrícula del vehículo. Identificación mínima para aceptarlo en custodia. */
+  /** Matrícula del vehículo (identificador). */
   plate: string | null
+  /** VIN / número de bastidor (identificador alternativo si no hay matrícula). */
+  vin: string | null
 }
 
 export type OfficialEntryExpedienteResult = {
@@ -36,12 +44,15 @@ export type OfficialEntryExpedienteResult = {
   missing: string[]
 }
 
+const isPresent = (v: string | null): boolean => v != null && v.trim().length > 0
+
 /** Evalúa el expediente mínimo de entrada oficial y devuelve qué falta (si algo). */
 export function evaluateOfficialEntryExpediente(
   input: OfficialEntryExpedienteInput
 ): OfficialEntryExpedienteResult {
   const missing: string[] = []
-  if (input.plate == null || input.plate.trim().length === 0) missing.push('plate')
+  // Identificación mínima: matrícula O VIN. Basta uno.
+  if (!isPresent(input.plate) && !isPresent(input.vin)) missing.push('identificacion')
   return { ok: missing.length === 0, missing }
 }
 

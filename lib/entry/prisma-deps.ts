@@ -54,8 +54,8 @@ export async function getEntryChecklistSignals(
 
 /**
  * Carga el expediente mínimo de ENTRADA OFICIAL (política propia `isReadyForOfficialEntry`, NO TASADO).
- * Solo lee la identificación del vehículo (matrícula); no carga precio, fotos ni datos comerciales,
- * porque la entrada no los exige. Devuelve null si el vehículo no existe.
+ * Solo lee la identificación del vehículo (matrícula O VIN); no carga precio, fotos ni datos
+ * comerciales, porque la entrada no los exige. Devuelve null si el vehículo no existe.
  */
 export async function getEntryExpedienteInput(
   client: EntryReadClient,
@@ -63,8 +63,8 @@ export async function getEntryExpedienteInput(
 ): Promise<OfficialEntryExpedienteInput | null> {
   const vehicle = await client.vehicle.findUnique({
     where: { id: vehicleId },
-    select: { plate: true },
+    select: { plate: true, vin: true },
   })
   if (!vehicle) return null
-  return { plate: vehicle.plate }
+  return { plate: vehicle.plate, vin: vehicle.vin }
 }

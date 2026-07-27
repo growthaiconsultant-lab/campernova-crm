@@ -69,6 +69,7 @@ type SeedOpts = {
   withContrato?: boolean // CONTRATO_GESTION con versión ACTIVE
   classifyRequired?: boolean // dispone (NO_APLICABLE) las 7 requeridas
   withPlate?: boolean
+  withVin?: boolean // identificador alternativo (vehículo sin matrícula)
   withDesiredPrice?: boolean
   withPhoto?: boolean
   withArrival?: boolean // physical_arrival_at ya registrado (hito previo, corrección 7.1)
@@ -79,6 +80,7 @@ const FULL: Required<SeedOpts> = {
   withContrato: true,
   classifyRequired: true,
   withPlate: true,
+  withVin: false, // identificación por matrícula por defecto; VIN es la alternativa
   withDesiredPrice: true,
   withPhoto: true,
   withArrival: true,
@@ -110,6 +112,7 @@ async function seed(opts: SeedOpts = FULL): Promise<Fixture> {
       type: 'AUTOCARAVANA',
       status: 'TASADO',
       plate: o.withPlate ? `1234-ABC-${s.slice(0, 3)}` : null,
+      vin: o.withVin ? `VF1${s.slice(0, 14).toUpperCase()}` : null,
       desiredPrice: o.withDesiredPrice ? 30000 : null,
       physicalArrivalAt: o.withArrival ? new Date() : null,
       physicalArrivalById: o.withArrival ? user.id : null,
@@ -376,8 +379,12 @@ describe('validateEntryTx · precondición por precondición (rechaza sin escrib
       'CHECKLIST_NOT_CLASSIFIED',
     ],
     ['sin comercial responsable', { withResponsible: false }, 'RESPONSIBLE_NOT_SET'],
-    // Expediente mínimo de entrada = identificación (matrícula). NO exige foto ni precio.
-    ['expediente incompleto (sin matrícula)', { withPlate: false }, 'EXPEDIENTE_INCOMPLETE'],
+    // Expediente mínimo de entrada = identificación (matrícula O VIN). NO exige foto ni precio.
+    [
+      'expediente incompleto (sin matrícula NI VIN)',
+      { withPlate: false, withVin: false },
+      'EXPEDIENTE_INCOMPLETE',
+    ],
   ] as const)('%s → %s', async (_label, opts, expected) => {
     const f = await seed(opts)
     const err = await validate(f, prismaA).catch((e) => e)
@@ -394,6 +401,14 @@ describe('validateEntryTx · precondición por precondición (rechaza sin escrib
     const st = await entryState(f.vehicleId)
     expect(st.entryValidatedAt).not.toBeNull()
     expect(st.entryValidatedById).toBe(f.userId)
+    expect(await counts(f)).toEqual({ orders: 1, activeOrders: 1, validatedActivities: 1 })
+  })
+
+  it('valida la entrada con VIN y SIN matrícula (vehículo aún no matriculado)', async () => {
+    const f = await seed({ withPlate: false, withVin: true })
+    const res = await validate(f, prismaA)
+    expect(res.workOrderId).toBeTruthy()
+    expect((await entryState(f.vehicleId)).entryValidatedAt).not.toBeNull()
     expect(await counts(f)).toEqual({ orders: 1, activeOrders: 1, validatedActivities: 1 })
   })
 
