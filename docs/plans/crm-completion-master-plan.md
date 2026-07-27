@@ -71,7 +71,11 @@ Sin RLS remota.
 Corregir de raíz el hydration error de `/vendedores/[id]?tab=compradores` (no solo ocultarlo con el
 error boundary). Boundaries específicos solo donde sean pequeños y necesarios.
 
-### A2 — Entrada oficial + matching endurecido · **PLANIFICADO (no iniciar aún)**
+### A2 — Entrada oficial + matching endurecido · **MIGRADO (staging + producción) + FUSIONADO (#140 → `2f33e58`) + DESPLEGADO · validación autenticada UI en staging completa; smoke autenticado prod + observación 24 h pendientes**
+
+> Ver `docs/releases/2026-07-27-a2-production.md`. Expediente mínimo de entrada propio
+> (`isReadyForOfficialEntry` = matrícula O VIN; NO TASADO). Validado e2e por UI autenticada en staging;
+> subida documental + clasificación en bloque como prerrequisitos controlados.
 
 Transacción de validación de entrada (precondiciones: contrato de gestión firmado, presencia física,
 expediente mínimo, comercial responsable, ubicación, llaves custodiadas, checklist documental
