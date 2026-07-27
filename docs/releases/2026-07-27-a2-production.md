@@ -73,9 +73,9 @@ identidades Auth temporales restantes; sin objetos de Storage sintéticos.
 ## 5. Credencial administrativa temporal de staging
 
 La Secret key temporal se usó solo server-side, nunca se imprimió, y su archivo local
-(`.env.staging.admin.local`, gitignored) quedó **vaciado**. **Revocación pendiente (única acción
-manual para el dueño):** _Revoke the staging Secret API key named `a2_e2e_temporary`_ (no revocable
-por CLI/MCP disponibles).
+(`.env.staging.admin.local`, gitignored) quedó **vaciado**. **Revocada por el dueño el 2026-07-27**
+(la revocación no era posible por los canales CLI/MCP disponibles) → **no queda ningún acceso
+administrativo temporal a staging**.
 
 ## 6. Estado tras A2
 
