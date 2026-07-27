@@ -46,7 +46,8 @@ prepared through controlled staging setup._
 
 - **Observación 24 h** (Sentry/Vercel) de A2 — **no** completada.
 - **Smoke autenticado read-only en producción** de A1/A2 y de HARD-1/PERM-1/M1 — pendiente del dueño.
-- **Acción manual del dueño:** _Revoke the staging Secret API key named `a2_e2e_temporary`_ (usada para
-  la validación e2e de A2; no revocable por CLI/MCP disponibles; su archivo local quedó vaciado).
+- **Secret key temporal de staging (`a2_e2e_temporary`):** usada para la validación e2e de A2;
+  **revocada por el dueño el 2026-07-27** y archivo local (`.env.staging.admin.local`) vaciado → **no
+  queda ningún acceso administrativo temporal a staging**.
 - **Consolidación de `CLAUDE.md`**: su sección «Estado actual» es un log histórico por bloques; este
   Project Brief es la fotografía vigente. No se duplican cifras aquí en `CLAUDE.md`.
