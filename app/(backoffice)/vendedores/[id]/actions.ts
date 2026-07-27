@@ -5,7 +5,9 @@ import { z } from 'zod'
 import { db } from '@/lib/db'
 import { requireAgente } from '@/lib/auth'
 import { updateSellerLeadSchema, updateVehicleSchema } from '@/lib/validators/seller-lead'
-import { runAndSaveAutoValuation } from '@/lib/valuation/save'
+import { runAndSavePreliminaryValuation } from '@/lib/valuation/save'
+import { officialValuationTx, buildOfficialValuationRoots, isValuationError } from '@/lib/valuation'
+import type { EquipmentFlags } from '@/lib/valuation'
 import { recalculateMatchesForVehicle } from '@/lib/matching'
 import {
   SELLER_LEAD_TRANSITIONS,
@@ -285,16 +287,13 @@ export async function updateVehicle(vehicleId: string, data: unknown) {
     throw err
   }
 
-  // Re-tasar automáticamente tras cualquier cambio de datos del vehículo
-  await runAndSaveAutoValuation(vehicleId, {
-    brand,
-    model,
-    type,
-    year,
-    km,
-    conservationState,
-    equipment: equipmentResolved,
-  })
+  // A3: re-valoración PRELIMINAR tras cambios de datos del vehículo. No cambia estado ni escribe
+  // los denormalizados oficiales; la tasación oficial (gated) es la única que lo hace.
+  await runAndSavePreliminaryValuation(
+    vehicleId,
+    { brand, model, type, year, km, conservationState, equipment: equipmentResolved },
+    actor.id
+  )
   await recalculateMatchesForVehicle(vehicleId, db)
 
   revalidatePath(`/vendedores/${vehicle.sellerLeadId}`)
@@ -369,11 +368,19 @@ export async function addSellerLeadNote(leadId: string, content: string) {
   return { ok: true }
 }
 
-const overrideValuationSchema = z
+// ─── Tasación oficial (A3) ──────────────────────────────────────────────────
+// La tasación oficial exige ENTRADA OFICIAL ACTIVA + INSPECCIÓN DE ENTRADA COMPLETADA (gate estricto,
+// sin bypass manual en v1). Es la ÚNICA vía que escribe los denormalizados oficiales y transiciona
+// `NUEVO → TASADO`. El núcleo transaccional (locks + CAS) vive en `officialValuationTx`.
+
+const officialManualSchema = z
   .object({
-    min: z.number().positive('Debe ser mayor que 0'),
-    recommended: z.number().positive('Debe ser mayor que 0'),
-    max: z.number().positive('Debe ser mayor que 0'),
+    min: z.number().nonnegative('No puede ser negativo'),
+    recommended: z.number().nonnegative('No puede ser negativo'),
+    max: z.number().nonnegative('No puede ser negativo'),
+    confidence: z.enum(['ALTA', 'MEDIA', 'BAJA']),
+    reason: z.string().trim().min(1, 'Indica el motivo de la tasación'),
+    notes: z.string().trim().max(1000).optional().nullable(),
   })
   .refine((d) => d.recommended >= d.min, {
     message: 'El precio recomendado debe ser ≥ mínimo',
@@ -384,61 +391,127 @@ const overrideValuationSchema = z
     path: ['max'],
   })
 
-export async function overrideValuation(vehicleId: string, data: unknown) {
+/**
+ * Registra una tasación OFICIAL MANUAL (guard: Comercial/ADMIN via `requireAgente`). Confianza
+ * DECLARADA explícitamente (fin del hardcode `ALTA`), motivo obligatorio, rango válido. Gated bajo
+ * el lock por entrada activa + inspección completada.
+ */
+export async function officialManualValuation(vehicleId: string, data: unknown) {
   const actor = await requireAgente()
 
-  const parsed = overrideValuationSchema.safeParse(data)
+  const parsed = officialManualSchema.safeParse(data)
   if (!parsed.success) {
     return { error: parsed.error.flatten() }
   }
-
-  const { min, recommended, max } = parsed.data
+  const { min, recommended, max, confidence, reason, notes } = parsed.data
 
   const vehicle = await db.vehicle.findUnique({
     where: { id: vehicleId },
-    select: { sellerLeadId: true, status: true },
+    select: { sellerLeadId: true },
   })
   if (!vehicle) return { error: { formErrors: ['Vehículo no encontrado'], fieldErrors: {} } }
 
-  const wasNuevo = vehicle.status === 'NUEVO'
-
-  // Escritura directa — la tasación manual no pasa por el algoritmo
-  await db.$transaction([
-    db.valuation.create({
-      data: {
+  const roots = buildOfficialValuationRoots({ vehicleId, sellerLeadId: vehicle.sellerLeadId })
+  try {
+    await withLockedRoots(roots, (tx) =>
+      officialValuationTx(tx, {
         vehicleId,
-        min,
-        recommended,
-        max,
-        method: 'MANUAL',
-        confidence: 'ALTA',
-        parameters: { source: 'manual_override' },
-        createdById: actor.id,
-      },
-    }),
-    db.vehicle.update({
-      where: { id: vehicleId },
-      data: {
-        valuationMin: min,
-        valuationRecommended: recommended,
-        valuationMax: max,
-        ...(wasNuevo ? { status: 'TASADO' } : {}),
-      },
-    }),
-    db.activity.create({
-      data: {
-        type: 'CAMBIO_ESTADO',
-        content: wasNuevo
-          ? 'Tasación manual registrada → Estado cambiado: Nuevo → Tasado'
-          : 'Tasación manual sobreescrita por el agente',
-        agentId: actor.id,
-        sellerLeadId: vehicle.sellerLeadId,
-      },
-    }),
-  ])
+        resolvedSellerLeadId: vehicle.sellerLeadId,
+        actorId: actor.id,
+        mode: {
+          kind: 'MANUAL',
+          min,
+          recommended,
+          max,
+          confidence,
+          reason: notes ? `${reason} · ${notes}` : reason,
+        },
+      })
+    )
+  } catch (err) {
+    if (isValuationError(err)) return { error: { formErrors: [err.message], fieldErrors: {} } }
+    if (isLockError(err)) return { error: { formErrors: [err.message], fieldErrors: {} } }
+    throw err
+  }
 
   await recalculateMatchesForVehicle(vehicleId, db)
-
   revalidatePath(`/vendedores/${vehicle.sellerLeadId}`)
   return { ok: true }
+}
+
+/**
+ * Ejecuta una tasación OFICIAL AUTOMÁTICA (algoritmo) sobre el vehículo (guard: Comercial/ADMIN).
+ * Gated igual que la manual. Un fallo técnico del cálculo aborta la transacción (sin dejar el
+ * vehículo a medias) y se registra como intento `FALLO_TECNICO`.
+ */
+export async function officialAutoValuation(vehicleId: string) {
+  const actor = await requireAgente()
+
+  const vehicle = await db.vehicle.findUnique({
+    where: { id: vehicleId },
+    select: {
+      sellerLeadId: true,
+      brand: true,
+      model: true,
+      type: true,
+      year: true,
+      km: true,
+      conservationState: true,
+      equipment: true,
+    },
+  })
+  if (!vehicle) return { error: { formErrors: ['Vehículo no encontrado'], fieldErrors: {} } }
+
+  const roots = buildOfficialValuationRoots({ vehicleId, sellerLeadId: vehicle.sellerLeadId })
+  let outcome: 'COMPLETADA' | 'SIN_REFERENCIA'
+  try {
+    const result = await withLockedRoots(roots, (tx) =>
+      officialValuationTx(tx, {
+        vehicleId,
+        resolvedSellerLeadId: vehicle.sellerLeadId,
+        actorId: actor.id,
+        mode: {
+          kind: 'AUTO',
+          input: {
+            brand: vehicle.brand,
+            model: vehicle.model,
+            type: vehicle.type,
+            year: vehicle.year,
+            km: vehicle.km,
+            conservationState: vehicle.conservationState,
+            equipment: (vehicle.equipment ?? {}) as EquipmentFlags,
+          },
+        },
+      })
+    )
+    outcome = result.outcome
+  } catch (err) {
+    if (isValuationError(err)) return { error: { formErrors: [err.message], fieldErrors: {} } }
+    if (isLockError(err)) return { error: { formErrors: [err.message], fieldErrors: {} } }
+    // FALLO_TECNICO: el cálculo lanzó (p. ej. error de BD) y la tx revirtió (vehículo intacto).
+    // Se registra el intento fuera de la transacción y se devuelve un error manejado.
+    console.error('[valuation] Tasación oficial automática fallida', vehicleId, err)
+    await db.vehicleValuationAttempt
+      .create({
+        data: {
+          vehicleId,
+          purpose: 'OFICIAL',
+          outcome: 'FALLO_TECNICO',
+          method: 'AUTO',
+          errorCode: err instanceof Error ? err.name : 'UNKNOWN',
+          createdById: actor.id,
+        },
+      })
+      .catch((e) => console.error('[valuation] No se pudo registrar el intento fallido', e))
+    return {
+      error: {
+        formErrors: ['No se pudo calcular la tasación (fallo técnico). Inténtalo de nuevo.'],
+        fieldErrors: {},
+      },
+    }
+  }
+
+  await recalculateMatchesForVehicle(vehicleId, db)
+  revalidatePath(`/vendedores/${vehicle.sellerLeadId}`)
+  return { ok: true, outcome }
 }

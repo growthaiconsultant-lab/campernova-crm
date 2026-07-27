@@ -13,6 +13,16 @@ const METHOD_LABELS = {
   MANUAL: 'Manual',
 }
 
+// A3 — finalidad. `null` = LEGACY/UNKNOWN (pre-A3): nunca se muestra como precio oficial.
+const PURPOSE_META: Record<
+  'OFICIAL' | 'PRELIMINAR' | 'LEGACY',
+  { label: string; className: string }
+> = {
+  OFICIAL: { label: 'Oficial', className: 'bg-green-100 text-green-700' },
+  PRELIMINAR: { label: 'Preliminar', className: 'bg-blue-100 text-blue-700' },
+  LEGACY: { label: 'Legacy', className: 'bg-muted text-muted-foreground' },
+}
+
 function formatEur(value: number | string | { toNumber(): number } | null): string {
   if (value === null || value === undefined) return '—'
   const n = typeof value === 'object' ? value.toNumber() : Number(value)
@@ -53,6 +63,16 @@ export function ValuationTimeline({ valuations }: Props) {
               <span className="rounded bg-muted px-2 py-0.5 text-xs text-muted-foreground">
                 {METHOD_LABELS[v.method]}
               </span>
+              {(() => {
+                const meta = PURPOSE_META[v.purpose ?? 'LEGACY']
+                return (
+                  <span
+                    className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${meta.className}`}
+                  >
+                    {meta.label}
+                  </span>
+                )
+              })()}
             </div>
             <p className="text-xs text-muted-foreground">
               {new Date(v.createdAt).toLocaleString('es-ES', {

@@ -10,7 +10,7 @@ vi.mock('@/lib/auth', () => ({
 }))
 
 vi.mock('@/lib/valuation/save', () => ({
-  runAndSaveAutoValuation: vi.fn().mockResolvedValue(null),
+  runAndSavePreliminaryValuation: vi.fn().mockResolvedValue(null),
 }))
 
 vi.mock('@/lib/matching', () => ({
