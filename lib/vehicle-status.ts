@@ -208,6 +208,14 @@ export async function applyManualVehicleUpdateTx(
     if (seller.archivedAt != null) throw new VehicleUpdateError('LEAD_ARCHIVED')
   }
 
+  // A3 — la primera transición `NUEVO → TASADO` la posee la tasación oficial (`officialValuationTx`),
+  // no la edición manual. Cualquier intento genérico de ALCANZAR `TASADO` (que no sea una edición
+  // sin cambio de estado `TASADO → TASADO`) se rechaza con un error de dominio específico, antes que
+  // el genérico de transición inválida, para no ocultar que la vía correcta es la tasación oficial.
+  if (p.nextStatus === 'TASADO' && vehicle.status !== 'TASADO') {
+    throw new VehicleUpdateError('OFFICIAL_VALUATION_REQUIRED')
+  }
+
   if (!isValidTransition(VEHICLE_TRANSITIONS, vehicle.status, p.nextStatus)) {
     throw new VehicleUpdateError('INVALID_VEHICLE_TRANSITION')
   }

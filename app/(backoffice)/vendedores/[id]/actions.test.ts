@@ -119,19 +119,11 @@ beforeEach(() => {
   mockDb.sellerLead.findUnique.mockResolvedValue({ archivedAt: null })
 })
 
-// ─── Legal guard — NUEVO → TASADO ─────────────────────────────────────────────
+// ─── A3 — la edición manual ya NO puede alcanzar TASADO (cierre del bypass) ────
 
-describe('updateVehicle — guard TASADO', () => {
-  it('bloquea la transición NUEVO→TASADO si faltan requisitos', async () => {
+describe('updateVehicle — NUEVO→TASADO exige tasación oficial (A3)', () => {
+  it('rechaza NUEVO→TASADO con OFFICIAL_VALUATION_REQUIRED, sin escribir ni consultar el expediente', async () => {
     mockDb.vehicle.findUnique.mockResolvedValue({ sellerLeadId: 'sl-1', status: 'NUEVO' })
-    vi.mocked(getVehicleLegalInput).mockResolvedValue(mockLegalInput)
-    vi.mocked(getVehicleDocumentSummary).mockResolvedValue(mockDocs)
-    vi.mocked(isReadyForStatus).mockReturnValue(false)
-    vi.mocked(listMissingRequirements).mockReturnValue([
-      { field: 'plate', message: 'Matrícula obligatoria', severity: 'error' },
-      { field: 'desiredPrice', message: 'Precio deseado obligatorio', severity: 'error' },
-    ])
-    mockDb.activity.create.mockResolvedValue({})
 
     const result = await updateVehicle('v-1', {
       ...baseVehicleData,
@@ -139,47 +131,52 @@ describe('updateVehicle — guard TASADO', () => {
       desiredPrice: null,
     })
 
-    expect(result.error).toBeDefined()
-    expect(result.error?.formErrors[0]).toMatch(/Matrícula obligatoria|Precio deseado/)
+    expect(result.error?.formErrors[0]).toBe(
+      VEHICLE_UPDATE_ERROR_MESSAGES.OFFICIAL_VALUATION_REQUIRED
+    )
+    // No pasa por el guard legal (el rechazo es anterior) ni escribe nada.
+    expect(getVehicleLegalInput).not.toHaveBeenCalled()
+    expect(isReadyForStatus).not.toHaveBeenCalled()
+    expect(mockDb.vehicle.updateMany).not.toHaveBeenCalled()
+    expect(mockDb.activity.create).not.toHaveBeenCalled()
   })
 
-  it('registra actividad PUBLICACION_BLOQUEADA al bloquear', async () => {
-    mockDb.vehicle.findUnique.mockResolvedValue({ sellerLeadId: 'sl-1', status: 'NUEVO' })
-    vi.mocked(getVehicleLegalInput).mockResolvedValue(mockLegalInput)
-    vi.mocked(getVehicleDocumentSummary).mockResolvedValue(mockDocs)
-    vi.mocked(isReadyForStatus).mockReturnValue(false)
-    vi.mocked(listMissingRequirements).mockReturnValue([
-      { field: 'plate', message: 'Matrícula obligatoria', severity: 'error' },
-    ])
+  it('el bypass está cerrado para cualquier origen que no sea ya TASADO', async () => {
+    // Ninguna vía genérica (NUEVO o PUBLICADO) puede llevar a TASADO.
+    for (const from of ['NUEVO', 'PUBLICADO'] as const) {
+      vi.clearAllMocks()
+      vi.mocked(requireAgente).mockResolvedValue(mockAgent)
+      vi.mocked(withLockedRoots).mockImplementation(async (_roots, operation) =>
+        operation(mockDb as never)
+      )
+      mockDb.sellerLead.findUnique.mockResolvedValue({ archivedAt: null })
+      mockDb.vehicle.findUnique.mockResolvedValue({ sellerLeadId: 'sl-1', status: from })
 
-    let activityType = ''
-    mockDb.activity.create.mockImplementation((args: { data: { type: string } }) => {
-      activityType = args.data.type
-      return Promise.resolve({})
-    })
+      const result = await updateVehicle('v-1', { ...baseVehicleData, status: 'TASADO' })
 
-    await updateVehicle('v-1', { ...baseVehicleData, status: 'TASADO', desiredPrice: null })
-
-    expect(activityType).toBe('PUBLICACION_BLOQUEADA')
+      expect(result.error?.formErrors[0]).toBe(
+        VEHICLE_UPDATE_ERROR_MESSAGES.OFFICIAL_VALUATION_REQUIRED
+      )
+      expect(mockDb.vehicle.updateMany).not.toHaveBeenCalled()
+    }
   })
 
-  it('permite la transición NUEVO→TASADO cuando los requisitos están completos', async () => {
-    mockDb.vehicle.findUnique.mockResolvedValue({ sellerLeadId: 'sl-1', status: 'NUEVO' })
-    vi.mocked(getVehicleLegalInput).mockResolvedValue({
-      ...mockLegalInput,
-      plate: '1234-ABC',
-      desiredPrice: 45000,
-      photoCount: 1,
-    })
-    vi.mocked(getVehicleDocumentSummary).mockResolvedValue(mockDocs)
-    vi.mocked(isReadyForStatus).mockReturnValue(true)
+  it('editar un vehículo ya TASADO sin cambiar de estado sigue permitido (from === to)', async () => {
+    mockDb.vehicle.findUnique.mockResolvedValue({ sellerLeadId: 'sl-1', status: 'TASADO' })
     mockDb.vehicle.updateMany.mockResolvedValue({ count: 1 })
-    mockDb.activity.create.mockResolvedValue({})
 
     const result = await updateVehicle('v-1', { ...baseVehicleData, status: 'TASADO' })
 
-    expect(result.error).toBeUndefined()
     expect(result).toMatchObject({ ok: true })
+    // No hay cambio de estado → sin Activity; y el guard OFFICIAL_VALUATION_REQUIRED no se dispara.
+    expect(mockDb.activity.create).not.toHaveBeenCalled()
+  })
+
+  it('el mensaje OFFICIAL_VALUATION_REQUIRED no filtra ids, SQL ni Prisma', () => {
+    expect(VEHICLE_UPDATE_ERROR_MESSAGES.OFFICIAL_VALUATION_REQUIRED).toMatch(/tasación oficial/i)
+    expect(VEHICLE_UPDATE_ERROR_MESSAGES.OFFICIAL_VALUATION_REQUIRED).not.toMatch(
+      /prisma|select|update |sl-1|v-1|[0-9a-f]{20,}/i
+    )
   })
 })
 
@@ -303,8 +300,10 @@ describe('updateVehicle — transiciones manuales retiradas (I3A)', () => {
     expect(VEHICLE_TRANSITIONS.RESERVADO).toBeUndefined()
   })
 
-  it('conserva las transiciones manuales legítimas', () => {
-    expect(VEHICLE_TRANSITIONS.NUEVO).toEqual(['TASADO'])
+  it('conserva las transiciones manuales legítimas (A3: NUEVO sin salidas manuales)', () => {
+    // A3 retira NUEVO → TASADO del mapa manual: NUEVO queda con lista vacía (no terminal).
+    expect(VEHICLE_TRANSITIONS.NUEVO).toEqual([])
+    expect(Object.values(VEHICLE_TRANSITIONS).flat()).not.toContain('TASADO')
     expect(VEHICLE_TRANSITIONS.TASADO).toEqual(['PUBLICADO'])
   })
 
@@ -377,20 +376,20 @@ describe('updateVehicle — CAS de estado (I3A)', () => {
   })
 
   it('la Activity solo se escribe tras un CAS exitoso y con cambio de estado', async () => {
-    // NUEVO → TASADO con expediente en regla: única transición manual con cambio de estado
-    // (junto a TASADO → PUBLICADO) tras I3B.
-    mockDb.vehicle.findUnique.mockResolvedValue({ sellerLeadId: 'sl-1', status: 'NUEVO' })
+    // TASADO → PUBLICADO con expediente en regla: única transición manual con cambio de estado
+    // tras A3 (NUEVO → TASADO ya no es manual).
+    mockDb.vehicle.findUnique.mockResolvedValue({ sellerLeadId: 'sl-1', status: 'TASADO' })
     vi.mocked(getVehicleLegalInput).mockResolvedValue({
       ...mockLegalInput,
       plate: '1234-ABC',
       desiredPrice: 45000,
-      photoCount: 1,
+      photoCount: 5,
     })
     vi.mocked(getVehicleDocumentSummary).mockResolvedValue(mockDocs)
     vi.mocked(isReadyForStatus).mockReturnValue(true)
     mockDb.vehicle.updateMany.mockResolvedValue({ count: 1 })
 
-    await updateVehicle('v-1', { ...baseVehicleData, status: 'TASADO' })
+    await updateVehicle('v-1', { ...baseVehicleData, status: 'PUBLICADO' })
 
     expect(mockDb.activity.create).toHaveBeenCalledTimes(1)
     expect(mockDb.activity.create.mock.calls[0][0].data.type).toBe('CAMBIO_ESTADO')

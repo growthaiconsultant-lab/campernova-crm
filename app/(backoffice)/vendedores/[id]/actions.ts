@@ -191,9 +191,11 @@ export async function updateVehicle(vehicleId: string, data: unknown) {
 
   const roots = buildVehicleUpdateRoots({ vehicleId, sellerLeadId: vehicle.sellerLeadId })
 
-  // La venta y la reserva ya no son alcanzables desde aquí (I3A): `VEHICLE_TRANSITIONS` solo ofrece
-  // `NUEVO → TASADO` y `TASADO → PUBLICADO`. `soldAt` lo fija el propietario de la venta,
-  // `completeDeliveryTx`. I3B mete la edición manual bajo `withLockedRoots`.
+  // La venta y la reserva ya no son alcanzables desde aquí (I3A). Tras A3 `VEHICLE_TRANSITIONS` solo
+  // ofrece `TASADO → PUBLICADO`: la primera transición `NUEVO → TASADO` la posee la tasación oficial
+  // (`officialValuationTx`), y un intento genérico de alcanzar `TASADO` se rechaza bajo el lock con
+  // `OFFICIAL_VALUATION_REQUIRED`. `soldAt` lo fija el propietario de la venta, `completeDeliveryTx`.
+  // I3B mete la edición manual bajo `withLockedRoots`.
   try {
     await withLockedRoots(roots, (tx) =>
       applyManualVehicleUpdateTx(
@@ -231,13 +233,15 @@ export async function updateVehicle(vehicleId: string, data: unknown) {
           },
         },
         {
-          // Guard legal para TASADO/PUBLICADO, releído con `tx` bajo el lock del vehículo. Las
-          // columnas del vehículo son estables (lock); los documentos son tabla aparte (límite
-          // documentado, DELIVERY/expediente se cierran fuera de I3B).
+          // Guard legal de PUBLICADO, releído con `tx` bajo el lock del vehículo. Las columnas del
+          // vehículo son estables (lock); los documentos son tabla aparte (límite documentado,
+          // DELIVERY/expediente se cierran fuera de I3B). El guard de TASADO desapareció con A3: la
+          // primera transición a TASADO ya no es alcanzable por esta vía (la posee la tasación
+          // oficial), así que aquí solo queda `TASADO → PUBLICADO`.
           beforeWrite: async ({ fromStatus, tx }) => {
             const isTransitioningTo = (s: string) => status === s && fromStatus !== s
-            if (!isTransitioningTo('TASADO') && !isTransitioningTo('PUBLICADO')) return
-            const targetStatus = status as 'TASADO' | 'PUBLICADO'
+            if (!isTransitioningTo('PUBLICADO')) return
+            const targetStatus = status as 'PUBLICADO'
             const txDb = tx as unknown as typeof db
             const [legalInput, docs] = await Promise.all([
               getVehicleLegalInput(txDb, vehicleId),
