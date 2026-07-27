@@ -176,8 +176,8 @@ jobs:
           count=$(psql "$PSQL_URL" -tAc "SELECT count(*) FROM _prisma_migrations WHERE finished_at IS NOT NULL")
           names=$(psql "$PSQL_URL" -tAc "SELECT string_agg(migration_name, ',' ORDER BY migration_name) FROM _prisma_migrations WHERE finished_at IS NOT NULL")
           echo "migraciones aplicadas: $count · nombres: $names"
-          test "$count" = "7" || { echo "esperado 7 migraciones aplicadas (baseline + PR5B1 + archivado + commitment + delivery_offer_link_expand + delivery_offer_link_required + vehicle_entry_foundations)"; exit 1; }
-          test "$names" = "000000000000_squashed_migrations,20260712000000_add_versioned_document_model,20260719120000_add_lead_archiving_model,20260720000000_add_calendar_event_commitment,20260721100000_add_delivery_offer_link_expand,20260721200000_make_delivery_offer_link_required,20260726000000_add_vehicle_entry_foundations" || { echo "conjunto u orden de migraciones inesperado"; exit 1; }
+          test "$count" = "8" || { echo "esperado 8 migraciones aplicadas (baseline + PR5B1 + archivado + commitment + delivery_offer_link_expand + delivery_offer_link_required + vehicle_entry_foundations + official_entry_activity_and_inspection_index)"; exit 1; }
+          test "$names" = "000000000000_squashed_migrations,20260712000000_add_versioned_document_model,20260719120000_add_lead_archiving_model,20260720000000_add_calendar_event_commitment,20260721100000_add_delivery_offer_link_expand,20260721200000_make_delivery_offer_link_required,20260726000000_add_vehicle_entry_foundations,20260726120000_add_official_entry_activity_and_inspection_index" || { echo "conjunto u orden de migraciones inesperado"; exit 1; }
 
       - name: Prisma migrate status (must be up to date)
         run: pnpm prisma migrate status
@@ -240,13 +240,22 @@ jobs:
           #                          vehicle_id→vehicles CASCADE + updated_by_id→users SET NULL)
           #   indexes     115 → 117 (+2: PK + unique compuesto (vehicle_id, category))
           #   without_rls 0 (la tabla nueva habilita RLS en la propia migración)
+          # Delta tras add_official_entry_activity_and_inspection_index (PR-A2, aditivo; sin DML):
+          #   enum_values 282 → 288 (+6: ENTRADA_VALIDADA, ENTRADA_ANULADA, LLAVES_REGISTRADAS,
+          #                          ORDEN_INSPECCION_CREADA, DISPOSICION_DOCUMENTAL_ACTUALIZADA,
+          #                          LLEGADA_REGISTRADA — corrección 7.1)
+          #   columns     460 → 462 (+2: vehicles.physical_arrival_at, physical_arrival_by_id — 7.1)
+          #   foreign_keys 73 → 74  (+1: physical_arrival_by_id→users SET NULL — 7.1)
+          #   indexes     117 → 118 (+1: work_orders_active_inspection_key parcial único)
+          #   tables/enums sin cambio (no crea tablas ni enums; la columna FK no lleva índice
+          #                dedicado, igual que entry_validated_by_id).
           assert offer_id_not_null "$(psql "$PSQL_URL" -tAc "SELECT is_nullable FROM information_schema.columns WHERE table_schema='public' AND table_name='deliveries' AND column_name='offer_id'")" NO
           assert tables "$tables" 32
-          assert columns "$columns" 460
+          assert columns "$columns" 462
           assert enums "$enums" 53
-          assert enum_values "$enum_values" 282
-          assert foreign_keys "$fks" 73
-          assert indexes "$indexes" 117
+          assert enum_values "$enum_values" 288
+          assert foreign_keys "$fks" 74
+          assert indexes "$indexes" 118
           assert tables_without_rls "$without_rls" 0
           assert tables_forced_rls "$forced" 0
           assert policies "$policies" 0

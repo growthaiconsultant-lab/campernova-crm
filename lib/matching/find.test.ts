@@ -22,6 +22,10 @@ function makeVehicle(overrides: Partial<MatchingVehicleInput> = {}): MatchingVeh
     maxMassKg: null,
     length: null,
     heightM: null,
+    // Entrada oficial activa por defecto (A2): validada, no anulada. El guard de find.ts solo
+    // actúa cuando `status` está definido; los tests de scoring que omiten status no se ven afectados.
+    entryValidatedAt: new Date('2026-01-01'),
+    entryAnnulledAt: null,
     ...overrides,
   }
 }
@@ -289,10 +293,7 @@ describe('findMatchesForBuyer', () => {
 // (vehículo o comprador) no es elegible, aunque haya contrapartes que casen.
 describe('guard de elegibilidad del sujeto (M1)', () => {
   it('vehículo NUEVO (sujeto no elegible) → []', async () => {
-    const deps = makeDeps(
-      [makeVehicle({ status: 'NUEVO', sellerArchivedAt: null })],
-      [makeBuyer()]
-    )
+    const deps = makeDeps([makeVehicle({ status: 'NUEVO', sellerArchivedAt: null })], [makeBuyer()])
     expect(await findMatchesForVehicle('v-base', deps, NOW_YEAR)).toEqual([])
   })
 
@@ -313,6 +314,22 @@ describe('guard de elegibilidad del sujeto (M1)', () => {
     expect(await findMatchesForVehicle('v-base', deps, NOW_YEAR)).toEqual([])
   })
 
+  it('vehículo sin entrada oficial validada (sujeto no elegible) → [] (A2)', async () => {
+    const deps = makeDeps(
+      [makeVehicle({ status: 'TASADO', sellerArchivedAt: null, entryValidatedAt: null })],
+      [makeBuyer()]
+    )
+    expect(await findMatchesForVehicle('v-base', deps, NOW_YEAR)).toEqual([])
+  })
+
+  it('vehículo con entrada oficial anulada (sujeto no elegible) → [] (A2)', async () => {
+    const deps = makeDeps(
+      [makeVehicle({ status: 'PUBLICADO', sellerArchivedAt: null, entryAnnulledAt: new Date() })],
+      [makeBuyer()]
+    )
+    expect(await findMatchesForVehicle('v-base', deps, NOW_YEAR)).toEqual([])
+  })
+
   it('comprador PERDIDO (sujeto no elegible) → []', async () => {
     const deps = makeDeps([makeVehicle()], [makeBuyer({ status: 'PERDIDO', archivedAt: null })])
     expect(await findMatchesForBuyer('b-base', deps, NOW_YEAR)).toEqual([])
@@ -327,10 +344,7 @@ describe('guard de elegibilidad del sujeto (M1)', () => {
   })
 
   it('comprador CUALIFICADO no archivado (sujeto elegible) → genera matches', async () => {
-    const deps = makeDeps(
-      [makeVehicle()],
-      [makeBuyer({ status: 'CUALIFICADO', archivedAt: null })]
-    )
+    const deps = makeDeps([makeVehicle()], [makeBuyer({ status: 'CUALIFICADO', archivedAt: null })])
     const results = await findMatchesForBuyer('b-base', deps, NOW_YEAR)
     expect(results.map((m) => m.vehicleId)).toEqual(['v-base'])
   })

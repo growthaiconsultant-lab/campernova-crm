@@ -21,6 +21,8 @@ const VEHICLE_SELECT = {
   length: true,
   heightM: true,
   status: true,
+  entryValidatedAt: true,
+  entryAnnulledAt: true,
   sellerLead: { select: { archivedAt: true } },
 } as const
 
@@ -60,6 +62,8 @@ type VehicleRow = {
   length: number | null
   heightM: number | null
   status: NonNullable<MatchingVehicleInput['status']>
+  entryValidatedAt: Date | null
+  entryAnnulledAt: Date | null
   sellerLead: { archivedAt: Date | null }
 }
 
@@ -111,6 +115,8 @@ function vehicleRowToInput(row: VehicleRow): MatchingVehicleInput {
     heightM: row.heightM,
     status: row.status,
     sellerArchivedAt: row.sellerLead.archivedAt,
+    entryValidatedAt: row.entryValidatedAt,
+    entryAnnulledAt: row.entryAnnulledAt,
   }
 }
 
