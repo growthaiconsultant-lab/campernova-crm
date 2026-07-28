@@ -49,10 +49,11 @@ export function scorePrice(vehiclePrice: number | null, maxBudget: number | null
 /// Antigüedad + km: media de dos componentes lineales.
 /// Año: 100 si current year, 0 si ≥15 años de antigüedad.
 /// Km: 100 si 0 km, 0 si ≥200.000 km.
-export function scoreAgeKm(year: number, km: number, nowYear: number): number {
-  const age = Math.max(0, nowYear - year)
-  const ageScore = clamp(1 - age / AGE_FLOOR_YEARS, 0, 1) * 100
-  const kmScore = clamp(1 - km / KM_FLOOR, 0, 1) * 100
+export function scoreAgeKm(year: number | null, km: number | null, nowYear: number): number {
+  // CAP-1: año/km desconocidos → componente neutral (60), no se castiga lo no capturado.
+  const ageScore =
+    year == null ? 60 : clamp(1 - Math.max(0, nowYear - year) / AGE_FLOOR_YEARS, 0, 1) * 100
+  const kmScore = km == null ? 60 : clamp(1 - km / KM_FLOOR, 0, 1) * 100
   return Math.round((ageScore + kmScore) / 2)
 }
 

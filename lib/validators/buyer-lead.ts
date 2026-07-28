@@ -1,5 +1,7 @@
 import { z } from 'zod'
 import { VEHICLE_CATEGORY_VALUES, BED_LAYOUT_VALUES, LICENSE_TYPE_VALUES } from '@/lib/rv-taxonomy'
+import { optionalText, optionalEmail } from './optional'
+// CAP-1 — captación progresiva: contacto opcional al crear/editar. `status` es workflow controlado.
 
 export const criticalEquipmentSchema = z.object({
   solar: z.boolean().default(false),
@@ -19,9 +21,9 @@ export const PURCHASE_TIMELINE_OPTIONS = [
 
 export const createBuyerLeadSchema = z.object({
   // Contacto
-  name: z.string().min(1, 'El nombre es obligatorio'),
-  email: z.string().email('Email no válido'),
-  phone: z.string().min(6, 'Teléfono demasiado corto'),
+  name: optionalText(200),
+  email: optionalEmail(),
+  phone: optionalText(30),
 
   // Preferencias de búsqueda
   vehicleType: z.enum(['CAMPER', 'AUTOCARAVANA']).optional().nullable(),
@@ -50,9 +52,9 @@ export type CreateBuyerLeadInput = z.infer<typeof createBuyerLeadSchema>
 export type BuyerLeadFormValues = z.input<typeof createBuyerLeadSchema>
 
 export const updateBuyerLeadSchema = z.object({
-  name: z.string().min(1, 'El nombre es obligatorio'),
-  email: z.string().email('Email no válido'),
-  phone: z.string().min(6, 'Teléfono demasiado corto'),
+  name: optionalText(200),
+  email: optionalEmail(),
+  phone: optionalText(30),
   status: z.enum(['NUEVO', 'CONTACTADO', 'CUALIFICADO', 'EN_NEGOCIACION', 'CERRADO', 'PERDIDO']),
   agentId: z.string().nullable(),
   vehicleType: z.enum(['CAMPER', 'AUTOCARAVANA']).optional().nullable(),

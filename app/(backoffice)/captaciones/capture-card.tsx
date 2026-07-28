@@ -25,8 +25,8 @@ import type { CaptureStatus, CapturePortal, LostReason } from '@prisma/client'
 
 export type CaptureCardData = {
   id: string
-  listingUrl: string
-  phone: string
+  listingUrl: string | null
+  phone: string | null
   portal: CapturePortal
   title: string | null
   askingPrice: number | null
@@ -156,24 +156,30 @@ export function CaptureCard({ c, agents }: { c: CaptureCardData; agents: Agent[]
       {/* Teléfono (WhatsApp) + responsable */}
       <div className="mt-2 flex items-center justify-between gap-2">
         <div className="flex items-center gap-2">
-          <a
-            href={c.listingUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            aria-label="Ver anuncio"
-            className="text-ink3 transition-colors hover:text-ink"
-          >
-            <ExternalLink size={13} strokeWidth={2} />
-          </a>
-          <a
-            href={buildWhatsAppUrl(c.phone, 'Hola, te contacto de CampersNova por tu anuncio.')}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-flex items-center gap-1 font-mono text-[10.5px] text-ink3 transition-colors hover:text-brand"
-          >
-            <MessageCircle size={12} strokeWidth={2} className="text-[#25D366]" />
-            {c.phone}
-          </a>
+          {c.listingUrl && (
+            <a
+              href={c.listingUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              aria-label="Ver anuncio"
+              className="text-ink3 transition-colors hover:text-ink"
+            >
+              <ExternalLink size={13} strokeWidth={2} />
+            </a>
+          )}
+          {c.phone ? (
+            <a
+              href={buildWhatsAppUrl(c.phone, 'Hola, te contacto de CampersNova por tu anuncio.')}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1 font-mono text-[10.5px] text-ink3 transition-colors hover:text-brand"
+            >
+              <MessageCircle size={12} strokeWidth={2} className="text-[#25D366]" />
+              {c.phone}
+            </a>
+          ) : (
+            <span className="font-mono text-[10.5px] text-ink3">Sin teléfono</span>
+          )}
         </div>
         {c.assignedToName && (
           <span

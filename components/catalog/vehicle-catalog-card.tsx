@@ -15,7 +15,8 @@ function eur(n: number) {
   }).format(n)
 }
 
-function fmtKm(n: number) {
+function fmtKm(n: number | null) {
+  if (n == null) return 'Km sin especificar'
   return new Intl.NumberFormat('es-ES').format(n) + ' km'
 }
 
@@ -66,14 +67,15 @@ export function VehicleCatalogCard({ vehicle: v }: { vehicle: PublicVehicle }) {
           className="text-[18px] leading-tight tracking-[-0.01em]"
           style={{ fontFamily: 'var(--font-fraunces)', color: 'var(--cn-teal-900)' }}
         >
-          {v.title} {v.year}
+          {v.year != null ? `${v.title} ${v.year}` : v.title}
         </h3>
 
         <p
           className="mt-1.5 font-mono text-[11px] uppercase tracking-[0.06em]"
           style={{ color: 'var(--cn-ink-500)' }}
         >
-          {fmtKm(v.km)} · {v.seats} plazas
+          {fmtKm(v.km)}
+          {v.seats != null ? ` · ${v.seats} plazas` : ''}
           {v.length ? ` · ${v.length} m` : ''}
         </p>
 

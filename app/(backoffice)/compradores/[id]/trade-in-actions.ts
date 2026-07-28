@@ -3,6 +3,7 @@
 import { revalidatePath } from 'next/cache'
 import { db } from '@/lib/db'
 import { requireAgente } from '@/lib/auth'
+import { personLabel } from '@/lib/display'
 import { defaultNextActionData } from '@/lib/next-action'
 import { runAndSavePreliminaryValuation } from '@/lib/valuation/save'
 import { recalculateMatchesForVehicle } from '@/lib/matching'
@@ -109,24 +110,20 @@ export async function createSellerLeadFromTradeIn(
   }
   const vehicleType = tradeInTypeToVehicleType(buyer.tradeInType)
   if (!vehicleType) return { error: 'Tipo de vehículo no válido para stock' }
-  if (
-    !buyer.tradeInBrand ||
-    !buyer.tradeInModel ||
-    buyer.tradeInYear == null ||
-    buyer.tradeInKm == null
-  ) {
-    return { error: 'Completa marca, modelo, año y km del vehículo antes de crear el lead' }
-  }
 
-  // Valores ya validados (no nulos) extraídos a consts: el narrowing de `buyer.tradeIn*`
-  // no se conserva dentro del closure de `db.$transaction`, pero sí en estas consts.
+  // CAP-1 — captación progresiva: NO se exige marca/modelo/año/km para crear el lead de
+  // vendedor. Los datos que falten se persisten como `null` y el agente los completa en la
+  // ficha del vehículo (las columnas son nullable). Solo el tipo (camper/autocaravana) es
+  // condición de elegibilidad para generar stock.
   const brand = buyer.tradeInBrand
   const model = buyer.tradeInModel
   const year = buyer.tradeInYear
   const km = buyer.tradeInKm
   const tradeInLabel = TRADE_IN_TYPE_LABELS[buyer.tradeInType]
+  const vehicleLabelText = [brand, model].filter(Boolean).join(' ') || 'vehículo sin identificar'
 
-  const originNote = `Origen: parte de pago del comprador ${buyer.name} (ficha /compradores/${buyer.id}).${
+  const buyerLabel = personLabel(buyer.name, { role: 'comprador sin identificar', id: buyer.id })
+  const originNote = `Origen: parte de pago del comprador ${buyerLabel} (ficha /compradores/${buyer.id}).${
     buyer.tradeInNotes ? ` Notas: ${buyer.tradeInNotes}` : ''
   }`
 
@@ -161,7 +158,7 @@ export async function createSellerLeadFromTradeIn(
             create: { type: 'NOTA', content: originNote },
           },
         },
-        linkingNotePrefix: `Creado lead de vendedor desde el vehículo de parte de pago (${tradeInLabel} ${brand} ${model}).`,
+        linkingNotePrefix: `Creado lead de vendedor desde el vehículo de parte de pago (${tradeInLabel} ${vehicleLabelText}).`,
       })
     )
   } catch (err) {

@@ -90,7 +90,10 @@ export async function getMercadoKpis(
 
   // Gap oferta/demanda por tipo (compradores explícitos - vehículos en stock)
   const stockByType = new Map<string, number>()
-  for (const g of stockVehicles) stockByType.set(g.type, g._count._all)
+  for (const g of stockVehicles) {
+    if (g.type == null) continue // vehículos sin tipo (captación progresiva) no cuentan por tipo
+    stockByType.set(g.type, g._count._all)
+  }
   const gapRows: GapRow[] = (['CAMPER', 'AUTOCARAVANA'] as const)
     .map((t) => {
       const demand = typeCounts.get(t) ?? 0

@@ -4,6 +4,7 @@ import { Suspense } from 'react'
 import { Package } from 'lucide-react'
 import { db } from '@/lib/db'
 import { requireCanViewVehiculos } from '@/lib/auth'
+import { vehicleLabel } from '@/lib/display'
 import { eligibleBuyerCounterpartMatchWhere, isVehicleEligible } from '@/lib/matching'
 import { VEHICLE_STATUS_LABELS } from '@/lib/state-machine'
 import { VehicleFilters } from './vehicle-filters'
@@ -214,10 +215,10 @@ export default async function VehiculosPage({ searchParams }: { searchParams: Se
                 {/* Cuerpo */}
                 <div className="p-3">
                   <div className="truncate font-hanken text-[13.5px] font-semibold text-ink">
-                    {v.brand} {v.model} {v.year}
+                    {vehicleLabel(v)}
                   </div>
                   <div className="mt-0.5 font-mono text-[11px] text-ink3">
-                    {TYPE_LABELS[v.type] ?? v.type}
+                    {v.type ? (TYPE_LABELS[v.type] ?? v.type) : 'Sin tipo'}
                     {v.km != null ? ` · ${v.km.toLocaleString('es-ES')} km` : ''}
                   </div>
                   <div className="mt-2 flex items-center justify-between gap-2">

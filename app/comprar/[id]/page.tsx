@@ -27,8 +27,14 @@ function eur(n: number) {
   }).format(n)
 }
 
-function fmtKm(n: number) {
+function fmtKm(n: number | null) {
+  if (n == null) return 'Km sin especificar'
   return new Intl.NumberFormat('es-ES').format(n) + ' km'
+}
+
+/** Título + año, omitiendo el año si aún no se ha capturado (CAP-1). */
+function titleYear(v: PublicVehicle): string {
+  return v.year != null ? `${v.title} ${v.year}` : v.title
 }
 
 interface Props {
@@ -41,15 +47,15 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const canonical = `/comprar/${v.slug}`
   const desc =
     v.description ??
-    `${v.title} ${v.year} · ${fmtKm(v.km)} · ${v.typeLabel} seminueva con garantía en CampersNova.`
+    `${titleYear(v)} · ${fmtKm(v.km)} · ${v.typeLabel} seminueva con garantía en CampersNova.`
   return {
-    title: `${v.title} ${v.year}`,
+    title: titleYear(v),
     description: desc,
     alternates: { canonical },
     openGraph: {
       type: 'website',
       url: `${SITE_URL}${canonical}`,
-      title: `${v.title} ${v.year}`,
+      title: titleYear(v),
       description: desc,
       images: v.photos[0] ? [{ url: v.photos[0].url, alt: v.photos[0].alt }] : undefined,
     },
@@ -60,13 +66,13 @@ function vehicleJsonLd(v: PublicVehicle) {
   return {
     '@context': 'https://schema.org',
     '@type': 'Vehicle',
-    name: `${v.title} ${v.year}`,
+    name: titleYear(v),
     description: v.description ?? undefined,
-    vehicleModelDate: String(v.year),
-    vehicleSeatingCapacity: v.seats,
+    ...(v.year != null && { vehicleModelDate: String(v.year) }),
+    ...(v.seats != null && { vehicleSeatingCapacity: v.seats }),
     bodyType: v.typeLabel,
-    brand: { '@type': 'Brand', name: v.brand },
-    model: v.model,
+    ...(v.brand ? { brand: { '@type': 'Brand', name: v.brand } } : {}),
+    ...(v.model ? { model: v.model } : {}),
     image: v.photos.map((p) => p.url),
     mileageFromOdometer: { '@type': 'QuantitativeValue', value: v.km, unitCode: 'KMT' },
     ...(v.price != null && {
@@ -89,9 +95,9 @@ export default async function VehicleDetailPage({ params }: Props) {
 
   const equipment = equipmentLabels(v.equipment)
   const specs = [
-    { lab: 'Año', val: String(v.year) },
+    { lab: 'Año', val: v.year != null ? String(v.year) : 'Sin especificar' },
     { lab: 'Kilómetros', val: fmtKm(v.km) },
-    { lab: 'Plazas', val: String(v.seats) },
+    { lab: 'Plazas', val: v.seats != null ? String(v.seats) : 'Sin especificar' },
     ...(v.length ? [{ lab: 'Longitud', val: `${v.length} m` }] : []),
     { lab: 'Tipo', val: v.typeLabel },
     ...(v.location ? [{ lab: 'Ubicación', val: v.location }] : []),
@@ -132,9 +138,7 @@ export default async function VehicleDetailPage({ params }: Props) {
               ) : null
             })()}
             <span aria-hidden>/</span>
-            <span style={{ color: 'var(--cn-teal-900)' }}>
-              {v.title} {v.year}
-            </span>
+            <span style={{ color: 'var(--cn-teal-900)' }}>{titleYear(v)}</span>
           </nav>
 
           {/* Gallery */}
@@ -230,7 +234,7 @@ export default async function VehicleDetailPage({ params }: Props) {
                 className="text-[clamp(2rem,4vw,3rem)] leading-[1.05] tracking-[-0.02em]"
                 style={{ fontFamily: 'var(--font-fraunces)', color: 'var(--cn-teal-900)' }}
               >
-                {v.title} {v.year}
+                {titleYear(v)}
               </h1>
               {v.description && (
                 <p

@@ -42,10 +42,20 @@ describe('createBuyerLead', () => {
     expect(mockDb.buyerLead.create).not.toHaveBeenCalled()
   })
 
-  it('rechaza si falta el nombre', async () => {
+  it('CAP-1: crea sin nombre (captación progresiva) → name se normaliza a null', async () => {
     const res = await createBuyerLead({ ...validInput, name: '' })
-    expect('error' in res).toBe(true)
-    expect(mockDb.buyerLead.create).not.toHaveBeenCalled()
+    expect(res).toEqual({ leadId: 'buyer-1' })
+    const arg = mockDb.buyerLead.create.mock.calls[0][0].data
+    expect(arg.name).toBeNull()
+  })
+
+  it('CAP-1: crea un comprador completamente vacío (todos los campos de negocio null)', async () => {
+    const res = await createBuyerLead({ name: '', email: '', phone: '' })
+    expect(res).toEqual({ leadId: 'buyer-1' })
+    const arg = mockDb.buyerLead.create.mock.calls[0][0].data
+    expect(arg.name).toBeNull()
+    expect(arg.email).toBeNull()
+    expect(arg.phone).toBeNull()
   })
 
   it('crea el lead con estado NUEVO y sin agente', async () => {

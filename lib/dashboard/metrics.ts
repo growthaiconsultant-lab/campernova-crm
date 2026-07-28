@@ -19,8 +19,8 @@ export type DaysInStockResult = {
 
 export type StagnantVehicle = {
   id: string
-  brand: string
-  model: string
+  brand: string | null
+  model: string | null
   year: number | null
   status: string
   daysInStatus: number

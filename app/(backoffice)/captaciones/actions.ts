@@ -36,13 +36,13 @@ export async function createCapture(
 ): Promise<{ error?: string; id?: string; duplicate?: Duplicate }> {
   const actor = await requireAgente()
 
-  const listingUrl = data.listingUrl?.trim()
-  const phone = data.phone?.trim()
-  if (!listingUrl) return { error: 'Pega el link del anuncio' }
-  if (!phone) return { error: 'Falta el teléfono' }
+  // CAP-1: captación progresiva — enlace y teléfono opcionales. Ausencia → null (nunca placeholder).
+  const listingUrl = data.listingUrl?.trim() || null
+  const phone = data.phone?.trim() || null
   if (!isValidPortal(data.portal)) return { error: 'Portal no válido' }
 
-  if (!allowDuplicate) {
+  // El aviso de duplicado por teléfono solo tiene sentido si se ha informado el teléfono.
+  if (!allowDuplicate && phone) {
     const [captures, sellers] = await Promise.all([
       db.vehicleCapture.findMany({ select: { id: true, phone: true, status: true } }),
       db.sellerLead.findMany({ select: { id: true, name: true, phone: true } }),
@@ -50,7 +50,14 @@ export async function createCapture(
     const dupCap = findDuplicateCaptureByPhone(phone, captures)
     if (dupCap) return { duplicate: { kind: 'capture', id: dupCap.id } }
     const dupSeller = sellers.find((s) => phonesMatch(s.phone, phone))
-    if (dupSeller) return { duplicate: { kind: 'seller', id: dupSeller.id, name: dupSeller.name } }
+    if (dupSeller)
+      return {
+        duplicate: {
+          kind: 'seller',
+          id: dupSeller.id,
+          name: dupSeller.name ?? 'Vendedor sin identificar',
+        },
+      }
   }
 
   const capture = await db.vehicleCapture.create({
@@ -159,7 +166,6 @@ export async function convertCaptureToSellerLead(
   }
 
   const { brand, model } = splitCaptureTitle(capture.title)
-  const currentYear = new Date().getFullYear()
   const originParts = [
     `Origen: captación de ${PORTAL_LABELS[capture.portal]} (${capture.listingUrl ?? ''}).`.trim(),
     capture.askingPrice ? `Pide ${Number(capture.askingPrice).toLocaleString('es-ES')} €.` : '',
@@ -175,21 +181,26 @@ export async function convertCaptureToSellerLead(
       convertCaptureTx(tx, {
         captureId: id,
         sellerData: {
-          name: capture.title?.trim() || `Vendedor ${PORTAL_LABELS[capture.portal]}`,
-          email: '', // la captación no trae email; el comercial lo completa
+          // CAP-1: sin placeholders. El nombre se deja en null si el título no aporta uno; la
+          // captación no trae email (→ null). El comercial completa la ficha luego.
+          name: capture.title?.trim() || null,
+          email: null,
           phone: capture.phone,
           canal: 'CN',
           status: 'NUEVO',
           agentId: capture.assignedToId ?? actor.id,
           ...defaultNextActionData(),
           vehicle: {
+            // CAP-1: la captación de portal NO conoce tipo/año/km/plazas → se dejan en null (nunca
+            // placeholders como km:0); el comercial los completa luego en la ficha. Marca/modelo se
+            // derivan del título si existe.
             create: {
-              type: 'AUTOCARAVANA', // el comercial ajusta tipo/año/km/plazas en la ficha
-              brand,
-              model,
-              year: currentYear,
-              km: 0,
-              seats: 4,
+              type: null,
+              brand: brand || null,
+              model: model || null,
+              year: null,
+              km: null,
+              seats: null,
               conservationState: 'NORMAL',
               equipment: {},
               desiredPrice: capture.askingPrice ?? null,
@@ -215,11 +226,11 @@ export async function convertCaptureToSellerLead(
   await runAndSavePreliminaryValuation(
     result.vehicleId,
     {
-      brand,
-      model,
-      type: 'AUTOCARAVANA',
-      year: currentYear,
-      km: 0,
+      brand: brand || null,
+      model: model || null,
+      type: null,
+      year: null,
+      km: null,
       conservationState: 'NORMAL',
       equipment: {},
     },

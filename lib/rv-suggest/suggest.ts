@@ -9,12 +9,13 @@ import { fetchImageAsBase64 } from '@/lib/ads/generate'
 import { normalizeRvSuggestion, type RvSuggestion } from './normalize'
 
 export type RvSuggestVehicle = {
-  brand: string
-  model: string
-  year: number
-  km: number
-  type: 'CAMPER' | 'AUTOCARAVANA'
-  seats: number
+  // CAP-1: la captación progresiva permite peritar con datos parciales; las fotos son la base.
+  brand: string | null
+  model: string | null
+  year: number | null
+  km: number | null
+  type: 'CAMPER' | 'AUTOCARAVANA' | null
+  seats: number | null
   conservationState?: string | null
   length?: number | null
 }
@@ -38,15 +39,13 @@ Reglas:
 
 /** Texto de usuario con los datos conocidos del vehículo. Puro (testeable). */
 export function buildRvSuggestUserText(v: RvSuggestVehicle): string {
-  const lines = [
-    `Vehículo a peritar:`,
-    `- Marca: ${v.brand}`,
-    `- Modelo: ${v.model}`,
-    `- Año: ${v.year}`,
-    `- Tipo: ${v.type}`,
-    `- Kilómetros: ${v.km}`,
-    `- Plazas homologadas (viaje): ${v.seats}`,
-  ]
+  const lines = [`Vehículo a peritar:`]
+  if (v.brand) lines.push(`- Marca: ${v.brand}`)
+  if (v.model) lines.push(`- Modelo: ${v.model}`)
+  if (v.year != null) lines.push(`- Año: ${v.year}`)
+  if (v.type) lines.push(`- Tipo: ${v.type}`)
+  if (v.km != null) lines.push(`- Kilómetros: ${v.km}`)
+  if (v.seats != null) lines.push(`- Plazas homologadas (viaje): ${v.seats}`)
   if (v.length != null) lines.push(`- Longitud conocida: ${v.length} m`)
   if (v.conservationState) lines.push(`- Estado de conservación: ${v.conservationState}`)
   lines.push('', 'Analiza las fotos adjuntas y propón la ficha técnica RV.')

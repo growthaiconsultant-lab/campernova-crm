@@ -12,6 +12,7 @@ import {
 } from 'lucide-react'
 import { db } from '@/lib/db'
 import { requireAgente } from '@/lib/auth'
+import { personLabel, vehicleLabel } from '@/lib/display'
 import { NATIVE_EVENT_TYPES } from '@/lib/calendar/event-meta'
 import type { CalendarEventType } from '@prisma/client'
 import { EventForm } from './event-form'
@@ -175,10 +176,13 @@ export default async function NuevoEventoPage({
 
       <EventForm
         agents={agents.map((a) => ({ id: a.id, label: a.name }))}
-        buyers={buyers.map((b) => ({ id: b.id, label: b.name }))}
+        buyers={buyers.map((b) => ({
+          id: b.id,
+          label: personLabel(b.name, { role: 'Comprador sin identificar', id: b.id }),
+        }))}
         vehicles={vehicles.map((v) => ({
           id: v.id,
-          label: `${v.brand} ${v.model} (${v.year})`,
+          label: vehicleLabel(v),
         }))}
         defaults={{
           type: nativeType,

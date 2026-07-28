@@ -301,7 +301,15 @@ export async function updateVehicle(vehicleId: string, data: unknown) {
   // los denormalizados oficiales; la tasación oficial (gated) es la única que lo hace.
   await runAndSavePreliminaryValuation(
     vehicleId,
-    { brand, model, type, year, km, conservationState, equipment: equipmentResolved },
+    {
+      brand: brand ?? null,
+      model: model ?? null,
+      type: type ?? null,
+      year: year ?? null,
+      km: km ?? null,
+      conservationState,
+      equipment: equipmentResolved,
+    },
     actor.id
   )
   await recalculateMatchesForVehicle(vehicleId, db)

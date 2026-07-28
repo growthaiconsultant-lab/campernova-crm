@@ -21,17 +21,18 @@ export type PublicVehiclePhoto = { url: string; alt: string }
 export type PublicVehicle = {
   /** Slug SEO: `marca-modelo-año-id`. */
   slug: string
-  brand: string
-  model: string
-  /** `${brand} ${model}` */
+  /** CAP-1: puede faltar en captación progresiva; `null` en vez de placeholder. */
+  brand: string | null
+  model: string | null
+  /** `${brand} ${model}` con fallback computado; NUNCA vacío. */
   title: string
-  year: number
-  km: number
-  seats: number
+  year: number | null
+  km: number | null
+  seats: number | null
   length: number | null
-  /** 'Camper' | 'Autocaravana' */
+  /** 'Camper' | 'Autocaravana' | 'Vehículo' (si el tipo aún no se ha capturado) */
   typeLabel: string
-  type: VehicleType
+  type: VehicleType | null
   location: string | null
   /** Precio de venta al cliente (salePrice). `null` → "Precio a consultar". */
   price: number | null
@@ -66,7 +67,9 @@ export function slugify(text: string): string {
 
 /** Construye el slug SEO de un vehículo. El id (cuid, sin guiones) va al final. */
 export function vehicleSlug(v: Pick<Vehicle, 'id' | 'brand' | 'model' | 'year'>): string {
-  return `${slugify(`${v.brand} ${v.model} ${v.year}`)}-${v.id}`
+  const parts = [v.brand, v.model, v.year].filter((p) => p != null && p !== '').join(' ')
+  const base = slugify(parts)
+  return base ? `${base}-${v.id}` : v.id
 }
 
 /** Extrae el id de cuid del slug (último segmento tras el guion). */
@@ -94,17 +97,21 @@ export function mapToPublicVehicle(v: VehicleWithPhotos): PublicVehicle {
     heating: eqRaw.heating === true,
   }
 
+  // Alt de imagen: mismo formato histórico (marca modelo año), null-safe.
+  const altBase =
+    [v.brand, v.model, v.year].filter((p) => p != null && p !== '').join(' ') ||
+    'Vehículo sin identificar'
   return {
     slug: vehicleSlug(v),
     brand: v.brand,
     model: v.model,
-    title: `${v.brand} ${v.model}`,
+    title: [v.brand, v.model].filter(Boolean).join(' ') || 'Vehículo sin identificar',
     year: v.year,
     km: v.km,
     seats: v.seats,
     length: v.length ?? null,
     type: v.type,
-    typeLabel: TYPE_LABELS[v.type] ?? 'Vehículo',
+    typeLabel: v.type ? (TYPE_LABELS[v.type] ?? 'Vehículo') : 'Vehículo',
     location: v.location ?? null,
     // Precio público = SOLO salePrice. Nunca desiredPrice/purchasePrice/valuación/margen.
     price: v.salePrice != null ? Number(v.salePrice) : null,
@@ -113,7 +120,7 @@ export function mapToPublicVehicle(v: VehicleWithPhotos): PublicVehicle {
     photos: v.photos
       .slice()
       .sort((a, b) => a.order - b.order)
-      .map((p) => ({ url: p.url, alt: p.altText ?? `${v.brand} ${v.model} ${v.year}` })),
+      .map((p) => ({ url: p.url, alt: p.altText ?? altBase })),
     verified: v.trustVerifiedAt != null,
   }
 }
@@ -134,8 +141,9 @@ export const CATEGORIES: {
   { type: 'CAMPER', slug: 'campers', label: 'Camper', labelPlural: 'Campers' },
 ]
 
-/** Devuelve la categoría navegable correspondiente a un tipo de vehículo. */
-export function categoryForType(type: VehicleType) {
+/** Devuelve la categoría navegable correspondiente a un tipo de vehículo (o null si no hay tipo). */
+export function categoryForType(type: VehicleType | null) {
+  if (type == null) return null
   return CATEGORIES.find((c) => c.type === type) ?? null
 }
 
@@ -183,13 +191,14 @@ export async function getCatalogBrands(): Promise<CatalogBrand[]> {
   const vehicles = await getPublishedVehiclesSafe()
   const map = new Map<string, CatalogBrand>()
   for (const v of vehicles) {
+    if (!v.brand) continue // sin marca (captación progresiva) → no genera faceta de marca
     const slug = brandSlug(v.brand)
     const existing = map.get(slug)
     if (existing) {
       existing.count++
-      if (!existing.types.includes(v.type)) existing.types.push(v.type)
+      if (v.type && !existing.types.includes(v.type)) existing.types.push(v.type)
     } else {
-      map.set(slug, { brand: v.brand, slug, count: 1, types: [v.type] })
+      map.set(slug, { brand: v.brand, slug, count: 1, types: v.type ? [v.type] : [] })
     }
   }
   return Array.from(map.values()).sort((a, b) => a.brand.localeCompare(b.brand, 'es'))
@@ -203,9 +212,9 @@ export async function getPublishedVehiclesByBrandSlug(
   slug: string
 ): Promise<{ brand: string; vehicles: PublicVehicle[] } | null> {
   const vehicles = await getPublishedVehiclesSafe()
-  const matching = vehicles.filter((v) => brandSlug(v.brand) === slug)
+  const matching = vehicles.filter((v) => v.brand != null && brandSlug(v.brand) === slug)
   if (matching.length === 0) return null
-  return { brand: matching[0]!.brand, vehicles: matching }
+  return { brand: matching[0]!.brand ?? '', vehicles: matching }
 }
 
 /**

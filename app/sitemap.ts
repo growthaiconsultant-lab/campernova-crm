@@ -43,7 +43,11 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     }
     if (vehicles.some((v) => v.type === 'AUTOCARAVANA')) catalogPaths.push('/comprar/autocaravanas')
     if (vehicles.some((v) => v.type === 'CAMPER')) catalogPaths.push('/comprar/campers')
-    for (const slug of Array.from(new Set(vehicles.map((v) => brandSlug(v.brand))))) {
+    const brandSlugs = vehicles
+      .map((v) => v.brand)
+      .filter((b): b is string => b != null && b !== '')
+      .map((b) => brandSlug(b))
+    for (const slug of Array.from(new Set(brandSlugs))) {
       catalogPaths.push(`/comprar/marcas/${slug}`)
     }
 

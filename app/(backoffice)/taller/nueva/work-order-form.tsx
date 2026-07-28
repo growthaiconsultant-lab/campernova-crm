@@ -3,12 +3,13 @@
 import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
+import { vehicleLabel } from '@/lib/display'
 import { createWorkOrder } from '../actions'
 
 interface Vehicle {
   id: string
-  brand: string
-  model: string
+  brand: string | null
+  model: string | null
   year: number | null
   sellerLeadName: string | null
 }
@@ -111,7 +112,7 @@ export function WorkOrderForm({
           <option value="">Selecciona un vehículo…</option>
           {vehicles.map((v) => (
             <option key={v.id} value={v.id}>
-              {v.brand} {v.model} {v.year ?? ''}
+              {vehicleLabel(v)}
               {v.sellerLeadName ? ` — ${v.sellerLeadName}` : ''}
             </option>
           ))}

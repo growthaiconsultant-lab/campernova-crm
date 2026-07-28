@@ -14,8 +14,21 @@ const KM_TOLERANCE_PCT = 0.2
 export function prismaValuationDeps(db: PrismaClient): ValuationDeps {
   return {
     async findComparables(input: ValuationVehicleInput): Promise<ComparableSale[]> {
-      const minKm = Math.floor(input.km * (1 - KM_TOLERANCE_PCT))
-      const maxKm = Math.ceil(input.km * (1 + KM_TOLERANCE_PCT))
+      // CAP-1: sin datos estructurales mínimos no hay comparables posibles (el guard de
+      // `calculateValuation` ya lo asegura; esto narra los tipos y protege el arithmetic).
+      if (
+        input.brand == null ||
+        input.model == null ||
+        input.type == null ||
+        input.year == null ||
+        input.km == null
+      ) {
+        return []
+      }
+      const km = input.km
+      const year = input.year
+      const minKm = Math.floor(km * (1 - KM_TOLERANCE_PCT))
+      const maxKm = Math.ceil(km * (1 + KM_TOLERANCE_PCT))
 
       const rows = await db.vehicle.findMany({
         where: {
@@ -23,7 +36,7 @@ export function prismaValuationDeps(db: PrismaClient): ValuationDeps {
           brand: input.brand,
           model: input.model,
           type: input.type,
-          year: { gte: input.year - YEAR_TOLERANCE, lte: input.year + YEAR_TOLERANCE },
+          year: { gte: year - YEAR_TOLERANCE, lte: year + YEAR_TOLERANCE },
           km: { gte: minKm, lte: maxKm },
           desiredPrice: { not: null },
         },
@@ -32,16 +45,20 @@ export function prismaValuationDeps(db: PrismaClient): ValuationDeps {
       })
 
       return rows
-        .filter((r) => r.desiredPrice !== null)
+        .filter((r) => r.desiredPrice !== null && r.year !== null && r.km !== null)
         .map((r) => ({
           id: r.id,
-          year: r.year,
-          km: r.km,
+          year: r.year as number,
+          km: r.km as number,
           price: Number(r.desiredPrice),
         }))
     },
 
     async findReferencePrice(input: ValuationVehicleInput): Promise<ReferencePriceData | null> {
+      if (input.brand == null || input.model == null || input.type == null || input.year == null) {
+        return null
+      }
+      const year = input.year
       const rows = await db.referencePrice.findMany({
         where: {
           brand: input.brand,
@@ -54,7 +71,7 @@ export function prismaValuationDeps(db: PrismaClient): ValuationDeps {
 
       // Pick the entry whose baseYear is closest to the vehicle's year.
       const closest = rows.reduce((best, row) =>
-        Math.abs(row.baseYear - input.year) < Math.abs(best.baseYear - input.year) ? row : best
+        Math.abs(row.baseYear - year) < Math.abs(best.baseYear - year) ? row : best
       )
 
       return {

@@ -1,3 +1,4 @@
+import { vehicleLabel } from '../display'
 import { NEXT_ACTION_LABELS } from '../next-action'
 import { EVENT_STATUS_LABELS, EVENT_TYPE_LABELS } from './event-meta'
 import type { CalendarEventStatus, CalendarEventType, NextActionType } from '@prisma/client'
@@ -11,8 +12,8 @@ export type DeliveryRow = {
   id: string
   scheduledAt: Date
   status: 'PROGRAMADA' | 'EN_CURSO' | 'COMPLETADA' | 'CANCELADA'
-  vehicle: { brand: string; model: string } | null
-  buyerLead: { name: string } | null
+  vehicle: { brand: string | null; model: string | null } | null
+  buyerLead: { name: string | null } | null
   responsable: { id: string; name: string } | null
 }
 
@@ -26,7 +27,7 @@ export type WorkOrderRow = {
   // ese valor; la etiqueta se define para que el día que exista no se muestre como "Reparación".
   kind: 'REPARACION' | 'MEJORA' | 'INSPECCION_ENTRADA'
   description: string
-  vehicle: { brand: string; model: string } | null
+  vehicle: { brand: string | null; model: string | null } | null
   assignedTo: { id: string; name: string } | null
 }
 
@@ -41,7 +42,7 @@ export type FollowupRow = {
 export type NextActionRow = {
   id: string
   leadKind: 'seller' | 'buyer'
-  name: string
+  name: string | null
   nextActionType: NextActionType
   nextActionDueAt: Date
   agent: { id: string; name: string } | null
@@ -56,9 +57,9 @@ export type EventRow = {
   endAt: Date | null
   allDay: boolean
   assignedTo: { id: string; name: string } | null
-  buyerLead: { name: string } | null
-  sellerLead: { name: string } | null
-  vehicle: { brand: string; model: string } | null
+  buyerLead: { name: string | null } | null
+  sellerLead: { name: string | null } | null
+  vehicle: { brand: string | null; model: string | null } | null
 }
 
 export type CaptureRow = {
@@ -94,7 +95,7 @@ const DELIVERY_LABEL: Record<DeliveryRow['status'], string> = {
 }
 
 export function deliveryToItem(r: DeliveryRow): CalendarItem {
-  const veh = r.vehicle ? `${r.vehicle.brand} ${r.vehicle.model}` : 'Vehículo'
+  const veh = r.vehicle ? vehicleLabel(r.vehicle) : 'Vehículo'
   return {
     id: `delivery:${r.id}`,
     source: 'delivery',
@@ -128,7 +129,7 @@ const WORKORDER_KIND_LABEL: Record<WorkOrderRow['kind'], string> = {
 }
 
 export function workOrderToItem(r: WorkOrderRow): CalendarItem {
-  const veh = r.vehicle ? `${r.vehicle.brand} ${r.vehicle.model}` : 'Vehículo'
+  const veh = r.vehicle ? vehicleLabel(r.vehicle) : 'Vehículo'
   return {
     id: `workorder:${r.id}`,
     source: 'workorder',
@@ -179,7 +180,7 @@ export function nextActionToItem(r: NextActionRow, now: Date = new Date()): Cale
     id: `next_action:${r.leadKind}:${r.id}`,
     source: 'next_action',
     kindLabel: 'Próxima acción',
-    title: `${NEXT_ACTION_LABELS[r.nextActionType]} · ${r.name}`,
+    title: `${NEXT_ACTION_LABELS[r.nextActionType]} · ${r.name ?? (r.leadKind === 'seller' ? 'Vendedor sin identificar' : 'Comprador sin identificar')}`,
     start: r.nextActionDueAt,
     end: null,
     allDay: false,
@@ -203,9 +204,7 @@ const EVENT_TONE: Record<CalendarEventStatus, CalendarTone> = {
 
 export function eventToItem(r: EventRow): CalendarItem {
   const context =
-    r.buyerLead?.name ??
-    r.sellerLead?.name ??
-    (r.vehicle ? `${r.vehicle.brand} ${r.vehicle.model}` : null)
+    r.buyerLead?.name ?? r.sellerLead?.name ?? (r.vehicle ? vehicleLabel(r.vehicle) : null)
   return {
     id: `event:${r.id}`,
     source: 'event',

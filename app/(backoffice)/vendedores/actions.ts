@@ -68,7 +68,15 @@ export async function createSellerLead(data: unknown) {
   // oficiales. La transición NUEVO → TASADO ocurre solo vía tasación oficial (entrada + inspección).
   await runAndSavePreliminaryValuation(
     vehicleId,
-    { brand, model, type, year, km, conservationState, equipment },
+    {
+      brand: brand ?? null,
+      model: model ?? null,
+      type: type ?? null,
+      year: year ?? null,
+      km: km ?? null,
+      conservationState,
+      equipment,
+    },
     actor.id
   )
   await recalculateMatchesForVehicle(vehicleId, db)

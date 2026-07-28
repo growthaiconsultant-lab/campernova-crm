@@ -86,9 +86,9 @@ export function SellerLeadForm() {
               name="name"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Nombre *</FormLabel>
+                  <FormLabel>Nombre</FormLabel>
                   <FormControl>
-                    <Input placeholder="Nombre completo" {...field} />
+                    <Input placeholder="Nombre completo" {...field} value={field.value ?? ''} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -99,9 +99,14 @@ export function SellerLeadForm() {
               name="email"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Email *</FormLabel>
+                  <FormLabel>Email</FormLabel>
                   <FormControl>
-                    <Input type="email" placeholder="correo@ejemplo.com" {...field} />
+                    <Input
+                      type="email"
+                      placeholder="correo@ejemplo.com"
+                      {...field}
+                      value={field.value ?? ''}
+                    />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -112,9 +117,14 @@ export function SellerLeadForm() {
               name="phone"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Teléfono *</FormLabel>
+                  <FormLabel>Teléfono</FormLabel>
                   <FormControl>
-                    <Input type="tel" placeholder="+34 600 000 000" {...field} />
+                    <Input
+                      type="tel"
+                      placeholder="+34 600 000 000"
+                      {...field}
+                      value={field.value ?? ''}
+                    />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -136,8 +146,8 @@ export function SellerLeadForm() {
                 name="type"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Tipo *</FormLabel>
-                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                    <FormLabel>Tipo</FormLabel>
+                    <Select onValueChange={field.onChange} defaultValue={field.value ?? undefined}>
                       <FormControl>
                         <SelectTrigger>
                           <SelectValue placeholder="Selecciona tipo" />
@@ -159,7 +169,7 @@ export function SellerLeadForm() {
                 name="conservationState"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Estado conservación *</FormLabel>
+                    <FormLabel>Estado conservación</FormLabel>
                     <Select onValueChange={field.onChange} defaultValue={field.value}>
                       <FormControl>
                         <SelectTrigger>
@@ -184,9 +194,13 @@ export function SellerLeadForm() {
                 name="brand"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Marca *</FormLabel>
+                    <FormLabel>Marca</FormLabel>
                     <FormControl>
-                      <Input placeholder="Ej: Hymer, Carado, Fiat…" {...field} />
+                      <Input
+                        placeholder="Ej: Hymer, Carado, Fiat…"
+                        {...field}
+                        value={field.value ?? ''}
+                      />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -199,9 +213,13 @@ export function SellerLeadForm() {
                 name="model"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Modelo *</FormLabel>
+                    <FormLabel>Modelo</FormLabel>
                     <FormControl>
-                      <Input placeholder="Ej: Ducato, Grand California…" {...field} />
+                      <Input
+                        placeholder="Ej: Ducato, Grand California…"
+                        {...field}
+                        value={field.value ?? ''}
+                      />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -214,15 +232,17 @@ export function SellerLeadForm() {
                 name="year"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Año *</FormLabel>
+                    <FormLabel>Año</FormLabel>
                     <FormControl>
                       <Input
                         type="number"
                         min={1980}
                         max={2030}
                         placeholder={String(new Date().getFullYear())}
-                        value={Number.isNaN(field.value) ? '' : (field.value ?? '')}
-                        onChange={(e) => field.onChange(e.target.valueAsNumber)}
+                        value={typeof field.value === 'number' ? field.value : ''}
+                        onChange={(e) =>
+                          field.onChange(e.target.value === '' ? null : e.target.valueAsNumber)
+                        }
                       />
                     </FormControl>
                     <FormMessage />
@@ -236,14 +256,16 @@ export function SellerLeadForm() {
                 name="km"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Kilómetros *</FormLabel>
+                    <FormLabel>Kilómetros</FormLabel>
                     <FormControl>
                       <Input
                         type="number"
                         min={0}
                         placeholder="Ej: 85000"
-                        value={Number.isNaN(field.value) ? '' : (field.value ?? '')}
-                        onChange={(e) => field.onChange(e.target.valueAsNumber)}
+                        value={typeof field.value === 'number' ? field.value : ''}
+                        onChange={(e) =>
+                          field.onChange(e.target.value === '' ? null : e.target.valueAsNumber)
+                        }
                       />
                     </FormControl>
                     <FormMessage />
@@ -257,15 +279,17 @@ export function SellerLeadForm() {
                 name="seats"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Plazas *</FormLabel>
+                    <FormLabel>Plazas</FormLabel>
                     <FormControl>
                       <Input
                         type="number"
                         min={1}
                         max={20}
                         placeholder="Ej: 4"
-                        value={Number.isNaN(field.value) ? '' : (field.value ?? '')}
-                        onChange={(e) => field.onChange(e.target.valueAsNumber)}
+                        value={typeof field.value === 'number' ? field.value : ''}
+                        onChange={(e) =>
+                          field.onChange(e.target.value === '' ? null : e.target.valueAsNumber)
+                        }
                       />
                     </FormControl>
                     <FormMessage />
@@ -286,7 +310,7 @@ export function SellerLeadForm() {
                         step="0.1"
                         min="0"
                         placeholder="Ej: 6.8"
-                        value={field.value ?? ''}
+                        value={typeof field.value === 'number' ? field.value : ''}
                         onChange={(e) =>
                           field.onChange(e.target.value === '' ? null : Number(e.target.value))
                         }
@@ -310,7 +334,7 @@ export function SellerLeadForm() {
                         min={0}
                         step="500"
                         placeholder="Ej: 35000"
-                        value={field.value ?? ''}
+                        value={typeof field.value === 'number' ? field.value : ''}
                         onChange={(e) =>
                           field.onChange(e.target.value === '' ? null : Number(e.target.value))
                         }
@@ -329,7 +353,7 @@ export function SellerLeadForm() {
                   <FormItem>
                     <FormLabel>Ubicación</FormLabel>
                     <FormControl>
-                      <Input placeholder="Ej: Barcelona" {...field} />
+                      <Input placeholder="Ej: Barcelona" {...field} value={field.value ?? ''} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>

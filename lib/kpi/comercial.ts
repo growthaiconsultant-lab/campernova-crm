@@ -1,4 +1,5 @@
 import type { PrismaClient, BuyerLeadStatus, SellerLeadStatus } from '@prisma/client'
+import { personLabel, vehicleLabel } from '@/lib/display'
 import { NEXT_ACTION_LABELS } from '@/lib/next-action'
 
 /**
@@ -127,7 +128,7 @@ export async function getComercialKpis(
     return {
       id: r.id,
       href: r.vehicle.sellerLeadId ? `/vendedores/${r.vehicle.sellerLeadId}` : '/ofertas',
-      name: `${r.buyerLead.name} · ${r.vehicle.brand} ${r.vehicle.model}`,
+      name: `${personLabel(r.buyerLead.name, { role: 'Comprador sin identificar' })} · ${vehicleLabel(r.vehicle)}`,
       reason:
         days == null
           ? 'Reserva sin fecha límite'
@@ -142,7 +143,7 @@ export async function getComercialKpis(
   const hotRows: ActionRow[] = hotBuyerRows.map((b) => ({
     id: b.id,
     href: `/compradores/${b.id}`,
-    name: b.name,
+    name: personLabel(b.name, { role: 'Comprador sin identificar', id: b.id }),
     reason:
       b.maxBudget != null
         ? `Caliente · hasta ${Number(b.maxBudget).toLocaleString('es-ES')} €`
@@ -153,7 +154,7 @@ export async function getComercialKpis(
   const overdueRows: ActionRow[] = overdueBuyerRows.map((b) => ({
     id: b.id,
     href: `/compradores/${b.id}`,
-    name: b.name,
+    name: personLabel(b.name, { role: 'Comprador sin identificar', id: b.id }),
     reason: `${b.nextActionType ? (NEXT_ACTION_LABELS[b.nextActionType] ?? b.nextActionType) : 'Acción'} vencida`,
     priority: 'red' as const,
   }))
