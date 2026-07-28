@@ -70,6 +70,33 @@ Por tanto: **aplicar la migración (staging → prod) ANTES de fusionar/desplega
   los denormalizados `Vehicle.valuation*` solo cambian tras una tasación **oficial**.
 - Un vehículo `NUEVO` recién creado ya **no** salta a `TASADO` por la auto-valoración.
 
+## 5b. Estado en STAGING (aplicado — 2026-07-28)
+
+- **Migración aplicada:** `20260727000000_add_valuation_purpose_and_attempts` en
+  `campersnova-crm-staging` (`iatuhydsfwoeprpbklod`) vía `prisma migrate deploy` (mecanismo canónico;
+  única migración pendiente antes; A1/A2 ya aplicadas). **Sin DML ni backfill.**
+- **Preflight (read-only):** A3 ausente; catálogo en baseline A2 (tables 32, columns 462, enums 53,
+  enum_values 288, FK 74, indexes 118, `tables_without_rls`=0). Negocio: vehicles 3, seller_leads 3,
+  buyer_leads 3, valuations 0, work_orders 3, activities 5.
+- **Postflight (read-only):** enums A3 = 2; `vehicle_valuation_attempts` con 17 columnas (incluye
+  `idempotency_key` + `request_fingerprint`); `valuations.purpose` presente; UNIQUE GLOBAL en
+  `idempotency_key`; RLS activa en la tabla nueva. Catálogo: tables 33, columns 480, enum_values 293,
+  FK 77, indexes 124, `tables_without_rls`=0. **Zero backfill:** vehicles 3, valuations 0
+  (`purpose IS NULL` = 0, vacío), attempts 0 — conteos sin cambios.
+- **Compatibilidad cliente A2 (old code + A3 schema):** compatible por construcción — migración
+  aditiva (columna nullable en `valuations`; tabla nueva no referenciada por el código A2; Prisma
+  selecciona columnas explícitas → sin P2022). Comprobación autenticada empírica: **pendiente** (ver
+  abajo).
+- **Validación autenticada (§9): BLOQUEADA.** No hay sesión autenticada segura disponible en esta
+  sesión: la Secret key temporal de staging fue **revocada** (`.env.staging.admin.local` vacío); las
+  credenciales de `.env.local` son de **producción** (prohibido usarlas contra staging y no válidas en
+  el GoTrue de staging); el MCP de Supabase solo expone SQL (sin admin de GoTrue / magic-link). No se
+  crearon datos sintéticos (nada que limpiar). **Intervención mínima para desbloquear:** el dueño
+  aporta, por un canal seguro, **una** de estas dos cosas — (a) una Secret/`service_role` key de
+  staging de corta duración (como en el e2e de A2) para acuñar una sesión vía admin
+  `generateLink`→`verifyOtp`; o (b) un `storageState` autenticado capturado desde el navegador en
+  staging, guardado en un archivo gitignored. Cualquiera habilita la validación UI de §9.
+
 ## 6. Riesgos y deuda
 
 - **Cerrado (§3):** la edición manual genérica ya **no** puede alcanzar `TASADO`
