@@ -2,7 +2,9 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 
 vi.mock('next/cache', () => ({ revalidatePath: vi.fn() }))
 vi.mock('@/lib/auth', () => ({ requireAgente: vi.fn() }))
-vi.mock('@/lib/valuation/save', () => ({ runAndSaveAutoValuation: vi.fn(() => Promise.resolve()) }))
+vi.mock('@/lib/valuation/save', () => ({
+  runAndSavePreliminaryValuation: vi.fn(() => Promise.resolve()),
+}))
 vi.mock('@/lib/matching', () => ({ recalculateMatchesForVehicle: vi.fn(() => Promise.resolve()) }))
 
 // El servicio atómico se mockea; ConversionConflictError se mantiene REAL (importOriginal).
@@ -21,7 +23,7 @@ vi.mock('@/lib/db', () => ({ db: mockDb }))
 
 import { requireAgente } from '@/lib/auth'
 import { revalidatePath } from 'next/cache'
-import { runAndSaveAutoValuation } from '@/lib/valuation/save'
+import { runAndSavePreliminaryValuation } from '@/lib/valuation/save'
 import { convertCaptureTx, ConversionConflictError } from '@/lib/capture-conversion'
 import { convertCaptureToSellerLead } from './actions'
 
@@ -74,7 +76,11 @@ describe('convertCaptureToSellerLead · conversión atómica', () => {
     expect(params.sellerData.canal).toBe('CN')
     expect((params.sellerData.vehicle as { create: { brand: string } }).create.brand).toBe('Adria')
 
-    expect(runAndSaveAutoValuation).toHaveBeenCalledWith('v1', expect.any(Object))
+    expect(runAndSavePreliminaryValuation).toHaveBeenCalledWith(
+      'v1',
+      expect.any(Object),
+      expect.any(String)
+    )
     expect(revalidatePath).toHaveBeenCalledWith('/captaciones')
     expect(revalidatePath).toHaveBeenCalledWith('/vendedores')
   })
@@ -85,7 +91,7 @@ describe('convertCaptureToSellerLead · conversión atómica', () => {
 
     const res = await convertCaptureToSellerLead('cap-1')
     expect(res).toEqual({ error: 'La captación ya ha sido convertida o su estado ha cambiado.' })
-    expect(runAndSaveAutoValuation).not.toHaveBeenCalled()
+    expect(runAndSavePreliminaryValuation).not.toHaveBeenCalled()
     expect(revalidatePath).not.toHaveBeenCalled()
   })
 
@@ -94,7 +100,7 @@ describe('convertCaptureToSellerLead · conversión atómica', () => {
     vi.mocked(convertCaptureTx).mockRejectedValue(new Error('DB caída'))
 
     await expect(convertCaptureToSellerLead('cap-1')).rejects.toThrow('DB caída')
-    expect(runAndSaveAutoValuation).not.toHaveBeenCalled()
+    expect(runAndSavePreliminaryValuation).not.toHaveBeenCalled()
     expect(revalidatePath).not.toHaveBeenCalled()
   })
 })

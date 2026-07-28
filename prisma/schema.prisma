@@ -431,6 +431,22 @@ enum ValuationConfidence {
   BAJA
 }
 
+/// Finalidad de una valoración (A3): orientativa antes de la entrada oficial, u oficial.
+/// `Valuation.purpose` es NULLABLE: las filas legacy (pre-A3) llevan `null` = LEGACY/UNKNOWN y
+/// NUNCA se consideran oficiales ni habilitan publicación/matching por sí solas (ver DATA-1).
+enum ValuationPurpose {
+  PRELIMINAR
+  OFICIAL
+}
+
+/// Resultado de un INTENTO de valoración (A3, append-only). Un intento que no produce cifras
+/// (SIN_REFERENCIA / FALLO_TECNICO) también se persiste — hoy `runAndSaveAutoValuation` los pierde.
+enum ValuationOutcome {
+  COMPLETADA
+  SIN_REFERENCIA
+  FALLO_TECNICO
+}
+
 enum DocumentType {
   DNI
   FICHA_TECNICA
@@ -523,6 +539,7 @@ model User {
   archivedBuyerLeads       BuyerLead[]            @relation("ArchivedBuyerLeads")
   activities               Activity[]
   valuations               Valuation[]
+  valuationAttempts        VehicleValuationAttempt[]
   vehicleAds               VehicleAd[]
   assignedWorkOrders       WorkOrder[]            @relation("AssignedWorkOrders")
   approvedWorkOrders       WorkOrder[]            @relation("ApprovedWorkOrders")
@@ -707,6 +724,7 @@ model Vehicle {
   keysReceivedBy   User?             @relation("KeysCustody", fields: [keysReceivedById], references: [id], onDelete: SetNull)
   photos           VehiclePhoto[]
   valuations       Valuation[]
+  valuationAttempts VehicleValuationAttempt[]
   matches          Match[]
   ads              VehicleAd[]
   costs            VehicleCost[]
@@ -751,15 +769,64 @@ model Valuation {
   max         Decimal             @db.Decimal(10, 2)
   method      ValuationMethod
   confidence  ValuationConfidence
+  // ── Finalidad (A3) — NULLABLE / additivo. Sin backfill: `null` = LEGACY/UNKNOWN (ver DATA-1).
+  // Las valoraciones nuevas SIEMPRE escriben purpose; una legacy nunca es oficial por sí sola.
+  purpose     ValuationPurpose?
   parameters  Json                @default("{}") // inputs del algoritmo para auditoría
   createdById String?             @map("created_by_id")
   createdAt   DateTime            @default(now()) @map("created_at")
 
   vehicle   Vehicle @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
   createdBy User?   @relation(fields: [createdById], references: [id])
+  attempts  VehicleValuationAttempt[]
 
   @@index([vehicleId])
   @@map("valuations")
+}
+
+/// Intento de valoración (A3) — registro **append-only** por vehículo. Nunca se actualiza ni se
+/// borra desde el dominio. A diferencia de `Valuation` (cifras NOT NULL), un intento admite outcome
+/// SIN_REFERENCIA / FALLO_TECNICO sin cifras. Fuente de verdad de la trazabilidad de valoración;
+/// Activity NO lo es. Cuando el intento COMPLETADA produce cifras, `valuationId` enlaza la
+/// `Valuation` creada.
+model VehicleValuationAttempt {
+  id            String               @id @default(cuid())
+  vehicleId     String               @map("vehicle_id")
+  purpose       ValuationPurpose
+  outcome       ValuationOutcome
+  method        ValuationMethod
+  confidence    ValuationConfidence? // null si el intento no produjo cifras
+  min           Decimal?             @db.Decimal(10, 2)
+  recommended   Decimal?             @db.Decimal(10, 2)
+  max           Decimal?             @db.Decimal(10, 2)
+  referenceUsed String?              @map("reference_used") // resumen legible de la base de cálculo
+  reason        String? // motivo estructurado (tasación manual) u observaciones
+  errorCode     String?              @map("error_code") // código/error técnico cuando FALLO_TECNICO
+  createdById   String?              @map("created_by_id")
+  valuationId   String?              @map("valuation_id") // Valuation creada si COMPLETADA
+  // Idempotencia de la tasación OFICIAL: clave generada por el cliente (una por intención). Un
+  // reintento de transporte reutiliza la misma clave → se devuelve el intento ya creado (sin duplicar
+  // Attempt/Valuation/Activity/transición). Nullable: los intentos PRELIMINAR no la usan (pueden
+  // repetirse). Unique GLOBAL (parcial-por-null: Postgres admite múltiples NULL) → una clave pertenece
+  // a lo sumo a UN intento; reutilizarla en otro vehículo/petición no crea un 2.º intento.
+  idempotencyKey String?             @map("idempotency_key")
+  // Huella determinista de la petición (sha256 del payload canónico: vehículo, purpose, modo, y para
+  // manual el rango/confianza/motivo/método/referencia normalizados). Vincula la clave a ESA petición:
+  // si la clave coincide pero la huella o el vehículo difieren → reutilización incompatible (rechazo),
+  // nunca se devuelve un resultado ajeno. Nullable (legacy/preliminar sin huella). No sensible.
+  requestFingerprint String?         @map("request_fingerprint")
+  createdAt     DateTime             @default(now()) @map("created_at")
+
+  vehicle   Vehicle    @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+  createdBy User?      @relation(fields: [createdById], references: [id], onDelete: SetNull)
+  valuation Valuation? @relation(fields: [valuationId], references: [id], onDelete: SetNull)
+
+  @@unique([idempotencyKey])
+  @@index([vehicleId])
+  @@index([vehicleId, purpose])
+  @@index([createdAt])
+  @@index([outcome])
+  @@map("vehicle_valuation_attempts")
 }
 
 /// Lead de comprador — persona que busca comprar un vehículo.

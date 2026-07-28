@@ -12,7 +12,7 @@ import {
   vehiclePhotoPublicUrl,
 } from '@/lib/supabase/storage'
 import { sendSellerLeadConfirmation, sendAgentLeadNotification } from '@/lib/email/send'
-import { runAndSaveAutoValuation } from '@/lib/valuation/save'
+import { runAndSavePreliminaryValuation } from '@/lib/valuation/save'
 import { recalculateMatchesForVehicle } from '@/lib/matching'
 import { defaultNextActionData } from '@/lib/next-action'
 import { emitKpiEvent } from '@/lib/kpi/emit'
@@ -188,8 +188,9 @@ export async function submitPublicLead(formData: FormData) {
     metadata: { canal: 'PRO' },
   })
 
-  // Auto-tasación — resultado usado en página de éxito y email
-  const valuation = await runAndSaveAutoValuation(vehicleId, {
+  // A3: valoración PRELIMINAR (orientativa) — resultado usado en la página de éxito y el email.
+  // No transiciona el vehículo ni escribe denormalizados oficiales (el lead entra sin entrada aún).
+  const valuation = await runAndSavePreliminaryValuation(vehicleId, {
     brand,
     model,
     type,

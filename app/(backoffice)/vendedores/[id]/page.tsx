@@ -7,9 +7,10 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { VehiclePhotoUploader } from '@/components/vehicle-photo-uploader'
 import { ValuationTimeline } from '@/components/valuation-timeline'
+import { ValuationAttempts } from '@/components/valuation-attempts'
 import { SellerLeadEditForm } from './seller-lead-edit-form'
 import { VehicleEditForm } from './vehicle-edit-form'
-import { ValuationOverrideForm } from './valuation-override-form'
+import { OfficialValuationPanel } from './official-valuation-panel'
 import { MatchesSection } from '@/components/matches-section'
 import type { VehicleMatchData } from '@/components/matches-section'
 import { OffersSection } from '@/components/offers-section'
@@ -105,6 +106,11 @@ export default async function FichaVendedorPage({
               orderBy: { createdAt: 'desc' },
               take: 10,
             },
+            valuationAttempts: {
+              include: { createdBy: { select: { name: true } } },
+              orderBy: { createdAt: 'desc' },
+              take: 12,
+            },
             matches: {
               include: {
                 buyerLead: {
@@ -170,6 +176,34 @@ export default async function FichaVendedorPage({
   const v = lead.vehicle
   const isAdmin = currentUser.role === 'ADMIN'
   const isAgente = ['ADMIN', 'AGENTE'].includes(currentUser.role)
+
+  // A3 — gate de la tasación oficial: entrada activa + inspección de entrada COMPLETADA + estado
+  // elegible. Determina si el panel de tasación oficial se habilita (la barrera dura vive en el
+  // núcleo transaccional; esto es solo la señal de UI).
+  const completedInspectionCount = v
+    ? await db.workOrder.count({
+        where: { vehicleId: v.id, kind: 'INSPECCION_ENTRADA', status: 'COMPLETADA' },
+      })
+    : 0
+  const entryActive = !!(v && v.entryValidatedAt && !v.entryAnnulledAt)
+  const officialGateReady =
+    !!v &&
+    entryActive &&
+    completedInspectionCount > 0 &&
+    !['VENDIDO', 'DESCARTADO'].includes(v.status)
+  const officialGateReason = !v
+    ? ''
+    : !entryActive
+      ? 'Requiere una entrada oficial activa.'
+      : completedInspectionCount === 0
+        ? 'Requiere la inspección de entrada COMPLETADA en Taller.'
+        : ['VENDIDO', 'DESCARTADO'].includes(v.status)
+          ? 'El vehículo no admite tasación oficial en su estado actual.'
+          : ''
+  // A3 — última valoración PRELIMINAR con cifras (orientativa; NUNCA es el precio oficial).
+  const latestPreliminary =
+    v?.valuationAttempts.find((a) => a.purpose === 'PRELIMINAR' && a.outcome === 'COMPLETADA') ??
+    null
 
   // M1 — re-filtrado de matches persistidos por elegibilidad (lectura):
   // si el SUJETO (vehículo) no es elegible, no se muestran matches; y de los que
@@ -1275,14 +1309,19 @@ export default async function FichaVendedorPage({
             </Card>
           )}
 
-          {/* ─────────────── ECONOMÍA · tasación ─────────────── */}
+          {/* ─────────────── ECONOMÍA · tasación (A3) ─────────────── */}
           {activeTab === 'economia' && v && (
             <Card>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
-                <CardTitle className="text-base">Tasación</CardTitle>
-                <ValuationOverrideForm vehicleId={v.id} />
+                <CardTitle className="text-base">Tasación oficial</CardTitle>
+                <OfficialValuationPanel
+                  vehicleId={v.id}
+                  gateReady={officialGateReady}
+                  gateReason={officialGateReason}
+                />
               </CardHeader>
-              <CardContent className="space-y-4">
+              <CardContent className="space-y-5">
+                {/* Precio OFICIAL = campos denormalizados (solo la tasación oficial los escribe). */}
                 {v.valuationRecommended ? (
                   <div className="flex flex-wrap gap-6">
                     <div>
@@ -1290,7 +1329,7 @@ export default async function FichaVendedorPage({
                       <p className="text-lg font-semibold">{EUR(Number(v.valuationMin))}</p>
                     </div>
                     <div>
-                      <p className="text-xs text-muted-foreground">Recomendado</p>
+                      <p className="text-xs text-muted-foreground">Recomendado (oficial)</p>
                       <p className="text-xl font-bold text-sidebar-primary">
                         {EUR(Number(v.valuationRecommended))}
                       </p>
@@ -1302,15 +1341,45 @@ export default async function FichaVendedorPage({
                   </div>
                 ) : (
                   <p className="text-sm text-muted-foreground">
-                    Sin tasación — guarda los datos del vehículo para calcularla automáticamente.
+                    Sin tasación oficial todavía. La tasación oficial requiere entrada activa +
+                    inspección de entrada completada.
                   </p>
                 )}
+
+                {/* Valoración PRELIMINAR (orientativa) — NUNCA es el precio oficial. */}
+                {latestPreliminary && (
+                  <div className="rounded-md border border-dashed border-border bg-muted/30 p-3">
+                    <p className="mb-1 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                      Valoración preliminar (orientativa)
+                    </p>
+                    <p className="text-sm">
+                      {EUR(Number(latestPreliminary.recommended))}{' '}
+                      <span className="text-muted-foreground">
+                        ({EUR(Number(latestPreliminary.min))} – {EUR(Number(latestPreliminary.max))}
+                        )
+                      </span>
+                    </p>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      No es un precio de venta ni habilita publicación/matching.
+                    </p>
+                  </div>
+                )}
+
                 {v.valuations.length > 0 && (
                   <div className="border-t pt-4">
                     <p className="mb-3 text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                      Historial
+                      Historial de valoraciones
                     </p>
                     <ValuationTimeline valuations={v.valuations} />
+                  </div>
+                )}
+
+                {v.valuationAttempts.length > 0 && (
+                  <div className="border-t pt-4">
+                    <p className="mb-3 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                      Intentos (incluye sin referencia / fallos)
+                    </p>
+                    <ValuationAttempts attempts={v.valuationAttempts} />
                   </div>
                 )}
               </CardContent>

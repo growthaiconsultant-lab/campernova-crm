@@ -13,7 +13,7 @@ import {
 } from '@/lib/captacion'
 import { isValidLostReason } from '@/lib/lost-reason'
 import { defaultNextActionData } from '@/lib/next-action'
-import { runAndSaveAutoValuation } from '@/lib/valuation/save'
+import { runAndSavePreliminaryValuation } from '@/lib/valuation/save'
 import { recalculateMatchesForVehicle } from '@/lib/matching'
 import { convertCaptureTx, ConversionConflictError } from '@/lib/capture-conversion'
 import type { CaptureStatus, LostReason } from '@prisma/client'
@@ -210,16 +210,21 @@ export async function convertCaptureToSellerLead(
     throw err
   }
 
-  // Enriquecimiento derivado, tras el commit (no bloqueante, recomputable).
-  await runAndSaveAutoValuation(result.vehicleId, {
-    brand,
-    model,
-    type: 'AUTOCARAVANA',
-    year: currentYear,
-    km: 0,
-    conservationState: 'NORMAL',
-    equipment: {},
-  })
+  // Enriquecimiento derivado, tras el commit (no bloqueante, recomputable). A3: valoración
+  // PRELIMINAR — no transiciona ni escribe denormalizados oficiales.
+  await runAndSavePreliminaryValuation(
+    result.vehicleId,
+    {
+      brand,
+      model,
+      type: 'AUTOCARAVANA',
+      year: currentYear,
+      km: 0,
+      conservationState: 'NORMAL',
+      equipment: {},
+    },
+    actor.id
+  )
   await recalculateMatchesForVehicle(result.vehicleId, db)
 
   revalidatePath('/captaciones')

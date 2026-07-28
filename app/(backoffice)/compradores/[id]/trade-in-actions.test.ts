@@ -2,7 +2,9 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 
 vi.mock('next/cache', () => ({ revalidatePath: vi.fn() }))
 vi.mock('@/lib/auth', () => ({ requireAgente: vi.fn() }))
-vi.mock('@/lib/valuation/save', () => ({ runAndSaveAutoValuation: vi.fn(() => Promise.resolve()) }))
+vi.mock('@/lib/valuation/save', () => ({
+  runAndSavePreliminaryValuation: vi.fn(() => Promise.resolve()),
+}))
 vi.mock('@/lib/matching', () => ({ recalculateMatchesForVehicle: vi.fn(() => Promise.resolve()) }))
 
 // El servicio atómico se mockea; ConversionConflictError se mantiene REAL (importOriginal).
@@ -22,7 +24,7 @@ vi.mock('@/lib/db', () => ({ db: mockDb }))
 
 import { requireAgente } from '@/lib/auth'
 import { revalidatePath } from 'next/cache'
-import { runAndSaveAutoValuation } from '@/lib/valuation/save'
+import { runAndSavePreliminaryValuation } from '@/lib/valuation/save'
 import { convertTradeInTx, ConversionConflictError } from '@/lib/capture-conversion'
 import { updateTradeIn, createSellerLeadFromTradeIn } from './trade-in-actions'
 
@@ -127,7 +129,11 @@ describe('createSellerLeadFromTradeIn · conversión atómica', () => {
     ).toBe('CAMPER')
     expect((params.sellerData.vehicle as { create: { brand: string } }).create.brand).toBe('VW')
 
-    expect(runAndSaveAutoValuation).toHaveBeenCalledWith('v1', expect.any(Object))
+    expect(runAndSavePreliminaryValuation).toHaveBeenCalledWith(
+      'v1',
+      expect.any(Object),
+      expect.any(String)
+    )
     expect(revalidatePath).toHaveBeenCalledWith('/vendedores')
   })
 
@@ -139,7 +145,7 @@ describe('createSellerLeadFromTradeIn · conversión atómica', () => {
     expect(res).toEqual({
       error: 'El vehículo entregado como parte de pago ya ha sido procesado.',
     })
-    expect(runAndSaveAutoValuation).not.toHaveBeenCalled()
+    expect(runAndSavePreliminaryValuation).not.toHaveBeenCalled()
     expect(revalidatePath).not.toHaveBeenCalled()
   })
 
@@ -148,7 +154,7 @@ describe('createSellerLeadFromTradeIn · conversión atómica', () => {
     vi.mocked(convertTradeInTx).mockRejectedValue(new Error('DB caída'))
 
     await expect(createSellerLeadFromTradeIn('b1')).rejects.toThrow('DB caída')
-    expect(runAndSaveAutoValuation).not.toHaveBeenCalled()
+    expect(runAndSavePreliminaryValuation).not.toHaveBeenCalled()
     expect(revalidatePath).not.toHaveBeenCalled()
   })
 })

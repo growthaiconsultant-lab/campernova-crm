@@ -3,7 +3,7 @@
 import { db } from '@/lib/db'
 import { requireAgente } from '@/lib/auth'
 import { createSellerLeadSchema } from '@/lib/validators/seller-lead'
-import { runAndSaveAutoValuation } from '@/lib/valuation/save'
+import { runAndSavePreliminaryValuation } from '@/lib/valuation/save'
 import { recalculateMatchesForVehicle } from '@/lib/matching'
 import { defaultNextActionData } from '@/lib/next-action'
 import { emitKpiEvent } from '@/lib/kpi/emit'
@@ -64,15 +64,13 @@ export async function createSellerLead(data: unknown) {
   })
 
   const vehicleId = lead.vehicle!.id
-  await runAndSaveAutoValuation(vehicleId, {
-    brand,
-    model,
-    type,
-    year,
-    km,
-    conservationState,
-    equipment,
-  })
+  // A3: valoración PRELIMINAR (orientativa) — no transiciona a TASADO ni escribe denormalizados
+  // oficiales. La transición NUEVO → TASADO ocurre solo vía tasación oficial (entrada + inspección).
+  await runAndSavePreliminaryValuation(
+    vehicleId,
+    { brand, model, type, year, km, conservationState, equipment },
+    actor.id
+  )
   await recalculateMatchesForVehicle(vehicleId, db)
 
   await emitKpiEvent({

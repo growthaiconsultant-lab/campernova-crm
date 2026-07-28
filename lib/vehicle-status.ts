@@ -124,6 +124,7 @@ export type VehicleUpdateErrorCode =
   | 'SELLER_LEAD_NOT_FOUND'
   | 'LEAD_ARCHIVED'
   | 'INVALID_VEHICLE_TRANSITION'
+  | 'OFFICIAL_VALUATION_REQUIRED'
 
 /** Mensajes seguros: sin ids, estado interno, SQL, Prisma, stack, cause ni PII. */
 export const VEHICLE_UPDATE_ERROR_MESSAGES: Record<VehicleUpdateErrorCode, string> = {
@@ -133,6 +134,10 @@ export const VEHICLE_UPDATE_ERROR_MESSAGES: Record<VehicleUpdateErrorCode, strin
   SELLER_LEAD_NOT_FOUND: 'No se ha encontrado el vendedor del vehículo',
   LEAD_ARCHIVED: 'No se puede editar el vehículo de un vendedor archivado. Reactívalo primero.',
   INVALID_VEHICLE_TRANSITION: INVALID_VEHICLE_TRANSITION_MESSAGE,
+  // A3: el estado «Tasado» solo se alcanza con una tasación oficial (entrada + inspección). La
+  // edición manual de estado nunca puede producir la primera transición NUEVO → TASADO.
+  OFFICIAL_VALUATION_REQUIRED:
+    'El estado “Tasado” solo se alcanza con una tasación oficial. Usa el panel de tasación oficial (requiere entrada validada e inspección de entrada completada).',
 }
 
 /** Conflicto de negocio esperado al coordinar la edición manual. No es un error técnico. */
@@ -201,6 +206,14 @@ export async function applyManualVehicleUpdateTx(
     })
     if (!seller) throw new VehicleUpdateError('SELLER_LEAD_NOT_FOUND')
     if (seller.archivedAt != null) throw new VehicleUpdateError('LEAD_ARCHIVED')
+  }
+
+  // A3 — la primera transición `NUEVO → TASADO` la posee la tasación oficial (`officialValuationTx`),
+  // no la edición manual. Cualquier intento genérico de ALCANZAR `TASADO` (que no sea una edición
+  // sin cambio de estado `TASADO → TASADO`) se rechaza con un error de dominio específico, antes que
+  // el genérico de transición inválida, para no ocultar que la vía correcta es la tasación oficial.
+  if (p.nextStatus === 'TASADO' && vehicle.status !== 'TASADO') {
+    throw new VehicleUpdateError('OFFICIAL_VALUATION_REQUIRED')
   }
 
   if (!isValidTransition(VEHICLE_TRANSITIONS, vehicle.status, p.nextStatus)) {

@@ -176,8 +176,8 @@ jobs:
           count=$(psql "$PSQL_URL" -tAc "SELECT count(*) FROM _prisma_migrations WHERE finished_at IS NOT NULL")
           names=$(psql "$PSQL_URL" -tAc "SELECT string_agg(migration_name, ',' ORDER BY migration_name) FROM _prisma_migrations WHERE finished_at IS NOT NULL")
           echo "migraciones aplicadas: $count · nombres: $names"
-          test "$count" = "8" || { echo "esperado 8 migraciones aplicadas (baseline + PR5B1 + archivado + commitment + delivery_offer_link_expand + delivery_offer_link_required + vehicle_entry_foundations + official_entry_activity_and_inspection_index)"; exit 1; }
-          test "$names" = "000000000000_squashed_migrations,20260712000000_add_versioned_document_model,20260719120000_add_lead_archiving_model,20260720000000_add_calendar_event_commitment,20260721100000_add_delivery_offer_link_expand,20260721200000_make_delivery_offer_link_required,20260726000000_add_vehicle_entry_foundations,20260726120000_add_official_entry_activity_and_inspection_index" || { echo "conjunto u orden de migraciones inesperado"; exit 1; }
+          test "$count" = "9" || { echo "esperado 9 migraciones aplicadas (baseline + PR5B1 + archivado + commitment + delivery_offer_link_expand + delivery_offer_link_required + vehicle_entry_foundations + official_entry_activity_and_inspection_index + valuation_purpose_and_attempts)"; exit 1; }
+          test "$names" = "000000000000_squashed_migrations,20260712000000_add_versioned_document_model,20260719120000_add_lead_archiving_model,20260720000000_add_calendar_event_commitment,20260721100000_add_delivery_offer_link_expand,20260721200000_make_delivery_offer_link_required,20260726000000_add_vehicle_entry_foundations,20260726120000_add_official_entry_activity_and_inspection_index,20260727000000_add_valuation_purpose_and_attempts" || { echo "conjunto u orden de migraciones inesperado"; exit 1; }
 
       - name: Prisma migrate status (must be up to date)
         run: pnpm prisma migrate status
@@ -249,13 +249,24 @@ jobs:
           #   indexes     117 → 118 (+1: work_orders_active_inspection_key parcial único)
           #   tables/enums sin cambio (no crea tablas ni enums; la columna FK no lleva índice
           #                dedicado, igual que entry_validated_by_id).
+          # Delta tras add_valuation_purpose_and_attempts (PR-A3, aditivo; sin DML ni backfill):
+          #   tables      32 → 33   (+1: vehicle_valuation_attempts)
+          #   columns     462 → 480 (+18: valuations.purpose +1, tabla nueva +17 —incluye idempotency_key
+          #                          y request_fingerprint, el binding de idempotencia a la petición)
+          #   enums       53 → 55   (+2: ValuationPurpose, ValuationOutcome)
+          #   enum_values 288 → 293 (+5: 2 de ValuationPurpose + 3 de ValuationOutcome)
+          #   foreign_keys 74 → 77  (+3: vehicle_id→vehicles CASCADE + created_by_id→users SET NULL +
+          #                          valuation_id→valuations SET NULL)
+          #   indexes     118 → 124 (+6: PK + 4 @@index + 1 unique idempotency_key; request_fingerprint
+          #                          NO lleva índice propio —siempre se busca por la clave unique)
+          #   without_rls 0 (la tabla nueva habilita RLS en la propia migración)
           assert offer_id_not_null "$(psql "$PSQL_URL" -tAc "SELECT is_nullable FROM information_schema.columns WHERE table_schema='public' AND table_name='deliveries' AND column_name='offer_id'")" NO
-          assert tables "$tables" 32
-          assert columns "$columns" 462
-          assert enums "$enums" 53
-          assert enum_values "$enum_values" 288
-          assert foreign_keys "$fks" 74
-          assert indexes "$indexes" 118
+          assert tables "$tables" 33
+          assert columns "$columns" 480
+          assert enums "$enums" 55
+          assert enum_values "$enum_values" 293
+          assert foreign_keys "$fks" 77
+          assert indexes "$indexes" 124
           assert tables_without_rls "$without_rls" 0
           assert tables_forced_rls "$forced" 0
           assert policies "$policies" 0

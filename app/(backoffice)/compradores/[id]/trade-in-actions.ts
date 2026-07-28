@@ -4,7 +4,7 @@ import { revalidatePath } from 'next/cache'
 import { db } from '@/lib/db'
 import { requireAgente } from '@/lib/auth'
 import { defaultNextActionData } from '@/lib/next-action'
-import { runAndSaveAutoValuation } from '@/lib/valuation/save'
+import { runAndSavePreliminaryValuation } from '@/lib/valuation/save'
 import { recalculateMatchesForVehicle } from '@/lib/matching'
 import { convertTradeInTx, ConversionConflictError } from '@/lib/capture-conversion'
 import {
@@ -81,7 +81,7 @@ export async function updateTradeIn(
 export async function createSellerLeadFromTradeIn(
   leadId: string
 ): Promise<{ error?: string; sellerLeadId?: string }> {
-  await requireAgente()
+  const actor = await requireAgente()
 
   const buyer = await db.buyerLead.findUnique({
     where: { id: leadId },
@@ -171,16 +171,13 @@ export async function createSellerLeadFromTradeIn(
     throw err
   }
 
-  // Enriquecimiento derivado, tras el commit (no bloqueante, recomputable).
-  await runAndSaveAutoValuation(result.vehicleId, {
-    brand,
-    model,
-    type: vehicleType,
-    year,
-    km,
-    conservationState: 'NORMAL',
-    equipment: {},
-  })
+  // Enriquecimiento derivado, tras el commit (no bloqueante, recomputable). A3: valoración
+  // PRELIMINAR — no transiciona ni escribe denormalizados oficiales.
+  await runAndSavePreliminaryValuation(
+    result.vehicleId,
+    { brand, model, type: vehicleType, year, km, conservationState: 'NORMAL', equipment: {} },
+    actor.id
+  )
   await recalculateMatchesForVehicle(result.vehicleId, db)
 
   revalidatePath(`/compradores/${leadId}`)

@@ -30,9 +30,17 @@ export const SELLER_LEAD_TRANSITIONS: Partial<Record<SellerLeadStatus, SellerLea
  * descarte; coordinar el descarte ahora daría una garantía falsa. Se reintroducirá en I3D, ya
  * coordinado, cuando I3C haya puesto Delivery bajo el protocolo.
  * `FINAL DISCARD COORDINATION REMAINS PENDING UNTIL DELIVERY IS COORDINATED`.
+ *
+ * `A3 REMOVES THE MANUAL NUEVO → TASADO TRANSITION` — `NUEVO` ya no tiene salidas manuales. La
+ * primera transición `NUEVO → TASADO` es consecuencia EXCLUSIVA de una tasación OFICIAL completada
+ * (`officialValuationTx`, gated por entrada activa + inspección de entrada COMPLETADA), que la
+ * ejecuta con su propio CAS sin consultar esta tabla. `OFFICIAL VALUATION OWNS THE FIRST
+ * NUEVO → TASADO`. Un intento genérico de alcanzar `TASADO` por edición manual se rechaza con
+ * `OFFICIAL_VALUATION_REQUIRED` (`lib/vehicle-status.ts`). `NUEVO` se conserva en el mapa con lista
+ * vacía (no es terminal: la UI no lo etiqueta «estado final», solo deja de ofrecer `TASADO`).
  */
 export const VEHICLE_TRANSITIONS: Partial<Record<VehicleStatus, VehicleStatus[]>> = {
-  NUEVO: ['TASADO'],
+  NUEVO: [],
   TASADO: ['PUBLICADO'],
 }
 
