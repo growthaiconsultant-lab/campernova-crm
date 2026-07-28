@@ -83,19 +83,40 @@ Por tanto: **aplicar la migración (staging → prod) ANTES de fusionar/desplega
   `idempotency_key`; RLS activa en la tabla nueva. Catálogo: tables 33, columns 480, enum_values 293,
   FK 77, indexes 124, `tables_without_rls`=0. **Zero backfill:** vehicles 3, valuations 0
   (`purpose IS NULL` = 0, vacío), attempts 0 — conteos sin cambios.
-- **Compatibilidad cliente A2 (old code + A3 schema):** compatible por construcción — migración
-  aditiva (columna nullable en `valuations`; tabla nueva no referenciada por el código A2; Prisma
-  selecciona columnas explícitas → sin P2022). Comprobación autenticada empírica: **pendiente** (ver
-  abajo).
-- **Validación autenticada (§9): BLOQUEADA.** No hay sesión autenticada segura disponible en esta
-  sesión: la Secret key temporal de staging fue **revocada** (`.env.staging.admin.local` vacío); las
-  credenciales de `.env.local` son de **producción** (prohibido usarlas contra staging y no válidas en
-  el GoTrue de staging); el MCP de Supabase solo expone SQL (sin admin de GoTrue / magic-link). No se
-  crearon datos sintéticos (nada que limpiar). **Intervención mínima para desbloquear:** el dueño
-  aporta, por un canal seguro, **una** de estas dos cosas — (a) una Secret/`service_role` key de
-  staging de corta duración (como en el e2e de A2) para acuñar una sesión vía admin
-  `generateLink`→`verifyOtp`; o (b) un `storageState` autenticado capturado desde el navegador en
-  staging, guardado en un archivo gitignored. Cualquiera habilita la validación UI de §9.
+- **Compatibilidad cliente A2 (old code + A3 schema): VERIFICADA empíricamente.** Se levantó el código
+  de `main` (A2, sin A3) contra la BD A3 de staging y, autenticado como AGENTE, se navegaron
+  `/dashboard`, `/vendedores`, ficha de vendedor con valoración **OFICIAL**, ficha con valoración
+  **legacy** (`purpose = null`), `/vehiculos` (lee `salePrice`/valoración) y `/compradores`: **todo 200,
+  sin redirección a /login, sin 5xx, sin P2022** en el log del servidor. Confirma la compatibilidad
+  aditiva (Prisma A2 selecciona columnas explícitas; no lee la tabla nueva).
+
+- **Validación autenticada A3 (2026-07-28): COMPLETADA en staging** con navegador real (Playwright) y
+  sesiones sintéticas (GoTrue admin + filas `users` sintéticas; sin PII, sin emails, sin producción):
+  - **Gate oficial (UI):** vehículo sin entrada activa y vehículo con entrada pero sin inspección
+    COMPLETADA → el panel muestra «Tasación oficial no disponible» con el motivo correcto.
+  - **Tasación oficial manual (UI + action + BD):** expediente válido (entrada activa +
+    `INSPECCION_ENTRADA` COMPLETADA) → `NUEVO → TASADO`; Attempt `OFICIAL/COMPLETADA/MANUAL`, Valuation
+    `OFICIAL`, denormalizados oficiales escritos, **confianza declarada MEDIA (no ALTA)**, Activity con
+    actor AGENTE; **`salePrice` intacto (40000)**.
+  - **Idempotencia vinculada, a través de la ACTION real:** replay idéntico (misma clave+payload) →
+    idempotente (sin 2.º Attempt/Valuation/Activity/transición); misma clave con **otro payload** y con
+    **otro vehículo** → `IDEMPOTENCY_KEY_REUSED_WITH_DIFFERENT_REQUEST` (nunca resultado ajeno, cero
+    escritura en el 2.º vehículo); usuario **TALLER** reutilizando la clave → 303 (forbidden), **no
+    recupera** el resultado previo (autorización antes que idempotencia). Resultado en BD: **exactamente
+    1 Attempt / 1 Valuation / 1 transición** pese a los 4 POST adicionales.
+  - **Readers (UI):** el precio **oficial** se muestra como tal; la valoración **legacy** (`purpose
+null`) se etiqueta «Legacy» y **no** como precio oficial («Sin tasación oficial todavía»);
+    `salePrice` no se presenta como tasación oficial.
+  - **§6.1 preliminar / §6.2 formulario genérico (no ofrece TASADO):** cubiertos por los tests de
+    servidor (unit `actions.test.ts`: `updateVehicle NUEVO→TASADO → OFFICIAL_VALUATION_REQUIRED`,
+    «bypass cerrado para cualquier origen»; el selector de estado se limita a `VEHICLE_TRANSITIONS`) y
+    por la vía oficial-única demostrada; no se re-disparó por UI por fricción del form Radix/RHF en
+    headless (deuda menor de cobertura UI, no de comportamiento).
+  - **Limpieza:** todos los datos sintéticos eliminados por IDs exactos; conteos de vuelta al baseline
+    (vehicles 3, seller_leads 3, buyer_leads 3, valuations 0, attempts 0, work_orders 3, users 7); cero
+    residuo; **cero afectación a datos preexistentes**. Acceso temporal cerrado
+    (`.env.staging.admin.local` a 0 bytes). **Pendiente manual del dueño:** revocar la Secret key de
+    staging `a3_e2e_temporary` (el MCP no gestiona API keys).
 
 ## 6. Riesgos y deuda
 
@@ -106,4 +127,7 @@ Por tanto: **aplicar la migración (staging → prod) ANTES de fusionar/desplega
   bajo lock). Un reintento con la misma clave ya no duplica el historial.
 - **Pendiente (DATA-1, autorización de datos):** reconciliación de `Valuation.purpose = null` (legacy)
   y limpieza de matches históricos inelegibles.
-- Validación autenticada end-to-end de la UI: la hace el dueño (auth-gated, no verificable headless).
+- **Producción: pendiente de autorización.** Con la migración A3 verificada en staging, la compatibilidad
+  A2 confirmada y la validación autenticada A3 completada, el siguiente gate es el rollout productivo
+  (orden BD-antes-que-cliente) — **no autorizado todavía**. Observación de 24 h: pendiente tras el
+  despliegue productivo.
