@@ -62,8 +62,18 @@ enlaces en producción).
   sin denormalizados oficiales + `salePrice` intacto). Datos sintéticos limpiados por IDs exactos;
   baseline restaurado; cero residuo.
 - **Producción (inmediata, técnica):** migración + postflight + compatibilidad A2 técnica + deployment
-  READY del commit fusionado. **Pendiente:** smoke **autenticado** read-only de producción; **observación
-  24 h**.
+  READY del commit fusionado.
+- **Producción (autenticada read-only, COMPLETA — 2026-07-28):** con la **sesión productiva legítima
+  del dueño** (perfil de Chrome autenticado como ADMIN; solo navegación/lectura, sin envíos ni cambios),
+  se comprobaron dashboard, `/vendedores`, ficha de vendedor, **pestaña Economía (A3)** (panel de
+  tasación oficial + gate «no disponible» + estados vacíos «Sin tasación oficial todavía»; economía/
+  `salePrice` renderizada **separada** de la tasación), `/vehiculos`, `/compradores` y una ficha de
+  comprador: **renderizan correctamente con datos reales; formularios cargan; permisos correctos (ADMIN);
+  sin P2022, 5xx, Prisma, Server Actions, valoración ni errores de permisos.** Única anomalía de consola:
+  advertencias de hidratación de React (#422/#425) **intermitentes y recuperables**, que **no** se
+  reprodujeron en recarga limpia de la pestaña A3 (clase pre-existente de render de fechas/tiempos
+  relativos; 0 usuarios). Ver §6.
+- **Pendiente:** **observación 24 h** (Sentry/Vercel).
 
 ## 5. Estado exacto por entorno
 
@@ -75,11 +85,18 @@ enlaces en producción).
 
 ## 6. Pendientes / fuera de alcance
 
-- **Pendiente:** smoke autenticado read-only de producción; observación 24 h; revisión Sentry
-  prolongada.
-- **Diferido (no iniciado):** reconciliación de valoraciones legacy `purpose = null` (**DATA-1**);
-  **PUB-1**; **B1A**; historial comercial de `salePrice` (se abordará en PUB-1). Sin marketplace/SaaS/
-  multiempresa.
+- **Pendiente:** **observación 24 h** (Sentry/Vercel); revisión Sentry prolongada.
+- **DATA-1 (reconciliación de valoraciones legacy): NO APLICABLE — no hay filas `Valuation` legacy en
+  producción** (`Valuation = 0`, `Valuation.purpose IS NULL = 0`). No se abre tarea de reconciliación de
+  valoraciones legacy salvo que se importen valoraciones antiguas u otra deuda de datos verificable.
+- **Incidencia independiente (no A3):** error de hidratación React (#422/#425) en la ficha de comprador
+  `/compradores/[id]` (Sentry `CAMPERNOVA-CRM-G`): **first seen ~1 h antes del deploy A3**, sin recurrir
+  tras el deploy, 6 eventos, **0 usuarios**, recuperable (la ficha renderiza y funciona). **No atribuible
+  a A3** (A3 no modificó la ficha de comprador; la pestaña A3 no lo reprodujo en recarga limpia). Causa
+  probable: desajuste SSR/cliente de fechas/tiempos relativos. Se trata como **tarea separada** de baja
+  prioridad; **no** se corrige en este cierre.
+- **Diferido (no iniciado):** **PUB-1**; **B1A**; historial comercial de `salePrice` (se abordará en
+  PUB-1). Sin marketplace/SaaS/multiempresa.
 - **Acceso administrativo temporal:** las Secret keys temporales de staging (`a2_e2e_temporary`,
   `a3_e2e_temporary`, `a3_ui_final_temporary`) fueron **revocadas**; no queda acceso administrativo
   temporal a staging. `.env.staging.admin.local` vacío.
