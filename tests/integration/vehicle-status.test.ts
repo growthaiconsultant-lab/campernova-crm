@@ -530,11 +530,12 @@ describe('edición manual coordinada por raíces (I3B)', () => {
     const aRes = await a
     const bRes = await b
 
-    // A gana; B, ya desbloqueado, relee PUBLICADO: su edición «como TASADO» (PUBLICADO → TASADO) ya
-    // no es una transición válida → error de dominio, sin segunda escritura. La relectura dentro del
-    // lock hace imposible el estado obsoleto: por eso B falla por transición, no por CAS.
+    // A gana; B, ya desbloqueado, relee PUBLICADO. Alcanzar «Tasado» por edición manual NUNCA está
+    // permitido (A3 §3: TASADO es fuente única de la tasación oficial), así que B falla con
+    // OFFICIAL_VALUATION_REQUIRED. El rechazo se evalúa sobre el estado releído DENTRO del lock
+    // (no por CAS): sin segunda escritura ni estado obsoleto.
     expect(aRes).not.toBeInstanceOf(Error)
-    expect(isVehicleUpdateError(bRes) && bRes.code).toBe('INVALID_VEHICLE_TRANSITION')
+    expect(isVehicleUpdateError(bRes) && bRes.code).toBe('OFFICIAL_VALUATION_REQUIRED')
     const st = await finalState(f)
     expect(st.vehicleStatus).toBe('PUBLICADO')
     expect(st.cambiosEstado).toBe(1)
