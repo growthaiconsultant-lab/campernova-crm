@@ -142,6 +142,24 @@ reader tras recarga`, sin cambios de código (HEAD `6c2c8c5`, CI 4/4). Migració
   a 0 bytes). **Pendiente manual del dueño:** revocar la Secret key `a3_ui_final_temporary` (el MCP no
   gestiona API keys).
 
+## 5d. Producción (aplicado — 2026-07-28)
+
+- **Migración aplicada** en `campersnova-crm` (`bbmglaatlyilxutzomxd`) vía `prisma migrate deploy`
+  (orden BD-antes-que-cliente; A3 única pendiente; checksum idéntico a staging/local
+  `95c989f2…3c413`). **Sin DML ni backfill.**
+- **Postflight:** objetos A3 presentes; catálogo `tables 33 / columns 480 / enum_values 293 / FK 77 /
+indexes 124 / RLS-gaps 0`; **conteos de negocio idénticos al preflight** (vehicles 51, seller_leads
+  51, buyer_leads 117, valuations 0, work_orders 4, activities 250, users 8); legacy
+  `Valuation.purpose IS NULL` = 0 (vacuo).
+- **Compatibilidad A2 técnica:** con el cliente A2 aún activo, rutas públicas/catálogo del sitio en
+  vivo (`campersnova.com`) → 200, sin P2022, sin 5xx.
+- **Merge + deploy:** PR #144 fusionado por squash (`6a8c61d`); deployment de Vercel del mismo commit
+  **READY**, target production, alias `campersnova.com`. Smoke técnico de rutas post-deploy → 200, sin
+  errores. **Sentry inmediato:** sin errores A3 nuevos (P2022/Prisma/valuation/vehicle-status/5xx
+  ausentes; solo issues cosméticas pre-existentes de WebView/next-image, 0 usuarios).
+- **Pendiente:** smoke **autenticado** read-only de producción; **observación 24 h**. Detalle en
+  `docs/releases/2026-07-28-a3-production.md`.
+
 ## 6. Riesgos y deuda
 
 - **Cerrado (§3):** la edición manual genérica ya **no** puede alcanzar `TASADO`
