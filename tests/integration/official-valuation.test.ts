@@ -22,6 +22,7 @@ import {
   officialValuationTx,
   buildOfficialValuationRoots,
   isValuationError,
+  officialRequestFingerprint,
   type OfficialValuationMode,
   type OfficialValuationHooks,
 } from '@/lib/valuation'
@@ -483,10 +484,15 @@ describe('officialValuationTx · idempotencia (clave explícita)', () => {
     expect(st.attempts).toBe(1)
   })
 
-  it('intento FALLO_TECNICO previo con la clave → VALUATION_ATTEMPT_FAILED (clave consumida, vehículo intacto)', async () => {
+  it('intento FALLO_TECNICO previo de la MISMA petición → VALUATION_ATTEMPT_FAILED (clave consumida, vehículo intacto)', async () => {
     const f = await seed()
     const key = `idem_${uniqueSuffix()}`
-    // Simula el registro de fallo técnico que hace el server action FUERA de la transacción.
+    // Simula el registro de fallo técnico que hace el server action AUTO FUERA de la transacción:
+    // debe llevar la huella de la MISMA petición (AUTO) para que el reintento se reconozca como tal.
+    const autoFingerprint = officialRequestFingerprint({
+      vehicleId: f.vehicleId,
+      mode: { kind: 'AUTO' },
+    })
     await prismaA.vehicleValuationAttempt.create({
       data: {
         vehicleId: f.vehicleId,
@@ -496,14 +502,40 @@ describe('officialValuationTx · idempotencia (clave explícita)', () => {
         errorCode: 'X',
         createdById: f.userId,
         idempotencyKey: key,
+        requestFingerprint: autoFingerprint,
       },
     })
-    const err = await official(f, prismaA, { idempotencyKey: key }).catch((e) => e)
+    // Reintento de la MISMA petición (AUTO, misma clave) → falla consumida.
+    const err = await official(f, prismaA, { idempotencyKey: key, mode: AUTO }).catch((e) => e)
     expect(codeOf(err)).toBe('VALUATION_ATTEMPT_FAILED')
     const st = await state(f.vehicleId)
     expect(st.status).toBe('NUEVO')
     expect(st.valuations).toBe(0)
     expect(st.attempts).toBe(1) // solo el fallo previo
+  })
+
+  it('FALLO_TECNICO previo pero OTRA petición (misma clave) → reutilización incompatible', async () => {
+    const f = await seed()
+    const key = `idem_${uniqueSuffix()}`
+    const autoFingerprint = officialRequestFingerprint({
+      vehicleId: f.vehicleId,
+      mode: { kind: 'AUTO' },
+    })
+    await prismaA.vehicleValuationAttempt.create({
+      data: {
+        vehicleId: f.vehicleId,
+        purpose: 'OFICIAL',
+        outcome: 'FALLO_TECNICO',
+        method: 'AUTO',
+        errorCode: 'X',
+        createdById: f.userId,
+        idempotencyKey: key,
+        requestFingerprint: autoFingerprint,
+      },
+    })
+    // Reintento con la misma clave pero MANUAL (otra petición) → reutilización, no "fallo".
+    const err = await official(f, prismaA, { idempotencyKey: key, mode: MANUAL }).catch((e) => e)
+    expect(codeOf(err)).toBe('IDEMPOTENCY_KEY_REUSED_WITH_DIFFERENT_REQUEST')
   })
 
   it('unique index: rechaza dos claves iguales (P2002) y admite múltiples NULL (preliminares)', async () => {
