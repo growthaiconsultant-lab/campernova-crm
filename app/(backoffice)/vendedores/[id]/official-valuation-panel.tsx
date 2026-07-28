@@ -87,7 +87,7 @@ export function OfficialValuationPanel({ vehicleId, gateReady, gateReason }: Pro
     }
     try {
       const result = await officialManualValuation(vehicleId, data, idempotencyKey)
-      if (result.error) {
+      if ('error' in result && result.error) {
         setError(flattenError(result.error as ActionError))
       } else {
         setSuccess('Tasación oficial manual registrada.')

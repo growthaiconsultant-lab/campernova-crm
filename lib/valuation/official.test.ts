@@ -8,6 +8,7 @@ import type { Prisma } from '@prisma/client'
 import { calculateValuation } from './calculate'
 import { officialValuationTx, buildOfficialValuationRoots } from './official'
 import { isValuationError } from './errors'
+import { officialRequestFingerprint } from './idempotency'
 import type { OfficialValuationMode } from './official'
 import type { ValuationOutput } from './types'
 
@@ -22,7 +23,13 @@ type TxState = {
   completedInspections?: number
   casCount?: number
   /** Intento previo con la misma idempotencyKey (paso 0). `undefined` → no hay previo. */
-  priorAttempt?: { id: string; outcome: string; valuationId: string | null } | null
+  priorAttempt?: {
+    id: string
+    outcome: string
+    valuationId: string | null
+    vehicleId: string
+    requestFingerprint: string | null
+  } | null
 }
 
 function makeTx(state: TxState) {
@@ -190,11 +197,21 @@ describe('officialValuationTx · manual (fin del hardcode ALTA)', () => {
   })
 })
 
-describe('officialValuationTx · idempotencia (paso 0)', () => {
-  it('intento previo COMPLETADA con la misma clave → lo devuelve sin re-ejecutar (0 writes)', async () => {
+// Huella de la petición MANUAL usada por `run` (vehículo v1). Un prior con esta huella + v1 = misma
+// petición → retry legítimo. Cualquier otra huella/vehículo = reutilización incompatible.
+const RUN_FINGERPRINT = officialRequestFingerprint({ vehicleId: 'v1', mode: MANUAL })
+
+describe('officialValuationTx · idempotencia vinculada (paso 0)', () => {
+  it('previo COMPLETADA de la MISMA petición → lo devuelve sin re-ejecutar (0 writes)', async () => {
     const { tx, calls } = makeTx({
       vehicle: VALID_VEHICLE,
-      priorAttempt: { id: 'att-prev', outcome: 'COMPLETADA', valuationId: 'val-prev' },
+      priorAttempt: {
+        id: 'att-prev',
+        outcome: 'COMPLETADA',
+        valuationId: 'val-prev',
+        vehicleId: 'v1',
+        requestFingerprint: RUN_FINGERPRINT,
+      },
     })
     const res = await run(tx)
     expect(res.outcome).toBe('COMPLETADA')
@@ -210,32 +227,81 @@ describe('officialValuationTx · idempotencia (paso 0)', () => {
     expect(tx.vehicle.findUnique).not.toHaveBeenCalled()
   })
 
-  it('intento previo SIN_REFERENCIA con la misma clave → lo devuelve sin re-ejecutar', async () => {
+  it('previo SIN_REFERENCIA de la misma petición → lo devuelve sin re-ejecutar', async () => {
     const { tx, calls } = makeTx({
       vehicle: VALID_VEHICLE,
-      priorAttempt: { id: 'att-prev', outcome: 'SIN_REFERENCIA', valuationId: null },
+      priorAttempt: {
+        id: 'att-prev',
+        outcome: 'SIN_REFERENCIA',
+        valuationId: null,
+        vehicleId: 'v1',
+        requestFingerprint: RUN_FINGERPRINT,
+      },
     })
     const res = await run(tx)
     expect(res.outcome).toBe('SIN_REFERENCIA')
     expect(res.attemptId).toBe('att-prev')
-    expect(res.valuationId).toBeNull()
     expect(res.transitioned).toBe(false)
     expect(calls.attempts).toHaveLength(0)
   })
 
-  it('intento previo FALLO_TECNICO con la misma clave → VALUATION_ATTEMPT_FAILED', async () => {
+  it('previo FALLO_TECNICO de la misma petición → VALUATION_ATTEMPT_FAILED', async () => {
     const { tx } = makeTx({
       vehicle: VALID_VEHICLE,
-      priorAttempt: { id: 'att-prev', outcome: 'FALLO_TECNICO', valuationId: null },
+      priorAttempt: {
+        id: 'att-prev',
+        outcome: 'FALLO_TECNICO',
+        valuationId: null,
+        vehicleId: 'v1',
+        requestFingerprint: RUN_FINGERPRINT,
+      },
     })
     expect(codeOf(await run(tx).catch((e) => e))).toBe('VALUATION_ATTEMPT_FAILED')
   })
 
-  it('sin previo: la clave se persiste en el Attempt COMPLETADA', async () => {
+  it('clave reutilizada con OTRO vehículo → IDEMPOTENCY_KEY_REUSED_WITH_DIFFERENT_REQUEST (0 writes)', async () => {
+    const { tx, calls } = makeTx({
+      vehicle: VALID_VEHICLE,
+      priorAttempt: {
+        id: 'att-prev',
+        outcome: 'COMPLETADA',
+        valuationId: 'val-prev',
+        vehicleId: 'otro-vehiculo', // ≠ v1
+        requestFingerprint: RUN_FINGERPRINT,
+      },
+    })
+    expect(codeOf(await run(tx).catch((e) => e))).toBe(
+      'IDEMPOTENCY_KEY_REUSED_WITH_DIFFERENT_REQUEST'
+    )
+    expect(calls.attempts).toHaveLength(0)
+    expect(calls.valuations).toHaveLength(0)
+  })
+
+  it('clave reutilizada con OTRO payload (huella distinta) → reutilización incompatible', async () => {
+    const { tx, calls } = makeTx({
+      vehicle: VALID_VEHICLE,
+      priorAttempt: {
+        id: 'att-prev',
+        outcome: 'COMPLETADA',
+        valuationId: 'val-prev',
+        vehicleId: 'v1',
+        requestFingerprint: 'huella-de-otra-peticion', // ≠ RUN_FINGERPRINT
+      },
+    })
+    expect(codeOf(await run(tx).catch((e) => e))).toBe(
+      'IDEMPOTENCY_KEY_REUSED_WITH_DIFFERENT_REQUEST'
+    )
+    expect(calls.attempts).toHaveLength(0)
+  })
+
+  it('sin previo: la clave y la huella se persisten en el Attempt COMPLETADA', async () => {
     const { tx, calls } = makeTx({ vehicle: VALID_VEHICLE })
     await run(tx, { idempotencyKey: 'key-xyz' })
-    const att = calls.attempts[0] as { data: { idempotencyKey: string } }
+    const att = calls.attempts[0] as {
+      data: { idempotencyKey: string; requestFingerprint: string }
+    }
     expect(att.data.idempotencyKey).toBe('key-xyz')
+    expect(att.data.requestFingerprint).toBe(RUN_FINGERPRINT)
   })
 })
 

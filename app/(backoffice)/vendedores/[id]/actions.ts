@@ -6,8 +6,14 @@ import { db } from '@/lib/db'
 import { requireAgente } from '@/lib/auth'
 import { updateSellerLeadSchema, updateVehicleSchema } from '@/lib/validators/seller-lead'
 import { runAndSavePreliminaryValuation } from '@/lib/valuation/save'
-import { officialValuationTx, buildOfficialValuationRoots, isValuationError } from '@/lib/valuation'
-import type { EquipmentFlags } from '@/lib/valuation'
+import {
+  officialValuationTx,
+  buildOfficialValuationRoots,
+  isValuationError,
+  officialRequestFingerprint,
+  VALUATION_ERROR_MESSAGES,
+} from '@/lib/valuation'
+import type { EquipmentFlags, OfficialValuationMode } from '@/lib/valuation'
 import { recalculateMatchesForVehicle } from '@/lib/matching'
 import {
   SELLER_LEAD_TRANSITIONS,
@@ -377,29 +383,44 @@ export async function addSellerLeadNote(leadId: string, content: string) {
 // sin bypass manual en v1). Es la ÚNICA vía que escribe los denormalizados oficiales y transiciona
 // `NUEVO → TASADO`. El núcleo transaccional (locks + CAS) vive en `officialValuationTx`.
 
+function domainError(code: keyof typeof VALUATION_ERROR_MESSAGES) {
+  return {
+    error: {
+      formErrors: [VALUATION_ERROR_MESSAGES[code]],
+      fieldErrors: {} as Record<string, string[]>,
+    },
+  } as const
+}
+
 /**
- * Idempotencia de la tasación oficial (A3 §4). Si ya existe un intento con esta clave, devuelve el
- * resultado ya registrado sin re-ejecutar (no crea 2.º Attempt/Valuation/Activity ni re-transiciona).
- * `null` si no hay intento previo → el flujo normal continúa.
+ * Idempotencia de la tasación oficial (A3 §4), VINCULADA a la petición. Resuelve un intento previo con
+ * esta `idempotencyKey` comparándolo con la petición actual (mismo vehículo + misma huella del
+ * payload):
+ *   · sin previo                                   → `null` (continúa el flujo normal);
+ *   · previo de OTRA petición (vehículo/huella)    → error `IDEMPOTENCY_KEY_REUSED_WITH_DIFFERENT_REQUEST`
+ *     (NUNCA devuelve el resultado ajeno);
+ *   · previo `FALLO_TECNICO` de la MISMA petición  → error `VALUATION_ATTEMPT_FAILED`;
+ *   · previo COMPLETADA/SIN_REFERENCIA de la misma → `{ ok, outcome }` (resultado ya registrado).
+ * Requiere que la AUTORIZACIÓN (rol) ya se haya comprobado por el caller antes de invocarla: nunca
+ * devuelve datos de un resultado previo a quien no está autorizado.
  */
-async function priorOfficialResult(idempotencyKey: string) {
+async function resolvePriorOfficial(
+  idempotencyKey: string,
+  req: { vehicleId: string; fingerprint: string }
+) {
   const prior = await db.vehicleValuationAttempt.findUnique({
     where: { idempotencyKey },
-    select: { outcome: true },
+    select: { outcome: true, vehicleId: true, requestFingerprint: true },
   })
   if (!prior) return null
-  if (prior.outcome === 'FALLO_TECNICO') {
-    return {
-      error: {
-        formErrors: ['No se pudo calcular la tasación (fallo técnico). Inténtalo de nuevo.'],
-        fieldErrors: {} as Record<string, string[]>,
-      },
-    } as const
+  if (prior.vehicleId !== req.vehicleId || prior.requestFingerprint !== req.fingerprint) {
+    return domainError('IDEMPOTENCY_KEY_REUSED_WITH_DIFFERENT_REQUEST')
   }
+  if (prior.outcome === 'FALLO_TECNICO') return domainError('VALUATION_ATTEMPT_FAILED')
   return { ok: true as const, outcome: prior.outcome as 'COMPLETADA' | 'SIN_REFERENCIA' }
 }
 
-/** Conflicto unique sobre `idempotency_key` (doble submit concurrente) → tratar como idempotencia. */
+/** Conflicto unique sobre `idempotency_key` (doble submit concurrente) → resolver contra el previo. */
 function isIdempotencyConflict(err: unknown): boolean {
   return (
     typeof err === 'object' &&
@@ -448,8 +469,20 @@ export async function officialManualValuation(
   }
   const { min, recommended, max, confidence, reason, notes } = parsed.data
 
-  // Idempotencia: reintento de la misma petición → devuelve el resultado ya registrado.
-  const replay = await priorOfficialResult(idempotencyKey)
+  // Modo canónico (misma representación para la huella y para el dominio).
+  const mode: OfficialValuationMode = {
+    kind: 'MANUAL',
+    min,
+    recommended,
+    max,
+    confidence,
+    reason: notes ? `${reason} · ${notes}` : reason,
+  }
+  const fingerprint = officialRequestFingerprint({ vehicleId, mode })
+
+  // Idempotencia VINCULADA: reintento de la MISMA petición → resultado ya registrado; clave reutilizada
+  // con otra petición → rechazo (nunca resultado ajeno). Autorización ya comprobada (requireAgente).
+  const replay = await resolvePriorOfficial(idempotencyKey, { vehicleId, fingerprint })
   if (replay) return replay
 
   const vehicle = await db.vehicle.findUnique({
@@ -466,20 +499,13 @@ export async function officialManualValuation(
         resolvedSellerLeadId: vehicle.sellerLeadId,
         actorId: actor.id,
         idempotencyKey,
-        mode: {
-          kind: 'MANUAL',
-          min,
-          recommended,
-          max,
-          confidence,
-          reason: notes ? `${reason} · ${notes}` : reason,
-        },
+        mode,
       })
     )
   } catch (err) {
-    // Doble submit concurrente con la misma clave → idempotencia, no error.
+    // Doble submit concurrente con la misma clave → resolver contra el previo (idempotencia o rechazo).
     if (isIdempotencyConflict(err)) {
-      const p = await priorOfficialResult(idempotencyKey)
+      const p = await resolvePriorOfficial(idempotencyKey, { vehicleId, fingerprint })
       if (p) return p
     }
     if (isValuationError(err)) return { error: { formErrors: [err.message], fieldErrors: {} } }
@@ -503,8 +529,12 @@ export async function officialAutoValuation(vehicleId: string, idempotencyKey: s
   if (!idempotencyKey || idempotencyKey.trim().length === 0) {
     return { error: { formErrors: ['Falta la clave de idempotencia'], fieldErrors: {} } }
   }
-  // Idempotencia: reintento de la misma petición → devuelve el resultado ya registrado.
-  const replay = await priorOfficialResult(idempotencyKey)
+  // La huella AUTO identifica la petición por vehículo + modo (las cifras se derivan del vehículo).
+  const fingerprint = officialRequestFingerprint({ vehicleId, mode: { kind: 'AUTO' } })
+
+  // Idempotencia VINCULADA: reintento de la MISMA petición → resultado ya registrado; clave reutilizada
+  // con otra petición (otro vehículo o AUTO↔MANUAL) → rechazo. Autorización ya comprobada (requireAgente).
+  const replay = await resolvePriorOfficial(idempotencyKey, { vehicleId, fingerprint })
   if (replay) return replay
 
   const vehicle = await db.vehicle.findUnique({
@@ -547,16 +577,16 @@ export async function officialAutoValuation(vehicleId: string, idempotencyKey: s
     )
     outcome = result.outcome
   } catch (err) {
-    // Doble submit concurrente con la misma clave → idempotencia, no error.
+    // Doble submit concurrente con la misma clave → resolver contra el previo (idempotencia o rechazo).
     if (isIdempotencyConflict(err)) {
-      const p = await priorOfficialResult(idempotencyKey)
+      const p = await resolvePriorOfficial(idempotencyKey, { vehicleId, fingerprint })
       if (p) return p
     }
     if (isValuationError(err)) return { error: { formErrors: [err.message], fieldErrors: {} } }
     if (isLockError(err)) return { error: { formErrors: [err.message], fieldErrors: {} } }
     // FALLO_TECNICO: el cálculo lanzó (p. ej. error de BD) y la tx revirtió (vehículo intacto).
-    // Se registra el intento fuera de la transacción (consumiendo la clave) y se devuelve un error
-    // manejado. Un reintento con la MISMA clave devolverá VALUATION_ATTEMPT_FAILED (paso 0 / pre-check).
+    // Se registra el intento fuera de la transacción (consumiendo la clave, con su huella) y se
+    // devuelve un error manejado. Un reintento con la MISMA petición → VALUATION_ATTEMPT_FAILED.
     console.error('[valuation] Tasación oficial automática fallida', vehicleId, err)
     try {
       await db.vehicleValuationAttempt.create({
@@ -568,12 +598,13 @@ export async function officialAutoValuation(vehicleId: string, idempotencyKey: s
           errorCode: err instanceof Error ? err.name : 'UNKNOWN',
           createdById: actor.id,
           idempotencyKey,
+          requestFingerprint: fingerprint,
         },
       })
     } catch (writeErr) {
-      // Otra petición con la misma clave registró antes su intento → idempotencia: devuélvelo.
+      // Otra petición con la misma clave registró antes su intento → resolver (idempotencia o rechazo).
       if (isIdempotencyConflict(writeErr)) {
-        const p = await priorOfficialResult(idempotencyKey)
+        const p = await resolvePriorOfficial(idempotencyKey, { vehicleId, fingerprint })
         if (p) return p
       }
       console.error('[valuation] No se pudo registrar el intento fallido', writeErr)

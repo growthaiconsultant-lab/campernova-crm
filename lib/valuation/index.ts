@@ -23,6 +23,7 @@ export {
   isValuationError,
   type ValuationErrorCode,
 } from './errors'
+export { officialRequestFingerprint, OFFICIAL_REQUEST_FINGERPRINT_VERSION } from './idempotency'
 export type {
   AlgorithmMethod,
   ComparableSale,

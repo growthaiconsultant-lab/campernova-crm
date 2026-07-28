@@ -807,8 +807,14 @@ model VehicleValuationAttempt {
   // Idempotencia de la tasación OFICIAL: clave generada por el cliente (una por intención). Un
   // reintento de transporte reutiliza la misma clave → se devuelve el intento ya creado (sin duplicar
   // Attempt/Valuation/Activity/transición). Nullable: los intentos PRELIMINAR no la usan (pueden
-  // repetirse). Unique parcial-por-null (Postgres admite múltiples NULL) → solo dedup de oficiales.
+  // repetirse). Unique GLOBAL (parcial-por-null: Postgres admite múltiples NULL) → una clave pertenece
+  // a lo sumo a UN intento; reutilizarla en otro vehículo/petición no crea un 2.º intento.
   idempotencyKey String?             @map("idempotency_key")
+  // Huella determinista de la petición (sha256 del payload canónico: vehículo, purpose, modo, y para
+  // manual el rango/confianza/motivo/método/referencia normalizados). Vincula la clave a ESA petición:
+  // si la clave coincide pero la huella o el vehículo difieren → reutilización incompatible (rechazo),
+  // nunca se devuelve un resultado ajeno. Nullable (legacy/preliminar sin huella). No sensible.
+  requestFingerprint String?         @map("request_fingerprint")
   createdAt     DateTime             @default(now()) @map("created_at")
 
   vehicle   Vehicle    @relation(fields: [vehicleId], references: [id], onDelete: Cascade)

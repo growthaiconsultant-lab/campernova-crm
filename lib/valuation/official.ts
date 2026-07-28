@@ -19,6 +19,7 @@ import type { Prisma, PrismaClient, ValuationConfidence } from '@prisma/client'
 import type { LockRoot } from '@/lib/locking'
 import { calculateValuation } from './calculate'
 import { ValuationError } from './errors'
+import { officialRequestFingerprint } from './idempotency'
 import { referenceUsedLabel, resultToOutcome, validateManualValuation } from './outcome'
 import { prismaValuationDeps } from './prisma-deps'
 import type { ValuationVehicleInput } from './types'
@@ -92,15 +93,30 @@ export async function officialValuationTx(
   p: OfficialValuationParams,
   hooks: OfficialValuationHooks = {}
 ): Promise<OfficialValuationResult> {
-  // (0) Idempotencia bajo el lock: si ya existe un intento con esta clave, devuélvelo sin re-ejecutar
-  //     (no crea 2.º Attempt/Valuation/Activity ni re-transiciona). Barrera frente a doble submit
-  //     concurrente serializado por el lock del vehículo; el unique index es la barrera final. El
-  //     `FALLO_TECNICO` previo lo intercepta el server action ANTES de abrir la tx (no llega aquí).
+  // (0) Idempotencia bajo el lock, VINCULADA a la petición. Huella determinista del payload
+  //     (`officialRequestFingerprint`). Si ya existe un intento con esta clave:
+  //       · mismo vehículo + misma huella → es el MISMO intento → se devuelve sin re-ejecutar
+  //         (no crea 2.º Attempt/Valuation/Activity ni re-transiciona);
+  //       · cualquier diferencia (otro vehículo, otro modo, otro rango/confianza/motivo) →
+  //         reutilización incompatible → `IDEMPOTENCY_KEY_REUSED_WITH_DIFFERENT_REQUEST` (nunca se
+  //         devuelve un resultado ajeno).
+  //     Barrera frente a doble submit serializado por el lock del vehículo; el unique GLOBAL es la
+  //     barrera final. El `FALLO_TECNICO` previo de la MISMA petición → `VALUATION_ATTEMPT_FAILED`.
+  const fingerprint = officialRequestFingerprint({ vehicleId: p.vehicleId, mode: p.mode })
   const prior = await tx.vehicleValuationAttempt.findUnique({
     where: { idempotencyKey: p.idempotencyKey },
-    select: { id: true, outcome: true, valuationId: true },
+    select: {
+      id: true,
+      outcome: true,
+      valuationId: true,
+      vehicleId: true,
+      requestFingerprint: true,
+    },
   })
   if (prior) {
+    if (prior.vehicleId !== p.vehicleId || prior.requestFingerprint !== fingerprint) {
+      throw new ValuationError('IDEMPOTENCY_KEY_REUSED_WITH_DIFFERENT_REQUEST')
+    }
     if (prior.outcome === 'FALLO_TECNICO') throw new ValuationError('VALUATION_ATTEMPT_FAILED')
     return {
       outcome: prior.outcome as 'COMPLETADA' | 'SIN_REFERENCIA',
@@ -195,6 +211,7 @@ export async function officialValuationTx(
         method,
         createdById: p.actorId,
         idempotencyKey: p.idempotencyKey,
+        requestFingerprint: fingerprint,
       },
       select: { id: true },
     })
@@ -256,6 +273,7 @@ export async function officialValuationTx(
       createdById: p.actorId,
       valuationId: valuation.id,
       idempotencyKey: p.idempotencyKey,
+      requestFingerprint: fingerprint,
     },
     select: { id: true },
   })

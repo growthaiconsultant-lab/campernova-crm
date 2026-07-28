@@ -11,9 +11,10 @@
   - `CREATE TYPE "ValuationPurpose"` (PRELIMINAR, OFICIAL);
   - `CREATE TYPE "ValuationOutcome"` (COMPLETADA, SIN_REFERENCIA, FALLO_TECNICO);
   - `ALTER TABLE "valuations" ADD COLUMN "purpose"` (nullable);
-  - `CREATE TABLE "vehicle_valuation_attempts"` (16 columnas —incluye `idempotency_key`—, PK + 4
-    índices + 1 **UNIQUE** en `idempotency_key`, 3 FK) + `ENABLE ROW LEVEL SECURITY`.
-- **Deltas de catálogo (validados por migration-replay):** tables +1 (33), columns +17 (479),
+  - `CREATE TABLE "vehicle_valuation_attempts"` (17 columnas —incluye `idempotency_key` y
+    `request_fingerprint`—, PK + 4 índices + 1 **UNIQUE GLOBAL** en `idempotency_key`, 3 FK) +
+    `ENABLE ROW LEVEL SECURITY`.
+- **Deltas de catálogo (validados por migration-replay):** tables +1 (33), columns +18 (480),
   enums +2 (55), enum_values +5 (293), foreign_keys +3 (77), indexes +6 (124), `tables_without_rls`
   = 0. Migraciones aplicadas: 8 → 9.
 
@@ -33,11 +34,14 @@
   - motivo (fin del hardcode `ALTA`). Un intento AUTO sin datos → `SIN_REFERENCIA` sin tocar el
     vehículo. Un fallo técnico aborta la transacción (vehículo intacto) y se registra como
     `FALLO_TECNICO`.
-- **Idempotencia** (clave `crypto.randomUUID()` por intento, UI → action → dominio): reintento con la
-  misma clave devuelve el resultado ya registrado (sin 2.º Attempt/Valuation/Activity/transición);
-  clave nueva → intento nuevo. Barreras: pre-chequeo en el action + paso 0 bajo el lock + UNIQUE index
-  (P2002 tratado como idempotencia, no 500). `NULL` múltiple ⇒ los preliminares no colisionan. Ver
-  spec §6.
+- **Idempotencia VINCULADA a la petición** (clave `crypto.randomUUID()` por intento + huella
+  `request_fingerprint`, UI → action → dominio): un intento con la clave solo se reutiliza si pertenece
+  a la MISMA petición (mismo `vehicleId` + misma huella del payload normalizado); si la clave coincide
+  pero la petición difiere (otro vehículo, otro modo AUTO/MANUAL, otro rango/confianza/motivo) →
+  `IDEMPOTENCY_KEY_REUSED_WITH_DIFFERENT_REQUEST` (nunca devuelve un resultado ajeno). Autorización
+  (`requireAgente`) ANTES de resolver cualquier intento previo. Barreras: pre-chequeo con binding en el
+  action + paso 0 con binding bajo el lock + UNIQUE GLOBAL (P2002 re-resuelto con binding, no 500).
+  `NULL` múltiple ⇒ los preliminares no colisionan. Ver spec §6.
 - **Precio oficial = denormalizados `Vehicle.valuation*`.** La UI etiqueta la preliminar como
   «orientativa» y NUNCA la muestra como precio oficial.
 

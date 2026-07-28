@@ -17,6 +17,7 @@ export type ValuationErrorCode =
   | 'REASON_REQUIRED'
   | 'VALUATION_STATUS_CONFLICT'
   | 'VALUATION_ATTEMPT_FAILED'
+  | 'IDEMPOTENCY_KEY_REUSED_WITH_DIFFERENT_REQUEST'
 
 /** Mensajes visibles: sin ids, estado interno, SQL, Prisma, stack, cause ni PII. */
 export const VALUATION_ERROR_MESSAGES: Record<ValuationErrorCode, string> = {
@@ -38,6 +39,8 @@ export const VALUATION_ERROR_MESSAGES: Record<ValuationErrorCode, string> = {
     'El estado del vehículo cambió mientras se registraba la tasación. Inténtalo de nuevo.',
   VALUATION_ATTEMPT_FAILED:
     'El intento de tasación anterior con esta clave falló técnicamente. Reinténtalo con una tasación nueva.',
+  IDEMPOTENCY_KEY_REUSED_WITH_DIFFERENT_REQUEST:
+    'Esta clave de idempotencia ya se usó para una tasación distinta. Genera una tasación nueva.',
 }
 
 /** Conflicto de negocio esperado en el flujo de tasación oficial. No es un error técnico. */

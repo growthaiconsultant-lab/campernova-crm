@@ -111,34 +111,51 @@ Auditoría de escritores de `status = 'TASADO'` y de los campos oficiales
 **(§4) Idempotencia de la tasación oficial.** Clave explícita generada por el cliente
 (`crypto.randomUUID()`), una por intención de tasar, que viaja **UI → server action → dominio**:
 
-- **Persistencia:** `VehicleValuationAttempt.idempotencyKey` (nullable) con **UNIQUE index**. Nullable
-  ⇒ Postgres admite múltiples `NULL` → los intentos **preliminares** (sin clave) no colisionan; solo
-  se deduplican los **oficiales**.
-- **Tres barreras:** (1) pre-chequeo en el server action (`priorOfficialResult`) antes de abrir la tx;
-  (2) **paso 0 dentro de la tx**, bajo el lock del vehículo, que si encuentra un intento con esa clave
-  lo devuelve sin re-ejecutar (ni 2.ª Valuation, ni denormalizado, ni CAS, ni Activity, ni 2.º
-  Attempt); (3) el **UNIQUE index** como barrera final — un P2002 sobre `idempotency_key` se traduce a
-  idempotencia (re-lectura + devolver el existente), no a 500.
-- **Semántica:** misma clave → mismo resultado (`transitioned:false` en el reintento). Nueva tasación
-  intencionada → clave nueva → intento nuevo. Un **rechazo de gate no consume la clave** (no se
-  escribe intento). Un **`FALLO_TECNICO` sí consume la clave**: se registra fuera de la tx con la clave
-  y un reintento con la misma clave devuelve `VALUATION_ATTEMPT_FAILED` (hay que usar una clave nueva).
+- **Vinculación a la petición (binding).** La clave NO basta por sí sola: se persiste además una
+  **huella determinista de la petición** `VehicleValuationAttempt.requestFingerprint`
+  (`officialRequestFingerprint`, sha256 del payload canónico: vehículo + purpose + modo AUTO/MANUAL y,
+  para manual, rango/confianza/motivo/método/referencia **normalizados** —dinero a 2 decimales, strings
+  `trim`, nulls consistentes, orden estable). Al encontrar un intento con la clave se compara
+  **`(vehicleId + requestFingerprint)`**:
+  - coinciden → es la MISMA petición → retry legítimo → se devuelve el intento registrado;
+  - difieren (otro vehículo, otro modo AUTO/MANUAL, otro rango/confianza/motivo) → **reutilización
+    incompatible** → error de dominio `IDEMPOTENCY_KEY_REUSED_WITH_DIFFERENT_REQUEST`. **Nunca** se
+    devuelve un resultado ajeno ni se escribe nada. La huella es **no sensible** (sin PII).
+- **Persistencia:** `idempotencyKey` (nullable) con **UNIQUE GLOBAL** (no por vehículo). Global ⇒ una
+  clave pertenece a lo sumo a UN intento; reutilizarla en otro vehículo no crea un 2.º intento «válido»
+  sino que se detecta como reutilización. Nullable ⇒ Postgres admite múltiples `NULL` → los intentos
+  **preliminares** (sin clave) no colisionan; solo se deduplican los **oficiales**.
+- **Tres barreras:** (1) pre-chequeo en el server action (`resolvePriorOfficial`, con binding) antes de
+  abrir la tx; (2) **paso 0 dentro de la tx**, bajo el lock del vehículo, con el mismo binding, que si
+  la clave pertenece a esta petición devuelve el intento sin re-ejecutar (ni 2.ª Valuation, ni
+  denormalizado, ni CAS, ni Activity, ni 2.º Attempt) y si pertenece a otra la rechaza; (3) el **UNIQUE
+  index** como barrera final — un P2002 sobre `idempotency_key` se re-lee y se resuelve con el mismo
+  binding (idempotencia si coincide, reutilización si no), nunca un 500.
+- **Autorización primero.** `requireAgente()` es la PRIMERA sentencia de ambos server actions: un rol
+  no autorizado se rechaza antes de cualquier lectura de un intento previo. La clave NO es una
+  credencial: no da acceso a resultados a quien no está autorizado.
+- **Semántica:** misma clave + misma petición → mismo resultado (`transitioned:false` en el reintento).
+  Misma clave + petición distinta → `IDEMPOTENCY_KEY_REUSED_WITH_DIFFERENT_REQUEST`. Nueva tasación
+  intencionada → clave nueva. Un **rechazo de gate no consume la clave** (no se escribe intento). Un
+  **`FALLO_TECNICO` sí consume la clave** (se registra fuera de la tx con clave + huella): un reintento
+  de la misma petición devuelve `VALUATION_ATTEMPT_FAILED` (hay que usar una clave nueva).
 
 **Grafo de llamada transaccional (efectos externos SIEMPRE fuera de la tx):**
 
 ```
 officialManual/AutoValuation (server action)
-  ├─ requireAgente()                         (fuera de tx)
-  ├─ priorOfficialResult(key)                (fuera de tx — barrera 1)
+  ├─ requireAgente()                              (fuera de tx — AUTORIZACIÓN primero)
+  ├─ fp = officialRequestFingerprint(vehicleId, mode)
+  ├─ resolvePriorOfficial(key, {vehicleId, fp})   (fuera de tx — barrera 1, con binding)
   ├─ withLockedRoots(Vehicle→SellerLead)
   │    └─ officialValuationTx(tx, {…, idempotencyKey})
-  │         (0) findUnique(idempotencyKey)   (barrera 2, bajo lock)
-  │         (1–5) relectura + GATE estricto  (sin I/O externo)
-  │         (6) calculateValuation(deps=tx)  (solo lecturas locales/BD — sin fetch/HTTP/IA)
-  │         (7/8–12) Attempt (+Valuation +denorm +CAS +Activity)  (unique = barrera 3)
-  ├─ (AUTO/catch) registrar FALLO_TECNICO    (fuera de tx, con la clave)
-  ├─ recalculateMatchesForVehicle(...)       (fuera de tx)
-  └─ revalidatePath(...)                      (fuera de tx)
+  │         (0) findUnique(key) + binding(vehicleId, fp)  (barrera 2, bajo lock)
+  │         (1–5) relectura + GATE estricto       (sin I/O externo)
+  │         (6) calculateValuation(deps=tx)        (solo lecturas locales/BD — sin fetch/HTTP/IA)
+  │         (7/8–12) Attempt(+fp) (+Valuation +denorm +CAS +Activity)  (unique = barrera 3)
+  ├─ (AUTO/catch) registrar FALLO_TECNICO(+fp)    (fuera de tx, con clave + huella)
+  ├─ recalculateMatchesForVehicle(...)            (fuera de tx)
+  └─ revalidatePath(...)                           (fuera de tx)
 ```
 
 **(§5) Alcance transaccional:** el cálculo AUTO corre bajo el lock, pero `calculateValuation` +

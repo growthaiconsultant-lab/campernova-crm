@@ -39,6 +39,7 @@ const { mockDb } = vi.hoisted(() => {
     delivery: { findFirst: vi.fn() },
     activity: { create: vi.fn() },
     user: { findUnique: vi.fn() },
+    vehicleValuationAttempt: { findUnique: vi.fn(), create: vi.fn() },
     $transaction: vi.fn(),
   }
   return { mockDb }
@@ -57,7 +58,12 @@ import {
 import { revalidatePath } from 'next/cache'
 import { VEHICLE_TRANSITIONS } from '@/lib/state-machine'
 import { withLockedRoots } from '@/lib/locking'
-import { updateVehicle, discardSellerLead } from './actions'
+import {
+  updateVehicle,
+  discardSellerLead,
+  officialManualValuation,
+  officialAutoValuation,
+} from './actions'
 import {
   VEHICLE_STATUS_CONFLICT_MESSAGE,
   INVALID_VEHICLE_TRANSITION_MESSAGE,
@@ -567,5 +573,26 @@ describe('discardSellerLead', () => {
     expect(data).not.toHaveProperty('deletedAt')
     // No se modifica el vehículo asociado ni ninguna otra entidad de negocio.
     expect(mockDb.vehicle.update).not.toHaveBeenCalled()
+  })
+})
+
+describe('tasación oficial · autorización precede a la idempotencia (A3 §4)', () => {
+  it('officialManualValuation: rol no autorizado → rechaza sin consultar intentos previos', async () => {
+    vi.mocked(requireAgente).mockRejectedValue(new Error('forbidden'))
+    await expect(
+      officialManualValuation(
+        'v-1',
+        { min: 1, recommended: 2, max: 3, confidence: 'MEDIA', reason: 'x' },
+        'idem-key'
+      )
+    ).rejects.toThrow('forbidden')
+    // Nunca recupera un resultado previo usando la clave: la autorización es lo primero.
+    expect(mockDb.vehicleValuationAttempt.findUnique).not.toHaveBeenCalled()
+  })
+
+  it('officialAutoValuation: rol no autorizado → rechaza sin consultar intentos previos', async () => {
+    vi.mocked(requireAgente).mockRejectedValue(new Error('forbidden'))
+    await expect(officialAutoValuation('v-1', 'idem-key')).rejects.toThrow('forbidden')
+    expect(mockDb.vehicleValuationAttempt.findUnique).not.toHaveBeenCalled()
   })
 })

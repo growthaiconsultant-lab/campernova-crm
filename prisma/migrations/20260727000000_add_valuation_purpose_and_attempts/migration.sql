@@ -37,6 +37,7 @@ CREATE TABLE "vehicle_valuation_attempts" (
     "created_by_id" TEXT,
     "valuation_id" TEXT,
     "idempotency_key" TEXT,
+    "request_fingerprint" TEXT,
     "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
     CONSTRAINT "vehicle_valuation_attempts_pkey" PRIMARY KEY ("id")
@@ -55,8 +56,11 @@ CREATE INDEX "vehicle_valuation_attempts_created_at_idx" ON "vehicle_valuation_a
 CREATE INDEX "vehicle_valuation_attempts_outcome_idx" ON "vehicle_valuation_attempts"("outcome");
 
 -- CreateIndex
--- Idempotencia de la tasación oficial: unique sobre la clave (nullable → múltiples NULL permitidos,
--- así los intentos PRELIMINAR sin clave no colisionan; solo se deduplican los oficiales con clave).
+-- Idempotencia de la tasación oficial: unique GLOBAL sobre la clave (nullable → múltiples NULL
+-- permitidos, así los intentos PRELIMINAR sin clave no colisionan). Global (no por vehículo): una
+-- clave pertenece a lo sumo a UN intento; reutilizarla en otro vehículo/petición NO crea un 2.º
+-- intento — el binding por `request_fingerprint` + `vehicle_id` decide retry legítimo vs reutilización
+-- incompatible (se rechaza; nunca se devuelve un resultado ajeno).
 CREATE UNIQUE INDEX "vehicle_valuation_attempts_idempotency_key_key" ON "vehicle_valuation_attempts"("idempotency_key");
 
 -- AddForeignKey

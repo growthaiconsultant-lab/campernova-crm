@@ -251,16 +251,18 @@ jobs:
           #                dedicado, igual que entry_validated_by_id).
           # Delta tras add_valuation_purpose_and_attempts (PR-A3, aditivo; sin DML ni backfill):
           #   tables      32 → 33   (+1: vehicle_valuation_attempts)
-          #   columns     462 → 479 (+17: valuations.purpose +1, tabla nueva +16 —incluye idempotency_key)
+          #   columns     462 → 480 (+18: valuations.purpose +1, tabla nueva +17 —incluye idempotency_key
+          #                          y request_fingerprint, el binding de idempotencia a la petición)
           #   enums       53 → 55   (+2: ValuationPurpose, ValuationOutcome)
           #   enum_values 288 → 293 (+5: 2 de ValuationPurpose + 3 de ValuationOutcome)
           #   foreign_keys 74 → 77  (+3: vehicle_id→vehicles CASCADE + created_by_id→users SET NULL +
           #                          valuation_id→valuations SET NULL)
-          #   indexes     118 → 124 (+6: PK + 4 @@index + 1 unique idempotency_key; los FK no llevan índice dedicado)
+          #   indexes     118 → 124 (+6: PK + 4 @@index + 1 unique idempotency_key; request_fingerprint
+          #                          NO lleva índice propio —siempre se busca por la clave unique)
           #   without_rls 0 (la tabla nueva habilita RLS en la propia migración)
           assert offer_id_not_null "$(psql "$PSQL_URL" -tAc "SELECT is_nullable FROM information_schema.columns WHERE table_schema='public' AND table_name='deliveries' AND column_name='offer_id'")" NO
           assert tables "$tables" 33
-          assert columns "$columns" 479
+          assert columns "$columns" 480
           assert enums "$enums" 55
           assert enum_values "$enum_values" 293
           assert foreign_keys "$fks" 77

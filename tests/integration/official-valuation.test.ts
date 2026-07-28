@@ -135,6 +135,19 @@ const MANUAL: OfficialValuationMode = {
   reason: 'Tras inspección',
 }
 
+const AUTO: OfficialValuationMode = {
+  kind: 'AUTO',
+  input: {
+    brand: 'Adria',
+    model: 'Coral',
+    type: 'AUTOCARAVANA',
+    year: 2020,
+    km: 1000,
+    conservationState: 'BUENO',
+    equipment: {},
+  },
+}
+
 function official(
   f: Fixture,
   client: PrismaClient,
@@ -534,5 +547,107 @@ describe('officialValuationTx · idempotencia (clave explícita)', () => {
       where: { vehicleId: f.vehicleId, idempotencyKey: null },
     })
     expect(nulls).toBe(2)
+  })
+})
+
+describe('officialValuationTx · idempotencia VINCULADA a la petición', () => {
+  const codeOfBind = codeOf
+
+  it('misma clave + mismo payload (whitespace irrelevante) → replay idempotente', async () => {
+    const f = await seed()
+    const key = `idem_${uniqueSuffix()}`
+    const r1 = await official(f, prismaA, { idempotencyKey: key, mode: MANUAL })
+    // Mismo payload salvo espacios en el motivo → misma huella → mismo intento.
+    const r2 = await official(f, prismaA, {
+      idempotencyKey: key,
+      mode: { ...MANUAL, reason: '  Tras inspección  ' },
+    })
+    expect(r1.transitioned).toBe(true)
+    expect(r2.transitioned).toBe(false)
+    expect(r2.attemptId).toBe(r1.attemptId)
+    const st = await state(f.vehicleId)
+    expect(st.valuations).toBe(1)
+    expect(st.attempts).toBe(1)
+  })
+
+  it('misma clave + OTRO vehículo → IDEMPOTENCY_KEY_REUSED_WITH_DIFFERENT_REQUEST; cero escritura en el 2.º', async () => {
+    const f1 = await seed()
+    const f2 = await seed()
+    const key = `idem_${uniqueSuffix()}`
+    const r1 = await official(f1, prismaA, { idempotencyKey: key })
+    expect(r1.outcome).toBe('COMPLETADA')
+    const err = await official(f2, prismaA, { idempotencyKey: key }).catch((e) => e)
+    expect(codeOfBind(err)).toBe('IDEMPOTENCY_KEY_REUSED_WITH_DIFFERENT_REQUEST')
+    const st2 = await state(f2.vehicleId)
+    expect(st2.valuations).toBe(0)
+    expect(st2.attempts).toBe(0)
+    expect(st2.status).toBe('NUEVO')
+  })
+
+  it('misma clave + AUTO después de MANUAL → rechazo', async () => {
+    const f = await seed()
+    const key = `idem_${uniqueSuffix()}`
+    await official(f, prismaA, { idempotencyKey: key, mode: MANUAL })
+    const err = await official(f, prismaA, { idempotencyKey: key, mode: AUTO }).catch((e) => e)
+    expect(codeOfBind(err)).toBe('IDEMPOTENCY_KEY_REUSED_WITH_DIFFERENT_REQUEST')
+    expect((await state(f.vehicleId)).attempts).toBe(1)
+  })
+
+  it('misma clave + MANUAL después de AUTO → rechazo', async () => {
+    const f = await seed()
+    const key = `idem_${uniqueSuffix()}`
+    // AUTO sin reference_prices en la BD de test → SIN_REFERENCIA, pero registra el intento con la clave.
+    await official(f, prismaA, { idempotencyKey: key, mode: AUTO })
+    const err = await official(f, prismaA, { idempotencyKey: key, mode: MANUAL }).catch((e) => e)
+    expect(codeOfBind(err)).toBe('IDEMPOTENCY_KEY_REUSED_WITH_DIFFERENT_REQUEST')
+  })
+
+  it.each([
+    ['rango distinto', { ...MANUAL, recommended: 12500 } as OfficialValuationMode],
+    ['confianza distinta', { ...MANUAL, confidence: 'ALTA' } as OfficialValuationMode],
+    ['motivo distinto', { ...MANUAL, reason: 'Otro motivo' } as OfficialValuationMode],
+  ])('misma clave + %s → rechazo', async (_label, mode2) => {
+    const f = await seed()
+    const key = `idem_${uniqueSuffix()}`
+    await official(f, prismaA, { idempotencyKey: key, mode: MANUAL })
+    const err = await official(f, prismaA, { idempotencyKey: key, mode: mode2 }).catch((e) => e)
+    expect(codeOfBind(err)).toBe('IDEMPOTENCY_KEY_REUSED_WITH_DIFFERENT_REQUEST')
+    // El segundo intento no se escribe: sigue habiendo un único Attempt/Valuation.
+    const st = await state(f.vehicleId)
+    expect(st.attempts).toBe(1)
+    expect(st.valuations).toBe(1)
+  })
+
+  it('concurrente: misma clave + payload DISTINTO → exactamente una válida; la otra, reutilización; sin 500', async () => {
+    const f = await seed()
+    const key = `idem_${uniqueSuffix()}`
+    const aLocked = barrier()
+    const releaseA = barrier()
+    const a = official(f, prismaA, {
+      idempotencyKey: key,
+      mode: MANUAL,
+      hooks: {
+        beforeWrite: async () => {
+          aLocked.open()
+          await releaseA.wait
+        },
+      },
+    }).catch((e) => e)
+    await aLocked.wait
+    // B, misma clave, payload distinto (otro rango). Contiende por el lock del MISMO vehículo.
+    const b = official(f, prismaB, {
+      idempotencyKey: key,
+      mode: { ...MANUAL, recommended: 13000 },
+    }).catch((e) => e)
+    await waitUntilBlocked()
+    releaseA.open()
+    const aRes = await a
+    const bRes = await b
+    expect(aRes).not.toBeInstanceOf(Error)
+    // B, ya serializado tras A, ve el intento de A con huella distinta → reutilización incompatible.
+    expect(codeOfBind(bRes)).toBe('IDEMPOTENCY_KEY_REUSED_WITH_DIFFERENT_REQUEST')
+    const st = await state(f.vehicleId)
+    expect(st.valuations).toBe(1)
+    expect(st.attempts).toBe(1)
   })
 })
