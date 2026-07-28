@@ -37,14 +37,20 @@ prepared through controlled staging setup._
 
 - **A3 — valoración preliminar vs tasación oficial**: **migrado (staging+prod) + fusionado (#144,
   `6a8c61d`) + desplegado** (deployment READY). Cierre del bypass hacia TASADO + idempotencia vinculada
-  a la petición. Smoke autenticado de producción + observación 24 h **pendientes**. Detalle en
+  a la petición. **Smoke autenticado read-only de producción COMPLETO** (sesión ADMIN legítima; sin
+  errores A3). **Único pendiente: observación 24 h.** Detalle en
   `docs/releases/2026-07-28-a3-production.md`.
-- **PUB-1** — publicación/despublicación: **pendiente**.
-- **B1A** — señales económicas: **pendiente**.
-- **DATA-1** — clasificación/limpieza de datos (los ~331 matches históricos): **pendiente**. La
-  **reconciliación de `Valuation` legacy es NO APLICABLE** en producción (`Valuation = 0`,
-  `purpose IS NULL = 0`; no hay filas que reconciliar).
+- **PUB-1** — publicación/despublicación: **aplazado (decisión del dueño, 2026-07-28)** — no iniciar por
+  ahora. Incluye el historial comercial de `salePrice`.
+- **B1A** — señales económicas: **aplazado (decisión del dueño, 2026-07-28)** — no iniciar por ahora.
+- **DATA-1** — clasificación/limpieza de datos (los ~331 matches históricos): **pendiente** (sin
+  autorización de datos). La **reconciliación de `Valuation` legacy es NO APLICABLE** en producción
+  (`Valuation = 0`, `purpose IS NULL = 0`; no hay filas que reconciliar).
 - **Fuera del alcance activo**: marketplace, SaaS para terceros, multiempresa/multi-tenancy.
+
+> **Siguiente paso (tras el rollout de A3):** ninguno de los bloques nuevos arranca por ahora. Solo
+> queda la **observación de 24 h de A3** (Sentry/Vercel). PUB-1 y B1A quedan **aparcados** hasta que el
+> dueño lo decida.
 
 ## Pendientes operativos
 
