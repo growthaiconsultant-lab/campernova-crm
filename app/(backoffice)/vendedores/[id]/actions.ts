@@ -377,6 +377,38 @@ export async function addSellerLeadNote(leadId: string, content: string) {
 // sin bypass manual en v1). Es la ÚNICA vía que escribe los denormalizados oficiales y transiciona
 // `NUEVO → TASADO`. El núcleo transaccional (locks + CAS) vive en `officialValuationTx`.
 
+/**
+ * Idempotencia de la tasación oficial (A3 §4). Si ya existe un intento con esta clave, devuelve el
+ * resultado ya registrado sin re-ejecutar (no crea 2.º Attempt/Valuation/Activity ni re-transiciona).
+ * `null` si no hay intento previo → el flujo normal continúa.
+ */
+async function priorOfficialResult(idempotencyKey: string) {
+  const prior = await db.vehicleValuationAttempt.findUnique({
+    where: { idempotencyKey },
+    select: { outcome: true },
+  })
+  if (!prior) return null
+  if (prior.outcome === 'FALLO_TECNICO') {
+    return {
+      error: {
+        formErrors: ['No se pudo calcular la tasación (fallo técnico). Inténtalo de nuevo.'],
+        fieldErrors: {} as Record<string, string[]>,
+      },
+    } as const
+  }
+  return { ok: true as const, outcome: prior.outcome as 'COMPLETADA' | 'SIN_REFERENCIA' }
+}
+
+/** Conflicto unique sobre `idempotency_key` (doble submit concurrente) → tratar como idempotencia. */
+function isIdempotencyConflict(err: unknown): boolean {
+  return (
+    typeof err === 'object' &&
+    err != null &&
+    (err as { code?: string }).code === 'P2002' &&
+    JSON.stringify((err as { meta?: unknown }).meta ?? '').includes('idempotency')
+  )
+}
+
 const officialManualSchema = z
   .object({
     min: z.number().nonnegative('No puede ser negativo'),
@@ -400,14 +432,25 @@ const officialManualSchema = z
  * DECLARADA explícitamente (fin del hardcode `ALTA`), motivo obligatorio, rango válido. Gated bajo
  * el lock por entrada activa + inspección completada.
  */
-export async function officialManualValuation(vehicleId: string, data: unknown) {
+export async function officialManualValuation(
+  vehicleId: string,
+  data: unknown,
+  idempotencyKey: string
+) {
   const actor = await requireAgente()
 
+  if (!idempotencyKey || idempotencyKey.trim().length === 0) {
+    return { error: { formErrors: ['Falta la clave de idempotencia'], fieldErrors: {} } }
+  }
   const parsed = officialManualSchema.safeParse(data)
   if (!parsed.success) {
     return { error: parsed.error.flatten() }
   }
   const { min, recommended, max, confidence, reason, notes } = parsed.data
+
+  // Idempotencia: reintento de la misma petición → devuelve el resultado ya registrado.
+  const replay = await priorOfficialResult(idempotencyKey)
+  if (replay) return replay
 
   const vehicle = await db.vehicle.findUnique({
     where: { id: vehicleId },
@@ -422,6 +465,7 @@ export async function officialManualValuation(vehicleId: string, data: unknown) 
         vehicleId,
         resolvedSellerLeadId: vehicle.sellerLeadId,
         actorId: actor.id,
+        idempotencyKey,
         mode: {
           kind: 'MANUAL',
           min,
@@ -433,6 +477,11 @@ export async function officialManualValuation(vehicleId: string, data: unknown) 
       })
     )
   } catch (err) {
+    // Doble submit concurrente con la misma clave → idempotencia, no error.
+    if (isIdempotencyConflict(err)) {
+      const p = await priorOfficialResult(idempotencyKey)
+      if (p) return p
+    }
     if (isValuationError(err)) return { error: { formErrors: [err.message], fieldErrors: {} } }
     if (isLockError(err)) return { error: { formErrors: [err.message], fieldErrors: {} } }
     throw err
@@ -448,8 +497,15 @@ export async function officialManualValuation(vehicleId: string, data: unknown) 
  * Gated igual que la manual. Un fallo técnico del cálculo aborta la transacción (sin dejar el
  * vehículo a medias) y se registra como intento `FALLO_TECNICO`.
  */
-export async function officialAutoValuation(vehicleId: string) {
+export async function officialAutoValuation(vehicleId: string, idempotencyKey: string) {
   const actor = await requireAgente()
+
+  if (!idempotencyKey || idempotencyKey.trim().length === 0) {
+    return { error: { formErrors: ['Falta la clave de idempotencia'], fieldErrors: {} } }
+  }
+  // Idempotencia: reintento de la misma petición → devuelve el resultado ya registrado.
+  const replay = await priorOfficialResult(idempotencyKey)
+  if (replay) return replay
 
   const vehicle = await db.vehicle.findUnique({
     where: { id: vehicleId },
@@ -474,6 +530,7 @@ export async function officialAutoValuation(vehicleId: string) {
         vehicleId,
         resolvedSellerLeadId: vehicle.sellerLeadId,
         actorId: actor.id,
+        idempotencyKey,
         mode: {
           kind: 'AUTO',
           input: {
@@ -490,13 +547,19 @@ export async function officialAutoValuation(vehicleId: string) {
     )
     outcome = result.outcome
   } catch (err) {
+    // Doble submit concurrente con la misma clave → idempotencia, no error.
+    if (isIdempotencyConflict(err)) {
+      const p = await priorOfficialResult(idempotencyKey)
+      if (p) return p
+    }
     if (isValuationError(err)) return { error: { formErrors: [err.message], fieldErrors: {} } }
     if (isLockError(err)) return { error: { formErrors: [err.message], fieldErrors: {} } }
     // FALLO_TECNICO: el cálculo lanzó (p. ej. error de BD) y la tx revirtió (vehículo intacto).
-    // Se registra el intento fuera de la transacción y se devuelve un error manejado.
+    // Se registra el intento fuera de la transacción (consumiendo la clave) y se devuelve un error
+    // manejado. Un reintento con la MISMA clave devolverá VALUATION_ATTEMPT_FAILED (paso 0 / pre-check).
     console.error('[valuation] Tasación oficial automática fallida', vehicleId, err)
-    await db.vehicleValuationAttempt
-      .create({
+    try {
+      await db.vehicleValuationAttempt.create({
         data: {
           vehicleId,
           purpose: 'OFICIAL',
@@ -504,9 +567,17 @@ export async function officialAutoValuation(vehicleId: string) {
           method: 'AUTO',
           errorCode: err instanceof Error ? err.name : 'UNKNOWN',
           createdById: actor.id,
+          idempotencyKey,
         },
       })
-      .catch((e) => console.error('[valuation] No se pudo registrar el intento fallido', e))
+    } catch (writeErr) {
+      // Otra petición con la misma clave registró antes su intento → idempotencia: devuélvelo.
+      if (isIdempotencyConflict(writeErr)) {
+        const p = await priorOfficialResult(idempotencyKey)
+        if (p) return p
+      }
+      console.error('[valuation] No se pudo registrar el intento fallido', writeErr)
+    }
     return {
       error: {
         formErrors: ['No se pudo calcular la tasación (fallo técnico). Inténtalo de nuevo.'],

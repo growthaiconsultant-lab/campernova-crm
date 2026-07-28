@@ -16,6 +16,7 @@ export type ValuationErrorCode =
   | 'CONFIDENCE_REQUIRED'
   | 'REASON_REQUIRED'
   | 'VALUATION_STATUS_CONFLICT'
+  | 'VALUATION_ATTEMPT_FAILED'
 
 /** Mensajes visibles: sin ids, estado interno, SQL, Prisma, stack, cause ni PII. */
 export const VALUATION_ERROR_MESSAGES: Record<ValuationErrorCode, string> = {
@@ -35,6 +36,8 @@ export const VALUATION_ERROR_MESSAGES: Record<ValuationErrorCode, string> = {
   REASON_REQUIRED: 'Indica el motivo de la tasación manual.',
   VALUATION_STATUS_CONFLICT:
     'El estado del vehículo cambió mientras se registraba la tasación. Inténtalo de nuevo.',
+  VALUATION_ATTEMPT_FAILED:
+    'El intento de tasación anterior con esta clave falló técnicamente. Reinténtalo con una tasación nueva.',
 }
 
 /** Conflicto de negocio esperado en el flujo de tasación oficial. No es un error técnico. */

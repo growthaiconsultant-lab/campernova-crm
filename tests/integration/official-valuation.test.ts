@@ -144,6 +144,8 @@ function official(
     mode?: OfficialValuationMode
     hooks?: OfficialValuationHooks
     lockTimeoutMs?: number
+    /** Clave de idempotencia. Por defecto, una nueva por llamada (intento independiente). */
+    idempotencyKey?: string
   } = {}
 ) {
   const resolved = opts.resolvedSellerLeadId === undefined ? f.sellerId : opts.resolvedSellerLeadId
@@ -157,6 +159,7 @@ function official(
           vehicleId: f.vehicleId,
           resolvedSellerLeadId: resolved,
           actorId: opts.actorId ?? f.userId,
+          idempotencyKey: opts.idempotencyKey ?? `idem_${uniqueSuffix()}`,
           mode: opts.mode ?? MANUAL,
         },
         opts.hooks
@@ -374,5 +377,162 @@ describe('officialValuationTx · concurrencia', () => {
     await holder
     const st = await state(f.vehicleId)
     expect(st.valuations).toBe(1)
+  })
+})
+
+describe('officialValuationTx · idempotencia (clave explícita)', () => {
+  it('reintento SECUENCIAL con la misma clave → un solo Attempt/Valuation/transición; devuelve el existente', async () => {
+    const f = await seed()
+    const key = `idem_${uniqueSuffix()}`
+    const r1 = await official(f, prismaA, { idempotencyKey: key })
+    const r2 = await official(f, prismaA, { idempotencyKey: key })
+    expect(r1.outcome).toBe('COMPLETADA')
+    expect(r1.transitioned).toBe(true)
+    // El reintento devuelve el MISMO intento y NO re-transiciona ni duplica.
+    expect(r2.outcome).toBe('COMPLETADA')
+    expect(r2.transitioned).toBe(false)
+    expect(r2.attemptId).toBe(r1.attemptId)
+    expect(r2.valuationId).toBe(r1.valuationId)
+    const st = await state(f.vehicleId)
+    expect(st.valuations).toBe(1)
+    expect(st.attempts).toBe(1)
+    const transitions = await prismaA.activity.count({
+      where: { sellerLeadId: f.sellerId, content: { contains: 'Nuevo → Tasado' } },
+    })
+    expect(transitions).toBe(1)
+  })
+
+  it('clave NUEVA → intento independiente (dos Valuations, una sola transición)', async () => {
+    const f = await seed()
+    const r1 = await official(f, prismaA, { idempotencyKey: `k1_${uniqueSuffix()}` })
+    const r2 = await official(f, prismaA, { idempotencyKey: `k2_${uniqueSuffix()}` })
+    expect(r1.transitioned).toBe(true)
+    expect(r2.transitioned).toBe(false) // ya TASADO tras la primera
+    expect(r2.attemptId).not.toBe(r1.attemptId)
+    const st = await state(f.vehicleId)
+    expect(st.valuations).toBe(2)
+    expect(st.attempts).toBe(2)
+  })
+
+  it('doble submit CONCURRENTE con la misma clave → exactamente UN intento/Valuation/transición', async () => {
+    const f = await seed()
+    const key = `idem_${uniqueSuffix()}`
+    const aLocked = barrier()
+    const releaseA = barrier()
+    const a = official(f, prismaA, {
+      idempotencyKey: key,
+      hooks: {
+        beforeWrite: async () => {
+          aLocked.open()
+          await releaseA.wait
+        },
+      },
+    }).catch((e) => e)
+    await aLocked.wait
+    const b = official(f, prismaB, { idempotencyKey: key }).catch((e) => e)
+    await waitUntilBlocked()
+    releaseA.open()
+    const aRes = await a
+    const bRes = await b
+    expect(aRes).not.toBeInstanceOf(Error)
+    expect(bRes).not.toBeInstanceOf(Error)
+    // B se serializa tras A; su paso 0 (bajo el lock) encuentra el intento de A y lo devuelve.
+    expect(aRes.transitioned).toBe(true)
+    expect(bRes.transitioned).toBe(false)
+    expect(bRes.attemptId).toBe(aRes.attemptId)
+    const st = await state(f.vehicleId)
+    expect(st.valuations).toBe(1)
+    expect(st.attempts).toBe(1)
+    const transitions = await prismaA.activity.count({
+      where: { sellerLeadId: f.sellerId, content: { contains: 'Nuevo → Tasado' } },
+    })
+    expect(transitions).toBe(1)
+  })
+
+  it('un rechazo del gate NO consume la clave: reintento con la misma clave tras corregir el gate', async () => {
+    const f = await seed({ inspectionCompleted: false })
+    const key = `idem_${uniqueSuffix()}`
+    const err = await official(f, prismaA, { idempotencyKey: key }).catch((e) => e)
+    expect(codeOf(err)).toBe('INSPECTION_NOT_COMPLETED')
+    // Corrige el gate y reintenta con la MISMA clave: la clave seguía libre (no se escribió intento).
+    await prismaA.workOrder.create({
+      data: {
+        vehicleId: f.vehicleId,
+        kind: 'INSPECCION_ENTRADA',
+        status: 'COMPLETADA',
+        description: 'Inspección de entrada',
+      },
+    })
+    const res = await official(f, prismaA, { idempotencyKey: key })
+    expect(res.outcome).toBe('COMPLETADA')
+    expect(res.transitioned).toBe(true)
+    const st = await state(f.vehicleId)
+    expect(st.attempts).toBe(1)
+  })
+
+  it('intento FALLO_TECNICO previo con la clave → VALUATION_ATTEMPT_FAILED (clave consumida, vehículo intacto)', async () => {
+    const f = await seed()
+    const key = `idem_${uniqueSuffix()}`
+    // Simula el registro de fallo técnico que hace el server action FUERA de la transacción.
+    await prismaA.vehicleValuationAttempt.create({
+      data: {
+        vehicleId: f.vehicleId,
+        purpose: 'OFICIAL',
+        outcome: 'FALLO_TECNICO',
+        method: 'AUTO',
+        errorCode: 'X',
+        createdById: f.userId,
+        idempotencyKey: key,
+      },
+    })
+    const err = await official(f, prismaA, { idempotencyKey: key }).catch((e) => e)
+    expect(codeOf(err)).toBe('VALUATION_ATTEMPT_FAILED')
+    const st = await state(f.vehicleId)
+    expect(st.status).toBe('NUEVO')
+    expect(st.valuations).toBe(0)
+    expect(st.attempts).toBe(1) // solo el fallo previo
+  })
+
+  it('unique index: rechaza dos claves iguales (P2002) y admite múltiples NULL (preliminares)', async () => {
+    const f = await seed()
+    const key = `idem_${uniqueSuffix()}`
+    await prismaA.vehicleValuationAttempt.create({
+      data: {
+        vehicleId: f.vehicleId,
+        purpose: 'OFICIAL',
+        outcome: 'COMPLETADA',
+        method: 'MANUAL',
+        createdById: f.userId,
+        idempotencyKey: key,
+      },
+    })
+    await expect(
+      prismaA.vehicleValuationAttempt.create({
+        data: {
+          vehicleId: f.vehicleId,
+          purpose: 'OFICIAL',
+          outcome: 'COMPLETADA',
+          method: 'MANUAL',
+          createdById: f.userId,
+          idempotencyKey: key,
+        },
+      })
+    ).rejects.toMatchObject({ code: 'P2002' })
+    // Dos intentos PRELIMINAR sin clave conviven (NULL múltiple permitido por el unique parcial).
+    for (let i = 0; i < 2; i++) {
+      await prismaA.vehicleValuationAttempt.create({
+        data: {
+          vehicleId: f.vehicleId,
+          purpose: 'PRELIMINAR',
+          outcome: 'COMPLETADA',
+          method: 'AUTO',
+          createdById: f.userId,
+        },
+      })
+    }
+    const nulls = await prismaA.vehicleValuationAttempt.count({
+      where: { vehicleId: f.vehicleId, idempotencyKey: null },
+    })
+    expect(nulls).toBe(2)
   })
 })

@@ -87,12 +87,69 @@ null`) + inspección de entrada **completada** (WorkOrder `INSPECCION_ENTRADA` e
 | Oficial COMPLETADA (ya TASADO, re-tasación) | intacto | sí                    | OFICIAL/COMPLETADA        | OFICIAL                |
 | Oficial AUTO sin datos                      | intacto | no                    | OFICIAL/SIN_REFERENCIA    | —                      |
 
-## 6. Fuera de alcance / riesgos
+## 6. Invariante de fuente única de `TASADO` + auditoría de escritores
+
+La corrección final de A3 cierra dos garantías que el bloque debía introducir:
+
+**(§3) `TASADO` tiene una sola fuente.** `VEHICLE_TRANSITIONS.NUEVO` es `[]` (sin salidas manuales) y
+`updateVehicleTx` (`lib/vehicle-status.ts`) rechaza cualquier intento genérico de alcanzar `TASADO`
+por edición manual con el error de dominio `OFFICIAL_VALUATION_REQUIRED` **antes** que el genérico de
+transición inválida. La **única** vía que produce la primera transición `NUEVO → TASADO` es
+`officialValuationTx` (CAS `where status = NUEVO`), gated por entrada activa + inspección de entrada
+COMPLETADA.
+
+Auditoría de escritores de `status = 'TASADO'` y de los campos oficiales
+(`valuationMin/Recommended/Max`, `Valuation.purpose = OFICIAL`):
+
+| Escritor                                            | ¿Escribe `TASADO`?                             | ¿Escribe precio oficial?                               | Control                                             |
+| --------------------------------------------------- | ---------------------------------------------- | ------------------------------------------------------ | --------------------------------------------------- |
+| `officialValuationTx` (`lib/valuation/official.ts`) | **Sí** (CAS único)                             | Sí                                                     | Gate + lock + CAS + idempotencia. **Fuente única.** |
+| `updateVehicleTx` (`lib/vehicle-status.ts`)         | No — rechaza con `OFFICIAL_VALUATION_REQUIRED` | No                                                     | `VEHICLE_TRANSITIONS.NUEVO=[]` + guardia explícita  |
+| `overrideValuation` (preliminar)                    | No                                             | No (denormalizados preliminares, `purpose` no OFICIAL) | No toca estado                                      |
+| `runAndSaveAutoValuation` (preliminar)              | No                                             | No                                                     | No toca estado                                      |
+| Ofertas/entregas                                    | `RESERVADO/VENDIDO`, nunca `TASADO`            | No                                                     | Sus propias máquinas de estado                      |
+
+**(§4) Idempotencia de la tasación oficial.** Clave explícita generada por el cliente
+(`crypto.randomUUID()`), una por intención de tasar, que viaja **UI → server action → dominio**:
+
+- **Persistencia:** `VehicleValuationAttempt.idempotencyKey` (nullable) con **UNIQUE index**. Nullable
+  ⇒ Postgres admite múltiples `NULL` → los intentos **preliminares** (sin clave) no colisionan; solo
+  se deduplican los **oficiales**.
+- **Tres barreras:** (1) pre-chequeo en el server action (`priorOfficialResult`) antes de abrir la tx;
+  (2) **paso 0 dentro de la tx**, bajo el lock del vehículo, que si encuentra un intento con esa clave
+  lo devuelve sin re-ejecutar (ni 2.ª Valuation, ni denormalizado, ni CAS, ni Activity, ni 2.º
+  Attempt); (3) el **UNIQUE index** como barrera final — un P2002 sobre `idempotency_key` se traduce a
+  idempotencia (re-lectura + devolver el existente), no a 500.
+- **Semántica:** misma clave → mismo resultado (`transitioned:false` en el reintento). Nueva tasación
+  intencionada → clave nueva → intento nuevo. Un **rechazo de gate no consume la clave** (no se
+  escribe intento). Un **`FALLO_TECNICO` sí consume la clave**: se registra fuera de la tx con la clave
+  y un reintento con la misma clave devuelve `VALUATION_ATTEMPT_FAILED` (hay que usar una clave nueva).
+
+**Grafo de llamada transaccional (efectos externos SIEMPRE fuera de la tx):**
+
+```
+officialManual/AutoValuation (server action)
+  ├─ requireAgente()                         (fuera de tx)
+  ├─ priorOfficialResult(key)                (fuera de tx — barrera 1)
+  ├─ withLockedRoots(Vehicle→SellerLead)
+  │    └─ officialValuationTx(tx, {…, idempotencyKey})
+  │         (0) findUnique(idempotencyKey)   (barrera 2, bajo lock)
+  │         (1–5) relectura + GATE estricto  (sin I/O externo)
+  │         (6) calculateValuation(deps=tx)  (solo lecturas locales/BD — sin fetch/HTTP/IA)
+  │         (7/8–12) Attempt (+Valuation +denorm +CAS +Activity)  (unique = barrera 3)
+  ├─ (AUTO/catch) registrar FALLO_TECNICO    (fuera de tx, con la clave)
+  ├─ recalculateMatchesForVehicle(...)       (fuera de tx)
+  └─ revalidatePath(...)                      (fuera de tx)
+```
+
+**(§5) Alcance transaccional:** el cálculo AUTO corre bajo el lock, pero `calculateValuation` +
+`prismaValuationDeps` sólo hacen **lecturas locales/de BD** (comparables + `reference_prices`); **no
+hay `fetch`/HTTP/IA** en `lib/valuation` → no se mantiene una llamada de red abierta bajo el lock.
+
+## 7. Fuera de alcance / riesgos
 
 - **Fuera de alcance:** publicación (PUB-1), señales económicas (B1A), limpieza/reconciliación de
   datos (DATA-1). A3 **no** cambia la elegibilidad de matching/publicación (M1/A2): solo la tasación
   oficial alcanza `TASADO`.
-- **Riesgos abiertos:** (1) el camino manual `updateVehicle` puede llevar `NUEVO → TASADO` sin el gate
-  (I3B, fuera de A3); (2) sin token de idempotencia, un **reintento técnico** de una tasación oficial
-  crea una fila de historial duplicada (append-only) — aceptable para auditoría, dedupe futuro; (3)
-  la reclasificación de valoraciones legacy (`purpose = null`) queda pendiente (DATA-1).
+- **Riesgos abiertos:** la reclasificación de valoraciones legacy (`Valuation.purpose = null`) y de
+  matches históricos inelegibles queda pendiente (DATA-1, requiere autorización de datos).

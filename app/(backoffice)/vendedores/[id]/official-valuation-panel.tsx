@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -33,6 +33,10 @@ export function OfficialValuationPanel({ vehicleId, gateReady, gateReason }: Pro
   const [pending, setPending] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState<string | null>(null)
+  // Clave de idempotencia de la intención en curso. Se genera una vez por intento y se reutiliza si
+  // el mismo submit re-entra mientras hay una petición en vuelo (cinturón frente al doble clic
+  // ultrarrápido antes de que `disabled` surta efecto). Un reintento intencionado usa una clave nueva.
+  const inFlightKey = useRef<string | null>(null)
 
   if (!gateReady) {
     return (
@@ -41,24 +45,34 @@ export function OfficialValuationPanel({ vehicleId, gateReady, gateReason }: Pro
   }
 
   async function handleAuto() {
+    if (inFlightKey.current) return
+    const idempotencyKey = crypto.randomUUID()
+    inFlightKey.current = idempotencyKey
     setError(null)
     setSuccess(null)
     setPending(true)
-    const result = await officialAutoValuation(vehicleId)
-    setPending(false)
-    if ('error' in result && result.error) {
-      setError(flattenError(result.error as ActionError))
-    } else if ('outcome' in result && result.outcome === 'SIN_REFERENCIA') {
-      setSuccess(
-        'Sin datos suficientes para tasar (intento registrado). Prueba la tasación manual.'
-      )
-    } else {
-      setSuccess('Tasación oficial registrada.')
+    try {
+      const result = await officialAutoValuation(vehicleId, idempotencyKey)
+      if ('error' in result && result.error) {
+        setError(flattenError(result.error as ActionError))
+      } else if ('outcome' in result && result.outcome === 'SIN_REFERENCIA') {
+        setSuccess(
+          'Sin datos suficientes para tasar (intento registrado). Prueba la tasación manual.'
+        )
+      } else {
+        setSuccess('Tasación oficial registrada.')
+      }
+    } finally {
+      setPending(false)
+      inFlightKey.current = null
     }
   }
 
   async function handleManual(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()
+    if (inFlightKey.current) return
+    const idempotencyKey = crypto.randomUUID()
+    inFlightKey.current = idempotencyKey
     setError(null)
     setSuccess(null)
     setPending(true)
@@ -71,13 +85,17 @@ export function OfficialValuationPanel({ vehicleId, gateReady, gateReason }: Pro
       reason: String(fd.get('reason') ?? ''),
       notes: (fd.get('notes') as string) || null,
     }
-    const result = await officialManualValuation(vehicleId, data)
-    setPending(false)
-    if (result.error) {
-      setError(flattenError(result.error as ActionError))
-    } else {
-      setSuccess('Tasación oficial manual registrada.')
-      setMode('idle')
+    try {
+      const result = await officialManualValuation(vehicleId, data, idempotencyKey)
+      if (result.error) {
+        setError(flattenError(result.error as ActionError))
+      } else {
+        setSuccess('Tasación oficial manual registrada.')
+        setMode('idle')
+      }
+    } finally {
+      setPending(false)
+      inFlightKey.current = null
     }
   }
 

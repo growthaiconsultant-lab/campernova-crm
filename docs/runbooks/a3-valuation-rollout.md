@@ -11,10 +11,10 @@
   - `CREATE TYPE "ValuationPurpose"` (PRELIMINAR, OFICIAL);
   - `CREATE TYPE "ValuationOutcome"` (COMPLETADA, SIN_REFERENCIA, FALLO_TECNICO);
   - `ALTER TABLE "valuations" ADD COLUMN "purpose"` (nullable);
-  - `CREATE TABLE "vehicle_valuation_attempts"` (15 columnas, PK + 4 índices, 3 FK) + `ENABLE ROW
-LEVEL SECURITY`.
-- **Deltas de catálogo (validados por migration-replay):** tables +1 (33), columns +16 (478),
-  enums +2 (55), enum_values +5 (293), foreign_keys +3 (77), indexes +5 (123), `tables_without_rls`
+  - `CREATE TABLE "vehicle_valuation_attempts"` (16 columnas —incluye `idempotency_key`—, PK + 4
+    índices + 1 **UNIQUE** en `idempotency_key`, 3 FK) + `ENABLE ROW LEVEL SECURITY`.
+- **Deltas de catálogo (validados por migration-replay):** tables +1 (33), columns +17 (479),
+  enums +2 (55), enum_values +5 (293), foreign_keys +3 (77), indexes +6 (124), `tables_without_rls`
   = 0. Migraciones aplicadas: 8 → 9.
 
 ## 2. Conceptos
@@ -28,10 +28,16 @@ LEVEL SECURITY`.
 - **Tasación oficial** (`officialValuationTx` bajo `withLockedRoots`): **gate estricto** — entrada
   oficial activa (`entryValidatedAt != null AND entryAnnulledAt == null`) + WorkOrder
   `INSPECCION_ENTRADA` en `COMPLETADA` + estado elegible (no VENDIDO/DESCARTADO). Es la **única** vía
-  que escribe los denormalizados oficiales y transiciona `NUEVO → TASADO` (CAS). Auto o manual.
-  Manual exige confianza declarada + motivo (fin del hardcode `ALTA`). Un intento AUTO sin datos →
-  `SIN_REFERENCIA` sin tocar el vehículo. Un fallo técnico aborta la transacción (vehículo intacto) y
-  se registra como `FALLO_TECNICO`.
+  que escribe los denormalizados oficiales y transiciona `NUEVO → TASADO` (CAS); la edición manual de
+  estado se rechaza con `OFFICIAL_VALUATION_REQUIRED`. Auto o manual. Manual exige confianza declarada
+  - motivo (fin del hardcode `ALTA`). Un intento AUTO sin datos → `SIN_REFERENCIA` sin tocar el
+    vehículo. Un fallo técnico aborta la transacción (vehículo intacto) y se registra como
+    `FALLO_TECNICO`.
+- **Idempotencia** (clave `crypto.randomUUID()` por intento, UI → action → dominio): reintento con la
+  misma clave devuelve el resultado ya registrado (sin 2.º Attempt/Valuation/Activity/transición);
+  clave nueva → intento nuevo. Barreras: pre-chequeo en el action + paso 0 bajo el lock + UNIQUE index
+  (P2002 tratado como idempotencia, no 500). `NULL` múltiple ⇒ los preliminares no colisionan. Ver
+  spec §6.
 - **Precio oficial = denormalizados `Vehicle.valuation*`.** La UI etiqueta la preliminar como
   «orientativa» y NUNCA la muestra como precio oficial.
 
@@ -62,8 +68,11 @@ Por tanto: **aplicar la migración (staging → prod) ANTES de fusionar/desplega
 
 ## 6. Riesgos y deuda
 
-- La transición manual genérica `updateVehicle` (`VEHICLE_TRANSITIONS.NUEVO = ['TASADO']`, dominio
-  I3B) puede llevar a `TASADO` sin el gate entrada+inspección. **Fuera de A3**; reconciliar en futuro.
-- Sin token de idempotencia, un reintento técnico de tasación oficial añade una fila de historial
-  duplicada (append-only). Aceptable para auditoría; dedupe futuro.
+- **Cerrado (§3):** la edición manual genérica ya **no** puede alcanzar `TASADO`
+  (`VEHICLE_TRANSITIONS.NUEVO = []` + rechazo `OFFICIAL_VALUATION_REQUIRED`). `TASADO` tiene fuente
+  única: la tasación oficial.
+- **Cerrado (§4):** la tasación oficial es **idempotente** (clave explícita + UNIQUE index + paso 0
+  bajo lock). Un reintento con la misma clave ya no duplica el historial.
+- **Pendiente (DATA-1, autorización de datos):** reconciliación de `Valuation.purpose = null` (legacy)
+  y limpieza de matches históricos inelegibles.
 - Validación autenticada end-to-end de la UI: la hace el dueño (auth-gated, no verificable headless).

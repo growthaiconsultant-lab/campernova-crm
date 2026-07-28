@@ -21,6 +21,8 @@ type TxState = {
   seller?: { archivedAt: Date | null } | null
   completedInspections?: number
   casCount?: number
+  /** Intento previo con la misma idempotencyKey (paso 0). `undefined` → no hay previo. */
+  priorAttempt?: { id: string; outcome: string; valuationId: string | null } | null
 }
 
 function makeTx(state: TxState) {
@@ -46,6 +48,7 @@ function makeTx(state: TxState) {
     sellerLead: { findUnique: vi.fn().mockResolvedValue(state.seller ?? { archivedAt: null }) },
     workOrder: { count: vi.fn().mockResolvedValue(state.completedInspections ?? 1) },
     vehicleValuationAttempt: {
+      findUnique: vi.fn().mockResolvedValue(state.priorAttempt ?? null),
       create: vi.fn((args: unknown) => {
         calls.attempts.push(args)
         return Promise.resolve({ id: `att-${calls.attempts.length}` })
@@ -91,6 +94,7 @@ function run(
     vehicleId: 'v1',
     resolvedSellerLeadId: 's1',
     actorId: 'u1',
+    idempotencyKey: 'idem-1',
     mode: MANUAL,
     ...over,
   })
@@ -186,6 +190,55 @@ describe('officialValuationTx · manual (fin del hardcode ALTA)', () => {
   })
 })
 
+describe('officialValuationTx · idempotencia (paso 0)', () => {
+  it('intento previo COMPLETADA con la misma clave → lo devuelve sin re-ejecutar (0 writes)', async () => {
+    const { tx, calls } = makeTx({
+      vehicle: VALID_VEHICLE,
+      priorAttempt: { id: 'att-prev', outcome: 'COMPLETADA', valuationId: 'val-prev' },
+    })
+    const res = await run(tx)
+    expect(res.outcome).toBe('COMPLETADA')
+    expect(res.attemptId).toBe('att-prev')
+    expect(res.valuationId).toBe('val-prev')
+    expect(res.transitioned).toBe(false)
+    // No re-ejecuta: ni Valuation, ni denormalizado, ni CAS, ni Activity, ni nuevo Attempt.
+    expect(calls.valuations).toHaveLength(0)
+    expect(calls.updates).toHaveLength(0)
+    expect(calls.updateMany).toHaveLength(0)
+    expect(calls.activities).toHaveLength(0)
+    expect(calls.attempts).toHaveLength(0)
+    expect(tx.vehicle.findUnique).not.toHaveBeenCalled()
+  })
+
+  it('intento previo SIN_REFERENCIA con la misma clave → lo devuelve sin re-ejecutar', async () => {
+    const { tx, calls } = makeTx({
+      vehicle: VALID_VEHICLE,
+      priorAttempt: { id: 'att-prev', outcome: 'SIN_REFERENCIA', valuationId: null },
+    })
+    const res = await run(tx)
+    expect(res.outcome).toBe('SIN_REFERENCIA')
+    expect(res.attemptId).toBe('att-prev')
+    expect(res.valuationId).toBeNull()
+    expect(res.transitioned).toBe(false)
+    expect(calls.attempts).toHaveLength(0)
+  })
+
+  it('intento previo FALLO_TECNICO con la misma clave → VALUATION_ATTEMPT_FAILED', async () => {
+    const { tx } = makeTx({
+      vehicle: VALID_VEHICLE,
+      priorAttempt: { id: 'att-prev', outcome: 'FALLO_TECNICO', valuationId: null },
+    })
+    expect(codeOf(await run(tx).catch((e) => e))).toBe('VALUATION_ATTEMPT_FAILED')
+  })
+
+  it('sin previo: la clave se persiste en el Attempt COMPLETADA', async () => {
+    const { tx, calls } = makeTx({ vehicle: VALID_VEHICLE })
+    await run(tx, { idempotencyKey: 'key-xyz' })
+    const att = calls.attempts[0] as { data: { idempotencyKey: string } }
+    expect(att.data.idempotencyKey).toBe('key-xyz')
+  })
+})
+
 describe('officialValuationTx · auto', () => {
   const autoOutput = (method: ValuationOutput['method']): ValuationOutput => ({
     min: 9000,
@@ -232,8 +285,9 @@ describe('officialValuationTx · auto', () => {
     expect(calls.valuations).toHaveLength(0)
     expect(calls.updates).toHaveLength(0)
     expect(calls.updateMany).toHaveLength(0)
-    const att = calls.attempts[0] as { data: { outcome: string } }
+    const att = calls.attempts[0] as { data: { outcome: string; idempotencyKey: string } }
     expect(att.data.outcome).toBe('SIN_REFERENCIA')
+    expect(att.data.idempotencyKey).toBe('idem-1') // la clave viaja también al intento SIN_REFERENCIA
   })
 
   it('con datos → Valuation OFICIAL con confianza del algoritmo + transición', async () => {

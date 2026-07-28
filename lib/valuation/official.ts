@@ -57,6 +57,12 @@ export type OfficialValuationParams = {
   /** `sellerLeadId` observado en la lectura preliminar; detecta que la raíz cambió. */
   resolvedSellerLeadId: string | null
   actorId: string
+  /**
+   * Clave de idempotencia generada por el cliente (una por intención de tasar). Un reintento de
+   * transporte reutiliza la misma clave → se devuelve el intento ya creado. Una nueva tasación
+   * intencionada usa una clave nueva.
+   */
+  idempotencyKey: string
   mode: OfficialValuationMode
 }
 
@@ -86,6 +92,24 @@ export async function officialValuationTx(
   p: OfficialValuationParams,
   hooks: OfficialValuationHooks = {}
 ): Promise<OfficialValuationResult> {
+  // (0) Idempotencia bajo el lock: si ya existe un intento con esta clave, devuélvelo sin re-ejecutar
+  //     (no crea 2.º Attempt/Valuation/Activity ni re-transiciona). Barrera frente a doble submit
+  //     concurrente serializado por el lock del vehículo; el unique index es la barrera final. El
+  //     `FALLO_TECNICO` previo lo intercepta el server action ANTES de abrir la tx (no llega aquí).
+  const prior = await tx.vehicleValuationAttempt.findUnique({
+    where: { idempotencyKey: p.idempotencyKey },
+    select: { id: true, outcome: true, valuationId: true },
+  })
+  if (prior) {
+    if (prior.outcome === 'FALLO_TECNICO') throw new ValuationError('VALUATION_ATTEMPT_FAILED')
+    return {
+      outcome: prior.outcome as 'COMPLETADA' | 'SIN_REFERENCIA',
+      attemptId: prior.id,
+      valuationId: prior.valuationId,
+      transitioned: false,
+    }
+  }
+
   // (1) Relectura del vehículo + consistencia de raíz.
   const vehicle = await tx.vehicle.findUnique({
     where: { id: p.vehicleId },
@@ -170,6 +194,7 @@ export async function officialValuationTx(
         outcome: 'SIN_REFERENCIA',
         method,
         createdById: p.actorId,
+        idempotencyKey: p.idempotencyKey,
       },
       select: { id: true },
     })
@@ -230,6 +255,7 @@ export async function officialValuationTx(
       reason,
       createdById: p.actorId,
       valuationId: valuation.id,
+      idempotencyKey: p.idempotencyKey,
     },
     select: { id: true },
   })
