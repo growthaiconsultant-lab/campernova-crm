@@ -36,6 +36,7 @@ CREATE TABLE "vehicle_valuation_attempts" (
     "error_code" TEXT,
     "created_by_id" TEXT,
     "valuation_id" TEXT,
+    "idempotency_key" TEXT,
     "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
     CONSTRAINT "vehicle_valuation_attempts_pkey" PRIMARY KEY ("id")
@@ -52,6 +53,11 @@ CREATE INDEX "vehicle_valuation_attempts_created_at_idx" ON "vehicle_valuation_a
 
 -- CreateIndex
 CREATE INDEX "vehicle_valuation_attempts_outcome_idx" ON "vehicle_valuation_attempts"("outcome");
+
+-- CreateIndex
+-- Idempotencia de la tasación oficial: unique sobre la clave (nullable → múltiples NULL permitidos,
+-- así los intentos PRELIMINAR sin clave no colisionan; solo se deduplican los oficiales con clave).
+CREATE UNIQUE INDEX "vehicle_valuation_attempts_idempotency_key_key" ON "vehicle_valuation_attempts"("idempotency_key");
 
 -- AddForeignKey
 ALTER TABLE "vehicle_valuation_attempts" ADD CONSTRAINT "vehicle_valuation_attempts_vehicle_id_fkey" FOREIGN KEY ("vehicle_id") REFERENCES "vehicles"("id") ON DELETE CASCADE ON UPDATE CASCADE;
