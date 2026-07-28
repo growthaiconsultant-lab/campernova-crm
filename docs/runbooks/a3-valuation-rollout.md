@@ -107,16 +107,40 @@ Por tanto: **aplicar la migración (staging → prod) ANTES de fusionar/desplega
   - **Readers (UI):** el precio **oficial** se muestra como tal; la valoración **legacy** (`purpose
 null`) se etiqueta «Legacy» y **no** como precio oficial («Sin tasación oficial todavía»);
     `salePrice` no se presenta como tasación oficial.
-  - **§6.1 preliminar / §6.2 formulario genérico (no ofrece TASADO):** cubiertos por los tests de
-    servidor (unit `actions.test.ts`: `updateVehicle NUEVO→TASADO → OFFICIAL_VALUATION_REQUIRED`,
-    «bypass cerrado para cualquier origen»; el selector de estado se limita a `VEHICLE_TRANSITIONS`) y
-    por la vía oficial-única demostrada; no se re-disparó por UI por fricción del form Radix/RHF en
-    headless (deuda menor de cobertura UI, no de comportamiento).
+  - **§6.1 preliminar / §6.2 formulario genérico:** cubiertos en la ronda UI-final (ver §5c).
   - **Limpieza:** todos los datos sintéticos eliminados por IDs exactos; conteos de vuelta al baseline
     (vehicles 3, seller_leads 3, buyer_leads 3, valuations 0, attempts 0, work_orders 3, users 7); cero
     residuo; **cero afectación a datos preexistentes**. Acceso temporal cerrado
     (`.env.staging.admin.local` a 0 bytes). **Pendiente manual del dueño:** revocar la Secret key de
     staging `a3_e2e_temporary` (el MCP no gestiona API keys).
+
+## 5c. Validación UI final del recorrido `updateVehicle` (2026-07-28)
+
+Ronda dirigida a cerrar el hueco de que A3 conectó la valoración **preliminar** dentro de
+`updateVehicle`: se validó el recorrido operativo real `formulario → Server Action → dominio → BD →
+reader tras recarga`, sin cambios de código (HEAD `6c2c8c5`, CI 4/4). Migración A3 congelada
+(checksum `95c989f2…3c413`, sin tocar). Sesiones sintéticas (GoTrue admin + `users`), sin PII/emails/prod.
+
+- **`updateVehicle` real (AGENTE):** en la ficha, se editaron campos ordinarios (km 1000→1234,
+  ubicación Barcelona→«Girona A3UI») y se **guardó por la UI**; tras **recargar**, los cambios
+  **persisten**. Efecto lateral esperado: la **valoración preliminar se ejecutó** por la vía prevista →
+  Attempt **`PRELIMINAR/SIN_REFERENCIA`** (outcome correcto: sin `ReferencePrice` para ese modelo; sin
+  `Valuation` con cifras, coherente). Invariantes: **Vehicle sigue NUEVO**, **sin denormalizados
+  oficiales**, **`salePrice` intacto**, **sin Activity de transición a TASADO**. Sin 5xx ni errores
+  materiales de consola/servidor.
+- **Selector genérico de estado (UI):** en un Vehicle NUEVO el desplegable «Estado vehículo» ofrece
+  **solo «Nuevo»** (no TASADO).
+- **Rechazo en servidor (garantía de seguridad):** replay de la Server Action `updateVehicle`
+  manipulada con `status=TASADO` → **`OFFICIAL_VALUATION_REQUIRED`**, **cero escritura** (Vehicle sigue
+  NUEVO, sin denormalizados oficiales, sin Attempt extra, sin Activity de transición).
+- **Tasación oficial por ADMIN (UI):** expediente válido (entrada activa + `INSPECCION_ENTRADA`
+  COMPLETADA) → ADMIN ve la acción y completa una tasación manual con **confianza declarada BAJA (no
+  ALTA)** y motivo → `NUEVO → TASADO`; Attempt `OFICIAL/COMPLETADA/MANUAL`, Valuation `OFICIAL`, Activity
+  con **actor ADMIN**; **`salePrice` intacto (35000)**.
+- **Limpieza:** datos sintéticos eliminados por IDs exactos; baseline restaurado (3/3/3/0/0/3/7); cero
+  residuo; cero afectación a datos preexistentes. Acceso temporal cerrado (`.env.staging.admin.local`
+  a 0 bytes). **Pendiente manual del dueño:** revocar la Secret key `a3_ui_final_temporary` (el MCP no
+  gestiona API keys).
 
 ## 6. Riesgos y deuda
 
