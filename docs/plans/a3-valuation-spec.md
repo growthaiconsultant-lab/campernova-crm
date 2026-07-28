@@ -58,11 +58,10 @@ null`) + inspección de entrada **completada** (WorkOrder `INSPECCION_ENTRADA` e
   auto-valoración (`createSellerLead`, `submitPublicLead`, `updateVehicle`, captación→conversión,
   parte de pago) pasan a **PRELIMINAR**: no transicionan `NUEVO → TASADO` ni escriben los
   denormalizados oficiales. La transición ocurre **solo** vía tasación oficial (gated).
-  - **Límite de alcance (residual documentado):** la transición manual genérica de estado del
-    vehículo (`updateVehicle` → `VEHICLE_TRANSITIONS.NUEVO = ['TASADO']`, con su guard legal, dominio
-    I3B) **no** es una tasación y queda **fuera de A3**. Reconciliar ese camino con el gate
-    entrada+inspección es trabajo futuro (riesgo en §6). A3 solo garantiza que **ninguna valoración**
-    (auto o manual) transiciona sin el gate.
+  - **Cerrado en la corrección final (§3):** la transición manual genérica de estado del vehículo
+    (`updateVehicle`) ya **no** puede alcanzar `TASADO`. `VEHICLE_TRANSITIONS.NUEVO = []` y
+    `updateVehicleTx` rechaza el intento con `OFFICIAL_VALUATION_REQUIRED`. `TASADO` tiene **fuente
+    única** (la tasación oficial). Detalle e invariante en §6.
 - **D4 · `purpose` de las `Valuation` existentes → APLICADA.** Columna **nullable**, **sin backfill**.
   `purpose = null` = **LEGACY/UNKNOWN**: nunca es oficial por sí sola, nunca habilita
   publicación/matching, y los lectores la etiquetan «Legacy». Reconciliación futura = **DATA-1**.
