@@ -7,6 +7,7 @@ import { Label } from '@/components/ui/label'
 import { toast } from 'sonner'
 import {
   updateVehicleLegalFields,
+  updateVehiclePlate,
   markChargesChecked,
 } from '@/app/(backoffice)/vendedores/[id]/legal-actions'
 import { CheckCircle2, Shield } from 'lucide-react'
@@ -39,6 +40,7 @@ export function VehicleLegalFieldsForm({
 }: Props) {
   const [isPending, startTransition] = useTransition()
   const [isChargesPending, startChargesTransition] = useTransition()
+  const [isPlatePending, startPlateTransition] = useTransition()
 
   const [values, setValues] = useState({
     plate: plate ?? '',
@@ -67,6 +69,17 @@ export function VehicleLegalFieldsForm({
     })
   }
 
+  function handleSavePlate() {
+    startPlateTransition(async () => {
+      const res = await updateVehiclePlate(vehicleId, { plate: values.plate || null })
+      if (res.ok) {
+        toast.success('Matrícula guardada')
+      } else {
+        toast.error(res.error)
+      }
+    })
+  }
+
   function handleMarkCharges() {
     startChargesTransition(async () => {
       const res = await markChargesChecked(vehicleId)
@@ -81,21 +94,29 @@ export function VehicleLegalFieldsForm({
   return (
     <div className="space-y-4">
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-        {/* Matrícula */}
+        {/* Matrícula — editable por ADMIN y AGENTE (dato de captación, ver updateVehiclePlate) */}
         <div className="space-y-1.5">
           <Label htmlFor="plate" className="text-xs font-medium">
             Matrícula <span className="text-destructive">*</span>
           </Label>
-          {isAdmin ? (
-            <Input
-              id="plate"
-              value={values.plate}
-              onChange={(e) => handleChange('plate', e.target.value.toUpperCase())}
-              placeholder="1234-ABC"
-              className="h-8 font-mono text-sm"
-            />
-          ) : (
-            <p className="font-mono text-sm">{plate ?? '—'}</p>
+          <Input
+            id="plate"
+            value={values.plate}
+            onChange={(e) => handleChange('plate', e.target.value.toUpperCase())}
+            placeholder="1234-ABC"
+            className="h-8 font-mono text-sm"
+          />
+          {/* El AGENTE guarda solo la matrícula aquí; el ADMIN la guarda con el botón general. */}
+          {!isAdmin && (
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={handleSavePlate}
+              disabled={isPlatePending}
+              className="h-7 text-xs"
+            >
+              {isPlatePending ? 'Guardando…' : 'Guardar matrícula'}
+            </Button>
           )}
         </div>
 

@@ -268,6 +268,48 @@ export async function updateVehicleLegalFields(vehicleId: string, data: unknown)
   return { ok: true as const }
 }
 
+// ── Update plate only (AGENTE) ────────────────────────────────────────────────
+
+// La matrícula es un dato de captación que el comercial necesita anotar al dar de alta un vehículo
+// (alineado con CAP-1). A diferencia del resto del expediente legal (VIN, ITV, titularidad, cargas
+// DGT), que sigue siendo ADMIN, la matrícula puede editarla también un AGENTE mediante esta acción
+// acotada: SOLO toca `plate`, no habilita ninguna transición ni gate de publicación.
+const plateSchema = z.object({ plate: z.string().max(20).nullable().optional() })
+
+export async function updateVehiclePlate(vehicleId: string, data: unknown) {
+  const actor = await requireAgente()
+
+  const parsed = plateSchema.safeParse(data)
+  if (!parsed.success) return { ok: false as const, error: 'Datos inválidos' }
+
+  // CAP-1: vacío/espacios → null (nunca placeholder); normalizada a mayúsculas.
+  const raw = parsed.data.plate?.trim().toUpperCase()
+  const plate = raw ? raw : null
+
+  const vehicle = await db.vehicle.findUnique({
+    where: { id: vehicleId },
+    select: { sellerLeadId: true, plate: true },
+  })
+  if (!vehicle) return { ok: false as const, error: 'Vehículo no encontrado' }
+
+  if (plate === vehicle.plate) return { ok: true as const }
+
+  await db.$transaction([
+    db.vehicle.update({ where: { id: vehicleId }, data: { plate } }),
+    db.activity.create({
+      data: {
+        type: 'MATRICULA_AÑADIDA',
+        content: `Matrícula actualizada: ${plate ?? '(borrada)'}`,
+        agentId: actor.id,
+        sellerLeadId: vehicle.sellerLeadId,
+      },
+    }),
+  ])
+
+  revalidatePath(`/vendedores/${vehicle.sellerLeadId}`)
+  return { ok: true as const }
+}
+
 // ── Mark charges checked ──────────────────────────────────────────────────────
 
 export async function markChargesChecked(vehicleId: string, notes?: string) {

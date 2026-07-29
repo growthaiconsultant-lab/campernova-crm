@@ -63,6 +63,7 @@ import {
   uploadVehicleDocument,
   deleteVehicleDocument,
   updateVehicleLegalFields,
+  updateVehiclePlate,
   markChargesChecked,
   getVehicleDocumentSignedUrl,
 } from './legal-actions'
@@ -321,6 +322,54 @@ describe('updateVehicleLegalFields', () => {
 
     const result = await updateVehicleLegalFields('v-x', { plate: '1234-ABC' })
     expect(result.ok).toBe(false)
+  })
+})
+
+// ─── updateVehiclePlate (AGENTE) ──────────────────────────────────────────────
+
+describe('updateVehiclePlate', () => {
+  it('un AGENTE puede guardar la matrícula (solo `plate`)', async () => {
+    vi.mocked(requireAgente).mockResolvedValue(mockAgent)
+    mockDb.vehicle.findUnique.mockResolvedValue({ sellerLeadId: 'sl-1', plate: null })
+    mockDb.vehicle.update.mockResolvedValue({})
+    mockDb.activity.create.mockResolvedValue({})
+
+    const res = await updateVehiclePlate('v-1', { plate: '1234-abc' })
+    expect(res.ok).toBe(true)
+    // Normaliza a mayúsculas y solo toca plate.
+    expect(mockDb.vehicle.update).toHaveBeenCalledWith({
+      where: { id: 'v-1' },
+      data: { plate: '1234-ABC' },
+    })
+  })
+
+  it('registra actividad MATRICULA_AÑADIDA al cambiar', async () => {
+    vi.mocked(requireAgente).mockResolvedValue(mockAgent)
+    mockDb.vehicle.findUnique.mockResolvedValue({ sellerLeadId: 'sl-1', plate: null })
+    mockDb.vehicle.update.mockResolvedValue({})
+    const created: unknown[] = []
+    mockDb.activity.create.mockImplementation((a: { data: { type: string } }) => {
+      created.push(a.data)
+      return Promise.resolve({})
+    })
+    await updateVehiclePlate('v-1', { plate: '5678-XYZ' })
+    expect(created.map((a) => (a as { type: string }).type)).toContain('MATRICULA_AÑADIDA')
+  })
+
+  it('CAP-1: matrícula vacía → null (sin placeholder), sin escribir si no cambia', async () => {
+    vi.mocked(requireAgente).mockResolvedValue(mockAgent)
+    mockDb.vehicle.findUnique.mockResolvedValue({ sellerLeadId: 'sl-1', plate: null })
+    const res = await updateVehiclePlate('v-1', { plate: '   ' })
+    expect(res.ok).toBe(true)
+    // plate normaliza a null y coincide con el actual (null) → no-op, sin update.
+    expect(mockDb.vehicle.update).not.toHaveBeenCalled()
+  })
+
+  it('devuelve error si el vehículo no existe', async () => {
+    vi.mocked(requireAgente).mockResolvedValue(mockAgent)
+    mockDb.vehicle.findUnique.mockResolvedValue(null)
+    const res = await updateVehiclePlate('v-x', { plate: '1234-ABC' })
+    expect(res.ok).toBe(false)
   })
 })
 
