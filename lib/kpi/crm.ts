@@ -1,5 +1,6 @@
 import type { PrismaClient, BuyerLeadStatus, SellerLeadStatus } from '@prisma/client'
 import type { DashboardFilter } from '@/lib/dashboard/queries'
+import { personLabel } from '@/lib/display'
 import { LOST_REASON_LABELS } from '@/lib/lost-reason'
 import { NEXT_ACTION_LABELS } from '@/lib/next-action'
 import { BUYER_STATUSES_TERMINAL, SELLER_STATUSES_TERMINAL } from './stage-map'
@@ -133,14 +134,14 @@ export async function getCrmKpis(db: PrismaClient, filter: DashboardFilter): Pro
     ...withoutActionBuyers.map((b) => ({
       id: `b-${b.id}`,
       href: `/compradores/${b.id}`,
-      name: b.name,
+      name: personLabel(b.name, { role: 'Comprador sin identificar', id: b.id }),
       kind: 'Comprador' as const,
       detail: 'Sin próxima acción',
     })),
     ...withoutActionSellers.map((s) => ({
       id: `s-${s.id}`,
       href: `/vendedores/${s.id}`,
-      name: s.name,
+      name: personLabel(s.name, { role: 'Vendedor sin identificar', id: s.id }),
       kind: 'Vendedor' as const,
       detail: 'Sin próxima acción',
     })),
@@ -150,14 +151,14 @@ export async function getCrmKpis(db: PrismaClient, filter: DashboardFilter): Pro
     ...overdueBuyers.map((b) => ({
       id: `b-${b.id}`,
       href: `/compradores/${b.id}`,
-      name: b.name,
+      name: personLabel(b.name, { role: 'Comprador sin identificar', id: b.id }),
       kind: 'Comprador' as const,
       detail: `${b.nextActionType ? (NEXT_ACTION_LABELS[b.nextActionType] ?? b.nextActionType) : 'Acción'} · vencía ${fmtDue(b.nextActionDueAt)}`,
     })),
     ...overdueSellers.map((s) => ({
       id: `s-${s.id}`,
       href: `/vendedores/${s.id}`,
-      name: s.name,
+      name: personLabel(s.name, { role: 'Vendedor sin identificar', id: s.id }),
       kind: 'Vendedor' as const,
       detail: `${s.nextActionType ? (NEXT_ACTION_LABELS[s.nextActionType] ?? s.nextActionType) : 'Acción'} · vencía ${fmtDue(s.nextActionDueAt)}`,
     })),

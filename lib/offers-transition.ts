@@ -183,8 +183,8 @@ function buildActivityContent(p: {
   toStatus: OfferStatus
   depositAmount?: number | null
   rejectionReason?: LostReason | null
-  brand: string
-  model: string
+  brand: string | null
+  model: string | null
 }): string {
   const label = `Oferta ${OFFER_STATUS_LABELS[p.toStatus].toLowerCase()}`
   const detail =
@@ -193,7 +193,8 @@ function buildActivityContent(p: {
       : p.toStatus === 'RECHAZADA' && p.rejectionReason
         ? `${label} (${p.rejectionReason})`
         : label
-  return `${detail} — ${p.brand} ${p.model}`
+  const veh = [p.brand, p.model].filter(Boolean).join(' ') || 'Vehículo sin identificar'
+  return `${detail} — ${veh}`
 }
 
 function formatEur(n: number): string {

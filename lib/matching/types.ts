@@ -13,10 +13,11 @@ import type { EquipmentFlags } from '../valuation/types'
 /// `price` = `desiredPrice ?? valuationRecommended` (decidido en el adapter).
 export type MatchingVehicleInput = {
   id: string
-  type: VehicleType
-  seats: number
-  year: number
-  km: number
+  // CAP-1: datos estructurales pueden faltar (captación progresiva) → null.
+  type: VehicleType | null
+  seats: number | null
+  year: number | null
+  km: number | null
   equipment: EquipmentFlags
   location: string | null
   price: number | null

@@ -47,9 +47,9 @@ const BUYER_SELECT = {
 type VehicleRow = {
   id: string
   type: MatchingVehicleInput['type']
-  seats: number
-  year: number
-  km: number
+  seats: number | null
+  year: number | null
+  km: number | null
   equipment: unknown
   location: string | null
   desiredPrice: { toString(): string } | null

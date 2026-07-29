@@ -164,11 +164,13 @@ export async function createDelivery(formData: unknown): Promise<ActionResult<{ 
       vehicle: { select: { brand: true, model: true } },
     },
   })
-  if (detail) {
+  if (detail && detail.buyerLead.email) {
     sendDeliveryConfirmation({
-      buyerName: detail.buyerLead.name,
+      buyerName: detail.buyerLead.name ?? 'Comprador sin identificar',
       buyerEmail: detail.buyerLead.email,
-      vehicleLabel: `${detail.vehicle.brand} ${detail.vehicle.model}`,
+      vehicleLabel:
+        [detail.vehicle.brand, detail.vehicle.model].filter(Boolean).join(' ') ||
+        'Vehículo sin identificar',
       scheduledAt: new Date(scheduledAt),
       deliveryId: created.deliveryId,
     }).catch(console.error)

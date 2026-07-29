@@ -14,7 +14,8 @@ export function passesHardFilters(
     return false
   }
 
-  if (buyer.minSeats !== null && vehicle.seats < buyer.minSeats) {
+  // Fail-open CAP-1: si no se conocen las plazas del vehículo, no se descarta.
+  if (buyer.minSeats !== null && vehicle.seats !== null && vehicle.seats < buyer.minSeats) {
     return false
   }
 

@@ -73,13 +73,16 @@ export function splitCaptureTitle(title: string | null | undefined): {
   return { brand: parts[0], model: parts.slice(1).join(' ') }
 }
 
-export type CaptureRow = { id: string; phone: string; status: CaptureStatus }
+export type CaptureRow = { id: string; phone: string | null; status: CaptureStatus }
 
 /**
  * Detecta una captación existente con el mismo teléfono (normalizado) que siga
  * viva (no rechazada ni convertida). Evita que dos comerciales persigan el mismo.
  */
-export function findDuplicateCaptureByPhone(phone: string, rows: CaptureRow[]): CaptureRow | null {
-  if (normalizePhone(phone).length === 0) return null
+export function findDuplicateCaptureByPhone(
+  phone: string | null | undefined,
+  rows: CaptureRow[]
+): CaptureRow | null {
+  if (!phone || normalizePhone(phone).length === 0) return null
   return rows.find((r) => !isTerminalCaptureStatus(r.status) && phonesMatch(r.phone, phone)) ?? null
 }

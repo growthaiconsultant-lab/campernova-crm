@@ -28,14 +28,17 @@ export async function downloadVehiclePhotosZip(vehicleId: string): Promise<Buffe
 }
 
 export function buildZipFilename(vehicle: {
-  brand: string
-  model: string
-  year: number
+  brand: string | null
+  model: string | null
+  year: number | null
   id: string
 }): string {
-  const slug = `${vehicle.brand}-${vehicle.model}-${vehicle.year}`
+  const slug = [vehicle.brand, vehicle.model, vehicle.year]
+    .filter((p) => p != null && p !== '')
+    .join('-')
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/^-+|-+$/g, '')
-  return `${slug}-${vehicle.id.slice(0, 6).toLowerCase()}.zip`
+  const prefix = slug ? `${slug}-` : 'vehiculo-'
+  return `${prefix}${vehicle.id.slice(0, 6).toLowerCase()}.zip`
 }

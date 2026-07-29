@@ -2,6 +2,7 @@
 
 import { db } from '@/lib/db'
 import { requireAuth } from '@/lib/auth'
+import { personLabel, vehicleLabel } from '@/lib/display'
 
 /**
  * Búsqueda global (⌘K): compradores, vendedores, vehículos y captaciones por
@@ -92,26 +93,26 @@ export async function globalSearch(query: string): Promise<SearchResults> {
   return {
     compradores: buyers.map((b) => ({
       id: b.id,
-      label: b.name,
+      label: personLabel(b.name, { role: 'Comprador sin identificar', id: b.id }),
       sub: b.phone ?? '',
       href: `/compradores/${b.id}`,
     })),
     vendedores: sellers.map((s) => ({
       id: s.id,
-      label: s.name,
-      sub: s.vehicle ? `${s.vehicle.brand} ${s.vehicle.model} ${s.vehicle.year}` : 'Sin vehículo',
+      label: personLabel(s.name, { role: 'Vendedor sin identificar', id: s.id }),
+      sub: s.vehicle ? vehicleLabel(s.vehicle) : 'Sin vehículo',
       href: `/vendedores/${s.id}`,
     })),
     vehiculos: vehicles.map((v) => ({
       id: v.id,
-      label: `${v.brand} ${v.model} ${v.year}`,
+      label: vehicleLabel(v),
       sub: v.plate ?? v.status,
       href: `/vendedores/${v.sellerLeadId}`,
     })),
     captaciones: captures.map((c) => ({
       id: c.id,
       label: c.title ?? 'Captación sin título',
-      sub: c.phone,
+      sub: c.phone ?? '',
       href: '/captaciones',
     })),
   }

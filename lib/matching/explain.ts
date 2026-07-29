@@ -95,14 +95,16 @@ export function explainMatch(
   }
 
   // ── Antigüedad / km ──
+  const ageKmDetail = [
+    vehicle.year != null ? String(vehicle.year) : null,
+    vehicle.km != null ? `${vehicle.km.toLocaleString('es-ES')} km` : null,
+  ]
+    .filter(Boolean)
+    .join(', ')
   if (breakdown.ageKm >= 70) {
-    reasons.push(
-      `Pocos km y vehículo reciente (${vehicle.year}, ${vehicle.km.toLocaleString('es-ES')} km)`
-    )
+    reasons.push(`Pocos km y vehículo reciente${ageKmDetail ? ` (${ageKmDetail})` : ''}`)
   } else if (breakdown.ageKm < 45) {
-    risks.push(
-      `Antigüedad o km elevados (${vehicle.year}, ${vehicle.km.toLocaleString('es-ES')} km)`
-    )
+    risks.push(`Antigüedad o km elevados${ageKmDetail ? ` (${ageKmDetail})` : ''}`)
   }
 
   // ── Zona ──

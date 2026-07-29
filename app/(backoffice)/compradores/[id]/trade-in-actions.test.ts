@@ -107,11 +107,18 @@ describe('createSellerLeadFromTradeIn · validaciones previas', () => {
     expect(convertTradeInTx).not.toHaveBeenCalled()
   })
 
-  it('rechaza si faltan marca/modelo/año/km', async () => {
-    mockDb.buyerLead.findUnique.mockResolvedValue({ ...eligibleBuyer, tradeInKm: null })
+  it('CAP-1: procede aunque falten marca/modelo/año/km (captación progresiva, campos nullable)', async () => {
+    mockDb.buyerLead.findUnique.mockResolvedValue({
+      ...eligibleBuyer,
+      tradeInBrand: null,
+      tradeInModel: null,
+      tradeInYear: null,
+      tradeInKm: null,
+    })
     const res = await createSellerLeadFromTradeIn('b1')
-    expect(res.error).toContain('Completa')
-    expect(convertTradeInTx).not.toHaveBeenCalled()
+    // Ya no se bloquea por datos de vehículo incompletos: la conversión procede.
+    expect(res.error).toBeUndefined()
+    expect(convertTradeInTx).toHaveBeenCalled()
   })
 })
 

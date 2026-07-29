@@ -46,9 +46,9 @@ export async function GET(request: Request) {
       continue
     }
 
-    const buyerName = warranty.buyerLead.name
+    const buyerName = warranty.buyerLead.name ?? 'Cliente'
     const vehicleLabel = warranty.vehicle
-      ? `${warranty.vehicle.brand} ${warranty.vehicle.model}`
+      ? [warranty.vehicle.brand, warranty.vehicle.model].filter(Boolean).join(' ') || 'tu camper'
       : 'tu camper'
 
     const html =

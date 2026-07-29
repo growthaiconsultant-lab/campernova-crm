@@ -1,5 +1,6 @@
 import { db } from '@/lib/db'
 import { requireAgente } from '@/lib/auth'
+import { personLabel, vehicleLabel } from '@/lib/display'
 import { OFFER_STATUS_LABELS, OFFER_STATUS_COLORS, isActiveHold, isReservation } from '@/lib/offers'
 import { RESERVATION_STALE_DAYS } from '@/lib/kpi/thresholds'
 import { Eyebrow, Card, KpiCard, ActionableTable, HexPill, ButtonLink } from '@/components/redesign'
@@ -45,9 +46,12 @@ export default async function OfertasPage() {
     status: o.status,
     reservedUntil: o.reservedUntil,
     updatedAt: o.updatedAt,
-    buyerName: o.buyerLead.name,
+    buyerName: personLabel(o.buyerLead.name, {
+      role: 'Comprador sin identificar',
+      id: o.buyerLead.id,
+    }),
     buyerId: o.buyerLead.id,
-    vehicleLabel: `${o.vehicle.brand} ${o.vehicle.model} (${o.vehicle.year})`,
+    vehicleLabel: vehicleLabel(o.vehicle),
     sellerLeadId: o.vehicle.sellerLeadId,
   }))
 

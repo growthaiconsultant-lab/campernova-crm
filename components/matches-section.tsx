@@ -6,6 +6,7 @@ import { ChevronDown, ChevronUp } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { updateMatchStatus } from '@/app/(backoffice)/matches/actions'
+import { initialOf, personLabel, vehicleLabel } from '@/lib/display'
 import { formatEur } from '@/lib/format/currency'
 import type { MatchStatus } from '@prisma/client'
 
@@ -20,7 +21,7 @@ export type VehicleMatchData = {
   explanation?: MatchExplanationData
   buyerLead: {
     id: string
-    name: string
+    name: string | null
     vehicleType: string | null
     minSeats: number | null
     maxBudget: number | null
@@ -35,10 +36,10 @@ export type BuyerMatchData = {
   explanation?: MatchExplanationData
   vehicle: {
     id: string
-    brand: string
-    model: string
-    year: number
-    km: number
+    brand: string | null
+    model: string | null
+    year: number | null
+    km: number | null
     price: number | null
     photoUrl: string | null
     sellerLeadId: string
@@ -179,10 +180,12 @@ function BuyerMatchCard({ match }: { match: VehicleMatchData }) {
         {/* Avatar + nombre */}
         <div className="flex min-w-0 items-center gap-2">
           <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-muted text-sm font-medium uppercase">
-            {buyerLead.name.charAt(0)}
+            {initialOf(buyerLead.name)}
           </div>
           <div className="min-w-0">
-            <p className="truncate text-sm font-medium">{buyerLead.name}</p>
+            <p className="truncate text-sm font-medium">
+              {personLabel(buyerLead.name, { role: 'Comprador sin identificar', id: buyerLead.id })}
+            </p>
             <p className="text-xs text-muted-foreground">
               {buyerLead.vehicleType === 'CAMPER'
                 ? 'Camper'
@@ -250,7 +253,7 @@ function VehicleMatchCard({ match }: { match: BuyerMatchData }) {
             // eslint-disable-next-line @next/next/no-img-element
             <img
               src={vehicle.photoUrl}
-              alt={`${vehicle.brand} ${vehicle.model}`}
+              alt={vehicleLabel(vehicle)}
               className="h-full w-full object-cover"
             />
           ) : (
@@ -263,11 +266,9 @@ function VehicleMatchCard({ match }: { match: BuyerMatchData }) {
         {/* Info vehículo */}
         <div className="flex min-w-0 flex-1 items-start justify-between gap-2">
           <div className="min-w-0">
-            <p className="truncate text-sm font-medium">
-              {vehicle.brand} {vehicle.model} ({vehicle.year})
-            </p>
+            <p className="truncate text-sm font-medium">{vehicleLabel(vehicle)}</p>
             <p className="text-xs text-muted-foreground">
-              {vehicle.km.toLocaleString('es-ES')} km
+              {vehicle.km != null ? `${vehicle.km.toLocaleString('es-ES')} km` : 'Km s/d'}
               {vehicle.price ? ` · ${formatEur(vehicle.price)}` : ''}
             </p>
           </div>

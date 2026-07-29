@@ -40,9 +40,10 @@ function computeFromReference(
   reference: ReferencePriceData,
   input: ValuationVehicleInput
 ): { min: number; recommended: number; max: number; yearFactor: number } {
-  const yf = yearFactor(input.year, reference.baseYear)
+  // Solo se alcanza con `year`/`km` presentes (guard en calculateValuation); `?? 0` como cinturón.
+  const yf = yearFactor(input.year ?? reference.baseYear, reference.baseYear)
   const adjustedBase = reference.basePrice * yf
-  const kmDepreciation = input.km * reference.depreciationPerKm
+  const kmDepreciation = (input.km ?? 0) * reference.depreciationPerKm
   const recommended = Math.max(adjustedBase - kmDepreciation, 0)
   return {
     min: recommended * (1 - REFERENCE_RANGE_PCT),
@@ -61,7 +62,7 @@ function referenceConfidence(
   input: ValuationVehicleInput,
   reference: ReferencePriceData
 ): Confidence {
-  return Math.abs(input.year - reference.baseYear) <= 1 ? 'MEDIA' : 'BAJA'
+  return Math.abs((input.year ?? reference.baseYear) - reference.baseYear) <= 1 ? 'MEDIA' : 'BAJA'
 }
 
 /// Tasación de un vehículo. Busca primero comparables internos (≥3 vendidos),
@@ -71,11 +72,36 @@ export async function calculateValuation(
   input: ValuationVehicleInput,
   deps: ValuationDeps
 ): Promise<ValuationOutput> {
-  const comparables = await deps.findComparables(input)
-
   const conservation = conservationFactor(input.conservationState)
   const equipment = equipmentFactor(input.equipment)
   const adjustmentFactor = conservation * equipment
+
+  // CAP-1: sin datos estructurales mínimos (marca/modelo/tipo/año/km) no se puede tasar → NONE
+  // (SIN_REFERENCIA), sin fallar. La captación progresiva permite guardar el vehículo incompleto.
+  const hasCore =
+    input.brand != null &&
+    input.model != null &&
+    input.type != null &&
+    input.year != null &&
+    input.km != null
+  if (!hasCore) {
+    return {
+      min: 0,
+      recommended: 0,
+      max: 0,
+      method: 'NONE',
+      confidence: 'BAJA',
+      parameters: {
+        input,
+        method: 'NONE',
+        comparablesCount: 0,
+        reference: null,
+        adjustments: { conservationFactor: conservation, equipmentFactor: equipment },
+      },
+    }
+  }
+
+  const comparables = await deps.findComparables(input)
 
   if (comparables.length >= COMPARABLES_REQUIRED) {
     const raw = computeFromComparables(comparables)

@@ -5,7 +5,7 @@ import { redirect } from 'next/navigation'
 import { headers } from 'next/headers'
 import { db } from '@/lib/db'
 import { createClient } from '@/lib/supabase/server'
-import { createSellerLeadSchema } from '@/lib/validators/seller-lead'
+import { createSellerLeadPublicSchema } from '@/lib/validators/seller-lead'
 import {
   VEHICLE_PHOTOS_BUCKET,
   vehiclePhotoPath,
@@ -96,7 +96,7 @@ export async function submitPublicLead(formData: FormData) {
     bathroomType: (formData.get('bathroomType') as string | null) || null,
   }
 
-  const parsed = createSellerLeadSchema.safeParse(raw)
+  const parsed = createSellerLeadPublicSchema.safeParse(raw)
   if (!parsed.success) {
     return { error: 'Datos del formulario inválidos. Revisa los campos.' }
   }

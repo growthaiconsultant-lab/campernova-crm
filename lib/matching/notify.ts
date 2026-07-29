@@ -1,4 +1,5 @@
 import type { PrismaClient } from '@prisma/client'
+import { personLabel, vehicleLabel } from '@/lib/display'
 import { sendMatchNotification } from '@/lib/email/send'
 
 export const MATCH_NOTIFICATION_THRESHOLD = 70
@@ -61,8 +62,13 @@ export async function notifyHighScoreMatches(
 
       if (!vehicle || !buyer) continue
 
-      const vehicleSummary = `${vehicle.brand} ${vehicle.model} ${vehicle.year} · ${vehicle.km.toLocaleString('es-ES')} km`
-      const buyerParts = [buyer.name]
+      const vehicleSummary = [
+        vehicleLabel(vehicle),
+        vehicle.km != null ? `${vehicle.km.toLocaleString('es-ES')} km` : null,
+      ]
+        .filter(Boolean)
+        .join(' · ')
+      const buyerParts: string[] = [personLabel(buyer.name, { role: 'Comprador sin identificar' })]
       if (buyer.vehicleType) {
         buyerParts.push(buyer.vehicleType === 'CAMPER' ? 'Camper' : 'Autocaravana')
       }

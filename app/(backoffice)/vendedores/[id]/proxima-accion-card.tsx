@@ -15,8 +15,8 @@ type NextAction = {
 type Props = {
   phone: string | null
   leadId: string
-  leadName: string
-  vehicleInfo?: { type: string; brand: string; model: string }
+  leadName: string | null
+  vehicleInfo?: { type: string | null; brand: string | null; model: string | null }
   nextAction: NextAction
   nextActionType: NextActionType | null
   nextActionDueAt: string | null

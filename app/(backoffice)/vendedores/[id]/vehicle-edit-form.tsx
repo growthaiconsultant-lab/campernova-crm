@@ -142,7 +142,7 @@ export function VehicleEditForm({ vehicleId, defaultValues }: Props) {
             render={({ field }) => (
               <FormItem>
                 <FormLabel>Tipo</FormLabel>
-                <Select onValueChange={field.onChange} value={field.value}>
+                <Select onValueChange={field.onChange} value={field.value ?? undefined}>
                   <FormControl>
                     <SelectTrigger>
                       <SelectValue />
@@ -207,7 +207,7 @@ export function VehicleEditForm({ vehicleId, defaultValues }: Props) {
               <FormItem>
                 <FormLabel>Marca</FormLabel>
                 <FormControl>
-                  <Input {...field} />
+                  <Input {...field} value={field.value ?? ''} />
                 </FormControl>
                 <FormMessage />
               </FormItem>
@@ -222,7 +222,7 @@ export function VehicleEditForm({ vehicleId, defaultValues }: Props) {
               <FormItem>
                 <FormLabel>Modelo</FormLabel>
                 <FormControl>
-                  <Input {...field} />
+                  <Input {...field} value={field.value ?? ''} />
                 </FormControl>
                 <FormMessage />
               </FormItem>
@@ -241,8 +241,10 @@ export function VehicleEditForm({ vehicleId, defaultValues }: Props) {
                     type="number"
                     min={1980}
                     max={new Date().getFullYear() + 1}
-                    value={Number.isNaN(field.value) ? '' : (field.value ?? '')}
-                    onChange={(e) => field.onChange(e.target.valueAsNumber)}
+                    value={typeof field.value === 'number' ? field.value : ''}
+                    onChange={(e) =>
+                      field.onChange(e.target.value === '' ? null : e.target.valueAsNumber)
+                    }
                   />
                 </FormControl>
                 <FormMessage />
@@ -261,8 +263,10 @@ export function VehicleEditForm({ vehicleId, defaultValues }: Props) {
                   <Input
                     type="number"
                     min={0}
-                    value={Number.isNaN(field.value) ? '' : (field.value ?? '')}
-                    onChange={(e) => field.onChange(e.target.valueAsNumber)}
+                    value={typeof field.value === 'number' ? field.value : ''}
+                    onChange={(e) =>
+                      field.onChange(e.target.value === '' ? null : e.target.valueAsNumber)
+                    }
                   />
                 </FormControl>
                 <FormMessage />
@@ -282,8 +286,10 @@ export function VehicleEditForm({ vehicleId, defaultValues }: Props) {
                     type="number"
                     min={1}
                     max={20}
-                    value={Number.isNaN(field.value) ? '' : (field.value ?? '')}
-                    onChange={(e) => field.onChange(e.target.valueAsNumber)}
+                    value={typeof field.value === 'number' ? field.value : ''}
+                    onChange={(e) =>
+                      field.onChange(e.target.value === '' ? null : e.target.valueAsNumber)
+                    }
                   />
                 </FormControl>
                 <FormMessage />
@@ -328,7 +334,7 @@ export function VehicleEditForm({ vehicleId, defaultValues }: Props) {
                     type="number"
                     step="0.1"
                     min="0"
-                    value={field.value ?? ''}
+                    value={typeof field.value === 'number' ? field.value : ''}
                     onChange={(e) =>
                       field.onChange(e.target.value === '' ? null : Number(e.target.value))
                     }
@@ -351,7 +357,7 @@ export function VehicleEditForm({ vehicleId, defaultValues }: Props) {
                     type="number"
                     min={0}
                     step="500"
-                    value={field.value ?? ''}
+                    value={typeof field.value === 'number' ? field.value : ''}
                     onChange={(e) =>
                       field.onChange(e.target.value === '' ? null : Number(e.target.value))
                     }

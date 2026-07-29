@@ -598,9 +598,12 @@ model KpiEvent {
 /// Lead de vendedor — persona que quiere vender su vehículo.
 model SellerLead {
   id              String           @id @default(cuid())
-  name            String
-  email           String
-  phone           String
+  // CAP-1: captación progresiva — ningún campo de negocio es obligatorio al crear/editar.
+  // La ausencia real se persiste como null (nunca placeholders). Los gates operativos (A2/A3/
+  // publicación) siguen exigiendo lo suyo en sus hitos, no en la captación.
+  name            String?
+  email           String?
+  phone           String?
   canal           LeadCanal        @default(PRO)
   status          SellerLeadStatus @default(NUEVO)
   source          String?
@@ -648,13 +651,16 @@ model SellerLead {
 model Vehicle {
   id                   String                @id @default(cuid())
   sellerLeadId         String                @unique @map("seller_lead_id")
-  brand                String
-  model                String
-  year                 Int
-  km                   Int
-  seats                Int // plazas homologadas (de viaje)
+  // CAP-1: datos de negocio del vehículo opcionales al crear/editar (captación progresiva).
+  // Ausencia real = null; nunca placeholders. El matching y la valoración toleran la ausencia;
+  // los gates de entrada/tasación/publicación exigen sus requisitos en el hito, no aquí.
+  brand                String?
+  model                String?
+  year                 Int?
+  km                   Int?
+  seats                Int? // plazas homologadas (de viaje)
   length               Float? // largo en metros
-  type                 VehicleType
+  type                 VehicleType?
   // ── Taxonomía RV (Fase #3 v1) — nullable / additivo ──
   category             VehicleCategory?      @map("category")
   bedLayout            BedLayout?            @map("bed_layout")
@@ -1446,8 +1452,9 @@ model CalendarEvent {
 /// convierte a SellerLead+Vehicle cuando el vehículo llega a la nave.
 model VehicleCapture {
   id                 String        @id @default(cuid())
-  listingUrl         String        @map("listing_url")
-  phone              String
+  // CAP-1: captación progresiva — enlace y teléfono opcionales al crear/editar. Ausencia = null.
+  listingUrl         String?       @map("listing_url")
+  phone              String?
   portal             CapturePortal @default(OTRO)
   title              String? // etiqueta corta (marca/modelo) opcional
   askingPrice        Decimal?      @map("asking_price") @db.Decimal(10, 2)

@@ -42,8 +42,15 @@ describe('createBuyerLead', () => {
     expect(mockDb.buyerLead.create).not.toHaveBeenCalled()
   })
 
-  it('rechaza si falta el nombre', async () => {
+  // CAP-1 deja FUERA de alcance a BuyerLead: el contacto del comprador sigue siendo obligatorio.
+  it('rechaza si falta el nombre (no-regresión CAP-1: comprador conserva sus reglas)', async () => {
     const res = await createBuyerLead({ ...validInput, name: '' })
+    expect('error' in res).toBe(true)
+    expect(mockDb.buyerLead.create).not.toHaveBeenCalled()
+  })
+
+  it('rechaza si falta el teléfono (no-regresión CAP-1)', async () => {
+    const res = await createBuyerLead({ ...validInput, phone: '' })
     expect('error' in res).toBe(true)
     expect(mockDb.buyerLead.create).not.toHaveBeenCalled()
   })

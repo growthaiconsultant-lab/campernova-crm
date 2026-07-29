@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import { VEHICLE_CATEGORY_VALUES, BED_LAYOUT_VALUES, LICENSE_TYPE_VALUES } from '@/lib/rv-taxonomy'
+// CAP-1 deja FUERA de alcance a BuyerLead: el contacto del comprador sigue siendo obligatorio.
 
 export const criticalEquipmentSchema = z.object({
   solar: z.boolean().default(false),

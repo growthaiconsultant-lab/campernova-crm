@@ -3,6 +3,7 @@ import { Suspense } from 'react'
 import Link from 'next/link'
 import { db } from '@/lib/db'
 import { requireAgente } from '@/lib/auth'
+import { initialOf, personLabel, vehicleLabel } from '@/lib/display'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { VehiclePhotoUploader } from '@/components/vehicle-photo-uploader'
@@ -258,7 +259,7 @@ export default async function FichaVendedorPage({
   // Block 18 — ofertas por el vehículo + candidatos (compradores matcheados)
   const offerCandidates = visibleMatches.map((m) => ({
     id: m.buyerLead.id,
-    label: m.buyerLead.name,
+    label: personLabel(m.buyerLead.name, { role: 'Comprador sin identificar', id: m.buyerLead.id }),
   }))
   const offerRows = (v?.offers ?? []).map((o) => ({
     id: o.id,
@@ -267,7 +268,10 @@ export default async function FichaVendedorPage({
     status: o.status,
     reservedUntil: o.reservedUntil ? o.reservedUntil.toISOString() : null,
     notes: o.notes,
-    counterpartLabel: o.buyerLead.name,
+    counterpartLabel: personLabel(o.buyerLead.name, {
+      role: 'Comprador sin identificar',
+      id: o.buyerLead.id,
+    }),
     counterpartHref: `/compradores/${o.buyerLead.id}`,
   }))
 
@@ -540,7 +544,7 @@ export default async function FichaVendedorPage({
               />
             ) : (
               <div className="flex h-full w-full items-center justify-center text-lg font-bold text-muted-foreground/40">
-                {v ? v.brand.charAt(0).toUpperCase() : '—'}
+                {v ? initialOf(v.brand) : '—'}
               </div>
             )}
           </div>
@@ -549,7 +553,7 @@ export default async function FichaVendedorPage({
           <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-center gap-3">
               <h1 className="text-[26px] font-bold leading-tight tracking-[-0.02em]">
-                {v ? `${v.brand} ${v.model}` : lead.name}
+                {v ? vehicleLabel(v) : personLabel(lead.name, { role: 'Vendedor sin identificar' })}
               </h1>
               {v ? (
                 <StatusPill status={v.status} entity="vehicle" />
@@ -890,10 +894,15 @@ export default async function FichaVendedorPage({
                       >
                         <div className="flex items-center gap-3">
                           <div className="flex h-8 w-8 items-center justify-center rounded-full bg-muted text-sm font-semibold">
-                            {m.buyerLead.name.charAt(0)}
+                            {initialOf(m.buyerLead.name)}
                           </div>
                           <div>
-                            <p className="text-sm font-medium">{m.buyerLead.name}</p>
+                            <p className="text-sm font-medium">
+                              {personLabel(m.buyerLead.name, {
+                                role: 'Comprador sin identificar',
+                                id: m.buyerLead.id,
+                              })}
+                            </p>
                             <p className="text-xs text-muted-foreground">
                               {m.buyerLead.vehicleType === 'CAMPER' ? 'Camper' : 'Autocaravana'}
                               {m.buyerLead.maxBudget
@@ -1414,11 +1423,14 @@ export default async function FichaVendedorPage({
                   className="flex items-center gap-3 rounded-lg border border-border p-3 transition-colors hover:bg-muted"
                 >
                   <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-green-100 text-sm font-bold text-green-700">
-                    {closedMatch.buyerLead.name.charAt(0).toUpperCase()}
+                    {initialOf(closedMatch.buyerLead.name)}
                   </div>
                   <div className="min-w-0">
                     <p className="truncate text-sm font-semibold text-foreground">
-                      {closedMatch.buyerLead.name}
+                      {personLabel(closedMatch.buyerLead.name, {
+                        role: 'Comprador sin identificar',
+                        id: closedMatch.buyerLead.id,
+                      })}
                     </p>
                     <p className="text-xs text-muted-foreground">Operación cerrada · ver ficha →</p>
                   </div>

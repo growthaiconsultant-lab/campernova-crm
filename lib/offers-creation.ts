@@ -234,8 +234,9 @@ export async function createOfferTx(
 
   return {
     offerId: offer.id,
-    buyerName: buyer.name,
-    vehicleLabel: `${vehicle.brand} ${vehicle.model}`,
+    buyerName: buyer.name ?? 'Comprador sin identificar',
+    vehicleLabel:
+      [vehicle.brand, vehicle.model].filter(Boolean).join(' ') || 'Vehículo sin identificar',
     sellerLeadId: vehicle.sellerLeadId,
   }
 }

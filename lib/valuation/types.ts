@@ -8,13 +8,15 @@ export type EquipmentFlags = {
   heating?: boolean
 }
 
-/// Datos mínimos de un vehículo para tasarlo.
+/// Datos mínimos de un vehículo para tasarlo. CAP-1: los campos estructurales pueden faltar
+/// (captación progresiva); si falta alguno esencial (marca/modelo/tipo/año/km), el algoritmo
+/// devuelve `method: 'NONE'` (SIN_REFERENCIA) en vez de fallar. `conservationState` tiene default.
 export type ValuationVehicleInput = {
-  brand: string
-  model: string
-  type: VehicleType
-  year: number
-  km: number
+  brand: string | null
+  model: string | null
+  type: VehicleType | null
+  year: number | null
+  km: number | null
   conservationState: ConservationState
   equipment: EquipmentFlags
 }
