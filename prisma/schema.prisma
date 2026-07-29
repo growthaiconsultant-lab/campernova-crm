@@ -839,10 +839,9 @@ model VehicleValuationAttempt {
 /// criticalEquipment es JSONB con flags: solar, kitchen, bathroom, shower, heating.
 model BuyerLead {
   id                     String              @id @default(cuid())
-  // CAP-1: captación progresiva — datos de contacto opcionales al crear/editar. Ausencia = null.
-  name                   String?
-  email                  String?
-  phone                  String?
+  name                   String
+  email                  String
+  phone                  String
   agentId                String?             @map("agent_id")
   vehicleType            VehicleType?        @map("vehicle_type")
   minSeats               Int?                @map("min_seats") // plazas de viaje requeridas (homologadas)

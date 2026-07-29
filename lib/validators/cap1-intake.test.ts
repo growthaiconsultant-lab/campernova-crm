@@ -89,20 +89,23 @@ describe('CAP-1 · updates internos', () => {
     expect(r.type ?? null).toBeNull()
     expect(r.status).toBe('NUEVO')
   })
-  it('updateBuyerLead: solo status; contacto → null', () => {
-    const r = updateBuyerLeadSchema.parse({ status: 'NUEVO', agentId: null })
-    expect(r.name).toBeNull()
-    expect(r.email).toBeNull()
-    expect(r.phone).toBeNull()
-  })
 })
 
-describe('CAP-1 · createBuyerLead (interno)', () => {
-  it('objeto vacío es válido; contacto → null', () => {
-    const r = createBuyerLeadSchema.parse({})
-    expect(r.name).toBeNull()
-    expect(r.email).toBeNull()
-    expect(r.phone).toBeNull()
+describe('CAP-1 · BuyerLead queda FUERA de alcance (contacto sigue obligatorio)', () => {
+  it('createBuyerLead: objeto vacío → inválido (name/email/phone obligatorios)', () => {
+    expect(createBuyerLeadSchema.safeParse({}).success).toBe(false)
+    expect(createBuyerLeadSchema.safeParse({ name: '', email: '', phone: '' }).success).toBe(false)
+  })
+  it('createBuyerLead: con contacto completo → válido', () => {
+    const ok = createBuyerLeadSchema.safeParse({
+      name: 'Ana',
+      email: 'a@b.com',
+      phone: '600111222',
+    })
+    expect(ok.success).toBe(true)
+  })
+  it('updateBuyerLead: sin contacto → inválido', () => {
+    expect(updateBuyerLeadSchema.safeParse({ status: 'NUEVO', agentId: null }).success).toBe(false)
   })
 })
 

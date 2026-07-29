@@ -18,7 +18,7 @@ const NEXT_ACTION_TEXT: Record<string, string> = {
 type Props = {
   phone: string | null
   leadId: string
-  leadName: string | null
+  leadName: string
   status: string
   nextActionType: NextActionType | null
   nextActionDueAt: string | null

@@ -42,7 +42,7 @@ const EQUIPMENT_ITEMS = [
 
 type EquipmentKey = (typeof EQUIPMENT_ITEMS)[number]['id']
 
-type DuplicateInfo = { id: string; name: string | null; status: string }
+type DuplicateInfo = { id: string; name: string; status: string }
 
 export function BuyerLeadForm() {
   const router = useRouter()
@@ -107,9 +107,9 @@ export function BuyerLeadForm() {
               name="name"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Nombre</FormLabel>
+                  <FormLabel>Nombre *</FormLabel>
                   <FormControl>
-                    <Input placeholder="Nombre completo" {...field} value={field.value ?? ''} />
+                    <Input placeholder="Nombre completo" {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -120,14 +120,9 @@ export function BuyerLeadForm() {
               name="email"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Email</FormLabel>
+                  <FormLabel>Email *</FormLabel>
                   <FormControl>
-                    <Input
-                      type="email"
-                      placeholder="correo@ejemplo.com"
-                      {...field}
-                      value={field.value ?? ''}
-                    />
+                    <Input type="email" placeholder="correo@ejemplo.com" {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -138,14 +133,9 @@ export function BuyerLeadForm() {
               name="phone"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Teléfono</FormLabel>
+                  <FormLabel>Teléfono *</FormLabel>
                   <FormControl>
-                    <Input
-                      type="tel"
-                      placeholder="+34 600 000 000"
-                      {...field}
-                      value={field.value ?? ''}
-                    />
+                    <Input type="tel" placeholder="+34 600 000 000" {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -370,7 +360,7 @@ export function BuyerLeadForm() {
                 href={`/compradores/${duplicate.id}`}
                 className="font-semibold underline underline-offset-2"
               >
-                {duplicate.name ?? 'Comprador sin identificar'}
+                {duplicate.name}
               </Link>{' '}
               (
               {BUYER_STATUS_LABELS[duplicate.status as keyof typeof BUYER_STATUS_LABELS] ??

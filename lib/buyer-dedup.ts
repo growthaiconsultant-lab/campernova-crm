@@ -3,11 +3,11 @@ import { normalizePhone, phonesMatch } from './phone'
 
 export type DuplicateBuyer = {
   id: string
-  name: string | null
+  name: string
   status: string
 }
 
-type BuyerRow = { id: string; name: string | null; phone: string | null; status: string }
+type BuyerRow = { id: string; name: string; phone: string; status: string }
 
 /** Deps inyectables — facilita los tests sin Prisma. */
 export type BuyerDedupDeps = {
@@ -19,10 +19,10 @@ export type BuyerDedupDeps = {
  * Devuelve el primero que coincida, o null. No crea nada.
  */
 export async function findDuplicateBuyerByPhone(
-  phone: string | null | undefined,
+  phone: string,
   deps: BuyerDedupDeps
 ): Promise<DuplicateBuyer | null> {
-  if (!phone || normalizePhone(phone).length === 0) return null
+  if (normalizePhone(phone).length === 0) return null
   const rows = await deps.listBuyersWithPhone()
   const hit = rows.find((r) => phonesMatch(r.phone, phone))
   return hit ? { id: hit.id, name: hit.name, status: hit.status } : null

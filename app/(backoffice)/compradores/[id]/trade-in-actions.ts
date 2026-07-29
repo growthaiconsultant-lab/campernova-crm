@@ -3,7 +3,6 @@
 import { revalidatePath } from 'next/cache'
 import { db } from '@/lib/db'
 import { requireAgente } from '@/lib/auth'
-import { personLabel } from '@/lib/display'
 import { defaultNextActionData } from '@/lib/next-action'
 import { runAndSavePreliminaryValuation } from '@/lib/valuation/save'
 import { recalculateMatchesForVehicle } from '@/lib/matching'
@@ -122,8 +121,7 @@ export async function createSellerLeadFromTradeIn(
   const tradeInLabel = TRADE_IN_TYPE_LABELS[buyer.tradeInType]
   const vehicleLabelText = [brand, model].filter(Boolean).join(' ') || 'vehículo sin identificar'
 
-  const buyerLabel = personLabel(buyer.name, { role: 'comprador sin identificar', id: buyer.id })
-  const originNote = `Origen: parte de pago del comprador ${buyerLabel} (ficha /compradores/${buyer.id}).${
+  const originNote = `Origen: parte de pago del comprador ${buyer.name} (ficha /compradores/${buyer.id}).${
     buyer.tradeInNotes ? ` Notas: ${buyer.tradeInNotes}` : ''
   }`
 

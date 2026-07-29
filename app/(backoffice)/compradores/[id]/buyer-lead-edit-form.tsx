@@ -124,7 +124,7 @@ export function BuyerLeadEditForm({ leadId, defaultValues, agents, isAdmin }: Pr
                   <FormItem>
                     <FieldLabel>Nombre</FieldLabel>
                     <FormControl>
-                      <input {...field} value={field.value ?? ''} className={inputCls} />
+                      <input {...field} className={inputCls} />
                     </FormControl>
                     <FormMessage className="text-[11px]" />
                   </FormItem>
@@ -139,12 +139,7 @@ export function BuyerLeadEditForm({ leadId, defaultValues, agents, isAdmin }: Pr
                   <FormItem>
                     <FieldLabel>Email</FieldLabel>
                     <FormControl>
-                      <input
-                        type="email"
-                        {...field}
-                        value={field.value ?? ''}
-                        className={inputCls}
-                      />
+                      <input type="email" {...field} className={inputCls} />
                     </FormControl>
                     <FormMessage className="text-[11px]" />
                   </FormItem>
@@ -159,7 +154,7 @@ export function BuyerLeadEditForm({ leadId, defaultValues, agents, isAdmin }: Pr
                   <FormItem>
                     <FieldLabel>Teléfono</FieldLabel>
                     <FormControl>
-                      <input type="tel" {...field} value={field.value ?? ''} className={inputCls} />
+                      <input type="tel" {...field} className={inputCls} />
                     </FormControl>
                     <FormMessage className="text-[11px]" />
                   </FormItem>

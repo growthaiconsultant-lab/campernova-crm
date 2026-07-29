@@ -3,7 +3,6 @@ import { Suspense } from 'react'
 import Link from 'next/link'
 import { db } from '@/lib/db'
 import { requireAgente } from '@/lib/auth'
-import { initialOf, personLabel } from '@/lib/display'
 import { BuyerLeadEditForm } from './buyer-lead-edit-form'
 import { TradeInCard } from './trade-in-card'
 import { BuyerTopbarActions } from './buyer-topbar-actions'
@@ -425,7 +424,7 @@ export default async function FichaCompradorPage({
         {/* Identity row — centrada en la necesidad */}
         <div className="flex items-start gap-4">
           <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-muted text-lg font-semibold text-foreground">
-            {initialOf(lead.name)}
+            {lead.name.charAt(0).toUpperCase()}
           </div>
 
           <div className="min-w-0 flex-1">
@@ -441,9 +440,7 @@ export default async function FichaCompradorPage({
             </div>
 
             <div className="mt-1 flex flex-wrap items-center gap-x-4 gap-y-1 text-[12px] text-muted-foreground">
-              <span className="font-medium text-foreground">
-                {personLabel(lead.name, { role: 'Comprador sin identificar' })}
-              </span>
+              <span className="font-medium text-foreground">{lead.name}</span>
               <span>#{lead.id.slice(-8)}</span>
               <span>
                 Alta:{' '}
