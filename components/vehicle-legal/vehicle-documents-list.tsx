@@ -138,7 +138,7 @@ function DocumentCard({ doc, isAdmin }: { doc: VehicleDocumentItem; isAdmin: boo
         <div className="min-w-0">
           <p className="truncate text-sm font-medium">{doc.name}</p>
           <p className="text-xs text-muted-foreground">
-            {doc.createdAt.toLocaleDateString('es-ES')}
+            {doc.createdAt.toLocaleDateString('es-ES', { timeZone: 'Europe/Madrid' })}
             {doc.uploadedBy ? ` · ${doc.uploadedBy.name}` : ''}
             {doc.fileSize ? ` · ${formatBytes(doc.fileSize)}` : ''}
           </p>

@@ -153,7 +153,9 @@ export function VehicleLegalFieldsForm({
             />
           ) : (
             <p className="text-sm">
-              {itvValidUntil ? itvValidUntil.toLocaleDateString('es-ES') : '—'}
+              {itvValidUntil
+                ? itvValidUntil.toLocaleDateString('es-ES', { timeZone: 'Europe/Madrid' })
+                : '—'}
             </p>
           )}
         </div>
@@ -173,7 +175,9 @@ export function VehicleLegalFieldsForm({
             />
           ) : (
             <p className="text-sm">
-              {titleTransferredAt ? titleTransferredAt.toLocaleDateString('es-ES') : '—'}
+              {titleTransferredAt
+                ? titleTransferredAt.toLocaleDateString('es-ES', { timeZone: 'Europe/Madrid' })
+                : '—'}
             </p>
           )}
         </div>
@@ -188,7 +192,10 @@ export function VehicleLegalFieldsForm({
               <p className="text-sm font-medium">Informe de cargas DGT</p>
               {chargeCheckedAt ? (
                 <p className="text-xs text-muted-foreground">
-                  Verificado el {chargeCheckedAt.toLocaleDateString('es-ES')}
+                  Verificado el{' '}
+                  {chargeCheckedAt.toLocaleDateString('es-ES', {
+                    timeZone: 'Europe/Madrid',
+                  })}
                   {chargeCheckedByName ? ` por ${chargeCheckedByName}` : ''}
                 </p>
               ) : (
