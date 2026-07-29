@@ -171,6 +171,7 @@ function validate(
     resolvedSellerLeadId?: string | null
     hooks?: ValidateEntryHooks
     lockTimeoutMs?: number
+    requirePreconditions?: boolean
   } = {}
 ) {
   const resolved = opts.resolvedSellerLeadId === undefined ? f.sellerId : opts.resolvedSellerLeadId
@@ -188,6 +189,9 @@ function validate(
           keysCount: 2,
           keysLocation: 'Panel',
           keysNotes: null,
+          // Por defecto ENDURECE (los tests de precondición esperan que lancen). El flag productivo
+          // es `false`; el camino relajado se prueba explícitamente aparte.
+          requirePreconditions: opts.requirePreconditions ?? true,
         },
         opts.hooks
       ),
@@ -370,6 +374,59 @@ describe('validateEntryTx · camino feliz', () => {
   })
 })
 
+describe('validateEntryTx · fase relajada (requirePreconditions=false)', () => {
+  it('valida un vehículo SIN llegada, SIN responsable, SIN contrato, SIN checklist, SIN matrícula, SIN llaves', async () => {
+    const f = await seed({
+      withResponsible: false,
+      withContrato: false,
+      classifyRequired: false,
+      withPlate: false,
+      withVin: false,
+      withDesiredPrice: false,
+      withPhoto: false,
+      withArrival: false,
+    })
+    const res = await validate(f, prismaA, {
+      requirePreconditions: false,
+    })
+    expect(res.workOrderId).toBeTruthy()
+
+    const c = await counts(f)
+    expect(c).toEqual({ orders: 1, activeOrders: 1, validatedActivities: 1 })
+
+    const st = await entryState(f.vehicleId)
+    expect(st.entryValidatedAt).not.toBeNull()
+    // Aparcamiento/llaves se aportaron en el helper → se persisten; nada obligatorio, pero se guarda.
+    expect(st.naveLocation).toBe('Nave A-3')
+  })
+
+  it('valida con aparcamiento y llaves VACÍOS → persiste null (sin placeholder)', async () => {
+    const f = await seed({ withArrival: false })
+    const roots = buildEntryRoots({ vehicleId: f.vehicleId, sellerLeadId: f.sellerId })
+    const res = await withLockedRoots(
+      roots,
+      (tx) =>
+        validateEntryTx(tx, {
+          vehicleId: f.vehicleId,
+          resolvedSellerLeadId: f.sellerId,
+          actorId: f.userId,
+          parkingLocation: '',
+          keysCount: 0,
+          keysLocation: '',
+          keysNotes: null,
+          requirePreconditions: false,
+        }),
+      { client: prismaA }
+    )
+    expect(res.workOrderId).toBeTruthy()
+    const st = await entryState(f.vehicleId)
+    expect(st.entryValidatedAt).not.toBeNull()
+    expect(st.naveLocation).toBeNull()
+    expect(st.keysCount).toBeNull()
+    expect(st.keysLocation).toBeNull()
+  })
+})
+
 describe('validateEntryTx · precondición por precondición (rechaza sin escribir)', () => {
   it.each([
     ['sin contrato de gestión vigente', { withContrato: false }, 'CONTRATO_GESTION_MISSING'],
@@ -434,6 +491,7 @@ describe('validateEntryTx · precondición por precondición (rechaza sin escrib
           keysCount: 0,
           keysLocation: 'Panel',
           keysNotes: null,
+          requirePreconditions: true,
         }),
       { client: prismaA }
     ).catch((e) => e)

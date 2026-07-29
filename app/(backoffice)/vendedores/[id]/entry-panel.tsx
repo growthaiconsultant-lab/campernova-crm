@@ -36,6 +36,7 @@ import {
   annulEntry,
   setDocumentDisposition,
 } from './entry-actions'
+import { ENTRY_REQUIRE_PRECONDITIONS } from '@/lib/entry/config'
 
 // ── Tipos serializados desde el RSC ─────────────────────────────────────────────
 
@@ -115,7 +116,9 @@ export function EntryPanel(props: EntryPanelProps) {
   const hasArrival = props.arrivalAt != null
   // Estado terminal de la entrada: anulada. Activa: validada y no anulada.
   const canRegisterArrival = !hasArrival && !isValidated && !isAnnulled
-  const canValidate = hasArrival && !isValidated && !isAnnulled
+  // Fase de arranque: la llegada física deja de ser requisito para validar (ENTRY_REQUIRE_PRECONDITIONS).
+  const canValidate =
+    !isValidated && !isAnnulled && (ENTRY_REQUIRE_PRECONDITIONS ? hasArrival : true)
   const canAnnul = props.isAdmin && isValidated
 
   // ── Sub-acciones ─────────────────────────────────────────────────────────────
@@ -350,12 +353,16 @@ export function EntryPanel(props: EntryPanelProps) {
           <p className="text-cn-ink-400 mt-0.5 text-xs">
             Registra la ubicación de aparcamiento y la custodia de llaves. Al validar se crea la
             orden de inspección de entrada en Taller.
-            {props.responsibleName ? '' : ' Asigna antes un comercial responsable.'}
+            {ENTRY_REQUIRE_PRECONDITIONS
+              ? props.responsibleName
+                ? ''
+                : ' Asigna antes un comercial responsable.'
+              : ' De momento no es obligatorio rellenar estos campos ni la documentación.'}
           </p>
           <div className="mt-3 grid gap-3 sm:grid-cols-2">
             <div className="space-y-1.5 sm:col-span-2">
               <Label htmlFor="entry-parking" className="text-xs font-medium">
-                Ubicación de aparcamiento en la nave *
+                Ubicación de aparcamiento en la nave{ENTRY_REQUIRE_PRECONDITIONS ? ' *' : ''}
               </Label>
               <Input
                 id="entry-parking"
@@ -367,7 +374,7 @@ export function EntryPanel(props: EntryPanelProps) {
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="entry-keys-count" className="text-xs font-medium">
-                Nº de llaves *
+                Nº de llaves{ENTRY_REQUIRE_PRECONDITIONS ? ' *' : ''}
               </Label>
               <Input
                 id="entry-keys-count"
@@ -380,7 +387,7 @@ export function EntryPanel(props: EntryPanelProps) {
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="entry-keys-location" className="text-xs font-medium">
-                Ubicación de las llaves *
+                Ubicación de las llaves{ENTRY_REQUIRE_PRECONDITIONS ? ' *' : ''}
               </Label>
               <Input
                 id="entry-keys-location"
