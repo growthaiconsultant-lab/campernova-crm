@@ -500,7 +500,7 @@ export default async function FichaVendedorPage({
           </Link>
           <span className="text-muted-foreground/40">/</span>
           <span className="font-semibold text-foreground">
-            {v ? `${v.brand} ${v.model}` : lead.name}
+            {v ? vehicleLabel(v) : personLabel(lead.name, { role: 'Vendedor sin identificar' })}
           </span>
         </nav>
         <div className="flex items-center gap-2">
@@ -588,7 +588,10 @@ export default async function FichaVendedorPage({
             {/* Vendedor + contacto */}
             <div className="mt-2.5 flex flex-wrap items-center gap-2 text-sm">
               <span className="text-muted-foreground">
-                Vendedor · <span className="font-medium text-foreground">{lead.name}</span>
+                Vendedor ·{' '}
+                <span className="font-medium text-foreground">
+                  {personLabel(lead.name, { role: 'Vendedor sin identificar' })}
+                </span>
               </span>
               {lead.phone && (
                 <a
