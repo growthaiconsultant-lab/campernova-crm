@@ -38,11 +38,14 @@ const registerArrivalSchema = z.object({
   vehicleId: z.string().min(1),
 })
 
+// Fase de arranque: aparcamiento y llaves son OPCIONALES a nivel de formulario. Si más adelante se
+// re-endurece la entrada (ENTRY_REQUIRE_PRECONDITIONS=true), `validateEntryTx` los exige bajo el lock
+// y devuelve el error de dominio correspondiente. Se conservan los topes de longitud/tipo.
 const validateEntrySchema = z.object({
   vehicleId: z.string().min(1),
-  parkingLocation: z.string().trim().min(1, 'Indica la ubicación de aparcamiento'),
-  keysCount: z.coerce.number().int().positive('Registra al menos una llave'),
-  keysLocation: z.string().trim().min(1, 'Indica dónde se guardan las llaves'),
+  parkingLocation: z.string().trim().max(200).optional().default(''),
+  keysCount: z.coerce.number().int().min(0).optional().default(0),
+  keysLocation: z.string().trim().max(200).optional().default(''),
   keysNotes: z.string().trim().max(1000).optional().nullable(),
 })
 

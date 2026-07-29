@@ -6,6 +6,7 @@
  * la transacción abierta por `withLockedRoots`.
  */
 export { EntryError, ENTRY_ERROR_MESSAGES, isEntryError, type EntryErrorCode } from './errors'
+export { ENTRY_REQUIRE_PRECONDITIONS } from './config'
 export {
   deriveCategoryState,
   deriveDocumentChecklist,

@@ -26,6 +26,7 @@ import type { ChecklistItemCategory, VehicleDocumentCategory } from '@prisma/cli
 import type { LockRoot } from '@/lib/locking'
 import { PUBLICADO_REQUIRED_DOCS } from '@/lib/vehicle-legal'
 import { areCategoriesClassified, isContratoGestionSatisfied } from './checklist'
+import { ENTRY_REQUIRE_PRECONDITIONS } from './config'
 import { isReadyForOfficialEntry } from './entry-expediente'
 import { EntryError } from './errors'
 import { getEntryChecklistSignals, getEntryExpedienteInput } from './prisma-deps'
@@ -118,6 +119,12 @@ export type ValidateEntryParams = {
   keysCount: number
   keysLocation: string
   keysNotes: string | null
+  /**
+   * Si se exigen las precondiciones de negocio (llegada, responsable, aparcamiento, llaves, contrato,
+   * checklist, expediente). Por defecto toma el flag global `ENTRY_REQUIRE_PRECONDITIONS`. Los tests
+   * pasan `true` para verificar el endurecimiento; producción usa el flag (hoy `false`).
+   */
+  requirePreconditions?: boolean
 }
 
 export type ValidateEntryHooks = {
@@ -162,31 +169,37 @@ export async function validateEntryTx(
   if (vehicle.entryAnnulledAt != null) throw new EntryError('ENTRY_ANNULLED_TERMINAL')
   if (vehicle.entryValidatedAt != null) throw new EntryError('ENTRY_ALREADY_VALIDATED')
 
-  // (4) Preconditions de input.
-  // La presencia física es ahora un HITO PERSISTIDO previo (corrección 7.1): se lee de la columna
-  // `physicalArrivalAt` bajo el lock, no de un booleano transitorio del formulario.
-  if (vehicle.physicalArrivalAt == null) throw new EntryError('VEHICLE_NOT_PRESENT')
-  if (seller.agentId == null) throw new EntryError('RESPONSIBLE_NOT_SET')
-  if (p.parkingLocation.trim().length === 0) throw new EntryError('PARKING_LOCATION_MISSING')
-  if (!(Number.isInteger(p.keysCount) && p.keysCount > 0) || p.keysLocation.trim().length === 0) {
-    throw new EntryError('KEYS_NOT_RECEIVED')
-  }
+  // Precondiciones de NEGOCIO (4)-(6): solo se exigen si el flag/param lo pide. En la fase de
+  // arranque están relajadas (ver `lib/entry/config.ts`) para no bloquear a la comercial. Los guards
+  // de integridad/idempotencia de arriba y de abajo se mantienen SIEMPRE.
+  const enforce = p.requirePreconditions ?? ENTRY_REQUIRE_PRECONDITIONS
+  if (enforce) {
+    // (4) Preconditions de input.
+    // La presencia física es un HITO PERSISTIDO previo (corrección 7.1): se lee de la columna
+    // `physicalArrivalAt` bajo el lock, no de un booleano transitorio del formulario.
+    if (vehicle.physicalArrivalAt == null) throw new EntryError('VEHICLE_NOT_PRESENT')
+    if (seller.agentId == null) throw new EntryError('RESPONSIBLE_NOT_SET')
+    if (p.parkingLocation.trim().length === 0) throw new EntryError('PARKING_LOCATION_MISSING')
+    if (!(Number.isInteger(p.keysCount) && p.keysCount > 0) || p.keysLocation.trim().length === 0) {
+      throw new EntryError('KEYS_NOT_RECEIVED')
+    }
 
-  // (5) Preconditions documentales (releídas bajo el lock; tablas aparte → límite documentado).
-  const signals = await getEntryChecklistSignals(tx, p.vehicleId, ENTRY_SIGNAL_CATEGORIES)
-  if (!isContratoGestionSatisfied(signals)) throw new EntryError('CONTRATO_GESTION_MISSING')
-  if (!areCategoriesClassified(signals, ENTRY_CLASSIFIED_DOC_CATEGORIES)) {
-    throw new EntryError('CHECKLIST_NOT_CLASSIFIED')
-  }
+    // (5) Preconditions documentales (releídas bajo el lock; tablas aparte → límite documentado).
+    const signals = await getEntryChecklistSignals(tx, p.vehicleId, ENTRY_SIGNAL_CATEGORIES)
+    if (!isContratoGestionSatisfied(signals)) throw new EntryError('CONTRATO_GESTION_MISSING')
+    if (!areCategoriesClassified(signals, ENTRY_CLASSIFIED_DOC_CATEGORIES)) {
+      throw new EntryError('CHECKLIST_NOT_CLASSIFIED')
+    }
 
-  // (6) Expediente mínimo de ENTRADA OFICIAL — política PROPIA (`isReadyForOfficialEntry`), NO
-  //     reutiliza `isReadyForStatus(..., 'TASADO')`. Solo exige identificación del vehículo
-  //     (matrícula); NO exige desiredPrice, fotografías, tasación ni datos comerciales (fases
-  //     posteriores). El contrato de gestión y el checklist ya se comprobaron en (5).
-  const expediente = await getEntryExpedienteInput(tx, p.vehicleId)
-  if (!expediente) throw new EntryError('VEHICLE_NOT_FOUND')
-  if (!isReadyForOfficialEntry(expediente)) {
-    throw new EntryError('EXPEDIENTE_INCOMPLETE')
+    // (6) Expediente mínimo de ENTRADA OFICIAL — política PROPIA (`isReadyForOfficialEntry`), NO
+    //     reutiliza `isReadyForStatus(..., 'TASADO')`. Solo exige identificación del vehículo
+    //     (matrícula); NO exige desiredPrice, fotografías, tasación ni datos comerciales (fases
+    //     posteriores). El contrato de gestión y el checklist ya se comprobaron en (5).
+    const expediente = await getEntryExpedienteInput(tx, p.vehicleId)
+    if (!expediente) throw new EntryError('VEHICLE_NOT_FOUND')
+    if (!isReadyForOfficialEntry(expediente)) {
+      throw new EntryError('EXPEDIENTE_INCOMPLETE')
+    }
   }
 
   // (7) Unicidad de orden de inspección: 1ª barrera por conteo (el índice parcial es la 2ª).
@@ -202,17 +215,22 @@ export async function validateEntryTx(
   await hooks.beforeWrite?.()
 
   // (8) CAS sobre `entryValidatedAt IS NULL` — segunda barrera de idempotencia frente a carreras.
+  // Aparcamiento y llaves pueden faltar en la fase relajada → se escriben null en vez de placeholder.
   const now = new Date()
+  const parkingTrim = p.parkingLocation.trim()
+  const keysLocationTrim = p.keysLocation.trim()
+  const keysProvided =
+    Number.isInteger(p.keysCount) && p.keysCount > 0 && keysLocationTrim.length > 0
   const cas = await tx.vehicle.updateMany({
     where: { id: p.vehicleId, entryValidatedAt: null, entryAnnulledAt: null },
     data: {
       entryValidatedAt: now,
       entryValidatedById: p.actorId,
-      naveLocation: p.parkingLocation.trim(),
-      keysReceivedAt: now,
-      keysReceivedById: p.actorId,
-      keysCount: p.keysCount,
-      keysLocation: p.keysLocation.trim(),
+      naveLocation: parkingTrim.length > 0 ? parkingTrim : null,
+      keysReceivedAt: keysProvided ? now : null,
+      keysReceivedById: keysProvided ? p.actorId : null,
+      keysCount: keysProvided ? p.keysCount : null,
+      keysLocation: keysProvided ? keysLocationTrim : null,
       keysNotes: p.keysNotes,
     },
   })
@@ -235,7 +253,8 @@ export async function validateEntryTx(
     select: { id: true },
   })
 
-  // (10) Traza (NO fuente de verdad). El estado se lee de las columnas del vehículo.
+  // (10) Traza (NO fuente de verdad). El estado se lee de las columnas del vehículo. La traza de
+  // llaves solo se registra si realmente se aportaron (fase relajada: pueden faltar).
   await tx.activity.createMany({
     data: [
       {
@@ -244,12 +263,16 @@ export async function validateEntryTx(
         agentId: p.actorId,
         sellerLeadId: vehicle.sellerLeadId,
       },
-      {
-        type: 'LLAVES_REGISTRADAS',
-        content: `Llaves registradas: ${p.keysCount} · ${p.keysLocation.trim()}`,
-        agentId: p.actorId,
-        sellerLeadId: vehicle.sellerLeadId,
-      },
+      ...(keysProvided
+        ? [
+            {
+              type: 'LLAVES_REGISTRADAS' as const,
+              content: `Llaves registradas: ${p.keysCount} · ${keysLocationTrim}`,
+              agentId: p.actorId,
+              sellerLeadId: vehicle.sellerLeadId,
+            },
+          ]
+        : []),
       {
         type: 'ORDEN_INSPECCION_CREADA',
         content: 'Orden de inspección de entrada creada',

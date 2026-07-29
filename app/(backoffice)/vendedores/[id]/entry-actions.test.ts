@@ -121,16 +121,22 @@ describe('validateEntry', () => {
     expect(validateEntryTx).toHaveBeenCalledOnce()
   })
 
-  it('input inválido (sin ubicación de aparcamiento) → error de validación, no toca la tx', async () => {
+  it('fase relajada: permite validar SIN ubicación de aparcamiento (la tx decide)', async () => {
     const res = await validateEntry({ ...validForm, parkingLocation: '' })
-    expect(res.ok).toBe(false)
-    expect(validateEntryTx).not.toHaveBeenCalled()
+    expect(res.ok).toBe(true)
+    expect(validateEntryTx).toHaveBeenCalledOnce()
   })
 
-  it('keysCount no positivo → error de validación', async () => {
-    const res = await validateEntry({ ...validForm, keysCount: 0 })
-    expect(res.ok).toBe(false)
-    expect(validateEntryTx).not.toHaveBeenCalled()
+  it('fase relajada: permite validar SIN llaves (keysCount 0, sin ubicación)', async () => {
+    const res = await validateEntry({ ...validForm, keysCount: 0, keysLocation: '' })
+    expect(res.ok).toBe(true)
+    expect(validateEntryTx).toHaveBeenCalledOnce()
+  })
+
+  it('validar con TODO vacío (solo vehicleId) → ok (nada obligatorio)', async () => {
+    const res = await validateEntry({ vehicleId: 'v1' })
+    expect(res.ok).toBe(true)
+    expect(validateEntryTx).toHaveBeenCalledOnce()
   })
 
   it('vehículo inexistente → VEHICLE_NOT_FOUND, sin abrir la tx', async () => {
