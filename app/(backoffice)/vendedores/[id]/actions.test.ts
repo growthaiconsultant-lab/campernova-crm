@@ -60,6 +60,8 @@ import { VEHICLE_TRANSITIONS } from '@/lib/state-machine'
 import { withLockedRoots } from '@/lib/locking'
 import {
   updateVehicle,
+  publishVehicle,
+  forcePublishVehicle,
   discardSellerLead,
   officialManualValuation,
   officialAutoValuation,
@@ -512,6 +514,144 @@ describe('updateVehicle — coordinación por raíces (I3B)', () => {
 })
 
 // ─── discardSellerLead — decisión comercial (NO archiva, NO elimina) ───────────
+
+describe('publicación desde la tarjeta del expediente', () => {
+  const missingRequirements = [
+    { field: 'vin', message: 'VIN / número de bastidor', severity: 'error' as const },
+    {
+      field: 'doc_DNI_VENDEDOR',
+      message: 'Documento: DNI/NIE del vendedor',
+      severity: 'error' as const,
+    },
+  ]
+
+  it('fuerza TASADO → PUBLICADO con requisitos faltantes y deja una auditoría detallada', async () => {
+    mockDb.vehicle.findUnique.mockResolvedValue({
+      sellerLeadId: 'sl-1',
+      status: 'TASADO',
+      publishedAt: null,
+    })
+    vi.mocked(getVehicleLegalInput).mockResolvedValue(mockLegalInput)
+    vi.mocked(getVehicleDocumentSummary).mockResolvedValue(mockDocs)
+    vi.mocked(listMissingRequirements).mockReturnValue(missingRequirements)
+    mockDb.vehicle.updateMany.mockResolvedValue({ count: 1 })
+    mockDb.activity.create.mockResolvedValue({})
+
+    const result = await forcePublishVehicle('v-1')
+
+    expect(result).toEqual({ ok: true })
+    expect(withLockedRoots).toHaveBeenCalledWith(
+      [
+        { type: 'vehicle', id: 'v-1' },
+        { type: 'sellerLead', id: 'sl-1' },
+      ],
+      expect.any(Function)
+    )
+    expect(mockDb.vehicle.updateMany).toHaveBeenCalledWith({
+      where: { id: 'v-1', status: 'TASADO' },
+      data: { status: 'PUBLICADO', publishedAt: expect.any(Date) },
+    })
+    const activity = mockDb.activity.create.mock.calls[0][0].data
+    expect(activity).toMatchObject({
+      type: 'CAMBIO_ESTADO',
+      agentId: 'agent-1',
+      sellerLeadId: 'sl-1',
+    })
+    expect(activity.content).toMatch(/publicación forzada/i)
+    expect(activity.content).toContain('VIN / número de bastidor')
+    expect(activity.content).toContain('Documento: DNI/NIE del vendedor')
+    expect(isReadyForStatus).not.toHaveBeenCalled()
+    expect(revalidatePath).toHaveBeenCalledWith('/vendedores/sl-1')
+    expect(revalidatePath).toHaveBeenCalledWith('/comprar')
+    expect(revalidatePath).toHaveBeenCalledWith('/comprar/vehiculos')
+    expect(revalidatePath).toHaveBeenCalledWith('/comprar/[id]', 'page')
+  })
+
+  it('rechaza un rol TALLER antes de leer o modificar el vehículo', async () => {
+    vi.mocked(requireAgente).mockRejectedValue(new Error('forbidden: TALLER'))
+
+    await expect(forcePublishVehicle('v-1')).rejects.toThrow('forbidden: TALLER')
+
+    expect(mockDb.vehicle.findUnique).not.toHaveBeenCalled()
+    expect(withLockedRoots).not.toHaveBeenCalled()
+    expect(mockDb.vehicle.updateMany).not.toHaveBeenCalled()
+  })
+
+  it('no inicia la publicación forzada si el vehículo no está TASADO', async () => {
+    mockDb.vehicle.findUnique.mockResolvedValue({
+      sellerLeadId: 'sl-1',
+      status: 'PUBLICADO',
+      publishedAt: null,
+    })
+
+    const result = await forcePublishVehicle('v-1')
+
+    expect(result).toEqual({
+      error: { formErrors: [INVALID_VEHICLE_TRANSITION_MESSAGE], fieldErrors: {} },
+    })
+    expect(getVehicleLegalInput).not.toHaveBeenCalled()
+    expect(mockDb.vehicle.updateMany).not.toHaveBeenCalled()
+    expect(mockDb.activity.create).not.toHaveBeenCalled()
+  })
+
+  it('conserva publishedAt cuando el vehículo ya se había publicado antes', async () => {
+    const firstPublishedAt = new Date('2026-06-01T10:00:00.000Z')
+    mockDb.vehicle.findUnique.mockResolvedValue({
+      sellerLeadId: 'sl-1',
+      status: 'TASADO',
+      publishedAt: firstPublishedAt,
+    })
+    vi.mocked(getVehicleLegalInput).mockResolvedValue(mockLegalInput)
+    vi.mocked(getVehicleDocumentSummary).mockResolvedValue(mockDocs)
+    vi.mocked(listMissingRequirements).mockReturnValue(missingRequirements)
+    mockDb.vehicle.updateMany.mockResolvedValue({ count: 1 })
+
+    await forcePublishVehicle('v-1')
+
+    expect(mockDb.vehicle.updateMany.mock.calls[0][0].data).toEqual({ status: 'PUBLICADO' })
+  })
+
+  it('la publicación normal sigue bloqueada si el expediente no está listo', async () => {
+    mockDb.vehicle.findUnique.mockResolvedValue({
+      sellerLeadId: 'sl-1',
+      status: 'TASADO',
+      publishedAt: null,
+    })
+    vi.mocked(getVehicleLegalInput).mockResolvedValue(mockLegalInput)
+    vi.mocked(getVehicleDocumentSummary).mockResolvedValue(mockDocs)
+    vi.mocked(listMissingRequirements).mockReturnValue(missingRequirements)
+    vi.mocked(isReadyForStatus).mockReturnValue(false)
+    mockDb.activity.create.mockResolvedValue({})
+
+    const result = await publishVehicle('v-1')
+
+    expect('error' in result).toBe(true)
+    if (!('error' in result)) throw new Error('La publicación normal debía quedar bloqueada')
+    expect(result.error.formErrors[0]).toMatch(/VIN[\s\S]*DNI|DNI[\s\S]*VIN/)
+    expect(isReadyForStatus).toHaveBeenCalledWith(mockLegalInput, 'PUBLICADO', mockDocs)
+    expect(mockDb.vehicle.updateMany).not.toHaveBeenCalled()
+    expect(mockDb.activity.create.mock.calls[0][0].data.type).toBe('PUBLICACION_BLOQUEADA')
+  })
+
+  it('la publicación normal publica cuando no hay errores legales', async () => {
+    mockDb.vehicle.findUnique.mockResolvedValue({
+      sellerLeadId: 'sl-1',
+      status: 'TASADO',
+      publishedAt: null,
+    })
+    vi.mocked(getVehicleLegalInput).mockResolvedValue(mockLegalInput)
+    vi.mocked(getVehicleDocumentSummary).mockResolvedValue(mockDocs)
+    vi.mocked(listMissingRequirements).mockReturnValue([])
+    vi.mocked(isReadyForStatus).mockReturnValue(true)
+    mockDb.vehicle.updateMany.mockResolvedValue({ count: 1 })
+
+    const result = await publishVehicle('v-1')
+
+    expect(result).toEqual({ ok: true })
+    expect(mockDb.vehicle.updateMany).toHaveBeenCalledTimes(1)
+    expect(mockDb.activity.create.mock.calls[0][0].data.content).not.toMatch(/forzada/i)
+  })
+})
 
 describe('discardSellerLead', () => {
   it('descarta (→ DESCARTADO) con motivo y guarda lostReason + notas', async () => {

@@ -1,10 +1,14 @@
 import { CheckCircle2, XCircle, AlertCircle } from 'lucide-react'
+import type { VehicleStatus } from '@prisma/client'
 import { listMissingRequirements } from '@/lib/vehicle-legal'
 import type { VehicleLegalInput, DocumentSummary, MissingRequirement } from '@/lib/vehicle-legal'
+import { PublishVehicleButton } from './publish-vehicle-button'
 
 interface Props {
   vehicle: VehicleLegalInput
   docs: DocumentSummary[]
+  vehicleStatus: VehicleStatus
+  canPublish: boolean
 }
 
 function RequirementRow({ req }: { req: MissingRequirement }) {
@@ -24,7 +28,7 @@ function RequirementRow({ req }: { req: MissingRequirement }) {
   )
 }
 
-export function MissingForPublishCard({ vehicle, docs }: Props) {
+export function MissingForPublishCard({ vehicle, docs, vehicleStatus, canPublish }: Props) {
   const missing = listMissingRequirements(vehicle, 'PUBLICADO', docs)
   const errors = missing.filter((m) => m.severity === 'error')
   const warnings = missing.filter((m) => m.severity === 'warning')
@@ -62,6 +66,12 @@ export function MissingForPublishCard({ vehicle, docs }: Props) {
             <RequirementRow key={r.field} req={r} />
           ))}
         </ul>
+      )}
+
+      {canPublish && vehicleStatus === 'TASADO' && (
+        <div className="border-current/10 mt-4 border-t pt-4">
+          <PublishVehicleButton vehicleId={vehicle.id} force={!allGood} />
+        </div>
       )}
     </div>
   )

@@ -1145,7 +1145,14 @@ export default async function FichaVendedorPage({
                     canUpload={isAgente}
                   />
                 </div>
-                {isAgente && <MissingForPublishCard vehicle={legalInput} docs={docSummary} />}
+                {isAgente && (
+                  <MissingForPublishCard
+                    vehicle={legalInput}
+                    docs={docSummary}
+                    vehicleStatus={v.status}
+                    canPublish={isAgente}
+                  />
+                )}
                 <div className="rounded-xl border border-cn-line p-4">
                   <p className="text-sm font-medium text-cn-ink-700">Taller</p>
                   <p className="text-cn-ink-400 mt-0.5 text-xs">
