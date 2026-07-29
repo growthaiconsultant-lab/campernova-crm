@@ -11,6 +11,12 @@
 > proceso) y la validación mínima por categoría (C0–C9) siguen aplicando exactamente igual, sin importar
 > qué agente escribió cada línea. Codex es un ejecutor; **la responsabilidad del cambio es tuya y la
 > revisión final la conduce Claude.**
+>
+> Claude es responsable de la **integridad global del plan**. Delegar a Codex partes mecánicas no
+> delega la responsabilidad arquitectónica: Claude debe revisar la integración entre todas las partes
+> delegadas y comprobar el cumplimiento del
+> [estándar permanente de calidad para planes](planning-quality-standard.md) antes de presentar o
+> autorizar el plan.
 
 ---
 
@@ -104,3 +110,7 @@ Claude:  validación post-despliegue (Sentry/PostHog/KPIs) cuando llegue a un en
 
 Regla práctica: **si el paso requiere criterio de dominio, riesgo o seguridad, lo conduce Claude. Si es
 traducir un plan cerrado en código, lo hace Codex.**
+
+El reparto descrito aquí complementa el
+[proceso universal de cambios de ingeniería](engineering-change-process.md); no sustituye sus gates,
+autorizaciones ni criterios de bloqueo.
