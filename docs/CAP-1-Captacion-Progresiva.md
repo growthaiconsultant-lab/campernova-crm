@@ -1,8 +1,11 @@
 # CAP-1 — Alta y edición progresiva de candidatos y vehículos
 
-> **Estado:** Draft PR (`feat/progressive-candidate-intake-cap1`). Sin fusionar, sin migración
-> remota, sin despliegue. Este documento describe el cambio tal como está implementado localmente
-> con CI local en verde.
+> **Estado:** **EN PRODUCCIÓN** (fast-track por urgencia operativa, 2026-07-29). PR #150 fusionado
+> a `main` (`145359f`); migración `20260728130000` aplicada a producción DB-first (11 columnas,
+> checksum `cb2d2dd3…12b9`, sin DML/backfill, conteos idénticos al preflight); deployment READY en
+> `campersnova.com`; smoke autenticado con un único expediente sintético + limpieza exacta. La
+> validación autenticada en staging se **omitió** por urgencia (excepción autorizada). **Observación
+> de 24 h: pendiente.** Detalle en `docs/releases/2026-07-29-cap1-production.md`.
 
 ## 1. Política (vinculante)
 
