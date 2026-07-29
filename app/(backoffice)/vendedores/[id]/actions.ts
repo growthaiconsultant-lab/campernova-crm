@@ -26,6 +26,7 @@ import { isValidLostReason, LOST_REASON_LABELS } from '@/lib/lost-reason'
 import {
   applyManualVehicleUpdateTx,
   buildVehicleUpdateRoots,
+  VehicleUpdateError,
   isVehicleStatusConflict,
   isVehicleUpdateError,
   VEHICLE_STATUS_CONFLICT_MESSAGE,
@@ -319,6 +320,133 @@ export async function updateVehicle(vehicleId: string, data: unknown) {
   // PUB-1: publicar (o editar un vehículo publicado) debe refrescar el catálogo público (ISR).
   revalidatePublicCatalog()
   return { ok: true }
+}
+
+type PublishVehicleResult =
+  | { ok: true }
+  | { error: { formErrors: string[]; fieldErrors: Record<string, string[]> } }
+
+/**
+ * Publicación dedicada desde la tarjeta del expediente. Conserva el mismo protocolo que
+ * `updateVehicle`: lock de raíces, relectura transaccional, transición validada y CAS. La única
+ * diferencia entre el flujo normal y el forzado es si los requisitos legales bloquean la escritura.
+ */
+async function publishVehicleInternal(
+  vehicleId: string,
+  force: boolean
+): Promise<PublishVehicleResult> {
+  const actor = await requireAgente()
+
+  // Lectura preliminar solo para resolver las raíces del lock. El estado se relee dentro de la tx.
+  const vehicle = await db.vehicle.findUnique({
+    where: { id: vehicleId },
+    select: { sellerLeadId: true },
+  })
+  if (!vehicle) {
+    return { error: { formErrors: ['Vehículo no encontrado'], fieldErrors: {} } }
+  }
+
+  const roots = buildVehicleUpdateRoots({ vehicleId, sellerLeadId: vehicle.sellerLeadId })
+  let missingLines: string[] = []
+
+  try {
+    await withLockedRoots(roots, (tx) =>
+      applyManualVehicleUpdateTx(
+        tx,
+        {
+          vehicleId,
+          resolvedSellerLeadId: vehicle.sellerLeadId,
+          nextStatus: 'PUBLICADO',
+          data: { status: 'PUBLICADO' },
+          actorId: actor.id,
+          activityContent: (fromStatus) =>
+            force
+              ? `Publicación forzada: ${VEHICLE_STATUS_LABELS[fromStatus]} → ${VEHICLE_STATUS_LABELS.PUBLICADO}. Requisitos pendientes:\n${missingLines.length > 0 ? missingLines.join('\n') : '- Ninguno'}`
+              : `Vehículo: ${VEHICLE_STATUS_LABELS[fromStatus]} → ${VEHICLE_STATUS_LABELS.PUBLICADO}`,
+        },
+        {
+          beforeWrite: async ({ fromStatus, tx }) => {
+            // La acción dedicada solo posee TASADO → PUBLICADO. Evita que un submit directo trate
+            // PUBLICADO → PUBLICADO como éxito por la regla general `from === to`.
+            if (fromStatus !== 'TASADO') {
+              throw new VehicleUpdateError('INVALID_VEHICLE_TRANSITION')
+            }
+
+            const txDb = tx as unknown as typeof db
+            const [legalInput, docs] = await Promise.all([
+              getVehicleLegalInput(txDb, vehicleId),
+              getVehicleDocumentSummary(txDb, vehicleId),
+            ])
+            const missing = legalInput
+              ? listMissingRequirements(legalInput, 'PUBLICADO', docs)
+              : [
+                  {
+                    field: 'vehicle',
+                    message: 'No se pudo leer el expediente legal',
+                    severity: 'error' as const,
+                  },
+                ]
+            missingLines = missing.map((requirement) => `- ${requirement.message}`)
+
+            if (!force && (!legalInput || !isReadyForStatus(legalInput, 'PUBLICADO', docs))) {
+              throw new VehiclePublicationBlockedError(
+                'PUBLICADO',
+                missing
+                  .filter((requirement) => requirement.severity === 'error')
+                  .map((requirement) => `- ${requirement.message}`)
+              )
+            }
+          },
+        }
+      )
+    )
+  } catch (err) {
+    if (err instanceof VehiclePublicationBlockedError) {
+      await db.activity.create({
+        data: {
+          type: 'PUBLICACION_BLOQUEADA',
+          content: `Intento de pasar a ${VEHICLE_STATUS_LABELS[err.targetStatus]} bloqueado.\n${err.lines.join('\n')}`,
+          agentId: actor.id,
+          sellerLeadId: vehicle.sellerLeadId,
+        },
+      })
+      return {
+        error: {
+          formErrors: [
+            `El vehículo no puede pasar a ${VEHICLE_STATUS_LABELS[err.targetStatus]}. Faltan:\n${err.lines.join('\n')}\n\nCompleta el expediente legal en la sección 'Expediente' de la ficha del vehículo antes de reintentar.`,
+          ],
+          fieldErrors: {},
+        },
+      }
+    }
+    if (isVehicleStatusConflict(err)) {
+      return { error: { formErrors: [VEHICLE_STATUS_CONFLICT_MESSAGE], fieldErrors: {} } }
+    }
+    if (isVehicleUpdateError(err)) {
+      return { error: { formErrors: [err.message], fieldErrors: {} } }
+    }
+    if (isLockError(err)) return { error: { formErrors: [err.message], fieldErrors: {} } }
+    throw err
+  }
+
+  // Se ejecuta tras el commit: no forma parte de la transición ni puede dejarla a medias.
+  await recalculateMatchesForVehicle(vehicleId, db)
+  revalidatePath(`/vendedores/${vehicle.sellerLeadId}`)
+  revalidatePublicCatalog()
+  return { ok: true }
+}
+
+/** Publicación normal desde la tarjeta: mantiene activo el gate del expediente legal. */
+export async function publishVehicle(vehicleId: string): Promise<PublishVehicleResult> {
+  return publishVehicleInternal(vehicleId, false)
+}
+
+/**
+ * Publicación excepcional autorizada para ADMIN/AGENTE. Salta únicamente el gate legal; conserva
+ * locks, relectura, transición TASADO → PUBLICADO, CAS, primera fecha de publicación y auditoría.
+ */
+export async function forcePublishVehicle(vehicleId: string): Promise<PublishVehicleResult> {
+  return publishVehicleInternal(vehicleId, true)
 }
 
 /**
