@@ -68,7 +68,7 @@ export function MissingForPublishCard({ vehicle, docs, vehicleStatus, canPublish
         </ul>
       )}
 
-      {canPublish && vehicleStatus === 'TASADO' && (
+      {canPublish && (vehicleStatus === 'NUEVO' || vehicleStatus === 'TASADO') && (
         <div className="border-current/10 mt-4 border-t pt-4">
           <PublishVehicleButton vehicleId={vehicle.id} force={!allGood} />
         </div>
