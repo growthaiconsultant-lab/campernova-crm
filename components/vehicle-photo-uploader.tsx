@@ -8,18 +8,28 @@ import { compressImage } from '@/lib/image/compress'
 import {
   deleteVehiclePhoto,
   reorderVehiclePhotos,
+  setVehiclePhotoCategory,
   uploadVehiclePhoto,
 } from '@/app/(backoffice)/vendedores/photo-actions'
+import type { PhotoCategory } from '@prisma/client'
 
 export type VehiclePhoto = {
   id: string
   url: string
   order: number
+  category?: PhotoCategory | null
 }
 
 const MIN_PHOTOS = 6
 const MAX_PHOTOS = 30
 const ACCEPTED_MIME = ['image/jpeg', 'image/png', 'image/webp']
+// PUB-1: categorías de foto para el anuncio. Opcional (Sin categoría) mientras el gate esté relajado.
+const CATEGORY_OPTIONS: { value: PhotoCategory; label: string }[] = [
+  { value: 'EXTERIOR', label: 'Exterior' },
+  { value: 'INTERIOR', label: 'Interior' },
+  { value: 'DETALLE', label: 'Detalle' },
+  { value: 'DOCUMENTAL', label: 'Documental' },
+]
 
 type Props = {
   vehicleId: string
@@ -106,6 +116,21 @@ export function VehiclePhotoUploader({ vehicleId, initialPhotos, className }: Pr
       const prev = photos
       setPhotos((p) => p.filter((x) => x.id !== photoId))
       const res = await deleteVehiclePhoto(photoId)
+      if ('error' in res) {
+        setError(res.error)
+        setPhotos(prev)
+      }
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    },
+    [photos]
+  )
+
+  const handleSetCategory = useCallback(
+    async (photoId: string, category: PhotoCategory | null) => {
+      setError(null)
+      const prev = photos
+      setPhotos((p) => p.map((x) => (x.id === photoId ? { ...x, category } : x)))
+      const res = await setVehiclePhotoCategory(photoId, category)
       if ('error' in res) {
         setError(res.error)
         setPhotos(prev)
@@ -265,6 +290,24 @@ export function VehiclePhotoUploader({ vehicleId, initialPhotos, className }: Pr
               >
                 <X className="h-4 w-4" aria-hidden />
               </button>
+              {/* PUB-1: categoría de la foto (opcional) */}
+              <select
+                value={photo.category ?? ''}
+                onClick={(e) => e.stopPropagation()}
+                onChange={(e) => {
+                  const val = e.target.value
+                  void handleSetCategory(photo.id, val === '' ? null : (val as PhotoCategory))
+                }}
+                aria-label={`Categoría de la foto ${index + 1}`}
+                className="absolute bottom-1 left-1 max-w-[80%] rounded bg-black/70 px-1 py-0.5 text-[11px] font-medium text-white"
+              >
+                <option value="">Sin categoría</option>
+                {CATEGORY_OPTIONS.map((o) => (
+                  <option key={o.value} value={o.value}>
+                    {o.label}
+                  </option>
+                ))}
+              </select>
             </li>
           ))}
           {Array.from({ length: uploading }).map((_, i) => (

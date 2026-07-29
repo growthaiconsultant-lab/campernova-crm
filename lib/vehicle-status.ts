@@ -189,7 +189,7 @@ export async function applyManualVehicleUpdateTx(
 ): Promise<{ statusChanged: boolean; fromStatus: VehicleStatus }> {
   const vehicle = await tx.vehicle.findUnique({
     where: { id: p.vehicleId },
-    select: { status: true, sellerLeadId: true },
+    select: { status: true, sellerLeadId: true, publishedAt: true },
   })
   if (!vehicle) throw new VehicleUpdateError('VEHICLE_NOT_FOUND')
 
@@ -222,6 +222,13 @@ export async function applyManualVehicleUpdateTx(
 
   await hooks.beforeWrite?.({ fromStatus: vehicle.status, tx })
 
+  // PUB-1: `publishedAt` = fecha de PRIMERA publicación. Se fija solo al pasar a `PUBLICADO` si aún
+  // es null (republicar no la reescribe; la despublicación la conserva). Sin backfill.
+  const data: Prisma.VehicleUpdateManyMutationInput =
+    p.nextStatus === 'PUBLICADO' && vehicle.status !== 'PUBLICADO' && vehicle.publishedAt == null
+      ? { ...p.data, publishedAt: new Date() }
+      : p.data
+
   const { statusChanged } = await applyVehicleUpdateTx(
     tx,
     {
@@ -231,7 +238,7 @@ export async function applyManualVehicleUpdateTx(
       sellerLeadId: vehicle.sellerLeadId,
       actorId: p.actorId,
       activityContent: p.activityContent(vehicle.status),
-      data: p.data,
+      data,
     },
     { beforeWrite: hooks.beforeCas }
   )

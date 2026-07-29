@@ -71,6 +71,8 @@ const ACTIVITY_LABELS: Record<ActivityType, string> = {
   ORDEN_INSPECCION_CREADA: 'Orden de inspección',
   DISPOSICION_DOCUMENTAL_ACTUALIZADA: 'Disposición documental',
   LLEGADA_REGISTRADA: 'Llegada física',
+  // PUB-1: retirada de anuncio (PUBLICADO → TASADO).
+  PUBLICACION_RETIRADA: 'Anuncio retirado',
 }
 
 const ICON_CLASSES: Record<ActivityType, string> = {
@@ -127,6 +129,7 @@ const ICON_CLASSES: Record<ActivityType, string> = {
   DISPOSICION_DOCUMENTAL_ACTUALIZADA:
     'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300',
   LLEGADA_REGISTRADA: 'bg-teal-100 text-teal-700 dark:bg-teal-900/40 dark:text-teal-300',
+  PUBLICACION_RETIRADA: 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300',
 }
 
 function ActivityIcon({ type }: { type: ActivityType }) {

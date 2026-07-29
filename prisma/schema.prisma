@@ -189,6 +189,19 @@ enum ActivityType {
   // Llegada física del vehículo a la nave (PR-A2, corrección 7.1). Hito persistido previo a la
   // entrada oficial: la validación exige physicalArrivalAt != null (leído bajo el lock).
   LLEGADA_REGISTRADA
+  // Despublicación de un anuncio (PUB-1): retirar del catálogo PUBLICADO → TASADO con motivo/actor.
+  // Trazabilidad, NO fuente de verdad (el estado se lee de vehicles.status).
+  PUBLICACION_RETIRADA
+}
+
+/// Categoría de una foto del vehículo (PUB-1). Permite exigir cobertura mínima (p. ej. exterior +
+/// interior) al publicar cuando el flag `PUBLICACION_REQUIERE_FOTOS_CATEGORIZADAS` esté activo, y
+/// organizar el anuncio. Las fotos antiguas quedan en `null` (sin categoría) — sin backfill.
+enum PhotoCategory {
+  EXTERIOR
+  INTERIOR
+  DETALLE
+  DOCUMENTAL
 }
 
 /// Temperatura comercial del lead comprador (CAM-62).
@@ -533,37 +546,37 @@ model User {
   createdAt        DateTime  @default(now()) @map("created_at")
   updatedAt        DateTime  @updatedAt @map("updated_at")
 
-  sellerLeads              SellerLead[]           @relation("AgentSellerLeads")
-  buyerLeads               BuyerLead[]            @relation("AgentBuyerLeads")
-  archivedSellerLeads      SellerLead[]           @relation("ArchivedSellerLeads")
-  archivedBuyerLeads       BuyerLead[]            @relation("ArchivedBuyerLeads")
+  sellerLeads              SellerLead[]              @relation("AgentSellerLeads")
+  buyerLeads               BuyerLead[]               @relation("AgentBuyerLeads")
+  archivedSellerLeads      SellerLead[]              @relation("ArchivedSellerLeads")
+  archivedBuyerLeads       BuyerLead[]               @relation("ArchivedBuyerLeads")
   activities               Activity[]
   valuations               Valuation[]
   valuationAttempts        VehicleValuationAttempt[]
   vehicleAds               VehicleAd[]
-  assignedWorkOrders       WorkOrder[]            @relation("AssignedWorkOrders")
-  approvedWorkOrders       WorkOrder[]            @relation("ApprovedWorkOrders")
+  assignedWorkOrders       WorkOrder[]               @relation("AssignedWorkOrders")
+  approvedWorkOrders       WorkOrder[]               @relation("ApprovedWorkOrders")
   workOrderTimeEntries     WorkOrderTimeEntry[]
   vehicleCostsCreated      VehicleCost[]
-  deliveriesResponsable    Delivery[]             @relation("ResponsableDeliveries")
+  deliveriesResponsable    Delivery[]                @relation("ResponsableDeliveries")
   warrantiesExtended       Warranty[]
   deliveryDocsUploaded     DeliveryDocument[]
-  postventaTicketsResp     PostventaTicket[]      @relation("ResponsibleTickets")
+  postventaTicketsResp     PostventaTicket[]         @relation("ResponsibleTickets")
   postventaPhotosUploaded  PostventaTicketPhoto[]
-  chargeChecksPerformed    Vehicle[]              @relation("ChargeChecks")
-  trustVerifications       Vehicle[]              @relation("TrustVerifications")
+  chargeChecksPerformed    Vehicle[]                 @relation("ChargeChecks")
+  trustVerifications       Vehicle[]                 @relation("TrustVerifications")
   vehicleDocumentsUploaded VehicleDocument[]
-  createdCalendarEvents    CalendarEvent[]        @relation("CreatedCalendarEvents")
-  assignedCalendarEvents   CalendarEvent[]        @relation("AssignedCalendarEvents")
-  createdCaptures          VehicleCapture[]       @relation("CreatedCaptures")
-  assignedCaptures         VehicleCapture[]       @relation("AssignedCaptures")
-  createdOffers            Offer[]                @relation("CreatedOffers")
-  kpiEvents                KpiEvent[]             @relation("KpiEventActor")
+  createdCalendarEvents    CalendarEvent[]           @relation("CreatedCalendarEvents")
+  assignedCalendarEvents   CalendarEvent[]           @relation("AssignedCalendarEvents")
+  createdCaptures          VehicleCapture[]          @relation("CreatedCaptures")
+  assignedCaptures         VehicleCapture[]          @relation("AssignedCaptures")
+  createdOffers            Offer[]                   @relation("CreatedOffers")
+  kpiEvents                KpiEvent[]                @relation("KpiEventActor")
   documentVersionsUploaded DocumentVersion[]
-  entryValidations         Vehicle[]              @relation("EntryValidations")
-  entryAnnulments          Vehicle[]              @relation("EntryAnnulments")
-  physicalArrivalsRecorded Vehicle[]              @relation("PhysicalArrivals")
-  keysCustodyRecorded      Vehicle[]              @relation("KeysCustody")
+  entryValidations         Vehicle[]                 @relation("EntryValidations")
+  entryAnnulments          Vehicle[]                 @relation("EntryAnnulments")
+  physicalArrivalsRecorded Vehicle[]                 @relation("PhysicalArrivals")
+  keysCustodyRecorded      Vehicle[]                 @relation("KeysCustody")
 
   documentRequirementDispositions VehicleDocumentRequirementDisposition[]
 
@@ -721,25 +734,25 @@ model Vehicle {
   createdAt            DateTime              @default(now()) @map("created_at")
   updatedAt            DateTime              @updatedAt @map("updated_at")
 
-  sellerLead       SellerLead        @relation(fields: [sellerLeadId], references: [id], onDelete: Cascade)
-  chargeCheckedBy  User?             @relation("ChargeChecks", fields: [chargeCheckedById], references: [id])
-  trustVerifiedBy  User?             @relation("TrustVerifications", fields: [trustVerifiedById], references: [id])
-  entryValidatedBy User?             @relation("EntryValidations", fields: [entryValidatedById], references: [id], onDelete: SetNull)
-  entryAnnulledBy  User?             @relation("EntryAnnulments", fields: [entryAnnulledById], references: [id], onDelete: SetNull)
-  physicalArrivalBy User?            @relation("PhysicalArrivals", fields: [physicalArrivalById], references: [id], onDelete: SetNull)
-  keysReceivedBy   User?             @relation("KeysCustody", fields: [keysReceivedById], references: [id], onDelete: SetNull)
-  photos           VehiclePhoto[]
-  valuations       Valuation[]
+  sellerLead        SellerLead                @relation(fields: [sellerLeadId], references: [id], onDelete: Cascade)
+  chargeCheckedBy   User?                     @relation("ChargeChecks", fields: [chargeCheckedById], references: [id])
+  trustVerifiedBy   User?                     @relation("TrustVerifications", fields: [trustVerifiedById], references: [id])
+  entryValidatedBy  User?                     @relation("EntryValidations", fields: [entryValidatedById], references: [id], onDelete: SetNull)
+  entryAnnulledBy   User?                     @relation("EntryAnnulments", fields: [entryAnnulledById], references: [id], onDelete: SetNull)
+  physicalArrivalBy User?                     @relation("PhysicalArrivals", fields: [physicalArrivalById], references: [id], onDelete: SetNull)
+  keysReceivedBy    User?                     @relation("KeysCustody", fields: [keysReceivedById], references: [id], onDelete: SetNull)
+  photos            VehiclePhoto[]
+  valuations        Valuation[]
   valuationAttempts VehicleValuationAttempt[]
-  matches          Match[]
-  ads              VehicleAd[]
-  costs            VehicleCost[]
-  workOrders       WorkOrder[]
-  deliveries       Delivery[]
-  warranty         Warranty?
-  documents        VehicleDocument[]
-  calendarEvents   CalendarEvent[]
-  offers           Offer[]
+  matches           Match[]
+  ads               VehicleAd[]
+  costs             VehicleCost[]
+  workOrders        WorkOrder[]
+  deliveries        Delivery[]
+  warranty          Warranty?
+  documents         VehicleDocument[]
+  calendarEvents    CalendarEvent[]
+  offers            Offer[]
 
   documentRequirementDispositions VehicleDocumentRequirementDisposition[]
 
@@ -753,12 +766,15 @@ model Vehicle {
 
 /// Fotos del vehículo almacenadas en Supabase Storage (bucket vehicle-photos).
 model VehiclePhoto {
-  id        String   @id @default(cuid())
-  vehicleId String   @map("vehicle_id")
+  id        String         @id @default(cuid())
+  vehicleId String         @map("vehicle_id")
   url       String
   order     Int
-  altText   String?  @map("alt_text")
-  createdAt DateTime @default(now()) @map("created_at")
+  altText   String?        @map("alt_text")
+  // PUB-1: categoría opcional (exterior/interior/detalle/documental). Nullable: las fotos previas a
+  // PUB-1 no la tienen. No se persiste placeholder.
+  category  PhotoCategory?
+  createdAt DateTime       @default(now()) @map("created_at")
 
   vehicle Vehicle @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
 
@@ -782,8 +798,8 @@ model Valuation {
   createdById String?             @map("created_by_id")
   createdAt   DateTime            @default(now()) @map("created_at")
 
-  vehicle   Vehicle @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
-  createdBy User?   @relation(fields: [createdById], references: [id])
+  vehicle   Vehicle                   @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+  createdBy User?                     @relation(fields: [createdById], references: [id])
   attempts  VehicleValuationAttempt[]
 
   @@index([vehicleId])
@@ -796,32 +812,32 @@ model Valuation {
 /// Activity NO lo es. Cuando el intento COMPLETADA produce cifras, `valuationId` enlaza la
 /// `Valuation` creada.
 model VehicleValuationAttempt {
-  id            String               @id @default(cuid())
-  vehicleId     String               @map("vehicle_id")
-  purpose       ValuationPurpose
-  outcome       ValuationOutcome
-  method        ValuationMethod
-  confidence    ValuationConfidence? // null si el intento no produjo cifras
-  min           Decimal?             @db.Decimal(10, 2)
-  recommended   Decimal?             @db.Decimal(10, 2)
-  max           Decimal?             @db.Decimal(10, 2)
-  referenceUsed String?              @map("reference_used") // resumen legible de la base de cálculo
-  reason        String? // motivo estructurado (tasación manual) u observaciones
-  errorCode     String?              @map("error_code") // código/error técnico cuando FALLO_TECNICO
-  createdById   String?              @map("created_by_id")
-  valuationId   String?              @map("valuation_id") // Valuation creada si COMPLETADA
+  id                 String               @id @default(cuid())
+  vehicleId          String               @map("vehicle_id")
+  purpose            ValuationPurpose
+  outcome            ValuationOutcome
+  method             ValuationMethod
+  confidence         ValuationConfidence? // null si el intento no produjo cifras
+  min                Decimal?             @db.Decimal(10, 2)
+  recommended        Decimal?             @db.Decimal(10, 2)
+  max                Decimal?             @db.Decimal(10, 2)
+  referenceUsed      String?              @map("reference_used") // resumen legible de la base de cálculo
+  reason             String? // motivo estructurado (tasación manual) u observaciones
+  errorCode          String?              @map("error_code") // código/error técnico cuando FALLO_TECNICO
+  createdById        String?              @map("created_by_id")
+  valuationId        String?              @map("valuation_id") // Valuation creada si COMPLETADA
   // Idempotencia de la tasación OFICIAL: clave generada por el cliente (una por intención). Un
   // reintento de transporte reutiliza la misma clave → se devuelve el intento ya creado (sin duplicar
   // Attempt/Valuation/Activity/transición). Nullable: los intentos PRELIMINAR no la usan (pueden
   // repetirse). Unique GLOBAL (parcial-por-null: Postgres admite múltiples NULL) → una clave pertenece
   // a lo sumo a UN intento; reutilizarla en otro vehículo/petición no crea un 2.º intento.
-  idempotencyKey String?             @map("idempotency_key")
+  idempotencyKey     String?              @map("idempotency_key")
   // Huella determinista de la petición (sha256 del payload canónico: vehículo, purpose, modo, y para
   // manual el rango/confianza/motivo/método/referencia normalizados). Vincula la clave a ESA petición:
   // si la clave coincide pero la huella o el vehículo difieren → reutilización incompatible (rechazo),
   // nunca se devuelve un resultado ajeno. Nullable (legacy/preliminar sin huella). No sensible.
-  requestFingerprint String?         @map("request_fingerprint")
-  createdAt     DateTime             @default(now()) @map("created_at")
+  requestFingerprint String?              @map("request_fingerprint")
+  createdAt          DateTime             @default(now()) @map("created_at")
 
   vehicle   Vehicle    @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
   createdBy User?      @relation(fields: [createdById], references: [id], onDelete: SetNull)

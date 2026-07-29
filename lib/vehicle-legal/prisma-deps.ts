@@ -1,5 +1,10 @@
-import type { PrismaClient } from '@prisma/client'
+import type { PrismaClient, PhotoCategory } from '@prisma/client'
 import type { VehicleLegalInput, DocumentSummary } from './types'
+
+/** Conteo de fotos por categoría inicializado a 0 (las fotos sin categoría no suman). */
+function emptyPhotosByCategory(): Record<PhotoCategory, number> {
+  return { EXTERIOR: 0, INTERIOR: 0, DETALLE: 0, DOCUMENTAL: 0 }
+}
 
 export async function getVehicleLegalInput(
   db: PrismaClient,
@@ -16,7 +21,7 @@ export async function getVehicleLegalInput(
       desiredPrice: true,
       purchasePrice: true,
       salePrice: true,
-      photos: { select: { id: true } },
+      photos: { select: { category: true } },
       workOrders: {
         where: { status: { in: ['PENDIENTE', 'EN_DIAGNOSTICO', 'PRESUPUESTADA', 'EN_CURSO'] } },
         select: { id: true },
@@ -25,6 +30,11 @@ export async function getVehicleLegalInput(
   })
 
   if (!vehicle) return null
+
+  const photosByCategory = emptyPhotosByCategory()
+  for (const p of vehicle.photos) {
+    if (p.category) photosByCategory[p.category]++
+  }
 
   return {
     id: vehicle.id,
@@ -36,6 +46,7 @@ export async function getVehicleLegalInput(
     purchasePrice: vehicle.purchasePrice,
     salePrice: vehicle.salePrice,
     photoCount: vehicle.photos.length,
+    photosByCategory,
     workOrdersBlockingCount: vehicle.workOrders.length,
   }
 }

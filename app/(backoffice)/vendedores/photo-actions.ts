@@ -11,12 +11,23 @@ import {
   vehiclePhotoPath,
   vehiclePhotoPublicUrl,
 } from '@/lib/supabase/storage'
+import type { PhotoCategory } from '@prisma/client'
 
 const ALLOWED_MIME = ['image/jpeg', 'image/png', 'image/webp'] as const
 const MAX_FILE_SIZE = 2 * 1024 * 1024 // 2 MB — bucket limit
 
+// PUB-1: categorías válidas de foto. Cualquier otro valor (o ausencia) → null (sin categoría).
+const PHOTO_CATEGORIES: readonly PhotoCategory[] = ['EXTERIOR', 'INTERIOR', 'DETALLE', 'DOCUMENTAL']
+function parsePhotoCategory(v: unknown): PhotoCategory | null {
+  return typeof v === 'string' && PHOTO_CATEGORIES.includes(v as PhotoCategory)
+    ? (v as PhotoCategory)
+    : null
+}
+
 type ActionError = { error: string }
-type UploadOk = { photo: { id: string; url: string; order: number } }
+type UploadOk = {
+  photo: { id: string; url: string; order: number; category: PhotoCategory | null }
+}
 type Ok = { ok: true }
 
 export async function uploadVehiclePhoto(formData: FormData): Promise<UploadOk | ActionError> {
@@ -24,6 +35,7 @@ export async function uploadVehiclePhoto(formData: FormData): Promise<UploadOk |
 
   const vehicleId = formData.get('vehicleId')
   const file = formData.get('file')
+  const category = parsePhotoCategory(formData.get('category'))
 
   if (typeof vehicleId !== 'string' || !vehicleId) {
     return { error: 'Vehicle ID inválido' }
@@ -64,8 +76,8 @@ export async function uploadVehiclePhoto(formData: FormData): Promise<UploadOk |
   const nextOrder = (last?.order ?? -1) + 1
 
   const photo = await db.vehiclePhoto.create({
-    data: { vehicleId, url, order: nextOrder },
-    select: { id: true, url: true, order: true },
+    data: { vehicleId, url, order: nextOrder, category },
+    select: { id: true, url: true, order: true, category: true },
   })
 
   const v = await db.vehicle.findUnique({
@@ -103,6 +115,31 @@ export async function deleteVehiclePhoto(photoId: string): Promise<Ok | ActionEr
   })
   if (v) revalidatePath(`/vendedores/${v.sellerLeadId}`)
 
+  return { ok: true }
+}
+
+/**
+ * PUB-1: fija/limpia la categoría de una foto. Resuelve Photo → Vehicle → SellerLead para revalidar
+ * la ficha (el `photoId` no trae el `sellerLeadId`). `null` limpia la categoría (queda sin clasificar).
+ */
+export async function setVehiclePhotoCategory(
+  photoId: string,
+  category: PhotoCategory | null
+): Promise<Ok | ActionError> {
+  await requireCanGenerateAds()
+
+  const parsed = category === null ? null : parsePhotoCategory(category)
+  if (category !== null && parsed === null) return { error: 'Categoría no válida' }
+
+  const photo = await db.vehiclePhoto.findUnique({
+    where: { id: photoId },
+    select: { id: true, vehicle: { select: { sellerLeadId: true } } },
+  })
+  if (!photo) return { error: 'Foto no encontrada' }
+
+  await db.vehiclePhoto.update({ where: { id: photoId }, data: { category: parsed } })
+
+  if (photo.vehicle?.sellerLeadId) revalidatePath(`/vendedores/${photo.vehicle.sellerLeadId}`)
   return { ok: true }
 }
 

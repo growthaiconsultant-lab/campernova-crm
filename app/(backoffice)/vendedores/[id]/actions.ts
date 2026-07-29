@@ -31,6 +31,7 @@ import {
   VEHICLE_STATUS_CONFLICT_MESSAGE,
 } from '@/lib/vehicle-status'
 import { withLockedRoots, isLockError } from '@/lib/locking'
+import { unpublishVehicleTx, isUnpublishError } from '@/lib/vehicle-unpublish'
 import type { VehicleStatus } from '@prisma/client'
 
 /**
@@ -315,6 +316,8 @@ export async function updateVehicle(vehicleId: string, data: unknown) {
   await recalculateMatchesForVehicle(vehicleId, db)
 
   revalidatePath(`/vendedores/${vehicle.sellerLeadId}`)
+  // PUB-1: publicar (o editar un vehículo publicado) debe refrescar el catálogo público (ISR).
+  revalidatePublicCatalog()
   return { ok: true }
 }
 
@@ -628,4 +631,60 @@ export async function officialAutoValuation(vehicleId: string, idempotencyKey: s
   await recalculateMatchesForVehicle(vehicleId, db)
   revalidatePath(`/vendedores/${vehicle.sellerLeadId}`)
   return { ok: true, outcome }
+}
+
+/**
+ * PUB-1 — Retira un anuncio publicado: `PUBLICADO → TASADO` (Comercial/AGENTE + Dirección/ADMIN).
+ * Transición dedicada (retirar ≠ tasar): lock/CAS, guard de ofertas activas bajo el lock, conserva
+ * `publishedAt`. Invalida el catálogo público además de la ficha.
+ */
+export async function unpublishVehicle(
+  vehicleId: string,
+  input: { reason?: string | null } = {}
+): Promise<{ ok: true } | { error: string }> {
+  const actor = await requireAgente()
+
+  const vehicle = await db.vehicle.findUnique({
+    where: { id: vehicleId },
+    select: { sellerLeadId: true },
+  })
+  if (!vehicle) return { error: 'Vehículo no encontrado' }
+
+  const roots = buildVehicleUpdateRoots({ vehicleId, sellerLeadId: vehicle.sellerLeadId })
+
+  try {
+    await withLockedRoots(roots, (tx) =>
+      unpublishVehicleTx(tx, {
+        vehicleId,
+        resolvedSellerLeadId: vehicle.sellerLeadId,
+        actorId: actor.id,
+        reason: input.reason?.trim() || null,
+      })
+    )
+  } catch (err) {
+    if (isUnpublishError(err)) return { error: err.message }
+    if (isVehicleStatusConflict(err)) return { error: VEHICLE_STATUS_CONFLICT_MESSAGE }
+    if (isLockError(err)) return { error: err.message }
+    throw err
+  }
+
+  // El vehículo vuelve a ser matchable (TASADO). Revalida ficha, listado interno y CATÁLOGO PÚBLICO
+  // (ISR): la lista y todas las fichas públicas `/comprar/[id]` (la ruta usa el SLUG, no el id, así que
+  // se invalida el patrón de página completo).
+  await recalculateMatchesForVehicle(vehicleId, db)
+  revalidatePath(`/vendedores/${vehicle.sellerLeadId}`)
+  revalidatePath('/vehiculos')
+  revalidatePublicCatalog()
+  return { ok: true }
+}
+
+/**
+ * PUB-1: invalida el catálogo público (ISR) tras publicar/despublicar. La ficha pública vive en
+ * `/comprar/[id]` con el SLUG como parámetro, así que se revalida el patrón de página completo en vez
+ * de una URL concreta.
+ */
+function revalidatePublicCatalog() {
+  revalidatePath('/comprar')
+  revalidatePath('/comprar/vehiculos')
+  revalidatePath('/comprar/[id]', 'page')
 }
