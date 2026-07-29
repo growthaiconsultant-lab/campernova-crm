@@ -228,3 +228,61 @@ describe('calculateCompletionPercent', () => {
     expect(pct).toBeLessThan(100)
   })
 })
+
+// ─── PUB-1: gate de cobertura fotográfica por categoría (flag) ──────────────────
+
+describe('PUB-1 — gate de fotos por categoría', () => {
+  it('flag OFF (por defecto): fotos sin categoría NO bloquean publicar', () => {
+    // publicadoReadyVehicle no trae photosByCategory (legacy) → con el flag desactivado, listo.
+    expect(isReadyForStatus(publicadoReadyVehicle, 'PUBLICADO', allDocsPresent, NOW)).toBe(true)
+  })
+
+  it('flag ON + fotos legacy (sin categoría) → NO listo (faltan exterior e interior)', () => {
+    const missing = listMissingRequirements(
+      publicadoReadyVehicle,
+      'PUBLICADO',
+      allDocsPresent,
+      NOW,
+      {
+        requireCategorizedPhotos: true,
+      }
+    )
+    const fields = missing.filter((m) => m.severity === 'error').map((m) => m.field)
+    expect(fields).toContain('photo_EXTERIOR')
+    expect(fields).toContain('photo_INTERIOR')
+    expect(
+      isReadyForStatus(publicadoReadyVehicle, 'PUBLICADO', allDocsPresent, NOW, {
+        requireCategorizedPhotos: true,
+      })
+    ).toBe(false)
+  })
+
+  it('flag ON + ≥1 exterior y ≥1 interior → listo', () => {
+    const v: VehicleLegalInput = {
+      ...publicadoReadyVehicle,
+      photosByCategory: { EXTERIOR: 2, INTERIOR: 1, DETALLE: 2, DOCUMENTAL: 0 },
+    }
+    expect(
+      isReadyForStatus(v, 'PUBLICADO', allDocsPresent, NOW, { requireCategorizedPhotos: true })
+    ).toBe(true)
+  })
+
+  it('flag ON + solo exterior → falta interior', () => {
+    const v: VehicleLegalInput = {
+      ...publicadoReadyVehicle,
+      photosByCategory: { EXTERIOR: 5, INTERIOR: 0, DETALLE: 0, DOCUMENTAL: 0 },
+    }
+    const fields = listMissingRequirements(v, 'PUBLICADO', allDocsPresent, NOW, {
+      requireCategorizedPhotos: true,
+    })
+      .filter((m) => m.severity === 'error')
+      .map((m) => m.field)
+    expect(fields).toContain('photo_INTERIOR')
+    expect(fields).not.toContain('photo_EXTERIOR')
+  })
+
+  it('el mínimo TOTAL de fotos sigue vigente con el flag OFF', () => {
+    const v: VehicleLegalInput = { ...publicadoReadyVehicle, photoCount: 3 }
+    expect(isReadyForStatus(v, 'PUBLICADO', allDocsPresent, NOW)).toBe(false)
+  })
+})

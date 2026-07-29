@@ -7,6 +7,16 @@ import {
   PUBLICADO_MIN_PHOTOS,
   DOC_LABELS,
 } from './requirements'
+import {
+  PUBLICACION_REQUIERE_FOTOS_CATEGORIZADAS,
+  PUBLICACION_CATEGORIAS_REQUERIDAS,
+  PHOTO_CATEGORY_LABELS,
+} from './config'
+
+/** Opciones del gate. `requireCategorizedPhotos` por defecto toma el flag global (testable). */
+export interface LegalGateOptions {
+  requireCategorizedPhotos?: boolean
+}
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -30,7 +40,8 @@ export function listMissingRequirements(
   vehicle: VehicleLegalInput,
   targetStatus: TargetStatus,
   docs: DocumentSummary[],
-  now: Date = new Date()
+  now: Date = new Date(),
+  opts: LegalGateOptions = {}
 ): MissingRequirement[] {
   const missing: MissingRequirement[] = []
 
@@ -130,13 +141,28 @@ export function listMissingRequirements(
       }
     }
 
-    // photos
+    // photos — mínimo TOTAL (vigente SIEMPRE, con o sin el flag de categorías)
     if (vehicle.photoCount < PUBLICADO_MIN_PHOTOS) {
       missing.push({
         field: 'photos',
         message: `Pack visual incompleto (${vehicle.photoCount} de ${PUBLICADO_MIN_PHOTOS} fotos)`,
         severity: 'error',
       })
+    }
+
+    // PUB-1: cobertura fotográfica por categoría — ADITIVA, solo si el flag está activo.
+    const requireCategorized =
+      opts.requireCategorizedPhotos ?? PUBLICACION_REQUIERE_FOTOS_CATEGORIZADAS
+    if (requireCategorized) {
+      for (const cat of PUBLICACION_CATEGORIAS_REQUERIDAS) {
+        if ((vehicle.photosByCategory?.[cat] ?? 0) === 0) {
+          missing.push({
+            field: `photo_${cat}`,
+            message: `Falta al menos una foto de ${PHOTO_CATEGORY_LABELS[cat]}`,
+            severity: 'error',
+          })
+        }
+      }
     }
 
     // active work orders
@@ -156,9 +182,10 @@ export function isReadyForStatus(
   vehicle: VehicleLegalInput,
   targetStatus: TargetStatus,
   docs: DocumentSummary[],
-  now: Date = new Date()
+  now: Date = new Date(),
+  opts: LegalGateOptions = {}
 ): boolean {
-  const missing = listMissingRequirements(vehicle, targetStatus, docs, now)
+  const missing = listMissingRequirements(vehicle, targetStatus, docs, now, opts)
   return missing.filter((r) => r.severity === 'error').length === 0
 }
 

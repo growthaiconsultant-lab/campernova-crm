@@ -33,6 +33,7 @@ import type { SellerLeadStatus } from '@prisma/client'
 import { PublicNotesEditor } from '@/components/vehicle-ads/public-notes-editor'
 import { GenerateAdButton } from '@/components/vehicle-ads/generate-ad-button'
 import { DownloadPhotosButton } from '@/components/vehicle-ads/download-photos-button'
+import { UnpublishButton } from './unpublish-button'
 import { VehicleEconomicsForm } from '@/components/vehicle-economics/vehicle-economics-form'
 import { VehicleMarginSummary } from '@/components/vehicle-economics/vehicle-margin-summary'
 import { VehicleCostsTable } from '@/components/vehicle-economics/vehicle-costs-table'
@@ -1262,6 +1263,24 @@ export default async function FichaVendedorPage({
                     )
                   })()}
                 </div>
+
+                {/* PUB-1: estado de publicación + retirar anuncio */}
+                {v.status === 'PUBLICADO' && (
+                  <div className="space-y-2 border-t pt-4">
+                    <p className="text-sm text-muted-foreground">
+                      Publicado:{' '}
+                      <span className="font-medium text-foreground">
+                        {v.publishedAt
+                          ? new Date(v.publishedAt).toLocaleDateString('es-ES', {
+                              timeZone: 'Europe/Madrid',
+                              dateStyle: 'medium',
+                            })
+                          : 'fecha desconocida'}
+                      </span>
+                    </p>
+                    <UnpublishButton vehicleId={v.id} />
+                  </div>
+                )}
               </CardContent>
             </Card>
           )}
