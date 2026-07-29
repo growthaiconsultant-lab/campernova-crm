@@ -525,6 +525,22 @@ describe('publicación desde la tarjeta del expediente', () => {
     },
   ]
 
+  it('mantiene NUEVO → PUBLICADO cerrado en la edición manual genérica', async () => {
+    mockDb.vehicle.findUnique.mockResolvedValue({
+      sellerLeadId: 'sl-1',
+      status: 'NUEVO',
+      publishedAt: null,
+    })
+
+    const result = await updateVehicle('v-1', { ...baseVehicleData, status: 'PUBLICADO' })
+
+    expect(result).toEqual({
+      error: { formErrors: [INVALID_VEHICLE_TRANSITION_MESSAGE], fieldErrors: {} },
+    })
+    expect(getVehicleLegalInput).not.toHaveBeenCalled()
+    expect(mockDb.vehicle.updateMany).not.toHaveBeenCalled()
+  })
+
   it('fuerza TASADO → PUBLICADO con requisitos faltantes y deja una auditoría detallada', async () => {
     mockDb.vehicle.findUnique.mockResolvedValue({
       sellerLeadId: 'sl-1',
@@ -565,6 +581,57 @@ describe('publicación desde la tarjeta del expediente', () => {
     expect(revalidatePath).toHaveBeenCalledWith('/comprar')
     expect(revalidatePath).toHaveBeenCalledWith('/comprar/vehiculos')
     expect(revalidatePath).toHaveBeenCalledWith('/comprar/[id]', 'page')
+  })
+
+  it('fuerza NUEVO → PUBLICADO con publishedAt, auditoría detallada y CAS sobre NUEVO', async () => {
+    mockDb.vehicle.findUnique.mockResolvedValue({
+      sellerLeadId: 'sl-1',
+      status: 'NUEVO',
+      publishedAt: null,
+    })
+    vi.mocked(getVehicleLegalInput).mockResolvedValue(mockLegalInput)
+    vi.mocked(getVehicleDocumentSummary).mockResolvedValue(mockDocs)
+    vi.mocked(listMissingRequirements).mockReturnValue(missingRequirements)
+    mockDb.vehicle.updateMany.mockResolvedValue({ count: 1 })
+    mockDb.activity.create.mockResolvedValue({})
+
+    const result = await forcePublishVehicle('v-1')
+
+    expect(result).toEqual({ ok: true })
+    expect(mockDb.vehicle.updateMany).toHaveBeenCalledWith({
+      where: { id: 'v-1', status: 'NUEVO' },
+      data: { status: 'PUBLICADO', publishedAt: expect.any(Date) },
+    })
+    const activity = mockDb.activity.create.mock.calls[0][0].data
+    expect(activity).toMatchObject({
+      type: 'CAMBIO_ESTADO',
+      agentId: 'agent-1',
+      sellerLeadId: 'sl-1',
+    })
+    expect(activity.content).toMatch(/publicación forzada/i)
+    expect(activity.content).toMatch(/Nuevo → Publicado/)
+    expect(activity.content).toContain('VIN / número de bastidor')
+    expect(activity.content).toContain('Documento: DNI/NIE del vendedor')
+  })
+
+  it('mantiene el gate legal en la publicación normal desde NUEVO', async () => {
+    mockDb.vehicle.findUnique.mockResolvedValue({
+      sellerLeadId: 'sl-1',
+      status: 'NUEVO',
+      publishedAt: null,
+    })
+    vi.mocked(getVehicleLegalInput).mockResolvedValue(mockLegalInput)
+    vi.mocked(getVehicleDocumentSummary).mockResolvedValue(mockDocs)
+    vi.mocked(listMissingRequirements).mockReturnValue(missingRequirements)
+    vi.mocked(isReadyForStatus).mockReturnValue(false)
+    mockDb.activity.create.mockResolvedValue({})
+
+    const result = await publishVehicle('v-1')
+
+    expect('error' in result).toBe(true)
+    expect(isReadyForStatus).toHaveBeenCalledWith(mockLegalInput, 'PUBLICADO', mockDocs)
+    expect(mockDb.vehicle.updateMany).not.toHaveBeenCalled()
+    expect(mockDb.activity.create.mock.calls[0][0].data.type).toBe('PUBLICACION_BLOQUEADA')
   })
 
   it('rechaza un rol TALLER antes de leer o modificar el vehículo', async () => {

@@ -359,6 +359,8 @@ async function publishVehicleInternal(
           nextStatus: 'PUBLICADO',
           data: { status: 'PUBLICADO' },
           actorId: actor.id,
+          // Opt-in exclusivo de esta acción: la edición manual genérica conserva NUEVO sin salidas.
+          allowDirectPublicationFromNuevo: true,
           activityContent: (fromStatus) =>
             force
               ? `Publicación forzada: ${VEHICLE_STATUS_LABELS[fromStatus]} → ${VEHICLE_STATUS_LABELS.PUBLICADO}. Requisitos pendientes:\n${missingLines.length > 0 ? missingLines.join('\n') : '- Ninguno'}`
@@ -366,9 +368,9 @@ async function publishVehicleInternal(
         },
         {
           beforeWrite: async ({ fromStatus, tx }) => {
-            // La acción dedicada solo posee TASADO → PUBLICADO. Evita que un submit directo trate
+            // La acción dedicada posee NUEVO/TASADO → PUBLICADO. Evita que un submit directo trate
             // PUBLICADO → PUBLICADO como éxito por la regla general `from === to`.
-            if (fromStatus !== 'TASADO') {
+            if (fromStatus !== 'NUEVO' && fromStatus !== 'TASADO') {
               throw new VehicleUpdateError('INVALID_VEHICLE_TRANSITION')
             }
 
@@ -443,7 +445,8 @@ export async function publishVehicle(vehicleId: string): Promise<PublishVehicleR
 
 /**
  * Publicación excepcional autorizada para ADMIN/AGENTE. Salta únicamente el gate legal; conserva
- * locks, relectura, transición TASADO → PUBLICADO, CAS, primera fecha de publicación y auditoría.
+ * locks, relectura, transición NUEVO/TASADO → PUBLICADO, CAS, primera fecha de publicación y
+ * auditoría.
  */
 export async function forcePublishVehicle(vehicleId: string): Promise<PublishVehicleResult> {
   return publishVehicleInternal(vehicleId, true)

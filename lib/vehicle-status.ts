@@ -164,6 +164,11 @@ export type ManualVehicleUpdateParams = {
   actorId: string
   /** Construye la traza a partir del estado releído dentro de la transacción. */
   activityContent: (fromStatus: VehicleStatus) => string
+  /**
+   * Excepción contenida para la acción dedicada de publicación: permite `NUEVO → PUBLICADO` sin
+   * abrir esa transición a la edición manual genérica ni añadirla a `VEHICLE_TRANSITIONS`.
+   */
+  allowDirectPublicationFromNuevo?: boolean
 }
 
 export type ManualVehicleUpdateHooks = {
@@ -216,7 +221,15 @@ export async function applyManualVehicleUpdateTx(
     throw new VehicleUpdateError('OFFICIAL_VALUATION_REQUIRED')
   }
 
-  if (!isValidTransition(VEHICLE_TRANSITIONS, vehicle.status, p.nextStatus)) {
+  const isAuthorizedDirectPublication =
+    p.allowDirectPublicationFromNuevo === true &&
+    vehicle.status === 'NUEVO' &&
+    p.nextStatus === 'PUBLICADO'
+
+  if (
+    !isAuthorizedDirectPublication &&
+    !isValidTransition(VEHICLE_TRANSITIONS, vehicle.status, p.nextStatus)
+  ) {
     throw new VehicleUpdateError('INVALID_VEHICLE_TRANSITION')
   }
 
