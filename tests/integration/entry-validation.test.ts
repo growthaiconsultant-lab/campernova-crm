@@ -491,6 +491,7 @@ describe('validateEntryTx · precondición por precondición (rechaza sin escrib
           keysCount: 0,
           keysLocation: 'Panel',
           keysNotes: null,
+          requirePreconditions: true,
         }),
       { client: prismaA }
     ).catch((e) => e)
