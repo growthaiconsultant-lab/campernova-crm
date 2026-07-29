@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useTransition } from 'react'
+import { useEffect, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { Pencil, Check, X } from 'lucide-react'
 import { setNextAction } from '@/app/(backoffice)/next-action-actions'
@@ -45,9 +45,14 @@ export function NextActionEditor({
   const [due, setDue] = useState(nextActionDueAt ? toDatetimeLocal(nextActionDueAt) : '')
   const [error, setError] = useState<string | null>(null)
   const [pending, startTransition] = useTransition()
+  const [mounted, setMounted] = useState(false)
 
   const dueDate = nextActionDueAt ? new Date(nextActionDueAt) : null
   const overdue = isNextActionOverdue(dueDate)
+
+  useEffect(() => {
+    setMounted(true)
+  }, [])
 
   function save() {
     setError(null)
@@ -143,7 +148,7 @@ export function NextActionEditor({
           <p className="text-[15px] font-semibold leading-snug text-white">
             {nextActionType ? NEXT_ACTION_LABELS[nextActionType] : fallbackText}
           </p>
-          {dueDate && (
+          {dueDate && mounted && (
             <p
               className={`mt-0.5 font-mono text-[11px] ${overdue ? 'font-semibold text-red-300' : 'text-white/60'}`}
             >
