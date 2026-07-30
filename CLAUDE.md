@@ -97,6 +97,19 @@ claude mcp add-json linear '{\"command\":\"npx\",\"args\":[\"-y\",\"mcp-linear@l
 
 `.claude/settings.json` y `.claude/settings.local.json` se mantienen como referencia de la estructura, pero la fuente de verdad funcional es el registro de la CLI.
 
+## Publicación libre — override del expediente + publicar sin tasar (PUB-2) — EN PRODUCCIÓN ✅
+
+ADMIN/AGENTE pueden **publicar/retirar un vehículo con libertad**, saltándose el gate legal (ITV, 7
+documentos, cargas, VIN, precios) y **sin necesidad de tasarlo** (`NUEVO → PUBLICADO` directo).
+Botones "Publicar" / "Publicar de todas formas" en la ficha del vendedor (sección Expediente legal,
+solo ADMIN/AGENTE, visibles en `NUEVO` o `TASADO`). La excepción `NUEVO → PUBLICADO` está **contenida**
+a la acción de publicación (opt-in `allowDirectPublicationFromNuevo`); la edición manual genérica
+mantiene `VEHICLE_TRANSITIONS` cerrado. Se conservan concurrencia (locks + CAS), permiso
+`requireAgente` y **auditoría** (`CAMBIO_ESTADO` "Publicación forzada" + lista de requisitos que
+faltaban). **Sin migración.** PRs #158 y #159, desplegados el 2026-07-29. Decisión de negocio del
+dueño (riesgo asumido: publicar al público sin ITV/documentos/precio → puede salir "Precio a
+consultar" y sin fotos). Detalle en [`docs/PUB-2-Publicacion-libre.md`](docs/PUB-2-Publicacion-libre.md).
+
 ## Estado actual (Block 23 — Rediseño fiel del CRM (handoff mockups) — EN PRODUCCIÓN ✅)
 
 > ⚠️ **Estado VIGENTE del programa I3 (coordinación de escritores):** I3A, I3B, I3C1A, I3C1B, I3C2 e
