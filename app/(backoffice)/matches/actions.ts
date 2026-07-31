@@ -5,15 +5,28 @@ import { db } from '@/lib/db'
 import { requireAgente } from '@/lib/auth'
 import type { MatchStatus } from '@prisma/client'
 
-const VALID_TRANSITIONS: Partial<Record<MatchStatus, MatchStatus[]>> = {
-  SUGERIDO: ['PROPUESTO_CLIENTE', 'RECHAZADO'],
-  PROPUESTO_CLIENTE: ['VISITA', 'RECHAZADO'],
-  VISITA: ['OFERTA', 'RECHAZADO'],
-  OFERTA: ['CERRADO', 'RECHAZADO'],
+const MATCH_STATUSES: MatchStatus[] = [
+  'SUGERIDO',
+  'PROPUESTO_CLIENTE',
+  'VISITA',
+  'OFERTA',
+  'CERRADO',
+  'RECHAZADO',
+]
+
+const MATCH_STATUS_LABELS: Record<MatchStatus, string> = {
+  SUGERIDO: 'Sugerido',
+  PROPUESTO_CLIENTE: 'Propuesto al cliente',
+  VISITA: 'Visita',
+  OFERTA: 'Oferta',
+  CERRADO: 'Cerrado',
+  RECHAZADO: 'Rechazado',
 }
 
 export async function updateMatchStatus(matchId: string, newStatus: MatchStatus) {
-  await requireAgente()
+  const actor = await requireAgente()
+
+  if (!MATCH_STATUSES.includes(newStatus)) return { error: 'Estado de match no válido' }
 
   const match = await db.match.findUnique({
     where: { id: matchId },
@@ -27,12 +40,7 @@ export async function updateMatchStatus(matchId: string, newStatus: MatchStatus)
 
   if (!match) return { error: 'Match no encontrado' }
 
-  const allowed = VALID_TRANSITIONS[match.status]
-  if (!allowed?.includes(newStatus)) {
-    return { error: `Transición inválida: ${match.status} → ${newStatus}` }
-  }
-
-  if (newStatus === 'CERRADO') {
+  if (newStatus === 'CERRADO' && match.status !== 'CERRADO') {
     const delivery = await db.delivery.findFirst({
       where: { vehicleId: match.vehicleId, status: 'COMPLETADA' },
     })
@@ -41,7 +49,30 @@ export async function updateMatchStatus(matchId: string, newStatus: MatchStatus)
     }
   }
 
-  await db.match.update({ where: { id: matchId }, data: { status: newStatus } })
+  if (newStatus !== match.status) {
+    await db.$transaction(async (tx) => {
+      await tx.match.update({ where: { id: matchId }, data: { status: newStatus } })
+      const content = `Match: ${MATCH_STATUS_LABELS[match.status]} → ${MATCH_STATUS_LABELS[newStatus]}`
+      await Promise.all([
+        tx.activity.create({
+          data: {
+            type: 'CAMBIO_ESTADO',
+            content,
+            agentId: actor.id,
+            sellerLeadId: match.vehicle.sellerLeadId,
+          },
+        }),
+        tx.activity.create({
+          data: {
+            type: 'CAMBIO_ESTADO',
+            content,
+            agentId: actor.id,
+            buyerLeadId: match.buyerLeadId,
+          },
+        }),
+      ])
+    })
+  }
 
   revalidatePath(`/vendedores/${match.vehicle.sellerLeadId}`)
   revalidatePath(`/compradores/${match.buyerLeadId}`)

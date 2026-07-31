@@ -134,23 +134,5 @@ export function classifyBlockers(input: ArchiveDependencyInput): ArchiveBlocker[
     })
   }
 
-  if (input.hasPendingNextAction) {
-    blockers.push({
-      type: 'PENDING_NEXT_ACTION',
-      count: 1,
-      message:
-        'Hay una próxima acción pendiente (incluidas las vencidas). Complétala o elimínala antes de archivar.',
-    })
-  }
-
-  if (input.futureEventCount > 0) {
-    const n = input.futureEventCount
-    blockers.push({
-      type: 'FUTURE_EVENT',
-      count: n,
-      message: `Hay ${n} ${PLURAL(n, 'evento futuro en el calendario', 'eventos futuros en el calendario')}. Complétalo${PLURAL(n, '', 's')} o cancélalo${PLURAL(n, '', 's')} antes de archivar.`,
-    })
-  }
-
   return blockers
 }

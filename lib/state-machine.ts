@@ -1,11 +1,35 @@
 import type { SellerLeadStatus, VehicleStatus, BuyerLeadStatus } from '@prisma/client'
 
-export const SELLER_LEAD_TRANSITIONS: Partial<Record<SellerLeadStatus, SellerLeadStatus[]>> = {
-  NUEVO: ['CONTACTADO', 'DESCARTADO'],
-  CONTACTADO: ['CUALIFICADO', 'DESCARTADO'],
-  CUALIFICADO: ['EN_NEGOCIACION', 'DESCARTADO'],
-  EN_NEGOCIACION: ['CERRADO', 'DESCARTADO'],
+const SELLER_LEAD_STATUSES: SellerLeadStatus[] = [
+  'NUEVO',
+  'CONTACTADO',
+  'CUALIFICADO',
+  'EN_NEGOCIACION',
+  'CERRADO',
+  'DESCARTADO',
+]
+
+const BUYER_LEAD_STATUSES: BuyerLeadStatus[] = [
+  'NUEVO',
+  'CONTACTADO',
+  'CUALIFICADO',
+  'EN_NEGOCIACION',
+  'CERRADO',
+  'PERDIDO',
+]
+
+function allOtherStatuses<T extends string>(statuses: T[], current: T): T[] {
+  return statuses.filter((status) => status !== current)
 }
+
+/**
+ * El estado del lead es una clasificación operativa corregible, no un gate del funnel. Cualquier
+ * estado válido puede sustituir al actual; la Activity de la action conserva la traza del salto.
+ */
+export const SELLER_LEAD_TRANSITIONS: Record<SellerLeadStatus, SellerLeadStatus[]> =
+  Object.fromEntries(
+    SELLER_LEAD_STATUSES.map((status) => [status, allOtherStatuses(SELLER_LEAD_STATUSES, status)])
+  ) as Record<SellerLeadStatus, SellerLeadStatus[]>
 
 /**
  * Transiciones de `Vehicle.status` que puede ejecutar la **edición manual** (`updateVehicle`).
@@ -44,12 +68,14 @@ export const VEHICLE_TRANSITIONS: Partial<Record<VehicleStatus, VehicleStatus[]>
   TASADO: ['PUBLICADO'],
 }
 
-export const BUYER_LEAD_TRANSITIONS: Partial<Record<BuyerLeadStatus, BuyerLeadStatus[]>> = {
-  NUEVO: ['CONTACTADO', 'PERDIDO'],
-  CONTACTADO: ['CUALIFICADO', 'PERDIDO'],
-  CUALIFICADO: ['EN_NEGOCIACION', 'PERDIDO'],
-  EN_NEGOCIACION: ['CERRADO', 'PERDIDO'],
-}
+/**
+ * Igual que en vendedores, todos los saltos son corregibles. El destino `CERRADO` permanece en el
+ * catálogo para la UI, pero `updateBuyerLead` conserva su guard de Delivery COMPLETADA.
+ */
+export const BUYER_LEAD_TRANSITIONS: Record<BuyerLeadStatus, BuyerLeadStatus[]> =
+  Object.fromEntries(
+    BUYER_LEAD_STATUSES.map((status) => [status, allOtherStatuses(BUYER_LEAD_STATUSES, status)])
+  ) as Record<BuyerLeadStatus, BuyerLeadStatus[]>
 
 export function isValidTransition<T extends string>(
   transitions: Partial<Record<T, T[]>>,

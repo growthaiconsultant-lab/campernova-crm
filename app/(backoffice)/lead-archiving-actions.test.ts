@@ -171,6 +171,23 @@ describe('archiveSellerLead', () => {
     expect(mockDb.activity.create).not.toHaveBeenCalled()
   })
 
+  it('archiva con próxima acción y eventos futuros, y los deja anotados en la Activity', async () => {
+    mockDb.sellerLead.findUnique.mockResolvedValue({ status: 'CONTACTADO', archivedAt: null })
+    vi.mocked(loadSellerArchiveDependencies).mockResolvedValue({
+      ...NO_DEPS,
+      hasPendingNextAction: true,
+      futureEventCount: 2,
+    })
+
+    const res = await archiveSellerLead('s1', 'OTRO')
+
+    expect(res).toEqual({ status: 'archived' })
+    expect(mockDb.sellerLead.updateMany).toHaveBeenCalledOnce()
+    const content = mockDb.activity.create.mock.calls[0][0].data.content as string
+    expect(content).toContain('Conserva próxima acción pendiente')
+    expect(content).toContain('Conserva 2 eventos futuros')
+  })
+
   it('exige autorización (requireAgente)', async () => {
     vi.mocked(requireAgente).mockRejectedValue(new Error('forbidden'))
     await expect(archiveSellerLead('s1', 'OTRO')).rejects.toThrow('forbidden')

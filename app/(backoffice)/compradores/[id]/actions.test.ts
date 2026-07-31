@@ -44,13 +44,19 @@ beforeEach(() => {
 })
 
 describe('updateBuyerLead', () => {
-  it('rechaza una transición de estado no permitida (NUEVO → CERRADO)', async () => {
+  it('permite una transición no secuencial (NUEVO → EN_NEGOCIACION) y deja Activity', async () => {
     mockDb.buyerLead.findUnique.mockResolvedValue({ status: 'NUEVO', agentId: null, agent: null })
-    const res = await updateBuyerLead('b1', { ...baseInput, status: 'CERRADO' })
-    expect((res as { error: { formErrors: string[] } }).error.formErrors[0]).toContain(
-      'Transición no permitida'
+    const res = await updateBuyerLead('b1', { ...baseInput, status: 'EN_NEGOCIACION' })
+    expect(res).toEqual({ ok: true })
+    expect(mockDb.buyerLead.update.mock.calls[0][0].data.status).toBe('EN_NEGOCIACION')
+    expect(mockDb.activity.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          type: 'CAMBIO_ESTADO',
+          content: 'Estado cambiado: Nuevo → En negociación',
+        }),
+      })
     )
-    expect(mockDb.buyerLead.update).not.toHaveBeenCalled()
   })
 
   it('permite una transición válida (NUEVO → CONTACTADO) y loguea CAMBIO_ESTADO', async () => {
@@ -84,7 +90,7 @@ describe('updateBuyerLead', () => {
 
   it('no permite CERRAR sin entrega completada', async () => {
     mockDb.buyerLead.findUnique.mockResolvedValue({
-      status: 'EN_NEGOCIACION',
+      status: 'NUEVO',
       agentId: null,
       agent: null,
     })
@@ -93,6 +99,15 @@ describe('updateBuyerLead', () => {
     expect((res as { error: { formErrors: string[] } }).error.formErrors[0]).toContain(
       'entrega completada'
     )
+    expect(mockDb.buyerLead.update).not.toHaveBeenCalled()
+  })
+
+  it('permite el salto directo a CERRADO cuando existe Delivery COMPLETADA', async () => {
+    mockDb.buyerLead.findUnique.mockResolvedValue({ status: 'NUEVO', agentId: null, agent: null })
+    mockDb.delivery.findFirst.mockResolvedValue({ id: 'delivery-1' })
+    const res = await updateBuyerLead('b1', { ...baseInput, status: 'CERRADO' })
+    expect(res).toEqual({ ok: true })
+    expect(mockDb.buyerLead.update.mock.calls[0][0].data.status).toBe('CERRADO')
   })
 })
 
@@ -126,11 +141,14 @@ describe('markBuyerLeadLost', () => {
     expect(mockDb.buyerLead.update.mock.calls[0][0].data.lostReasonNotes).toBeNull()
   })
 
-  it('no marca un lead en estado terminal CERRADO (CERRADO → PERDIDO inválido)', async () => {
+  it('permite corregir CERRADO → PERDIDO y conserva el motivo', async () => {
     mockDb.buyerLead.findUnique.mockResolvedValue({ status: 'CERRADO' })
     const res = await markBuyerLeadLost('b1', 'PRECIO')
-    expect(res.error).toContain('estado final')
-    expect(mockDb.buyerLead.update).not.toHaveBeenCalled()
+    expect(res).toEqual({ error: null })
+    expect(mockDb.buyerLead.update.mock.calls[0][0].data).toMatchObject({
+      status: 'PERDIDO',
+      lostReason: 'PRECIO',
+    })
   })
 })
 

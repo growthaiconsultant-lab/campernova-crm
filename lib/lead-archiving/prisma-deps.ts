@@ -1,5 +1,6 @@
 /**
- * Carga de dependencias activas para decidir si un lead puede archivarse (PR B2).
+ * Carga de dependencias activas para decidir si un lead puede archivarse y dejar contexto de las
+ * tareas/eventos que conserva (PR B2 + permisividad C2).
  *
  * Solo LECTURA: cuenta operaciones abiertas. No modifica, cancela ni reasigna nada — el
  * operador debe resolver las dependencias explícitamente (decisión de producto).
@@ -25,7 +26,7 @@ function futureEventWhere(now: Date) {
 
 /**
  * Dependencias de un VENDEDOR: su vehículo y todo lo que cuelga de él (ofertas, entregas),
- * más su propia próxima acción y eventos futuros.
+ * más su propia próxima acción y eventos futuros (estos dos últimos son informativos, no bloquean).
  */
 export async function loadSellerArchiveDependencies(
   db: ArchiveDbClient,

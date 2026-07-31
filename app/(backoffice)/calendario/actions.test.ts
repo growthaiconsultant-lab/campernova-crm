@@ -8,6 +8,8 @@ const { mockDb } = vi.hoisted(() => ({
     calendarEvent: { create: vi.fn(), findUnique: vi.fn(), update: vi.fn() },
     sellerLead: { findUnique: vi.fn() },
     buyerLead: { findUnique: vi.fn() },
+    activity: { create: vi.fn() },
+    $transaction: vi.fn(),
   },
 }))
 vi.mock('@/lib/db', () => ({ db: mockDb }))
@@ -39,12 +41,16 @@ beforeEach(() => {
   vi.mocked(requireAgente).mockResolvedValue({ id: 'agent-1', role: 'AGENTE' } as never)
   mockDb.calendarEvent.create.mockResolvedValue({ id: 'ev1' })
   mockDb.calendarEvent.update.mockResolvedValue({})
+  mockDb.activity.create.mockResolvedValue({})
+  mockDb.$transaction.mockImplementation(async (fn: (tx: typeof mockDb) => Promise<unknown>) =>
+    fn(mockDb)
+  )
   mockDb.sellerLead.findUnique.mockResolvedValue({ archivedAt: null })
   mockDb.buyerLead.findUnique.mockResolvedValue({ archivedAt: null })
   vi.mocked(withLockedRoots).mockImplementation(async (_roots, op) => op(mockDb as never))
 })
 
-describe('createCalendarEvent · serialización con leads archivados (FUTURE_EVENT)', () => {
+describe('createCalendarEvent · serialización con leads archivados', () => {
   it('evento futuro + comprador ACTIVO: bloquea la raíz del lead y crea', async () => {
     const res = await createCalendarEvent({ ...validInput, startAt: FUTURE_ISO })
     expect(res.id).toBe('ev1')
@@ -143,17 +149,24 @@ describe('updateCalendarEventStatus', () => {
     expect(data.status).toBe('COMPLETADO')
     expect(data.resultNotes).toBe('Cliente interesado')
     expect(data.completedAt).toBeInstanceOf(Date)
+    expect(mockDb.activity.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        type: 'CAMBIO_ESTADO',
+        buyerLeadId: 'b1',
+        content: 'Evento: Programado → Completado',
+      }),
+    })
   })
 
-  it('rechaza transición inválida (COMPLETADO → EN_CURSO)', async () => {
+  it('permite corregir COMPLETADO → EN_CURSO', async () => {
     mockDb.calendarEvent.findUnique.mockResolvedValue({
       status: 'COMPLETADO',
       buyerLeadId: null,
       sellerLeadId: null,
     })
     const res = await updateCalendarEventStatus('ev1', 'EN_CURSO')
-    expect(res.error).toContain('no permitida')
-    expect(mockDb.calendarEvent.update).not.toHaveBeenCalled()
+    expect(res.error).toBeUndefined()
+    expect(mockDb.calendarEvent.update.mock.calls[0][0].data.status).toBe('EN_CURSO')
   })
 
   it('cancelar guarda motivo + cancelledAt', async () => {

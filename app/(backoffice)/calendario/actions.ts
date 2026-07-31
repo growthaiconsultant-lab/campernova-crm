@@ -5,17 +5,20 @@ import { db } from '@/lib/db'
 import { requireAgente } from '@/lib/auth'
 import { withLockedRoots, isLockError, type LockRoot } from '@/lib/locking'
 import { createCalendarEventSchema } from '@/lib/validators/calendar-event'
-import { isValidEventTransition, EVENT_TYPE_LABELS } from '@/lib/calendar/event-meta'
+import {
+  isValidEventTransition,
+  EVENT_STATUS_LABELS,
+  EVENT_TYPE_LABELS,
+} from '@/lib/calendar/event-meta'
 import { resolveCommitment, canReclassify } from '@/lib/calendar/commitment'
 import { sendCalendarEventAssigned } from '@/lib/email/send'
 import type { CalendarEventStatus, Prisma } from '@prisma/client'
 
 /**
- * Un evento FUTURO no terminal vinculado a un lead es un "compromiso" que el archivado trata como
- * blocker duro (`classifyBlockers` → `FUTURE_EVENT`). Para que ese blocker no se pueda saltar por una
- * carrera, crear un evento futuro para un lead se serializa con archivar/reactivar mediante el mismo
- * protocolo de root locks: se bloquea la fila del lead, se relee `archivedAt` BAJO el lock y se rechaza
- * si está archivado. Los eventos sin lead, o pasados/terminales, no necesitan lock (no son blockers).
+ * No se agendan compromisos futuros sobre leads ya archivados. Para que esa política no se pueda
+ * saltar por una carrera, crear un evento futuro para un lead se serializa con archivar/reactivar
+ * mediante el mismo protocolo de root locks: se bloquea la fila del lead, se relee `archivedAt` BAJO
+ * el lock y se rechaza si está archivado. Los eventos sin lead o pasados no necesitan ese lock.
  */
 class ArchivedLeadEventError extends Error {
   constructor() {
@@ -87,8 +90,8 @@ export async function createCalendarEvent(
   }
 
   const roots = calendarLeadRoots(sellerLeadId, buyerLeadId)
-  // Un evento futuro no terminal es un blocker de archivado. Solo entonces hace falta serializar con
-  // el lead; un evento pasado (o sin lead) no puede violar el blocker y se crea directamente.
+  // Un evento futuro sobre un lead debe serializarse con su archivado para no crearse después de que
+  // el lead quede archivado. Los eventos pasados o sin lead se crean directamente.
   const isFutureCommitment = start.getTime() > Date.now()
 
   let event: { id: string }
@@ -171,7 +174,7 @@ export async function updateCalendarEventStatus(
   status: string,
   extra?: { resultNotes?: string; cancellationReason?: string }
 ): Promise<{ error?: string }> {
-  await requireAgente()
+  const actor = await requireAgente()
 
   const valid: CalendarEventStatus[] = [
     'PROGRAMADO',
@@ -194,21 +197,39 @@ export async function updateCalendarEventStatus(
   }
 
   const now = new Date()
-  await db.calendarEvent.update({
-    where: { id },
-    data: {
-      status: next,
-      ...(next === 'COMPLETADO'
-        ? { completedAt: now, resultNotes: extra?.resultNotes?.trim().slice(0, 2000) || null }
-        : {}),
-      ...(next === 'CANCELADO' || next === 'NO_SHOW'
-        ? {
-            cancelledAt: now,
-            cancellationReason: extra?.cancellationReason?.trim().slice(0, 500) || null,
-          }
-        : {}),
-    },
-  })
+  if (next !== event.status) {
+    await db.$transaction(async (tx) => {
+      await tx.calendarEvent.update({
+        where: { id },
+        data: {
+          status: next,
+          ...(next === 'COMPLETADO'
+            ? { completedAt: now, resultNotes: extra?.resultNotes?.trim().slice(0, 2000) || null }
+            : {}),
+          ...(next === 'CANCELADO' || next === 'NO_SHOW'
+            ? {
+                cancelledAt: now,
+                cancellationReason: extra?.cancellationReason?.trim().slice(0, 500) || null,
+              }
+            : {}),
+        },
+      })
+
+      const content = `Evento: ${EVENT_STATUS_LABELS[event.status]} → ${EVENT_STATUS_LABELS[next]}`
+      const activities: Array<{ sellerLeadId?: string; buyerLeadId?: string }> = [
+        ...(event.sellerLeadId ? [{ sellerLeadId: event.sellerLeadId }] : []),
+        ...(event.buyerLeadId ? [{ buyerLeadId: event.buyerLeadId }] : []),
+      ]
+      if (activities.length === 0) activities.push({})
+      await Promise.all(
+        activities.map((lead) =>
+          tx.activity.create({
+            data: { type: 'CAMBIO_ESTADO', content, agentId: actor.id, ...lead },
+          })
+        )
+      )
+    })
+  }
 
   revalidatePath('/calendario')
   revalidatePath(`/calendario/${id}`)

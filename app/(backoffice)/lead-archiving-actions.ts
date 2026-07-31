@@ -10,14 +10,11 @@
  * GARANTÍAS
  *  - No cambia el estado comercial, ni `lostReason`, ni vehículo, ofertas, reservas, entregas,
  *    documentos o KPIs. Solo escribe los 4 campos de archivado + una Activity.
- *  - No cancela, completa ni reasigna ninguna dependencia: si hay operativa abierta, BLOQUEA y
- *    devuelve el detalle para que el operador la resuelva.
- *  - **Integridad concurrente**: la lectura del lead, la lectura de TODAS las dependencias
- *    bloqueantes, la clasificación, el compare-and-swap y la Activity ocurren en una única
- *    transacción con aislamiento `Serializable`. Así es imposible archivar un lead para el que
- *    se creó una oferta, reserva, entrega o evento entre la comprobación y la escritura: esa
- *    concurrencia produce un conflicto de serialización, se reintenta, y el reintento ve la
- *    dependencia nueva y devuelve `blocked`.
+ *  - No cancela, completa ni reasigna ninguna dependencia. Bloquea por stock, ofertas/reservas y
+ *    entregas activas; próximas acciones y eventos futuros se conservan y se anotan en la Activity.
+ *  - **Integridad concurrente**: la lectura del lead y sus dependencias, la clasificación, el
+ *    compare-and-swap y la Activity ocurren bajo el mismo root lock y dentro de una transacción.
+ *    Así no se saltan por carrera los bloqueos de stock, ofertas/reservas o entregas activas.
  *
  * EFECTO CONOCIDO: Prisma actualiza `updatedAt` (`@updatedAt`) al archivar y al reactivar. Es
  * inevitable y aceptado; puede alterar el orden de las vistas que ordenan por `sort=updatedAt`.
@@ -48,11 +45,10 @@ type LeadKind = 'seller' | 'buyer'
 
 /**
  * Raíz del protocolo de locks para archivar/reactivar UN lead. Bloquear la fila del propio lead
- * basta para serializar con TODOS los writers coordinados que podrían crear una dependencia
- * bloqueante para él: `createOffer`, `updateOfferStatus`, `createDelivery`, la transición/
- * cancelación de Delivery, `updateVehicle` (I3B) y `setNextAction` — todos bloquean o escriben la
- * fila del lead. Así, gane quien gane, o el writer ve `archivedAt` fijado (rechaza `LEAD_ARCHIVED`),
- * o el archivado relee sus bloqueos BAJO el lock y ve la dependencia nueva (rechaza).
+ * basta para serializar con los writers coordinados: `createOffer`, `updateOfferStatus`,
+ * `createDelivery`, la transición/cancelación de Delivery, `updateVehicle` (I3B) y
+ * `setNextAction`. Los blockers de seguridad se releen bajo el lock; tareas y eventos se conservan
+ * como contexto informativo y los writers siguen rechazando nueva operativa sobre leads archivados.
  */
 function leadRoot(kind: LeadKind, leadId: string): LockRoot[] {
   return [{ type: kind === 'seller' ? 'sellerLead' : 'buyerLead', id: leadId }]
@@ -170,7 +166,11 @@ async function archiveLead(
         `Lead archivado · Motivo: ${ARCHIVE_REASON_LABELS[reason]}` +
         (cleanNotes ? ` — ${cleanNotes}` : '') +
         ` · Estado comercial: ${statusLabel(kind, lead.status)} (sin cambios)` +
-        ' · Archivado: no → sí'
+        ' · Archivado: no → sí' +
+        (deps.hasPendingNextAction ? ' · Conserva próxima acción pendiente' : '') +
+        (deps.futureEventCount > 0
+          ? ` · Conserva ${deps.futureEventCount} evento${deps.futureEventCount === 1 ? '' : 's'} futuro${deps.futureEventCount === 1 ? '' : 's'}`
+          : '')
       await tx.activity.create({
         data: activityData(kind, leadId, 'LEAD_ARCHIVADO', content, actor.id),
       })
