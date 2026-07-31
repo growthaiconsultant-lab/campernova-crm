@@ -97,6 +97,21 @@ claude mcp add-json linear '{\"command\":\"npx\",\"args\":[\"-y\",\"mcp-linear@l
 
 `.claude/settings.json` y `.claude/settings.local.json` se mantienen como referencia de la estructura, pero la fuente de verdad funcional es el registro de la CLI.
 
+## Permisividad Oleada 1 — saltos de estado libres + archivar con menos fricción — EN PRODUCCIÓN ✅
+
+Primera oleada del programa de **permisividad** (abrir gates de flujo para que el equipo trabaje sin
+que un paso previo bloquee al siguiente; re-endurecer cuando los flujos reales estén claros). Abre
+**solo muros de flujo de bajo riesgo**, conservando todas las barandillas de seguridad. Cambios: saltos
+de estado libres en **vendedor/comprador** (`lib/state-machine.ts`), **matches** y **calendario** (con
+traza `CAMBIO_ESTADO`); **archivar** deja de bloquear por próxima acción/eventos futuros. **Carve-outs
+conservados:** comprador→CERRADO y match→CERRADO siguen exigiendo `Delivery` COMPLETADA; archivar sigue
+bloqueado por ofertas/entregas vivas y stock `TASADO/PUBLICADO/RESERVADO`. **Sin tocar** concurrencia
+(locks/CAS), importes, unicidad, ofertas, entregas ni la máquina de estados del vehículo. **Sin
+migración.** PR #161, desplegado el 2026-07-31. Base para las decisiones: el inventario de 91
+restricciones (muro de flujo / barandilla / autorización). Detalle en
+[`docs/PERMISIVIDAD-Oleada1.md`](docs/PERMISIVIDAD-Oleada1.md). **Oleada 2 (con diseño, pendiente):**
+overrides auditados para tasación, ofertas/entregas/venta y archivar-con-stock.
+
 ## Publicación libre — override del expediente + publicar sin tasar (PUB-2) — EN PRODUCCIÓN ✅
 
 ADMIN/AGENTE pueden **publicar/retirar un vehículo con libertad**, saltándose el gate legal (ITV, 7
