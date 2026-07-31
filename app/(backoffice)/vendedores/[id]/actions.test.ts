@@ -62,6 +62,7 @@ import {
   updateVehicle,
   publishVehicle,
   forcePublishVehicle,
+  updateSellerLead,
   discardSellerLead,
   officialManualValuation,
   officialAutoValuation,
@@ -125,6 +126,30 @@ beforeEach(() => {
   )
   // Por defecto el vendedor existe y no está archivado (I3B lo relee dentro del lock).
   mockDb.sellerLead.findUnique.mockResolvedValue({ archivedAt: null })
+})
+
+describe('updateSellerLead — estados permisivos', () => {
+  it('permite NUEVO → EN_NEGOCIACION y registra la traza del salto', async () => {
+    mockDb.sellerLead.findUnique.mockResolvedValue({ status: 'NUEVO', agentId: null, agent: null })
+
+    const result = await updateSellerLead('s1', {
+      name: 'Marta',
+      email: 'marta@example.com',
+      phone: '600111222',
+      status: 'EN_NEGOCIACION',
+      agentId: null,
+    })
+
+    expect(result).toEqual({ ok: true })
+    expect(mockDb.sellerLead.update.mock.calls[0][0].data.status).toBe('EN_NEGOCIACION')
+    expect(mockDb.activity.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        type: 'CAMBIO_ESTADO',
+        sellerLeadId: 's1',
+        content: 'Estado cambiado: Nuevo → En negociación',
+      }),
+    })
+  })
 })
 
 // ─── A3 — la edición manual ya NO puede alcanzar TASADO (cierre del bypass) ────
@@ -763,11 +788,14 @@ describe('discardSellerLead', () => {
     expect(mockDb.sellerLead.update.mock.calls[0][0].data.lostReasonNotes).toBeNull()
   })
 
-  it('no descarta un lead ya en estado terminal', async () => {
+  it('permite corregir CERRADO → DESCARTADO y conserva el motivo', async () => {
     mockDb.sellerLead.findUnique.mockResolvedValue({ status: 'CERRADO' })
     const res = await discardSellerLead('s1', 'PRECIO')
-    expect(res.error).toContain('estado final')
-    expect(mockDb.sellerLead.update).not.toHaveBeenCalled()
+    expect(res).toEqual({ error: null })
+    expect(mockDb.sellerLead.update.mock.calls[0][0].data).toMatchObject({
+      status: 'DESCARTADO',
+      lostReason: 'PRECIO',
+    })
   })
 
   it('NO archiva ni elimina: solo cambia estado; no toca vehículo ni añade campos de archivado', async () => {

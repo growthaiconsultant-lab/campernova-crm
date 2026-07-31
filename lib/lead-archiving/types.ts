@@ -13,8 +13,6 @@ export type ArchiveBlockerType =
   | 'ACTIVE_OFFER' // oferta viva (ocupa el vehículo)
   | 'ACTIVE_RESERVATION' // oferta aceptada con señal > 0
   | 'ACTIVE_DELIVERY' // entrega programada o en curso
-  | 'PENDING_NEXT_ACTION' // próxima acción comercial sin resolver (incluida la vencida)
-  | 'FUTURE_EVENT' // evento de calendario futuro no cancelado/completado
 
 /** Bloqueo individual: tipo + cuántas dependencias + mensaje para el operador. Sin PII. */
 export type ArchiveBlocker = {
@@ -33,9 +31,9 @@ export type ArchiveDependencyInput = {
   activeReservationCount: number
   /** Entregas PROGRAMADA / EN_CURSO. */
   activeDeliveryCount: number
-  /** Próxima acción comercial pendiente (cualquiera, vencida incluida). */
+  /** Próxima acción conservada al archivar; se usa para la nota informativa de auditoría. */
   hasPendingNextAction: boolean
-  /** Eventos de calendario futuros en estado no terminal. */
+  /** Eventos futuros conservados al archivar; se usa para la nota informativa de auditoría. */
   futureEventCount: number
 }
 

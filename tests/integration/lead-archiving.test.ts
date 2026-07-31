@@ -399,16 +399,13 @@ describe('dependencias activas bloquean el archivado', () => {
     }
   })
 
-  it('próxima acción pendiente VENCIDA bloquea', async () => {
+  it('próxima acción pendiente VENCIDA no bloquea', async () => {
     const { leadId } = await makeSeller({ withNextAction: true })
     const res = await archiveSellerLead(leadId, 'OTRO')
-    expect(res).toMatchObject({ status: 'blocked' })
-    if (res.status === 'blocked') {
-      expect(res.blockers.some((b) => b.type === 'PENDING_NEXT_ACTION')).toBe(true)
-    }
+    expect(res).toEqual({ status: 'archived' })
   })
 
-  it('evento futuro bloquea; un evento pasado no', async () => {
+  it('evento futuro no bloquea', async () => {
     const { leadId } = await makeSeller()
     const future = await prisma.calendarEvent.create({
       data: {
@@ -423,14 +420,6 @@ describe('dependencias activas bloquean el archivado', () => {
       await prisma.calendarEvent.deleteMany({ where: { id: future.id } })
     })
 
-    const blocked = await archiveSellerLead(leadId, 'OTRO')
-    expect(blocked).toMatchObject({ status: 'blocked' })
-
-    // Cancelado → deja de bloquear (el operador lo resolvió explícitamente).
-    await prisma.calendarEvent.update({
-      where: { id: future.id },
-      data: { status: 'CANCELADO' },
-    })
     expect(await archiveSellerLead(leadId, 'OTRO')).toEqual({ status: 'archived' })
   })
 })

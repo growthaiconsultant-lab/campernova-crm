@@ -306,7 +306,7 @@ describe('archivar vs reactivar (mismo lead, deterministas)', () => {
   })
 })
 
-// ─── Serialización del writer de calendario (corrección del blocker FUTURE_EVENT) ─────────────────
+// ─── Serialización del writer de calendario con archivado ─────────────────────────────────────────
 
 const FUTURE = new Date(Date.now() + 7 * 86_400_000)
 const PAST = new Date(Date.now() - 7 * 86_400_000)
@@ -334,7 +334,7 @@ function futureEventInput(buyerId: string, startAt: Date) {
   }
 }
 
-describe('archivar comprador vs createCalendarEvent (blocker FUTURE_EVENT serializado)', () => {
+describe('archivar comprador vs createCalendarEvent', () => {
   it('createCalendarEvent de evento futuro ADQUIERE el lock del lead (contención observada)', async () => {
     const f = await seed('RESERVADO')
     const locked = barrier()
@@ -364,16 +364,13 @@ describe('archivar comprador vs createCalendarEvent (blocker FUTURE_EVENT serial
     expect(await prismaA.calendarEvent.count({ where: { buyerLeadId: f.buyerId } })).toBe(0)
   })
 
-  it('gana el EVENTO: archivar queda bloqueado por FUTURE_EVENT', async () => {
+  it('gana el EVENTO: archivar conserva el evento y queda permitido', async () => {
     const f = await seed('RESERVADO')
     const ev = await createCalendarEvent(futureEventInput(f.buyerId, FUTURE))
     expect(ev.id).toBeTruthy()
     const res = await archiveBuyerLead(f.buyerId, 'OTRO')
-    expect(res.status).toBe('blocked')
-    if (res.status === 'blocked') {
-      expect(res.blockers.some((b) => b.type === 'FUTURE_EVENT')).toBe(true)
-    }
-    expect(await buyerArchived(f.buyerId)).toBe(false)
+    expect(res.status).toBe('archived')
+    expect(await buyerArchived(f.buyerId)).toBe(true)
     await prismaA.calendarEvent.deleteMany({ where: { buyerLeadId: f.buyerId } })
   })
 

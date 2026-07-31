@@ -49,16 +49,26 @@ export function isValidEventPriority(v: string): v is CalendarEventPriority {
   return v in EVENT_PRIORITY_LABELS
 }
 
+const EVENT_STATUSES: CalendarEventStatus[] = [
+  'PROGRAMADO',
+  'CONFIRMADO',
+  'EN_CURSO',
+  'COMPLETADO',
+  'CANCELADO',
+  'NO_SHOW',
+]
+
 /**
- * Transiciones de estado válidas. Terminales: COMPLETADO, CANCELADO, NO_SHOW.
+ * El estado del evento se puede corregir libremente. Que un estado sea terminal para consultas de
+ * trabajo pendiente no impide volver a clasificar el evento.
  */
 export const EVENT_STATUS_TRANSITIONS: Record<CalendarEventStatus, CalendarEventStatus[]> = {
-  PROGRAMADO: ['CONFIRMADO', 'EN_CURSO', 'COMPLETADO', 'CANCELADO', 'NO_SHOW'],
-  CONFIRMADO: ['EN_CURSO', 'COMPLETADO', 'CANCELADO', 'NO_SHOW'],
-  EN_CURSO: ['COMPLETADO', 'CANCELADO'],
-  COMPLETADO: [],
-  CANCELADO: [],
-  NO_SHOW: [],
+  PROGRAMADO: EVENT_STATUSES.filter((status) => status !== 'PROGRAMADO'),
+  CONFIRMADO: EVENT_STATUSES.filter((status) => status !== 'CONFIRMADO'),
+  EN_CURSO: EVENT_STATUSES.filter((status) => status !== 'EN_CURSO'),
+  COMPLETADO: EVENT_STATUSES.filter((status) => status !== 'COMPLETADO'),
+  CANCELADO: EVENT_STATUSES.filter((status) => status !== 'CANCELADO'),
+  NO_SHOW: EVENT_STATUSES.filter((status) => status !== 'NO_SHOW'),
 }
 
 export function isValidEventTransition(
@@ -69,5 +79,5 @@ export function isValidEventTransition(
 }
 
 export function isTerminalEventStatus(s: CalendarEventStatus): boolean {
-  return EVENT_STATUS_TRANSITIONS[s].length === 0
+  return (['COMPLETADO', 'CANCELADO', 'NO_SHOW'] as CalendarEventStatus[]).includes(s)
 }

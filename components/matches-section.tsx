@@ -66,27 +66,18 @@ const MATCH_STATUS_COLORS: Record<string, string> = {
   RECHAZADO: 'bg-gray-100 text-gray-500',
 }
 
-const NEXT_STATUSES: Record<
-  string,
-  { status: MatchStatus; label: string; destructive?: boolean }[]
-> = {
-  SUGERIDO: [
-    { status: 'PROPUESTO_CLIENTE', label: 'Proponer' },
-    { status: 'RECHAZADO', label: 'Rechazar', destructive: true },
-  ],
-  PROPUESTO_CLIENTE: [
-    { status: 'VISITA', label: 'Visita' },
-    { status: 'RECHAZADO', label: 'Rechazar', destructive: true },
-  ],
-  VISITA: [
-    { status: 'OFERTA', label: 'Oferta' },
-    { status: 'RECHAZADO', label: 'Rechazar', destructive: true },
-  ],
-  OFERTA: [
-    { status: 'CERRADO', label: 'Cerrar trato' },
-    { status: 'RECHAZADO', label: 'Rechazar', destructive: true },
-  ],
-}
+const MATCH_STATUS_ACTIONS: {
+  status: MatchStatus
+  label: string
+  destructive?: boolean
+}[] = [
+  { status: 'SUGERIDO', label: 'Sugerido' },
+  { status: 'PROPUESTO_CLIENTE', label: 'Proponer' },
+  { status: 'VISITA', label: 'Visita' },
+  { status: 'OFERTA', label: 'Oferta' },
+  { status: 'CERRADO', label: 'Cerrar trato' },
+  { status: 'RECHAZADO', label: 'Rechazar', destructive: true },
+]
 
 const EQUIPMENT_LABELS: Record<string, string> = {
   solar: 'Solar',
@@ -140,7 +131,10 @@ function MatchExplanation({ explanation }: { explanation?: MatchExplanationData 
 
 function StatusButtons({ matchId, currentStatus }: { matchId: string; currentStatus: string }) {
   const [isPending, startTransition] = useTransition()
-  const transitions = NEXT_STATUSES[currentStatus] ?? []
+  const transitions =
+    currentStatus in MATCH_STATUS_LABELS
+      ? MATCH_STATUS_ACTIONS.filter(({ status }) => status !== currentStatus)
+      : []
 
   if (transitions.length === 0) return null
 

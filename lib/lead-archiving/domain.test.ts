@@ -139,15 +139,12 @@ describe('classifyBlockers', () => {
     expect(b[0]).toMatchObject({ type: 'ACTIVE_DELIVERY', count: 1 })
   })
 
-  it('próxima acción pendiente bloquea (también si está vencida)', () => {
-    const b = classifyBlockers({ ...NONE, hasPendingNextAction: true })
-    expect(b[0]).toMatchObject({ type: 'PENDING_NEXT_ACTION', count: 1 })
-    expect(b[0].message).toMatch(/vencidas/i)
+  it('próxima acción pendiente no bloquea, aunque esté vencida', () => {
+    expect(classifyBlockers({ ...NONE, hasPendingNextAction: true })).toEqual([])
   })
 
-  it('evento futuro bloquea', () => {
-    const b = classifyBlockers({ ...NONE, futureEventCount: 2 })
-    expect(b[0]).toMatchObject({ type: 'FUTURE_EVENT', count: 2 })
+  it('eventos futuros no bloquean', () => {
+    expect(classifyBlockers({ ...NONE, futureEventCount: 2 })).toEqual([])
   })
 
   it('varios bloqueos a la vez se acumulan', () => {
@@ -159,13 +156,7 @@ describe('classifyBlockers', () => {
       hasPendingNextAction: true,
       futureEventCount: 1,
     })
-    expect(b.map((x) => x.type)).toEqual([
-      'VEHICLE_IN_STOCK',
-      'ACTIVE_OFFER',
-      'ACTIVE_DELIVERY',
-      'PENDING_NEXT_ACTION',
-      'FUTURE_EVENT',
-    ])
+    expect(b.map((x) => x.type)).toEqual(['VEHICLE_IN_STOCK', 'ACTIVE_OFFER', 'ACTIVE_DELIVERY'])
   })
 
   it('los bloqueos no contienen PII (solo tipo, cantidad y mensaje genérico)', () => {
