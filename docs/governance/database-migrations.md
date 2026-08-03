@@ -5,7 +5,7 @@
 | **Título**                       | Gobierno de migraciones Prisma / PostgreSQL                                                                                                                                                        |
 | **Estado**                       | ACTIVE                                                                                                                                                                                             |
 | **Owner**                        | Engineering                                                                                                                                                                                        |
-| **Última revisión**              | 2026-07-13                                                                                                                                                                                         |
+| **Última revisión**              | 2026-08-03                                                                                                                                                                                         |
 | **Fuente de verdad relacionada** | Este documento (proceso). Estado de la baseline: [`../migration-history-baseline.md`](../migration-history-baseline.md).                                                                           |
 | **Alcance**                      | Esquema `public` de aplicación gestionado por Prisma.                                                                                                                                              |
 | **Fuera de alcance**             | Storage (ver [`supabase-storage.md`](supabase-storage.md)); ejecución del rollout documental (ver [`../operations/fase-0-operational-closeout.md`](../operations/fase-0-operational-closeout.md)). |
@@ -16,13 +16,8 @@
 
 1. **Prisma es la fuente de verdad** del esquema `public` de aplicación (`prisma/schema.prisma` +
    `prisma/migrations/`).
-2. **Hoy existen exactamente 6 migraciones:** `000000000000_squashed_migrations` (baseline) +
-   `20260712000000_add_versioned_document_model` (PR5B1) +
-   `20260719120000_add_lead_archiving_model` (B1 · archivado) +
-   `20260720000000_add_calendar_event_commitment` (I0) +
-   `20260721100000_add_delivery_offer_link_expand` (I3C1A · expand) +
-   `20260721200000_make_delivery_offer_link_required` (I3C1B · contract). El job CI
-   `migration-replay` lo verifica por nombre y conteo (fuente autoritativa:
+2. El conjunto vigente se descubre en `prisma/migrations/`; no se copia como lista o conteo en
+   documentación. El job `migration-replay` verifica el checkout completo (fuente autoritativa:
    [`.github/workflows/ci.yml`](../../.github/workflows/ci.yml)).
 3. **La baseline es inmutable.** No se edita, no se renombra, no se restaura el historial antiguo
    dentro de `prisma/migrations/` (reintroduciría el defecto de orden). El historial previo vive en
@@ -39,40 +34,15 @@
 
 ---
 
-## Conteos de catálogo (vigente en `main`, tras I3C1B)
+## Evidencia viva del catálogo
 
-> **Fuente autoritativa y siempre vigente:** el paso _Catalog verifications_ del job
-> `migration-replay` en [`.github/workflows/ci.yml`](../../.github/workflows/ci.yml) (falla si el
-> catálogo no coincide). Esta tabla es un reflejo; ante discrepancia, **manda CI**.
+Los conteos de tablas, columnas, enums, FKs, índices y políticas son outputs de verificación, no
+reglas de gobierno. La evidencia vigente está en el paso _Catalog verifications_ del job
+`migration-replay` asociado al commit auditado. Este documento no duplica cifras que una migración
+vuelve obsoletas.
 
-| Métrica                | Valor            |
-| ---------------------- | ---------------- |
-| Tablas (`public`)      | **31**           |
-| Columnas               | **441**          |
-| Enums                  | **51**           |
-| Valores de enum        | **269**          |
-| Claves foráneas        | **68**           |
-| Índices                | **115**          |
-| Tablas sin RLS         | **0**            |
-| Tablas con `FORCE RLS` | **0**            |
-| Políticas en `public`  | **0** (deny-all) |
-
-> Deltas históricos: baseline sola 30/412/48/255/60/101; tras PR5B1 31/431/49/258/65/111 (ver
-> [`../migration-history-baseline.md`](../migration-history-baseline.md)). El valor **vigente** (tras
-> commitment + I3C1A/B) es el de esta tabla; los conteos por migración están comentados en `ci.yml`.
-
-### Cómo actualizar los conteos de catálogo
-
-Toda migración aditiva futura cambia el catálogo. Al añadir una migración:
-
-1. Aplica la migración en una base efímera (`pnpm test:integration:prepare` o `prisma migrate deploy`).
-2. Recalcula los 6 conteos + los 3 de RLS (las mismas consultas del job `migration-replay` en
-   [`.github/workflows/ci.yml`](../../.github/workflows/ci.yml), paso _Catalog verifications_).
-3. Actualiza los valores esperados (`assert … <n>`) y el bloque de comentario del delta en `ci.yml`.
-4. Actualiza **todos** los lugares que reescriben los conteos: esta tabla, la de
-   [`../architecture/fase-0-final-state.md`](../architecture/fase-0-final-state.md#52-estado-validado)
-   y las de [`ci-quality-gates.md`](ci-quality-gates.md) (pasos de `migration-replay` y «Números de
-   referencia»). Esta tabla es la fuente principal; las demás deben coincidir con ella.
+Toda migración debe actualizar las aserciones de CI sólo cuando representen invariantes esperadas,
+no para mantener snapshots narrativos en varios documentos.
 
 ---
 
