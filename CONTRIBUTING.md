@@ -10,7 +10,7 @@ Flujo de trabajo profesional **trunk-based**: `main` siempre desplegable, cambio
 3. … desarrollas, commits atómicos (Conventional Commits) …
 4. git push -u origin <rama>
 5. Abres PR → CI ejecuta typecheck + lint + test
-6. Vercel genera un Preview (apuntando a la DB de staging)
+6. Vercel genera un Preview; sólo usa staging si sus variables están configuradas y verificadas
 7. CI en verde → squash-merge a main → deploy automático a producción
 ```
 
@@ -60,21 +60,25 @@ pnpm format        # prettier --write .
 
 ## Pull Requests
 
-- Rellena la plantilla de PR (qué cambia, cómo se prueba, ticket CAM, validación manual).
+- Sigue el routing de `docs/governance/sdd-workflow.md` y enlaza ticket/change brief cuando aplique.
+- Rellena la plantilla de PR con evidencia ejecutada; un check omitido no cuenta como verde.
 - CI (`quality`) debe quedar en **verde** antes de poder mergear (regla de protección de `main`).
-- Revisa el Preview de Vercel del PR (apunta a staging — seguro para probar migraciones).
+- Revisa el Preview de Vercel. No asumir que apunta a staging: comprobar variables y proyecto de
+  Supabase antes de ejecutar pruebas con datos o migraciones.
 - **Squash-merge** a `main`. Borra la rama.
 
 ## Migraciones de base de datos
 
-Las migraciones de Prisma se prueban primero en **staging** (vía el Preview del PR) antes de llegar a producción al mergear. Sigue el workflow de migraciones documentado en `CLAUDE.md` (sección "Workflow de migraciones Prisma + Supabase").
+Las migraciones de Prisma se reproducen primero en PostgreSQL efímero y Supabase local mediante CI.
+Staging sólo puede utilizarse después de verificar que existe, está aislado y las variables Preview
+no apuntan a producción. Sigue `docs/governance/database-migrations.md`.
 
 ## Entornos
 
-| Entorno     | Rama / contexto | Base de datos            |
-| ----------- | --------------- | ------------------------ |
-| Development | local           | Supabase staging o local |
-| Preview     | cualquier PR    | Supabase **staging**     |
-| Production  | `main`          | Supabase **prod**        |
+| Entorno     | Rama / contexto | Base de datos                                                 |
+| ----------- | --------------- | ------------------------------------------------------------- |
+| Development | local           | Supabase staging o local                                      |
+| Preview     | cualquier PR    | Staging sólo si está configurado y verificado; nunca asumirlo |
+| Production  | `main`          | Supabase **prod**                                             |
 
 Ver `README.md` § Entornos para la matriz de variables de entorno.

@@ -5,7 +5,7 @@
 | **Título**                       | Índice de documentación de arquitectura y gobierno de Fase 0       |
 | **Estado**                       | ACTIVE                                                             |
 | **Owner**                        | Engineering / Architecture                                         |
-| **Última revisión**              | 2026-07-13                                                         |
+| **Última revisión**              | 2026-08-03 (índice y routing SDD)                                  |
 | **Fuente de verdad relacionada** | Este índice (mapa de la documentación).                            |
 | **Alcance**                      | Documentación de arquitectura, gobierno y operaciones de Fase 0.   |
 | **Fuera de alcance**             | Documentación de producto (PRD, Roadmap, specs, planes de bloque). |
@@ -14,6 +14,18 @@
 **documentos históricos**. Ante cualquier duda, prevalece la fuente de verdad actual.
 
 ---
+
+## Empezar un cambio
+
+- [`governance/sdd-workflow.md`](governance/sdd-workflow.md) — **puerta de entrada canónica**:
+  fuente de verdad, rutas rápida/estándar/reforzada, estados y Definition of Done.
+- [`templates/change-brief.md`](templates/change-brief.md) — plantilla única de spec + plan para
+  cambios estándar.
+- [`specs/`](specs/) — intención versionada de cambios concretos; su estado no sustituye la
+  evidencia de PR, CI o deployment.
+
+Los cambios sensibles escalan desde el flujo SDD al proceso reforzado existente; no se duplican sus
+checklists.
 
 ## Arquitectura (estado actual)
 
@@ -59,6 +71,8 @@ marketplace y multiempresa están **diferidos**.
 
 ## Gobierno
 
+- [`governance/sdd-workflow.md`](governance/sdd-workflow.md) — flujo proporcional y cotidiano para
+  convertir necesidades en cambios verificables.
 - [`governance/database-migrations.md`](governance/database-migrations.md) — migraciones Prisma:
   baseline inmutable, proceso, catálogo, drift.
 - [`governance/supabase-storage.md`](governance/supabase-storage.md) — buckets, políticas, modelo
@@ -75,7 +89,7 @@ marketplace y multiempresa están **diferidos**.
   testing, analítica y validación post-despliegue. Complementa (no duplica)
   [`../CONTRIBUTING.md`](../CONTRIBUTING.md).
 - [`governance/testing-strategy.md`](governance/testing-strategy.md) — **estrategia de testing y
-  validación** (ACTIVE): pirámide real (721 unit · 59 integración · 19 Supabase), matriz
+  validación** (ACTIVE): pirámide real y conteos vivos en CI, matriz
   cambio→tests, regresión, testing de migraciones/concurrencia/Storage/KPIs/Sentry/PostHog,
   anti-patrones, flakes y validación post-despliegue.
 - [`governance/ai-handoff-protocol.md`](governance/ai-handoff-protocol.md) — **protocolo de

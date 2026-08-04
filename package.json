@@ -22,6 +22,7 @@
     "check:rls": "tsx scripts/check-rls.ts",
     "check:migration-history": "tsx scripts/check-migration-history.ts",
     "check:remote-migrations": "tsx scripts/check-remote-migrations.ts",
+    "check:sdd": "node scripts/check-sdd.mjs",
     "check:delivery-offer-nulls": "tsx scripts/check-delivery-offer-nulls.ts",
     "test:integration:prepare": "tsx scripts/integration-prepare.ts",
     "test:integration": "vitest run --config vitest.integration.config.ts",
@@ -35,6 +36,7 @@
     "documents:verify-backfill": "tsx scripts/verify-document-backfill.ts",
     "documents:rollback-backfill": "tsx scripts/rollback-document-backfill.ts",
     "documents:plan-storage-reconciliation": "tsx scripts/plan-storage-reconciliation.ts",
+    "precommit": "lint-staged",
     "prepare": "husky",
     "seed": "tsx prisma/seed.ts"
   },
@@ -111,7 +113,7 @@
     ]
   },
   "lint-staged": {
-    "*.{ts,tsx,js,jsx}": [
+    "*.{ts,tsx,js,jsx,mjs,cjs}": [
       "eslint --fix",
       "prettier --write"
     ],
