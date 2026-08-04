@@ -2,6 +2,7 @@ import { type NextRequest, NextResponse } from 'next/server'
 import { updateSession } from '@/lib/supabase/middleware'
 import { resolveLegacyRedirect, isLegacyGone } from '@/lib/legacy-redirects'
 import { resolveHostRedirect, apexHostFromEnv } from '@/lib/host-routing'
+import { isConfiguredCronPath } from '@/lib/cron/routes'
 
 const PUBLIC_PATHS = [
   '/',
@@ -55,6 +56,13 @@ export async function middleware(request: NextRequest) {
   })
   if (hostRedirect) {
     return NextResponse.redirect(hostRedirect, 308)
+  }
+
+  // Vercel Cron no sigue redirects. Solo las rutas exactas registradas atraviesan
+  // el guard de sesión Supabase; cada Route Handler conserva el boundary Bearer
+  // fail-closed. Una ruta desconocida bajo /api/cron sigue protegida normalmente.
+  if (isConfiguredCronPath(pathname)) {
+    return NextResponse.next({ request })
   }
 
   const isPublic = PUBLIC_PATHS.some((p) => pathname === p || pathname.startsWith(`${p}/`))

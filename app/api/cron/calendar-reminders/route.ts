@@ -4,6 +4,7 @@ import { prismaCalendarDeps } from '@/lib/calendar/prisma-deps'
 import { getCalendarItems } from '@/lib/calendar/aggregate'
 import { groupItemsByAssignee } from '@/lib/calendar/reminders'
 import { sendCalendarDigest } from '@/lib/email/send'
+import { isCronRequestAuthorized } from '@/lib/cron/auth'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -14,8 +15,9 @@ export const dynamic = 'force-dynamic'
  * a cada uno un email con sus eventos. No bloqueante e idempotente por día.
  */
 export async function GET(request: Request) {
-  const authHeader = request.headers.get('authorization')
-  if (process.env.NODE_ENV === 'production' && authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
+  const startedAt = Date.now()
+  if (!isCronRequestAuthorized(request)) {
+    console.warn(JSON.stringify({ event: 'cron.auth_rejected', job: 'calendar-reminders' }))
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
@@ -27,7 +29,16 @@ export async function GET(request: Request) {
   const byUser = groupItemsByAssignee(items)
 
   if (byUser.size === 0) {
-    return NextResponse.json({ sent: 0, users: 0, total: items.length })
+    const result = { sent: 0, failed: 0, users: 0, total: items.length }
+    console.info(
+      JSON.stringify({
+        event: 'cron.completed',
+        job: 'calendar-reminders',
+        ...result,
+        durationMs: Date.now() - startedAt,
+      })
+    )
+    return NextResponse.json(result)
   }
 
   const users = await db.user.findMany({
@@ -44,14 +55,17 @@ export async function GET(request: Request) {
   const fmtTime = (d: Date) =>
     d.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Madrid' })
 
+  const targetDate = start.toISOString().slice(0, 10)
   let sent = 0
+  let failed = 0
   for (const user of users) {
     if (!user.email) continue
     const userItems = byUser.get(user.id) ?? []
-    await sendCalendarDigest({
+    const delivered = await sendCalendarDigest({
       to: user.email,
       userName: user.name,
       dateLabel,
+      idempotencyKey: `calendar-digest/${targetDate}/${user.id}`,
       items: userItems.map((it) => ({
         kindLabel: it.kindLabel,
         title: it.title,
@@ -60,8 +74,18 @@ export async function GET(request: Request) {
         href: it.href,
       })),
     })
-    sent++
+    if (delivered) sent++
+    else failed++
   }
 
-  return NextResponse.json({ sent, users: users.length, total: items.length })
+  const result = { sent, failed, users: users.length, total: items.length }
+  console.info(
+    JSON.stringify({
+      event: 'cron.completed',
+      job: 'calendar-reminders',
+      ...result,
+      durationMs: Date.now() - startedAt,
+    })
+  )
+  return NextResponse.json(result)
 }
