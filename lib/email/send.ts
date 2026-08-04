@@ -265,25 +265,35 @@ export async function sendCalendarDigest(params: {
   to: string
   userName: string
   dateLabel: string
+  idempotencyKey: string
   items: CalendarDigestItem[]
-}): Promise<void> {
-  if (params.items.length === 0) return
+}): Promise<boolean> {
+  if (params.items.length === 0) return false
   const from = process.env.EMAIL_FROM ?? 'onboarding@resend.dev'
   const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000'
   try {
-    await getResend().emails.send({
-      from,
-      to: params.to,
-      subject: `Tu agenda de ${params.dateLabel} · ${params.items.length} evento${params.items.length === 1 ? '' : 's'}`,
-      html: calendarDigestHtml({
-        userName: params.userName,
-        dateLabel: params.dateLabel,
-        items: params.items,
-        appUrl,
-      }),
-    })
-  } catch (err) {
-    console.error('[email] sendCalendarDigest failed:', err)
+    const { error } = await getResend().emails.send(
+      {
+        from,
+        to: params.to,
+        subject: `Tu agenda de ${params.dateLabel} · ${params.items.length} evento${params.items.length === 1 ? '' : 's'}`,
+        html: calendarDigestHtml({
+          userName: params.userName,
+          dateLabel: params.dateLabel,
+          items: params.items,
+          appUrl,
+        }),
+      },
+      { idempotencyKey: params.idempotencyKey }
+    )
+    if (error) {
+      console.error('[email] sendCalendarDigest rejected')
+      return false
+    }
+    return true
+  } catch {
+    console.error('[email] sendCalendarDigest failed')
+    return false
   }
 }
 

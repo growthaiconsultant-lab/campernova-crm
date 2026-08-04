@@ -3,13 +3,15 @@ import { db } from '@/lib/db'
 import { getResend } from '@/lib/email/client'
 import { postventaDay7Html } from '@/lib/email/templates/postventa-day-7'
 import { postventaDay30Html } from '@/lib/email/templates/postventa-day-30'
+import { isCronRequestAuthorized } from '@/lib/cron/auth'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 
 export async function GET(request: Request) {
-  const authHeader = request.headers.get('authorization')
-  if (process.env.NODE_ENV === 'production' && authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
+  const startedAt = Date.now()
+  if (!isCronRequestAuthorized(request)) {
+    console.warn(JSON.stringify({ event: 'cron.auth_rejected', job: 'postventa-followups' }))
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
@@ -38,8 +40,8 @@ export async function GET(request: Request) {
   for (const followup of pendingFollowups) {
     const { warranty } = followup
     if (!warranty.buyerLead?.email) {
-      await db.postventaFollowup.update({
-        where: { id: followup.id },
+      await db.postventaFollowup.updateMany({
+        where: { id: followup.id, status: 'PENDIENTE' },
         data: { status: 'FALLIDO' },
       })
       failed++
@@ -62,28 +64,49 @@ export async function GET(request: Request) {
         : `¡Un mes ya con tu ${vehicleLabel}!`
 
     try {
-      await getResend().emails.send({
-        from,
-        to: warranty.buyerLead.email,
-        subject,
-        html,
-      })
+      const { error } = await getResend().emails.send(
+        {
+          from,
+          to: warranty.buyerLead.email,
+          subject,
+          html,
+        },
+        { idempotencyKey: `postventa-followup/${followup.id}` }
+      )
+      if (error) throw new Error('RESEND_REJECTED')
 
-      await db.postventaFollowup.update({
-        where: { id: followup.id },
+      // Una ejecución concurrente puede haber marcado FALLIDO al recibir el 409
+      // temporal de idempotencia; el envío confirmado siempre converge a ENVIADO.
+      await db.postventaFollowup.updateMany({
+        where: { id: followup.id, status: { in: ['PENDIENTE', 'FALLIDO'] } },
         data: { status: 'ENVIADO', sentAt: now },
       })
 
       sent++
-    } catch (err) {
-      console.error(`[cron] followup ${followup.id} failed:`, err)
-      await db.postventaFollowup.update({
-        where: { id: followup.id },
+    } catch {
+      console.error(
+        JSON.stringify({
+          event: 'cron.item_failed',
+          job: 'postventa-followups',
+          itemId: followup.id,
+        })
+      )
+      await db.postventaFollowup.updateMany({
+        where: { id: followup.id, status: 'PENDIENTE' },
         data: { status: 'FALLIDO' },
       })
       failed++
     }
   }
 
-  return NextResponse.json({ sent, failed, total: pendingFollowups.length })
+  const result = { sent, failed, total: pendingFollowups.length }
+  console.info(
+    JSON.stringify({
+      event: 'cron.completed',
+      job: 'postventa-followups',
+      ...result,
+      durationMs: Date.now() - startedAt,
+    })
+  )
+  return NextResponse.json(result)
 }
