@@ -1,15 +1,15 @@
 # PERM-2 — Reducir fricción comercial sin rebajar seguridad
 
-| Campo               | Valor                                                                              |
-| ------------------- | ---------------------------------------------------------------------------------- |
-| **Estado**          | IMPLEMENTED                                                                        |
-| **Owner**           | Engineering                                                                        |
-| **Ticket**          | [GitHub #166](https://github.com/growthaiconsultant-lab/campernova-crm/issues/166) |
-| **Rama / PR**       | `codex/perm-2a-low-risk-walls` / pendiente                                         |
-| **Categorías**      | C0, C1, C2, C3                                                                     |
-| **Riesgo**          | Medio                                                                              |
-| **Ruta SDD**        | Estándar                                                                           |
-| **Última revisión** | 2026-08-05                                                                         |
+| Campo               | Valor                                                                                                         |
+| ------------------- | ------------------------------------------------------------------------------------------------------------- |
+| **Estado**          | IMPLEMENTED                                                                                                   |
+| **Owner**           | Engineering                                                                                                   |
+| **Ticket**          | [GitHub #166](https://github.com/growthaiconsultant-lab/campernova-crm/issues/166)                            |
+| **Rama / PR**       | `codex/perm-2a-low-risk-walls` / [PR #167](https://github.com/growthaiconsultant-lab/campernova-crm/pull/167) |
+| **Categorías**      | C0, C1, C2, C3                                                                                                |
+| **Riesgo**          | Medio                                                                                                         |
+| **Ruta SDD**        | Estándar                                                                                                      |
+| **Última revisión** | 2026-08-05                                                                                                    |
 
 ## Problema y evidencia
 
@@ -136,9 +136,11 @@ permisos o integridad referencial.
 
 ## Cierre
 
-- **Commit:** pendiente.
-- **PR:** pendiente.
-- **CI:** pendiente.
+- **Commit:** `3279f29d74947722e3882bbf3239c2087700015e` (implementación).
+- **PR:** [#167](https://github.com/growthaiconsultant-lab/campernova-crm/pull/167), abierta y
+  fusionable; contiene exclusivamente los 14 archivos previstos.
+- **CI:** `quality`, `integration`, `migration-replay` y `supabase-storage` en PASS; Vercel Preview
+  Comments en PASS.
 - **Deployment:** no autorizado en este cambio.
 - **Validación:** `check:sdd`, 119 tests dirigidos, 1.409 tests globales, typecheck, lint, formato,
   `git diff --check` y build Next.js completados. El build local no alcanzó el pooler de Supabase
