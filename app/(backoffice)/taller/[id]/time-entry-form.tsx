@@ -20,9 +20,17 @@ interface Props {
   currentUserId: string
   isAdmin: boolean
   isClosed: boolean
+  canEdit: boolean
 }
 
-export function TimeEntrySection({ woId, entries, currentUserId, isAdmin, isClosed }: Props) {
+export function TimeEntrySection({
+  woId,
+  entries,
+  currentUserId,
+  isAdmin,
+  isClosed,
+  canEdit,
+}: Props) {
   const [isPending, startTransition] = useTransition()
   const [showForm, setShowForm] = useState(false)
   const [hours, setHours] = useState('')
@@ -73,7 +81,7 @@ export function TimeEntrySection({ woId, entries, currentUserId, isAdmin, isClos
             </span>
           </p>
         </div>
-        {!isClosed && (
+        {!isClosed && canEdit && (
           <button
             onClick={() => setShowForm((v) => !v)}
             className="rounded-lg bg-primary px-3 py-1.5 text-sm font-medium text-white hover:opacity-90"
@@ -196,7 +204,7 @@ export function TimeEntrySection({ woId, entries, currentUserId, isAdmin, isClos
                     {new Date(entry.workDate).toLocaleDateString('es-ES')}
                   </td>
                   <td className="px-4 py-3 text-right">
-                    {(isAdmin || entry.workerId === currentUserId) && !isClosed && (
+                    {canEdit && (isAdmin || entry.workerId === currentUserId) && !isClosed && (
                       <button
                         onClick={() => handleDelete(entry.id)}
                         disabled={isPending}

@@ -1,17 +1,17 @@
 'use client'
 
 import { useState, useTransition } from 'react'
-import { changeTicketStatus, setTicketCost } from '../actions'
+import { toast } from 'sonner'
+import { StatusCorrectionDialog } from '@/components/status-correction-dialog'
+import {
+  TICKET_CORRECTION_TARGET,
+  TICKET_FORWARD_TRANSITIONS,
+  TICKET_REOPEN_TARGET,
+  TICKET_STATUS_LABELS,
+} from '@/lib/postventa/transitions'
+import { changeTicketStatus, reopenTicket, setTicketCost } from '../actions'
 import { recordFollowupResponse } from '../followup-actions'
 import type { TicketStatus, TicketPriority } from '@prisma/client'
-
-const TICKET_STATUS_LABELS: Record<TicketStatus, string> = {
-  ABIERTO: 'Abierto',
-  EN_PROGRESO: 'En progreso',
-  RESUELTO: 'Resuelto',
-  CERRADO: 'Cerrado',
-  ANULADO: 'Anulado',
-}
 
 const TICKET_STATUS_COLORS: Record<TicketStatus, string> = {
   ABIERTO: 'bg-red-100 text-red-700',
@@ -28,12 +28,6 @@ const PRIORITY_COLORS: Record<TicketPriority, string> = {
   CRITICA: 'text-red-600',
 }
 
-const VALID_TRANSITIONS: Partial<Record<TicketStatus, TicketStatus[]>> = {
-  ABIERTO: ['EN_PROGRESO', 'ANULADO'],
-  EN_PROGRESO: ['RESUELTO', 'ANULADO'],
-  RESUELTO: ['CERRADO', 'EN_PROGRESO'],
-}
-
 interface Ticket {
   id: string
   title: string
@@ -44,9 +38,18 @@ interface Ticket {
   dueAt: Date | null
   costEstimate: { toString(): string } | null
   costReal: { toString(): string } | null
+  cost: { amount: { toString(): string } } | null
 }
 
-export function TicketCard({ ticket }: { ticket: Ticket }) {
+export function TicketCard({
+  ticket,
+  canEdit,
+  isAdmin,
+}: {
+  ticket: Ticket
+  canEdit: boolean
+  isAdmin: boolean
+}) {
   const [expanded, setExpanded] = useState(false)
   const [isPending, startTransition] = useTransition()
   const [costEstimate, setCostEstimate] = useState(
@@ -56,21 +59,27 @@ export function TicketCard({ ticket }: { ticket: Ticket }) {
     ticket.costReal ? Number(ticket.costReal.toString()) : ''
   )
 
-  const transitions = VALID_TRANSITIONS[ticket.status] ?? []
+  const transitions = canEdit ? (TICKET_FORWARD_TRANSITIONS[ticket.status] ?? []) : []
+  const correctionTarget = canEdit ? TICKET_CORRECTION_TARGET[ticket.status] : undefined
+  const reopenTarget = isAdmin ? TICKET_REOPEN_TARGET[ticket.status] : undefined
   const isTerminal = ticket.status === 'CERRADO' || ticket.status === 'ANULADO'
 
   function handleStatusChange(newStatus: TicketStatus) {
     startTransition(async () => {
-      await changeTicketStatus(ticket.id, newStatus)
+      const result = await changeTicketStatus(ticket.id, newStatus)
+      if (result.ok) toast.success(`Estado actualizado a ${TICKET_STATUS_LABELS[newStatus]}.`)
+      else toast.error(result.error)
     })
   }
 
   function handleCostSave() {
     startTransition(async () => {
-      await setTicketCost(ticket.id, {
+      const result = await setTicketCost(ticket.id, {
         costEstimate: costEstimate !== '' ? Number(costEstimate) : null,
         costReal: costReal !== '' ? Number(costReal) : null,
       })
+      if (result.ok) toast.success('Costes actualizados.')
+      else toast.error(result.error)
     })
   }
 
@@ -92,6 +101,15 @@ export function TicketCard({ ticket }: { ticket: Ticket }) {
             </span>
           </div>
           <p className="mt-1 text-sm font-medium text-cn-ink-700">{ticket.title}</p>
+          {!isTerminal && ticket.cost && (
+            <p className="mt-1 text-xs font-medium text-amber-700">
+              Coste contabilizado pendiente de refinalización:{' '}
+              {Number(ticket.cost.amount.toString()).toLocaleString('es-ES', {
+                style: 'currency',
+                currency: 'EUR',
+              })}
+            </p>
+          )}
         </div>
         <span className="text-cn-ink-400 shrink-0 text-xs">
           {new Date(ticket.openedAt).toLocaleDateString('es-ES', {
@@ -105,7 +123,7 @@ export function TicketCard({ ticket }: { ticket: Ticket }) {
         <div className="space-y-4 border-t border-cn-line p-4">
           <p className="whitespace-pre-wrap text-sm text-cn-ink-700">{ticket.description}</p>
 
-          {!isTerminal && transitions.length > 0 && (
+          {(transitions.length > 0 || correctionTarget || reopenTarget) && (
             <div className="flex flex-wrap gap-2">
               <span className="text-cn-ink-400 self-center text-xs">Cambiar estado:</span>
               {transitions.map((s) => (
@@ -118,6 +136,28 @@ export function TicketCard({ ticket }: { ticket: Ticket }) {
                   → {TICKET_STATUS_LABELS[s]}
                 </button>
               ))}
+              {correctionTarget && (
+                <StatusCorrectionDialog
+                  triggerLabel={`Corregir a ${TICKET_STATUS_LABELS[correctionTarget]}`}
+                  title="Corregir estado del ticket"
+                  description={`El ticket volverá de ${TICKET_STATUS_LABELS[ticket.status]} a ${TICKET_STATUS_LABELS[correctionTarget]}. La corrección quedará registrada.`}
+                  confirmLabel="Corregir estado"
+                  successMessage={`Ticket corregido a ${TICKET_STATUS_LABELS[correctionTarget]}.`}
+                  disabled={isPending}
+                  onConfirm={(reason) => changeTicketStatus(ticket.id, correctionTarget, reason)}
+                />
+              )}
+              {reopenTarget && (
+                <StatusCorrectionDialog
+                  triggerLabel={`Reabrir como ${TICKET_STATUS_LABELS[reopenTarget]}`}
+                  title="Reabrir ticket cerrado"
+                  description="El coste contabilizado se conserva hasta el próximo cierre, que conciliará el importe de forma atómica."
+                  confirmLabel="Reabrir ticket"
+                  successMessage={`Ticket reabierto como ${TICKET_STATUS_LABELS[reopenTarget]}.`}
+                  disabled={isPending}
+                  onConfirm={(reason) => reopenTicket(ticket.id, reopenTarget, reason)}
+                />
+              )}
             </div>
           )}
 
@@ -132,7 +172,7 @@ export function TicketCard({ ticket }: { ticket: Ticket }) {
                 onChange={(e) =>
                   setCostEstimate(e.target.value === '' ? '' : Number(e.target.value))
                 }
-                disabled={isTerminal}
+                disabled={isTerminal || !canEdit}
                 className="h-8 w-full rounded-lg border border-cn-line px-2 text-sm focus:outline-none disabled:opacity-50"
               />
             </div>
@@ -142,12 +182,12 @@ export function TicketCard({ ticket }: { ticket: Ticket }) {
                 type="number"
                 value={costReal}
                 onChange={(e) => setCostReal(e.target.value === '' ? '' : Number(e.target.value))}
-                disabled={isTerminal}
+                disabled={isTerminal || !canEdit}
                 className="h-8 w-full rounded-lg border border-cn-line px-2 text-sm focus:outline-none disabled:opacity-50"
               />
             </div>
           </div>
-          {!isTerminal && (
+          {!isTerminal && canEdit && (
             <button
               onClick={handleCostSave}
               disabled={isPending}

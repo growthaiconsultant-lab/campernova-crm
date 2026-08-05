@@ -101,9 +101,19 @@ export async function updateVehicleCost(costId: string, formData: unknown): Prom
 
   const cost = await db.vehicleCost.findUnique({
     where: { id: costId },
-    select: { vehicle: { select: { sellerLeadId: true } } },
+    select: {
+      workOrderId: true,
+      postventaTicketId: true,
+      vehicle: { select: { sellerLeadId: true } },
+    },
   })
   if (!cost) return { ok: false, error: 'Coste no encontrado' }
+  if (cost.workOrderId || cost.postventaTicketId) {
+    return {
+      ok: false,
+      error: 'Este coste lo genera la operativa. Corrige y finaliza de nuevo su orden o ticket.',
+    }
+  }
 
   const { category, description, amount, supplier, invoiceUrl } = parsed.data
 
@@ -127,9 +137,19 @@ export async function deleteVehicleCost(costId: string): Promise<ActionResult> {
 
   const cost = await db.vehicleCost.findUnique({
     where: { id: costId },
-    select: { vehicle: { select: { sellerLeadId: true } } },
+    select: {
+      workOrderId: true,
+      postventaTicketId: true,
+      vehicle: { select: { sellerLeadId: true } },
+    },
   })
   if (!cost) return { ok: false, error: 'Coste no encontrado' }
+  if (cost.workOrderId || cost.postventaTicketId) {
+    return {
+      ok: false,
+      error: 'Este coste lo genera la operativa y no se puede eliminar manualmente.',
+    }
+  }
 
   await db.vehicleCost.delete({ where: { id: costId } })
   revalidateVehiclePage(cost.vehicle.sellerLeadId)

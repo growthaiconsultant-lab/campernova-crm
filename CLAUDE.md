@@ -1299,6 +1299,7 @@ Módulo de gestión de órdenes de trabajo del taller mecánico propio (Manolo).
 app/(backoffice)/taller/
   page.tsx                        — listado de órdenes con filtros por estado y mecánico
   actions.ts                      — server actions: createWorkOrder, updateWorkOrderStatus,
+                                     reopenWorkOrder,
                                      updateChecklistItem, addTimeEntry, deleteTimeEntry,
                                      addPart, deletePart, approveWorkOrder, rejectWorkOrder,
                                      updateEstimatedCost
@@ -1311,6 +1312,9 @@ app/(backoffice)/taller/
   [id]/checklist-item-row.tsx     — fila de checklist: resultado + notas
   [id]/time-entry-form.tsx        — TimeEntrySection: imputar horas + tabla de entradas
   [id]/parts-section.tsx          — PartsSection: añadir piezas + tabla (solo admin borra)
+lib/taller/
+  transitions.ts                  — matriz canónica: avance / corrección / reapertura
+  transition-work-order.ts        — lock-aware CAS + Activity + reconciliación de costes
 ```
 
 #### Máquina de estados WorkOrder
@@ -1321,8 +1325,14 @@ PENDIENTE → EN_DIAGNOSTICO → PRESUPUESTADA → EN_CURSO → COMPLETADA
 (cualquier estado activo → RECHAZADA)
 ```
 
-- `COMPLETADA` y `RECHAZADA` son terminales; no hay transiciones de salida.
-- El mapa `VALID_TRANSITIONS` vive directamente en `actions.ts` (no en `lib/state-machine.ts`), ya que es la única entidad que lo usa.
+- Corrección no terminal (ADMIN/TALLER, motivo obligatorio): `EN_DIAGNOSTICO → PENDIENTE`,
+  `PRESUPUESTADA → EN_DIAGNOSTICO`, `EN_CURSO → PRESUPUESTADA`.
+- Reapertura terminal (solo ADMIN, motivo obligatorio): `COMPLETADA → EN_CURSO` y
+  `RECHAZADA → PENDIENTE`, únicamente para `REPARACION`/`MEJORA`.
+- `INSPECCION_ENTRADA` terminal no se reabre. Checklist, horas, piezas, presupuesto y agenda son
+  inmutables mientras la orden siga terminal.
+- La matriz canónica vive en `lib/taller/transitions.ts`; el núcleo transaccional relee bajo
+  `withLockedRoots`, aplica CAS y crea la Activity en la misma transacción.
 
 #### Aprobación CEO
 
@@ -1344,24 +1354,29 @@ Cada ítem puede marcarse como `PENDIENTE | OK | NECESITA_REPARACION | NO_APLICA
 
 #### Generación de VehicleCost al completar
 
-Al pasar a `COMPLETADA`, `updateWorkOrderStatus` genera automáticamente filas en `vehicle_costs` en la misma `$transaction`:
+Al pasar a `COMPLETADA`, `transitionWorkOrderTx` reconcilia automáticamente filas en
+`vehicle_costs` dentro de la misma transacción:
 
 - `MANO_OBRA_TALLER` → suma de `hours × hourlyRate` de todas las entradas de tiempo
 - `PIEZAS` → suma de `quantity × unitCost` de todas las piezas
 
-Solo se generan si el importe es > 0. Si no hay horas ni piezas, la transacción solo actualiza el estado + activity.
+Existe como máximo una fila por `(workOrderId, category)`. Si un total cambia se actualiza; si queda
+a cero se retira. Al reabrir se conserva el último coste contabilizado hasta refinalizar. Los costes
+source-linked no se editan ni borran mediante las actions manuales.
 
 #### Permisos por acción
 
 | Acción               | Rol mínimo |
 | -------------------- | ---------- |
-| Crear orden          | AGENTE     |
-| Cambiar estado       | AGENTE     |
-| Actualizar checklist | AGENTE     |
-| Imputar horas        | AGENTE     |
-| Borrar horas propias | AGENTE     |
+| Crear orden          | TALLER     |
+| Cambiar estado       | TALLER     |
+| Corregir estado      | TALLER     |
+| Reabrir terminal     | ADMIN      |
+| Actualizar checklist | TALLER     |
+| Imputar horas        | TALLER     |
+| Borrar horas propias | TALLER     |
 | Borrar horas ajenas  | ADMIN      |
-| Añadir piezas        | AGENTE     |
+| Añadir piezas        | TALLER     |
 | Borrar piezas        | ADMIN      |
 | Aprobar/rechazar CEO | ADMIN      |
 
@@ -1449,8 +1464,9 @@ Gestión de garantías, tickets de incidencia y follow-ups post-entrega. Las gar
 ```
 lib/postventa/
   create-warranty.ts          — createWarrantyForDelivery: Warranty + 2 Followups en $transaction
-  impute-ticket-cost.ts       — imputeTicketCostToVehicle: crea VehicleCost desde costReal del ticket
   extend-warranty.ts          — extendWarranty: amplía desde extendedTo o endDate
+  transitions.ts              — matriz canónica: avance / corrección / reapertura
+  transition-ticket.ts        — CAS + Activity + reconciliación source-linked en una transacción
   *.test.ts                   — 4 tests por archivo (12 total)
 app/(backoffice)/postventa/
   page.tsx                    — listado de garantías con tickets recientes + follow-ups pendientes
@@ -1483,10 +1499,17 @@ PostventaFollowup.status: PENDIENTE → ENVIADO → RESPONDIDO
 ```
 ABIERTO → EN_PROGRESO → RESUELTO → CERRADO
         ↘ ANULADO ←──────────────↗ (desde cualquier estado activo)
-EN_PROGRESO ← RESUELTO (reapertura)
+EN_PROGRESO ← RESUELTO (corrección con motivo)
 ```
 
-`CERRADO` y `ANULADO` son terminales. Al cerrar un ticket con `costReal > 0`: `imputeTicketCostToVehicle` crea `VehicleCost` tipo `GARANTIA` en la misma transacción.
+Correcciones no terminales (ADMIN/ENTREGAS, motivo): `EN_PROGRESO → ABIERTO` y
+`RESUELTO → EN_PROGRESO`. Reaperturas terminales (solo ADMIN, motivo): `CERRADO → RESUELTO` y
+`ANULADO → ABIERTO`. Mientras un ticket siga terminal no admite edición, costes ni fotos.
+
+Al cerrar con `costReal > 0`, `transitionTicketTx` crea o actualiza un único `VehicleCost` categoría
+`POSTVENTA`, enlazado por `postventaTicketId`. Al reabrir conserva esa proyección hasta el siguiente
+cierre; el recierre la actualiza o retira atómicamente. Los costes enlazados no se editan ni borran
+por la vía manual.
 
 #### Cron job — follow-ups automáticos
 

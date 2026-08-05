@@ -182,8 +182,8 @@ jobs:
           count=$(psql "$PSQL_URL" -tAc "SELECT count(*) FROM _prisma_migrations WHERE finished_at IS NOT NULL")
           names=$(psql "$PSQL_URL" -tAc "SELECT string_agg(migration_name, ',' ORDER BY migration_name) FROM _prisma_migrations WHERE finished_at IS NOT NULL")
           echo "migraciones aplicadas: $count · nombres: $names"
-          test "$count" = "11" || { echo "esperado 11 migraciones aplicadas (baseline + PR5B1 + archivado + commitment + delivery_offer_link_expand + delivery_offer_link_required + vehicle_entry_foundations + official_entry_activity_and_inspection_index + valuation_purpose_and_attempts + cap1_business_fields_nullable + add_photo_category_and_unpublish)"; exit 1; }
-          test "$names" = "000000000000_squashed_migrations,20260712000000_add_versioned_document_model,20260719120000_add_lead_archiving_model,20260720000000_add_calendar_event_commitment,20260721100000_add_delivery_offer_link_expand,20260721200000_make_delivery_offer_link_required,20260726000000_add_vehicle_entry_foundations,20260726120000_add_official_entry_activity_and_inspection_index,20260727000000_add_valuation_purpose_and_attempts,20260728130000_cap1_business_fields_nullable,20260729130000_add_photo_category_and_unpublish" || { echo "conjunto u orden de migraciones inesperado"; exit 1; }
+          test "$count" = "12" || { echo "esperado 12 migraciones aplicadas (baseline + PR5B1 + archivado + commitment + delivery_offer_link_expand + delivery_offer_link_required + vehicle_entry_foundations + official_entry_activity_and_inspection_index + valuation_purpose_and_attempts + cap1_business_fields_nullable + add_photo_category_and_unpublish + perm3_status_corrections)"; exit 1; }
+          test "$names" = "000000000000_squashed_migrations,20260712000000_add_versioned_document_model,20260719120000_add_lead_archiving_model,20260720000000_add_calendar_event_commitment,20260721100000_add_delivery_offer_link_expand,20260721200000_make_delivery_offer_link_required,20260726000000_add_vehicle_entry_foundations,20260726120000_add_official_entry_activity_and_inspection_index,20260727000000_add_valuation_purpose_and_attempts,20260728130000_cap1_business_fields_nullable,20260729130000_add_photo_category_and_unpublish,20260805160000_perm3_status_corrections" || { echo "conjunto u orden de migraciones inesperado"; exit 1; }
 
       - name: Prisma migrate status (must be up to date)
         run: pnpm prisma migrate status
@@ -278,13 +278,18 @@ jobs:
           #   enum_values 293 → 298 (+5: EXTERIOR/INTERIOR/DETALLE/DOCUMENTAL + ActivityType
           #                          PUBLICACION_RETIRADA)
           #   tables/foreign_keys/indexes sin cambio (la columna category no lleva índice ni FK).
+          # Delta tras perm3_status_corrections (PERM-3, aditivo; sin DML ni backfill):
+          #   columns     481 → 482 (+1: vehicle_costs.postventa_ticket_id, nullable)
+          #   foreign_keys 77 → 78 (+1: postventa_ticket_id→postventa_tickets, ON DELETE SET NULL)
+          #   indexes     124 → 126 (+2 unique: ticket de origen y work_order_id+category)
+          #   tables/enums/enum_values/RLS sin cambio.
           assert offer_id_not_null "$(psql "$PSQL_URL" -tAc "SELECT is_nullable FROM information_schema.columns WHERE table_schema='public' AND table_name='deliveries' AND column_name='offer_id'")" NO
           assert tables "$tables" 33
-          assert columns "$columns" 481
+          assert columns "$columns" 482
           assert enums "$enums" 56
           assert enum_values "$enum_values" 298
-          assert foreign_keys "$fks" 77
-          assert indexes "$indexes" 124
+          assert foreign_keys "$fks" 78
+          assert indexes "$indexes" 126
           assert tables_without_rls "$without_rls" 0
           assert tables_forced_rls "$forced" 0
           assert policies "$policies" 0

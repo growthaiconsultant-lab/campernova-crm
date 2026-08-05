@@ -32,7 +32,7 @@ Clasificación: **A** activo · **P** parcial/soporte · **L** legacy · **M** m
 | Activity                           | A     | Timeline humano (polimórfico leads)                             | SellerLead XOR BuyerLead                       | conservar como timeline; dejar de parsear para KPIs |
 | Document                           | **M** | (adjunto legal genérico) — **0 CRUD**                           | —                                              | **retirar**                                         |
 | VehicleAd                          | P     | **Texto** de anuncio IA para portales externos                  | Vehicle                                        | conservar; absorber en Listing (futuro)             |
-| VehicleCost                        | A     | Coste imputado al vehículo                                      | Vehicle, WorkOrder                             | conservar                                           |
+| VehicleCost                        | A     | Proyección operativa de coste imputado al vehículo              | Vehicle, WorkOrder, PostventaTicket            | conservar; fuente operativa enlazada                |
 | WorkOrder (+ checklist/time/parts) | A     | Orden de taller                                                 | Vehicle                                        | conservar                                           |
 | Delivery (+ checklist/documents)   | A     | Entrega física + firma                                          | Vehicle, BuyerLead                             | conservar; + `dealId` futuro                        |
 | DeliveryDocument                   | A     | Documento de entrega (versionado)                               | Delivery, DocumentVersion                      | conservar (**gated** por rollout)                   |
@@ -65,11 +65,13 @@ Clasificación: **A** activo · **P** parcial/soporte · **L** legacy · **M** m
 - **Entrega (venta canónica):** `lib/delivery-completion.ts` completa la entrega y hace CAS
   `PUBLICADO|RESERVADO → VENDIDO` + `soldAt` (`:90-91`), y crea `Warranty` + 2 `PostventaFollowup` en
   la misma tx (PR3).
-- **Garantía / postventa:** `Warranty` → `PostventaTicket` (cierre con `costReal` → `VehicleCost`
-  POSTVENTA) + `PostventaFollowup` (cron día 7/30).
+- **Garantía / postventa:** `Warranty` → `PostventaTicket`; el cierre reconcilia atómicamente un
+  `VehicleCost` POSTVENTA enlazado 1:1 al ticket. La reapertura conserva la última proyección hasta
+  refinalizar. `PostventaFollowup` mantiene el cron día 7/30.
 - **Trade-in:** `BuyerLead.tradeInSellerLeadId` (1:1) → `createSellerLeadFromTradeIn` crea
   `SellerLead` + `Vehicle` en tx.
-- **Taller / costes:** `WorkOrder` → horas/piezas → `VehicleCost`.
+- **Taller / costes:** `WorkOrder` → horas/piezas → `VehicleCost` único por orden/categoría. Completar
+  reconcilia la proyección; reabrir conserva el último importe hasta refinalizar.
 - **Documentos:** `VehicleDocument` / `DeliveryDocument` versionados vía `DocumentVersion`
   (Fase 0; backfill legacy **pendiente**).
 

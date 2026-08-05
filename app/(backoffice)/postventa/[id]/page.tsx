@@ -24,6 +24,7 @@ export default async function PostventaDetailPage({ params }: { params: { id: st
       },
       buyerLead: { select: { id: true, name: true, email: true, phone: true } },
       tickets: {
+        include: { cost: { select: { amount: true } } },
         orderBy: [{ status: 'asc' }, { openedAt: 'desc' }],
       },
       followups: {
@@ -38,6 +39,7 @@ export default async function PostventaDetailPage({ params }: { params: { id: st
   const isExpired = endDate < new Date()
   const daysLeft = Math.ceil((endDate.getTime() - Date.now()) / (1000 * 60 * 60 * 24))
   const isAdmin = currentUser.role === 'ADMIN'
+  const canEdit = currentUser.role === 'ADMIN' || currentUser.role === 'ENTREGAS'
 
   // Progreso de vigencia de la garantía (mockup POST2)
   const totalMs = endDate.getTime() - warranty.startDate.getTime()
@@ -207,7 +209,7 @@ export default async function PostventaDetailPage({ params }: { params: { id: st
         ) : (
           <div className="space-y-3">
             {warranty.tickets.map((ticket) => (
-              <TicketCard key={ticket.id} ticket={ticket} />
+              <TicketCard key={ticket.id} ticket={ticket} canEdit={canEdit} isAdmin={isAdmin} />
             ))}
           </div>
         )}

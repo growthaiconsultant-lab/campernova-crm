@@ -13,7 +13,7 @@ const { mockDb } = vi.hoisted(() => {
     vehicle: { findMany: vi.fn(), count: vi.fn() },
     sellerLead: { findMany: vi.fn(), count: vi.fn() },
     activity: { findMany: vi.fn() },
-    postventaTicket: { findMany: vi.fn() },
+    vehicleCost: { findMany: vi.fn() },
     user: { findMany: vi.fn() },
     workOrder: { findMany: vi.fn() },
     $queryRaw: vi.fn(),
@@ -270,17 +270,25 @@ describe('getLeadAcceptanceRate', () => {
 
 describe('getAveragePostventaCostPerVehicle', () => {
   it('returns null average when no tickets with cost', async () => {
-    mockDb.postventaTicket.findMany.mockResolvedValue([])
+    mockDb.vehicleCost.findMany.mockResolvedValue([])
     const result = await getAveragePostventaCostPerVehicle(mockDb as never, emptyFilter)
     expect(result.averageCost).toBeNull()
     expect(result.totalCost).toBe(0)
+    expect(mockDb.vehicleCost.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          category: 'POSTVENTA',
+          postventaTicketId: { not: null },
+        }),
+      })
+    )
   })
 
   it('averages cost across unique vehicles', async () => {
-    mockDb.postventaTicket.findMany.mockResolvedValue([
-      { costReal: 300, warranty: { delivery: { vehicleId: 'v-1' } } },
-      { costReal: 200, warranty: { delivery: { vehicleId: 'v-1' } } },
-      { costReal: 500, warranty: { delivery: { vehicleId: 'v-2' } } },
+    mockDb.vehicleCost.findMany.mockResolvedValue([
+      { amount: 300, vehicleId: 'v-1' },
+      { amount: 200, vehicleId: 'v-1' },
+      { amount: 500, vehicleId: 'v-2' },
     ])
     const result = await getAveragePostventaCostPerVehicle(mockDb as never, emptyFilter)
     // total = 1000, vehicles = 2, average = 500
