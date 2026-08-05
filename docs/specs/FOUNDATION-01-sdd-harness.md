@@ -1,15 +1,15 @@
 # FOUNDATION-01 — Implantar SDD ligero y un harness verificable
 
-| Campo               | Valor                                |
-| ------------------- | ------------------------------------ |
-| **Estado**          | IMPLEMENTED                          |
-| **Owner**           | Engineering                          |
-| **Ticket**          | FOUNDATION-01                        |
-| **Rama / PR**       | `codex/project-takeover` / pendiente |
-| **Categorías**      | C0, C9                               |
-| **Riesgo**          | Medio                                |
-| **Ruta SDD**        | Estándar                             |
-| **Última revisión** | 2026-08-03                           |
+| Campo               | Valor                              |
+| ------------------- | ---------------------------------- |
+| **Estado**          | VALIDATED                          |
+| **Owner**           | Engineering                        |
+| **Ticket**          | FOUNDATION-01                      |
+| **Rama / PR**       | `codex/project-takeover` / PR #163 |
+| **Categorías**      | C0, C9                             |
+| **Riesgo**          | Medio                              |
+| **Ruta SDD**        | Estándar                           |
+| **Última revisión** | 2026-08-05                         |
 
 ## Problema y evidencia
 
@@ -85,12 +85,12 @@ dominio sea sólida.
 
 ## Verificación
 
-| Criterio               | Evidencia prevista                                     | Resultado                                                      |
-| ---------------------- | ------------------------------------------------------ | -------------------------------------------------------------- |
-| Rutas y estructura SDD | `node scripts/check-sdd.mjs`                           | OK: 2 briefs y enlaces canónicos válidos                       |
-| Formato                | `pnpm exec prettier --check ...`                       | No ejecutado: dependencias locales incompletas y red bloqueada |
-| Scope                  | `git diff --check`, `git diff --stat`, revisión manual | OK; pendiente revisión humana final                            |
-| Seguridad              | Búsqueda de patrones de secretos en el diff            | OK                                                             |
+| Criterio               | Evidencia prevista                                     | Resultado                                        |
+| ---------------------- | ------------------------------------------------------ | ------------------------------------------------ |
+| Rutas y estructura SDD | `node scripts/check-sdd.mjs`                           | OK: 2 briefs y enlaces canónicos válidos         |
+| Formato                | `pnpm exec prettier --check ...`                       | OK tras restaurar las dependencias del workspace |
+| Scope                  | `git diff --check`, `git diff --stat`, revisión manual | OK; PR revisada y fusionada                      |
+| Seguridad              | Búsqueda de patrones de secretos en el diff            | OK                                               |
 
 ## Rollout, rollback y stop conditions
 
@@ -111,10 +111,11 @@ dominio sea sólida.
 
 ## Cierre
 
-- **Commit:** pendiente.
-- **PR:** pendiente.
-- **CI:** pendiente.
+- **Commit:** `75d1e5c8093547a6bd25dae147c34a2211579ebb`.
+- **PR:** [#163](https://github.com/growthaiconsultant-lab/campernova-crm/pull/163), fusionada en
+  `main` el 2026-08-04 mediante `f95ec44970d60a013648c1d0147ac19aa5996de3`.
+- **CI:** `quality`, `integration`, `migration-replay` y `supabase-storage` en PASS sobre el merge.
 - **Deployment:** N/A.
-- **Validación:** `check:sdd`, sintaxis Node/JSON, enlaces, whitespace y secretos verificados;
-  Prettier no ejecutado por dependencias incompletas.
+- **Validación:** `check:sdd`, formato, sintaxis Node/JSON, enlaces, whitespace y secretos
+  verificados. CRON-01 recorrió después el flujo SDD real hasta PR, CI y Production supervisada.
 - **Deuda restante:** reconciliar Linear y reparar el harness real en tickets separados.

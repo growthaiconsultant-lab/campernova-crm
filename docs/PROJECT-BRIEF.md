@@ -5,9 +5,26 @@
 > actual**. Fuentes complementarias: `docs/plans/crm-completion-master-plan.md` y los releases en
 > `docs/releases/`.
 >
-> **Fecha de corte:** 2026-07-27.
+> **Fecha de corte funcional del cuerpo:** 2026-07-27. **Addendum operativo:** 2026-08-05. Las tablas
+> funcionales inferiores conservan su corte histórico hasta una reconciliación dedicada; no deben
+> interpretarse como un backlog actualizado.
 
-## Estado del programa
+## Addendum operativo — takeover Codex
+
+| Evidencia     | Estado verificado                                                                  |
+| ------------- | ---------------------------------------------------------------------------------- |
+| `main`        | `20419c52530bb83f989c04ed18daeacd987c2a89`                                         |
+| Production    | Vercel completado; `https://campernova-crm.vercel.app/` responde 200               |
+| FOUNDATION-01 | PR #163 fusionada; SDD ligero y harness validados                                  |
+| CRON-01       | PR #164 fusionada; routing, autenticación e idempotencia desplegados               |
+| CI post-merge | `quality`, `integration`, `migration-replay` y `supabase-storage` en PASS          |
+| Cron smoke    | Calendario y postventa responden 401 sin Bearer; no se ejecutaron efectos manuales |
+
+No hubo migraciones de base de datos en FOUNDATION-01 ni CRON-01. El detalle y la deuda de
+observación posterior están en `docs/specs/FOUNDATION-01-sdd-harness.md` y
+`docs/specs/CRON-01-cron-auth-routing.md`.
+
+## Estado del programa — fotografía funcional 2026-07-27
 
 |                                         |                                                                                              |
 | --------------------------------------- | -------------------------------------------------------------------------------------------- |
