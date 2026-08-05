@@ -456,31 +456,34 @@ delegue explícitamente. Producción no se modifica por aprobar este documento.
 
 ## U. Estado de autorización
 
-**IMPLEMENTATION READY FOR CI REVIEW**
+**IMPLEMENTATION VALIDATED IN CI — PRODUCTION NOT AUTHORIZED**
 
 - Permitido ahora: implementar la opción A en esta rama, generar la migración local, ejecutar pruebas,
   crear commits y actualizar el PR borrador.
 - Prohibido ahora: aplicar la migración en Supabase, modificar datos de producción, fusionar el PR,
   desplegar staging/producción o declarar el cambio implementado/desplegado antes de su evidencia.
-- Siguiente gate: revisión del diff completo + CI verde + autorización separada para migración, merge y
-  despliegue.
+- Siguiente gate: revisión humana del diff + autorización separada para migración. Merge y despliegue
+  conservan autorizaciones posteriores propias.
 
 ## Verificación de esta fase
 
-| Criterio            | Evidencia                                                                  | Resultado                                                            |
-| ------------------- | -------------------------------------------------------------------------- | -------------------------------------------------------------------- |
-| Baseline de código  | Schema, actions, readers, tests, migraciones y permisos citados por línea. | Completado.                                                          |
-| Baseline de entorno | Consultas agregadas read-only sin PII.                                     | Completado el 2026-08-05.                                            |
-| SDD reforzado       | Secciones A–U, adversarial y matriz.                                       | `check:sdd` y `git diff --check`: OK.                                |
-| Implementación      | Núcleos transaccionales, guards, UX, schema/migración y tests.             | Local completa; CI PostgreSQL pendiente.                             |
-| Validación local    | Typecheck, lint, Prisma validate, SDD, build y 1.431 tests unitarios.      | PASS el 2026-08-05.                                                  |
-| PostgreSQL real     | Tests de concurrencia, reconciliación y rollback en base efímera.          | Escritos; ejecución local no disponible sin Docker, pendiente de CI. |
+| Criterio            | Evidencia                                                                  | Resultado                                  |
+| ------------------- | -------------------------------------------------------------------------- | ------------------------------------------ |
+| Baseline de código  | Schema, actions, readers, tests, migraciones y permisos citados por línea. | Completado.                                |
+| Baseline de entorno | Consultas agregadas read-only sin PII.                                     | Completado el 2026-08-05.                  |
+| SDD reforzado       | Secciones A–U, adversarial y matriz.                                       | `check:sdd` y `git diff --check`: OK.      |
+| Implementación      | Núcleos transaccionales, guards, UX, schema/migración y tests.             | Completa en la rama; producción intacta.   |
+| Validación local    | Typecheck, lint, Prisma validate, SDD, build y 1.431 tests unitarios.      | PASS el 2026-08-05.                        |
+| PostgreSQL real     | Tests de concurrencia, reconciliación y rollback en base efímera.          | PASS en CI `integration`.                  |
+| Migration replay    | 12 migraciones desde cero, paridad Prisma, RLS, catálogo e idempotencia.   | PASS en CI `migration-replay`.             |
+| CI completa         | `quality`, `integration`, `migration-replay`, `supabase-storage`, Vercel.  | PASS en run `31021465723` / Preview Ready. |
 
 ## Cierre
 
-- **Commit:** implementación pendiente de commit.
-- **PR:** #169 en borrador; pendiente de actualizar con la implementación.
-- **CI:** pendiente.
+- **Commit de implementación:** `86b8e82`.
+- **PR:** #169 en borrador, actualizada con la implementación.
+- **CI:** PASS (`quality`, `integration`, `migration-replay`, `supabase-storage`, Vercel Preview).
 - **Deployment:** no autorizado.
-- **Validación:** local PASS; PostgreSQL efímero, migration replay y revisión independiente pendientes.
-- **Deuda restante:** CI, revisión independiente y autorizaciones separadas de migración/merge/deploy.
+- **Validación:** local + PostgreSQL efímero + migration replay + Preview build PASS.
+- **Deuda restante:** revisión humana y autorizaciones separadas de migración/merge/deploy; smoke por
+  rol y observación de 24 h sólo después del despliegue autorizado.
