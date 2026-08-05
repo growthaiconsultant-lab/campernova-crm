@@ -2,8 +2,8 @@
 
 | Campo               | Valor                                                                              |
 | ------------------- | ---------------------------------------------------------------------------------- |
-| **Estado**          | DRAFT                                                                              |
-| **Owner**           | Engineering + Joel (decisión financiera)                                           |
+| **Estado**          | APPROVED                                                                           |
+| **Owner**           | Engineering                                                                        |
 | **Ticket**          | [GitHub #168](https://github.com/growthaiconsultant-lab/campernova-crm/issues/168) |
 | **Rama / PR**       | `codex/perm-3-workshop-postsales-design` / pendiente                               |
 | **Categorías**      | C0, C1, C2, C3, C4, C5, C6                                                         |
@@ -113,7 +113,7 @@ preflight inmediatamente anterior a cualquier migración.
 | Coste generado         | Debe quedar identificado por su fuente y protegido frente a edición/borrado manual. | El margen debe reconciliarse desde una única fuente operativa.                                                                                                                |
 | Reintento              | Mismo target ya aplicado devuelve éxito idempotente sin nueva Activity ni coste.    | Doble clic/retry no representa una nueva intención.                                                                                                                           |
 
-### Decisión material pendiente de Joel
+### Decisión financiera aprobada por Joel
 
 Cuando ADMIN reabre `WorkOrder COMPLETADA → EN_CURSO` o `PostventaTicket CERRADO → RESUELTO`, ¿qué
 ocurre con el coste ya imputado durante el intervalo de reapertura?
@@ -130,8 +130,10 @@ enlazada, la reconciliación y la Activity conservan trazabilidad suficiente par
 reversión económica real debe ser una acción financiera explícita, no un efecto implícito de cambiar
 una etiqueta.
 
-Resolución exacta requerida: Joel debe aprobar **A**, **B** o **C**. Hasta entonces las secciones F–T
-describen la implementación recomendada bajo A y la spec no autoriza código.
+**Resolución:** Joel aprobó la opción **A** el 2026-08-05. Durante una reapertura terminal se conserva
+el último coste contabilizado. La siguiente finalización reconcilia la proyección de forma atómica y
+registra el cambio en la Activity. Una reversión económica real sigue requiriendo una acción financiera
+explícita; no nace implícitamente de cambiar el estado operativo.
 
 ## F. Flujo funcional
 
@@ -400,7 +402,7 @@ delegue explícitamente. Producción no se modifica por aprobar este documento.
 
 ## Criterios de aceptación — T. Resultados verificables
 
-- [ ] Joel ha aprobado A, B o C y la spec está `APPROVED` antes de implementar.
+- [x] Joel ha aprobado la opción A y la spec está `APPROVED` antes de implementar.
 - [ ] Sólo se permiten las transiciones de la tabla G y los permisos de H.
 - [ ] Toda corrección/reapertura confirmada exige motivo y crea exactamente una Activity atómica.
 - [ ] Retry/doble clic del mismo target devuelve éxito sin duplicar Activity ni coste.
@@ -454,14 +456,14 @@ delegue explícitamente. Producción no se modifica por aprobar este documento.
 
 ## U. Estado de autorización
 
-**PLAN REQUIRES TARGETED DOMAIN DECISION**
+**PLAN READY FOR INDEPENDENT REVIEW**
 
-- Permitido ahora: revisión independiente del baseline, matrices, riesgos y recomendación A; resolver
-  A/B/C; corregir esta documentación.
-- Prohibido ahora: implementar, generar/aplicar migración, modificar datos, commit/push de código,
-  merge, staging o producción.
-- Siguiente gate: Joel elige A/B/C; Engineering incorpora la resolución, elimina la condición abierta,
-  revisa de nuevo A–U y cambia a `APPROVED` sólo si no queda otra decisión material.
+- Permitido ahora: implementar la opción A en esta rama, generar la migración local, ejecutar pruebas,
+  crear commits y actualizar el PR borrador.
+- Prohibido ahora: aplicar la migración en Supabase, modificar datos de producción, fusionar el PR,
+  desplegar staging/producción o declarar el cambio implementado/desplegado antes de su evidencia.
+- Siguiente gate: revisión del diff completo + CI verde + autorización separada para migración, merge y
+  despliegue.
 
 ## Verificación de esta fase
 
@@ -470,7 +472,7 @@ delegue explícitamente. Producción no se modifica por aprobar este documento.
 | Baseline de código  | Schema, actions, readers, tests, migraciones y permisos citados por línea. | Completado.                           |
 | Baseline de entorno | Consultas agregadas read-only sin PII.                                     | Completado el 2026-08-05.             |
 | SDD reforzado       | Secciones A–U, adversarial y matriz.                                       | `check:sdd` y `git diff --check`: OK. |
-| Implementación      | Código, migración, tests funcionales.                                      | No autorizada / no iniciada.          |
+| Implementación      | Código, migración, tests funcionales.                                      | Autorizada; pendiente.                |
 
 ## Cierre
 
@@ -479,4 +481,4 @@ delegue explícitamente. Producción no se modifica por aprobar este documento.
 - **CI:** pendiente.
 - **Deployment:** no autorizado.
 - **Validación:** diseño y preflight agregados; implementación no validada.
-- **Deuda restante:** decisión A/B/C y, después, implementación reforzada separada.
+- **Deuda restante:** implementación reforzada, revisión independiente y autorización de producción.
