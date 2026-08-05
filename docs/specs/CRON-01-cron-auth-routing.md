@@ -1,15 +1,15 @@
 # CRON-01 — Garantizar autenticación, routing e idempotencia de Vercel Cron
 
-| Campo               | Valor                     |
-| ------------------- | ------------------------- |
-| **Estado**          | IMPLEMENTED               |
-| **Owner**           | Engineering / Operations  |
-| **Ticket**          | CRON-01                   |
-| **Rama / PR**       | `codex/cron-auth-routing` |
-| **Categorías**      | C5, C8, C9                |
-| **Riesgo**          | Alto                      |
-| **Ruta SDD**        | Reforzada                 |
-| **Última revisión** | 2026-08-04                |
+| Campo               | Valor                               |
+| ------------------- | ----------------------------------- |
+| **Estado**          | DEPLOYED                            |
+| **Owner**           | Engineering / Operations            |
+| **Ticket**          | CRON-01                             |
+| **Rama / PR**       | `codex/cron-auth-routing` / PR #164 |
+| **Categorías**      | C5, C8, C9                          |
+| **Riesgo**          | Alto                                |
+| **Ruta SDD**        | Reforzada                           |
+| **Última revisión** | 2026-08-05                          |
 
 ## Problema y evidencia
 
@@ -95,22 +95,28 @@ No se modifica `schema.prisma`, no hay migración y no se añade ninguna depende
 - [x] Dos invocaciones equivalentes entregan la misma idempotency key a Resend.
 - [x] El response del handler es JSON, nunca redirect a `/login`.
 - [x] Los fallos de Resend no se contabilizan como envíos correctos.
-- [ ] Vercel Production tiene un `CRON_SECRET` verificado y de al menos 16 caracteres.
+- [ ] Vercel Production tiene un `CRON_SECRET` de al menos 16 caracteres. La variable existe, está
+      marcada como sensible y limitada a Production; su longitud/valor no se revelaron durante la
+      comprobación.
 - [ ] Staging/Preview aislado registra una ejecución controlada sin datos reales.
-- [x] Production no se ha modificado durante la implementación.
+- [x] Production solo se modificó después de autorización explícita y con todos los gates verdes.
 
 ## Evidencia ejecutada
 
-| Check                           | Resultado                                        |
-| ------------------------------- | ------------------------------------------------ |
-| Reproducción previa             | 10 fallos / 13 tests específicos                 |
-| Tests CRON-01 posteriores       | 18 / 18 PASS                                     |
-| Suite unitaria completa         | 1.409 / 1.409 PASS en 108 archivos               |
-| TypeScript                      | PASS                                             |
-| ESLint                          | PASS, sin warnings                               |
-| Build Next.js con acceso real   | PASS, 60 páginas generadas                       |
-| Migraciones                     | N/A, sin cambios de schema                       |
-| Ejecución autorizada en Preview | BLOQUEADA hasta aislar datos y verificar secreto |
+| Check                         | Resultado                                                              |
+| ----------------------------- | ---------------------------------------------------------------------- |
+| Reproducción previa           | 10 fallos / 13 tests específicos                                       |
+| Tests CRON-01 posteriores     | 18 / 18 PASS                                                           |
+| Suite unitaria completa       | 1.409 / 1.409 PASS en 108 archivos                                     |
+| TypeScript                    | PASS                                                                   |
+| ESLint                        | PASS, sin warnings                                                     |
+| Build Next.js con acceso real | PASS, 60 páginas generadas                                             |
+| Migraciones                   | N/A, sin cambios de schema                                             |
+| CI del merge a `main`         | PASS: quality, integration, migration-replay y supabase-storage        |
+| Vercel Production             | PASS: deployment `20419c52530bb83f989c04ed18daeacd987c2a89` completado |
+| Smoke público de Production   | `/` → 200; ambas rutas cron sin Bearer → 401                           |
+| Smoke sin auth de Preview     | Ambas rutas → 401 con evento `cron.auth_rejected`                      |
+| Ejecución autorizada manual   | No realizada: se evitaron datos y destinatarios reales                 |
 
 ## Rollout, rollback y stop conditions
 
@@ -123,10 +129,16 @@ No se modifica `schema.prisma`, no hay migración y no se añade ninguna depende
 - **Validación post-despliegue:** confirmar status, duración, conteos, ausencia de 3xx/401 y ausencia
   de duplicados durante dos ventanas programadas.
 
-## Estado de autorización
+## Estado operativo
 
-`IMPLEMENTED LOCALLY — DEPLOYMENT BLOCKED`
+`DEPLOYED — POST-DEPLOYMENT OBSERVATION PENDING`
 
-El código y sus pruebas están implementados. No se autoriza merge ni Production hasta obtener
-acceso administrativo a Vercel, verificar que `CRON_SECRET` existe en Production y disponer de un
-entorno Preview/Staging cuyos datos y destinatarios estén aislados.
+La PR [#164](https://github.com/growthaiconsultant-lab/campernova-crm/pull/164) se fusionó con
+autorización explícita el 2026-08-04. El commit de Production
+`20419c52530bb83f989c04ed18daeacd987c2a89` quedó desplegado con CI y Vercel verdes. Vercel registra
+los dos jobs como habilitados y `CRON_SECRET` existe únicamente en Production como variable
+sensible. No se reveló su valor ni se lanzó ningún job autorizado manualmente.
+
+Queda pendiente observar dos ventanas programadas y reconciliar duración, conteos, ausencia de
+duplicados y efectos externos. Preview/Staging sigue sin considerarse aislado para una ejecución
+autorizada.
