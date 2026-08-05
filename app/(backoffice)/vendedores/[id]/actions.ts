@@ -21,7 +21,7 @@ import {
   VEHICLE_STATUS_LABELS,
   isValidTransition,
 } from '@/lib/state-machine'
-import type { SellerLeadStatus } from '@prisma/client'
+import type { LostReason, SellerLeadStatus } from '@prisma/client'
 import { isValidLostReason, LOST_REASON_LABELS } from '@/lib/lost-reason'
 import {
   applyManualVehicleUpdateTx,
@@ -454,7 +454,7 @@ export async function forcePublishVehicle(vehicleId: string): Promise<PublishVeh
 
 /**
  * Descarta un vendedor: decisión COMERCIAL que lleva el lead al estado terminal `DESCARTADO`
- * con un motivo estructurado. NO archiva, NO oculta el registro de las bandejas y NO elimina
+ * con un motivo estructurado opcional. NO archiva, NO oculta el registro de las bandejas y NO elimina
  * datos. El nombre `archive*` queda reservado para el archivado real (aún no implementado).
  */
 export async function discardSellerLead(
@@ -464,9 +464,13 @@ export async function discardSellerLead(
 ) {
   const actor = await requireAgente()
 
-  // CAM-61: motivo estructurado obligatorio al descartar
-  if (!lostReason || !isValidLostReason(lostReason)) {
-    return { error: 'Selecciona el motivo del descarte' }
+  let reason: LostReason | null = null
+  const reasonCandidate = lostReason?.trim()
+  if (reasonCandidate) {
+    if (!isValidLostReason(reasonCandidate)) {
+      return { error: 'Selecciona el motivo del descarte' }
+    }
+    reason = reasonCandidate
   }
   const notes = lostReasonNotes?.trim().slice(0, 500) || null
 
@@ -483,12 +487,12 @@ export async function discardSellerLead(
   await db.$transaction(async (tx) => {
     await tx.sellerLead.update({
       where: { id: leadId },
-      data: { status: 'DESCARTADO', lostReason, lostReasonNotes: notes },
+      data: { status: 'DESCARTADO', lostReason: reason, lostReasonNotes: notes },
     })
     await tx.activity.create({
       data: {
         type: 'CAMBIO_ESTADO',
-        content: `Estado cambiado: ${SELLER_LEAD_STATUS_LABELS[lead.status as SellerLeadStatus]} → ${SELLER_LEAD_STATUS_LABELS['DESCARTADO']} · Motivo: ${LOST_REASON_LABELS[lostReason]}${notes ? ` — ${notes}` : ''}`,
+        content: `Estado cambiado: ${SELLER_LEAD_STATUS_LABELS[lead.status as SellerLeadStatus]} → ${SELLER_LEAD_STATUS_LABELS['DESCARTADO']} · Motivo: ${reason ? LOST_REASON_LABELS[reason] : 'sin especificar'}${notes ? ` — ${notes}` : ''}`,
         agentId: actor.id,
         sellerLeadId: leadId,
       },

@@ -8,8 +8,8 @@
  * Reglas por tipo:
  *   · `CITA`        → siempre EXTERNO (una cita se acuerda con alguien).
  *   · `LIMPIEZA`    → siempre INTERNO (operación de nave).
- *   · `LLAMADA`     → elección obligatoria del usuario.
- *   · `OTRO`        → elección obligatoria del usuario.
+ *   · `LLAMADA`     → elección opcional; sin ella queda INDETERMINADO.
+ *   · `OTRO`        → elección opcional; sin ella queda INDETERMINADO.
  *   · `SEGUIMIENTO` → INDETERMINADO: no es creable desde la UI (fuera de `NATIVE_EVENT_TYPES`) y
  *     no se reactiva aquí; si apareciera, se clasifica a mano.
  *
@@ -36,13 +36,13 @@ export const FORCED_COMMITMENT_BY_TYPE: Partial<Record<CalendarEventType, EventC
   LIMPIEZA: 'INTERNO',
 }
 
-/** Tipos en los que el usuario DEBE elegir; su semántica no es deducible. */
+/** Tipos en los que el usuario puede elegir; su semántica no es deducible. */
 export const EXPLICIT_COMMITMENT_TYPES: CalendarEventType[] = ['LLAMADA', 'OTRO']
 
 /** Opciones ofrecidas al usuario. `INDETERMINADO` nunca se elige a mano. */
 export const COMMITMENT_CHOICES: EventCommitment[] = ['EXTERNO', 'INTERNO']
 
-export function requiresExplicitCommitment(type: CalendarEventType): boolean {
+export function supportsExplicitCommitment(type: CalendarEventType): boolean {
   return EXPLICIT_COMMITMENT_TYPES.includes(type)
 }
 
@@ -52,7 +52,7 @@ export function isCommitmentChoice(value: unknown): value is EventCommitment {
 
 export type CommitmentResolution =
   | { ok: true; value: EventCommitment }
-  | { ok: false; reason: 'required' | 'incompatible' }
+  | { ok: false; reason: 'incompatible' }
 
 /**
  * Decide la clasificación definitiva de un evento a partir de su tipo y de lo que envíe el
@@ -60,7 +60,7 @@ export type CommitmentResolution =
  * manipulado en el navegador no puede colar una combinación inválida.
  *
  *  - Tipo con clasificación forzada: se impone la del tipo; si llega otra distinta → `incompatible`.
- *  - Tipo que exige elección: sin valor → `required`; con valor no elegible → `incompatible`.
+ *  - Tipo de semántica ambigua: sin valor → `INDETERMINADO`; con valor no elegible → `incompatible`.
  *  - Resto (`SEGUIMIENTO`): INDETERMINADO.
  *
  * Sirve tanto para crear como para cambiar el tipo de un evento existente: al cambiar de tipo se
@@ -76,8 +76,8 @@ export function resolveCommitment(
     return { ok: true, value: forced }
   }
 
-  if (requiresExplicitCommitment(type)) {
-    if (provided == null) return { ok: false, reason: 'required' }
+  if (supportsExplicitCommitment(type)) {
+    if (provided == null) return { ok: true, value: 'INDETERMINADO' }
     if (!isCommitmentChoice(provided)) return { ok: false, reason: 'incompatible' }
     return { ok: true, value: provided }
   }
@@ -95,7 +95,9 @@ export function isCommitmentValidForType(
 ): boolean {
   const forced = FORCED_COMMITMENT_BY_TYPE[type]
   if (forced) return commitment === forced
-  if (requiresExplicitCommitment(type)) return isCommitmentChoice(commitment)
+  if (supportsExplicitCommitment(type)) {
+    return commitment === 'INDETERMINADO' || isCommitmentChoice(commitment)
+  }
   return true
 }
 

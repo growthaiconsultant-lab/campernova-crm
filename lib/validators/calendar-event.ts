@@ -16,7 +16,8 @@ export const createCalendarEventSchema = z.object({
   priority: z.enum(['BAJA', 'MEDIA', 'ALTA', 'URGENTE']).default('MEDIA'),
   /**
    * Naturaleza del compromiso. Opcional aquí a propósito: el servidor la resuelve con
-   * `resolveCommitment`, que la impone para `CITA`/`LIMPIEZA` y la exige para `LLAMADA`/`OTRO`.
+   * `resolveCommitment`, que la impone para `CITA`/`LIMPIEZA` y usa `INDETERMINADO` cuando una
+   * `LLAMADA`/`OTRO` todavía no se ha clasificado.
    */
   commitment: z.enum(['EXTERNO', 'INTERNO']).optional().nullable(),
   assignedToId: z.string().optional().nullable(),

@@ -92,8 +92,9 @@ Clasificación: **A** activo · **P** parcial/soporte · **L** legacy · **M** m
 - **Autorización** por **rol global** (`UserRole`) en las server actions (`requireAgente/Admin`); no
   hay checks de ownership por entidad.
 - **Dos ejes independientes en los leads:**
-  - **Estado comercial** (terminal, irreversible): `discardSellerLead` (→ `DESCARTADO`) y
-    `markBuyerLeadLost` (→ `PERDIDO`), con motivo obligatorio y `Activity`. No eliminan datos.
+  - **Estado comercial** (clasificación operativa corregible): `discardSellerLead` (→ `DESCARTADO`)
+    y `markBuyerLeadLost` (→ `PERDIDO`), con motivo opcional y `Activity` obligatoria. No eliminan
+    datos; la máquina de estados permite corregir después la clasificación.
   - **Archivado** (organizativo, **reversible**): `archiveSellerLead`/`reactivateSellerLead` y
     `archiveBuyerLead`/`reactivateBuyerLead` (`app/(backoffice)/lead-archiving-actions.ts`).
     `archivedAt == null` ⇔ activo. No cambia el estado comercial, ni vehículo, ofertas, entregas,
@@ -127,16 +128,16 @@ Clasificación: **A** activo · **P** parcial/soporte · **L** legacy · **M** m
   evento **no** basta para saber si romperlo afecta a un cliente: una `LLAMADA` puede ser una
   llamada concertada o un recordatorio para llamar. La clasificación es explícita y la impone el
   servidor (`lib/calendar/commitment.ts`): `CITA → EXTERNO`, `LIMPIEZA → INTERNO`; `LLAMADA` y
-  `OTRO` **exigen elección** del usuario. `SEGUIMIENTO` no es creable desde la UI (fuera de
-  `NATIVE_EVENT_TYPES`) y queda `INDETERMINADO`.
+  `OTRO` permiten elegir `EXTERNO`/`INTERNO` o quedan `INDETERMINADO` para clasificarlos después.
+  `SEGUIMIENTO` no es creable desde la UI (fuera de `NATIVE_EVENT_TYPES`) y queda
+  `INDETERMINADO`.
   - **Histórico:** el backfill solo clasificó lo inequívoco (`CITA`, `LIMPIEZA`); `LLAMADA`, `OTRO`
     y `SEGUIMIENTO` quedaron `INDETERMINADO` **a propósito** — suponerlos internos podría ocultar un
     compromiso real con un cliente. Se clasifican a mano desde la ficha del evento
     (`setEventCommitment`), sin posibilidad de volver a `INDETERMINADO`.
-  - **Refinamiento por compromiso — todavía NO implementado:** hoy el archivado bloquea ante
-    **cualquier** evento futuro no terminal. La regla afinada (bloquear solo ante `EXTERNO` o
-    `INDETERMINADO` y advertir ante `INTERNO`) llega en I4/B2 final; el archivado de PR #117 aún
-    **no** discrimina por `commitment`.
+  - **Archivado permisivo:** desde la Oleada 1, los eventos futuros no bloquean el archivado. Se
+    conservan y su cantidad se registra en la Activity; `commitment` queda como clasificación
+    informativa del calendario, no como gate del lead.
   - **Sin índice propio:** la consulta de archivado filtra primero por `seller_lead_id` /
     `buyer_lead_id` / `vehicle_id` (ya indexados), lo que deja pocas filas por lead; `commitment`
     tiene 3 valores y no aportaría selectividad.
