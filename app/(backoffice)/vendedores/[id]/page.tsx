@@ -392,6 +392,7 @@ export default async function FichaVendedorPage({
     invoiceUrl: c.invoiceUrl,
     createdAt: c.createdAt,
     createdBy: c.createdBy ? { id: c.createdBy.id, name: c.createdBy.name } : null,
+    isGenerated: Boolean(c.workOrderId || c.postventaTicketId),
   }))
 
   const margin = v

@@ -88,6 +88,7 @@ export default async function WorkOrderPage({ params }: { params: { id: string }
   if (!wo) notFound()
 
   const isAdmin = currentUser.role === 'ADMIN'
+  const canEdit = currentUser.role === 'ADMIN' || currentUser.role === 'TALLER'
   const isClosed = wo.status === 'COMPLETADA' || wo.status === 'RECHAZADA'
 
   const checklistByCategory = wo.checklist.reduce(
@@ -194,9 +195,18 @@ export default async function WorkOrderPage({ params }: { params: { id: string }
       <WorkOrderActionsBar
         woId={wo.id}
         status={wo.status}
+        kind={wo.kind}
         approvalLevel={wo.approvalLevel}
         isAdmin={isAdmin}
+        canEdit={canEdit}
       />
+
+      {!isClosed && wo.costs.length > 0 && (
+        <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+          Coste contabilizado pendiente de refinalización. Se conserva el último importe y se
+          reconciliará al completar de nuevo la orden.
+        </div>
+      )}
 
       {/* Planificación / agenda */}
       <ScheduleCard
@@ -208,6 +218,7 @@ export default async function WorkOrderPage({ params }: { params: { id: string }
         scheduledStart={wo.scheduledStart ? wo.scheduledStart.toISOString() : null}
         scheduledEnd={wo.scheduledEnd ? wo.scheduledEnd.toISOString() : null}
         isClosed={isClosed}
+        canEdit={canEdit}
       />
 
       {/* Tabs */}
@@ -409,6 +420,7 @@ export default async function WorkOrderPage({ params }: { params: { id: string }
                               result={item.result as ChecklistItemResult}
                               notes={item.notes}
                               isClosed={isClosed}
+                              canEdit={canEdit}
                             />
                           ))}
                         </tbody>
@@ -427,12 +439,19 @@ export default async function WorkOrderPage({ params }: { params: { id: string }
                 currentUserId={currentUser.id}
                 isAdmin={isAdmin}
                 isClosed={isClosed}
+                canEdit={canEdit}
               />
             </TabPanel>
 
             {/* ── PIEZAS ── */}
             <TabPanel tab="piezas">
-              <PartsSection woId={wo.id} parts={parts} isAdmin={isAdmin} isClosed={isClosed} />
+              <PartsSection
+                woId={wo.id}
+                parts={parts}
+                isAdmin={isAdmin}
+                isClosed={isClosed}
+                canEdit={canEdit}
+              />
             </TabPanel>
 
             {/* ── COSTES RESULTANTES ── */}

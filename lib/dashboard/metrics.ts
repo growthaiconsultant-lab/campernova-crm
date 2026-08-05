@@ -296,26 +296,21 @@ export async function getAveragePostventaCostPerVehicle(
   database: PrismaClient,
   filter: DashboardFilter
 ): Promise<{ averageCost: number | null; totalCost: number; vehicleCount: number }> {
-  const tickets = await database.postventaTicket.findMany({
+  const costs = await database.vehicleCost.findMany({
     where: {
-      costReal: { not: null, gt: 0 },
-      ...(filter.agentId
-        ? { warranty: { delivery: { vehicle: { sellerLead: { agentId: filter.agentId } } } } }
-        : {}),
+      category: 'POSTVENTA',
+      postventaTicketId: { not: null },
+      ...(filter.agentId ? { vehicle: { sellerLead: { agentId: filter.agentId } } } : {}),
     },
-    select: {
-      costReal: true,
-      warranty: { select: { delivery: { select: { vehicleId: true } } } },
-    },
+    select: { amount: true, vehicleId: true },
   })
 
   const vehicleSet = new Set<string>()
   let totalCost = 0
 
-  for (const t of tickets) {
-    if (t.costReal) totalCost += Number(t.costReal)
-    const vehicleId = t.warranty?.delivery?.vehicleId
-    if (vehicleId) vehicleSet.add(vehicleId)
+  for (const cost of costs) {
+    totalCost += Number(cost.amount)
+    vehicleSet.add(cost.vehicleId)
   }
 
   const vehicleCount = vehicleSet.size

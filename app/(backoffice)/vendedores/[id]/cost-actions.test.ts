@@ -25,6 +25,7 @@ import { requireAdmin } from '@/lib/auth'
 import {
   createVehicleCost,
   deleteVehicleCost,
+  updateVehicleCost,
   updateVehicleEconomics,
   updateNaveLocation,
 } from './cost-actions'
@@ -92,6 +93,8 @@ describe('deleteVehicleCost', () => {
   it('admin puede borrar cualquier coste', async () => {
     vi.mocked(requireAdmin).mockResolvedValue(mockAdmin)
     mockDb.vehicleCost.findUnique.mockResolvedValue({
+      workOrderId: null,
+      postventaTicketId: null,
       vehicle: { sellerLeadId: 'sl-1' },
     })
     mockDb.vehicleCost.delete.mockResolvedValue({})
@@ -107,6 +110,38 @@ describe('deleteVehicleCost', () => {
     const result = await deleteVehicleCost('cost-unknown')
     expect(result.ok).toBe(false)
     expect((result as { ok: false; error: string }).error).toBe('Coste no encontrado')
+  })
+
+  it('no permite borrar un coste generado por taller o postventa', async () => {
+    vi.mocked(requireAdmin).mockResolvedValue(mockAdmin)
+    mockDb.vehicleCost.findUnique.mockResolvedValue({
+      workOrderId: 'wo-1',
+      postventaTicketId: null,
+      vehicle: { sellerLeadId: 'sl-1' },
+    })
+
+    const result = await deleteVehicleCost('generated-1')
+    expect(result.ok).toBe(false)
+    expect(mockDb.vehicleCost.delete).not.toHaveBeenCalled()
+  })
+})
+
+describe('updateVehicleCost', () => {
+  it('no permite editar un coste generado', async () => {
+    vi.mocked(requireAdmin).mockResolvedValue(mockAdmin)
+    mockDb.vehicleCost.findUnique.mockResolvedValue({
+      workOrderId: null,
+      postventaTicketId: 'ticket-1',
+      vehicle: { sellerLeadId: 'sl-1' },
+    })
+
+    const result = await updateVehicleCost('generated-1', {
+      category: 'POSTVENTA',
+      description: 'Cambio manual indebido',
+      amount: 1,
+    })
+    expect(result.ok).toBe(false)
+    expect(mockDb.vehicleCost.update).not.toHaveBeenCalled()
   })
 })
 

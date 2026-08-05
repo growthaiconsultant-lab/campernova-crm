@@ -18,6 +18,7 @@ interface Props {
   result: ChecklistItemResult
   notes: string | null
   isClosed: boolean
+  canEdit: boolean
 }
 
 export function ChecklistItemRow({
@@ -26,6 +27,7 @@ export function ChecklistItemRow({
   result: initialResult,
   notes: initialNotes,
   isClosed,
+  canEdit,
 }: Props) {
   const [isPending, startTransition] = useTransition()
   const [result, setResult] = useState<ChecklistItemResult>(initialResult)
@@ -52,7 +54,7 @@ export function ChecklistItemRow({
     <tr className="border-b border-cn-line last:border-0">
       <td className="py-2.5 pr-4 text-sm text-cn-ink-700">{item}</td>
       <td className="py-2.5 pr-4">
-        {isClosed ? (
+        {isClosed || !canEdit ? (
           <span className={`text-sm font-medium ${currentOption?.color}`}>
             {currentOption?.label}
           </span>
@@ -72,7 +74,7 @@ export function ChecklistItemRow({
         )}
       </td>
       <td className="py-2.5">
-        {isClosed ? (
+        {isClosed || !canEdit ? (
           <span className="text-cn-ink-400 text-xs">{notes || '—'}</span>
         ) : (
           <input

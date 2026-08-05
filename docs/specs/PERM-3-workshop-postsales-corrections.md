@@ -1,15 +1,15 @@
 # PERM-3 — Corregir estados de Taller y Postventa sin duplicar costes
 
-| Campo               | Valor                                                                              |
-| ------------------- | ---------------------------------------------------------------------------------- |
-| **Estado**          | APPROVED                                                                           |
-| **Owner**           | Engineering                                                                        |
-| **Ticket**          | [GitHub #168](https://github.com/growthaiconsultant-lab/campernova-crm/issues/168) |
-| **Rama / PR**       | `codex/perm-3-workshop-postsales-design` / pendiente                               |
-| **Categorías**      | C0, C1, C2, C3, C4, C5, C6                                                         |
-| **Riesgo**          | Alto                                                                               |
-| **Ruta SDD**        | Reforzada                                                                          |
-| **Última revisión** | 2026-08-05                                                                         |
+| Campo               | Valor                                                                                                                   |
+| ------------------- | ----------------------------------------------------------------------------------------------------------------------- |
+| **Estado**          | APPROVED                                                                                                                |
+| **Owner**           | Engineering                                                                                                             |
+| **Ticket**          | [GitHub #168](https://github.com/growthaiconsultant-lab/campernova-crm/issues/168)                                      |
+| **Rama / PR**       | `codex/perm-3-workshop-postsales-design` / [PR #169](https://github.com/growthaiconsultant-lab/campernova-crm/pull/169) |
+| **Categorías**      | C0, C1, C2, C3, C4, C5, C6                                                                                              |
+| **Riesgo**          | Alto                                                                                                                    |
+| **Ruta SDD**        | Reforzada                                                                                                               |
+| **Última revisión** | 2026-08-05                                                                                                              |
 
 ## Problema y evidencia — A. Objetivo
 
@@ -456,7 +456,7 @@ delegue explícitamente. Producción no se modifica por aprobar este documento.
 
 ## U. Estado de autorización
 
-**PLAN READY FOR INDEPENDENT REVIEW**
+**IMPLEMENTATION READY FOR CI REVIEW**
 
 - Permitido ahora: implementar la opción A en esta rama, generar la migración local, ejecutar pruebas,
   crear commits y actualizar el PR borrador.
@@ -467,18 +467,20 @@ delegue explícitamente. Producción no se modifica por aprobar este documento.
 
 ## Verificación de esta fase
 
-| Criterio            | Evidencia                                                                  | Resultado                             |
-| ------------------- | -------------------------------------------------------------------------- | ------------------------------------- |
-| Baseline de código  | Schema, actions, readers, tests, migraciones y permisos citados por línea. | Completado.                           |
-| Baseline de entorno | Consultas agregadas read-only sin PII.                                     | Completado el 2026-08-05.             |
-| SDD reforzado       | Secciones A–U, adversarial y matriz.                                       | `check:sdd` y `git diff --check`: OK. |
-| Implementación      | Código, migración, tests funcionales.                                      | Autorizada; pendiente.                |
+| Criterio            | Evidencia                                                                  | Resultado                                                            |
+| ------------------- | -------------------------------------------------------------------------- | -------------------------------------------------------------------- |
+| Baseline de código  | Schema, actions, readers, tests, migraciones y permisos citados por línea. | Completado.                                                          |
+| Baseline de entorno | Consultas agregadas read-only sin PII.                                     | Completado el 2026-08-05.                                            |
+| SDD reforzado       | Secciones A–U, adversarial y matriz.                                       | `check:sdd` y `git diff --check`: OK.                                |
+| Implementación      | Núcleos transaccionales, guards, UX, schema/migración y tests.             | Local completa; CI PostgreSQL pendiente.                             |
+| Validación local    | Typecheck, lint, Prisma validate, SDD, build y 1.431 tests unitarios.      | PASS el 2026-08-05.                                                  |
+| PostgreSQL real     | Tests de concurrencia, reconciliación y rollback en base efímera.          | Escritos; ejecución local no disponible sin Docker, pendiente de CI. |
 
 ## Cierre
 
-- **Commit:** pendiente.
-- **PR:** pendiente; si se abre será documental y en borrador.
+- **Commit:** implementación pendiente de commit.
+- **PR:** #169 en borrador; pendiente de actualizar con la implementación.
 - **CI:** pendiente.
 - **Deployment:** no autorizado.
-- **Validación:** diseño y preflight agregados; implementación no validada.
-- **Deuda restante:** implementación reforzada, revisión independiente y autorización de producción.
+- **Validación:** local PASS; PostgreSQL efímero, migration replay y revisión independiente pendientes.
+- **Deuda restante:** CI, revisión independiente y autorizaciones separadas de migración/merge/deploy.

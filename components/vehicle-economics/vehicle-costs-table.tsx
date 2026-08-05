@@ -18,6 +18,7 @@ interface Cost {
   invoiceUrl: string | null
   createdAt: Date
   createdBy: { id: string; name: string } | null
+  isGenerated: boolean
 }
 
 interface Props {
@@ -236,6 +237,11 @@ export function VehicleCostsTable({ vehicleId, costs, currentUserId, isAdmin }: 
                   </td>
                   <td className="px-4 py-3 text-cn-ink-700">
                     {cost.description}
+                    {cost.isGenerated && (
+                      <span className="ml-2 rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-slate-600">
+                        Operativo
+                      </span>
+                    )}
                     {cost.invoiceUrl && (
                       <a
                         href={cost.invoiceUrl}
@@ -257,7 +263,7 @@ export function VehicleCostsTable({ vehicleId, costs, currentUserId, isAdmin }: 
                     {cost.createdBy?.name ?? '—'}
                   </td>
                   <td className="px-4 py-3 text-right">
-                    {(isAdmin || cost.createdBy?.id === currentUserId) && (
+                    {!cost.isGenerated && (isAdmin || cost.createdBy?.id === currentUserId) && (
                       <button
                         onClick={() => handleDelete(cost.id)}
                         disabled={isPending}

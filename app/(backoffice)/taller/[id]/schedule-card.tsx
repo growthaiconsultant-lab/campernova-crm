@@ -20,6 +20,7 @@ interface Props {
   scheduledStart: string | null
   scheduledEnd: string | null
   isClosed: boolean
+  canEdit: boolean
 }
 
 function pad(n: number) {
@@ -45,12 +46,13 @@ export function ScheduleCard({
   scheduledStart,
   scheduledEnd,
   isClosed,
+  canEdit,
 }: Props) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
 
   const isScheduled = Boolean(scheduledStart && scheduledEnd)
-  const [editing, setEditing] = useState(!isScheduled)
+  const [editing, setEditing] = useState(canEdit && !isScheduled)
   const [assignee, setAssignee] = useState(assignedToId ?? '')
   const [hours, setHours] = useState(estimatedHours != null ? String(estimatedHours) : '')
   const [startDate, setStartDate] = useState(scheduledStart ? isoToDateInput(scheduledStart) : '')
@@ -119,7 +121,7 @@ export function ScheduleCard({
               Entrega estimada: {fmt(scheduledEnd!)} · bloqueado en la agenda
             </p>
           </div>
-          {!isClosed && (
+          {!isClosed && canEdit && (
             <button
               onClick={() => setEditing(true)}
               className="inline-flex h-9 items-center rounded-lg border border-cn-line px-3 text-sm text-cn-ink-500 hover:bg-cn-cream-50"
@@ -130,6 +132,8 @@ export function ScheduleCard({
         </div>
       ) : isClosed ? (
         <p className="text-cn-ink-400 text-sm">La orden está cerrada; no se puede planificar.</p>
+      ) : !canEdit ? (
+        <p className="text-cn-ink-400 text-sm">Sin planificación registrada.</p>
       ) : (
         <div className="space-y-4">
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">

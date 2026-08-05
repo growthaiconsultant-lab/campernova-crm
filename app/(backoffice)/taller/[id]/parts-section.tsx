@@ -19,9 +19,10 @@ interface Props {
   parts: Part[]
   isAdmin: boolean
   isClosed: boolean
+  canEdit: boolean
 }
 
-export function PartsSection({ woId, parts, isAdmin, isClosed }: Props) {
+export function PartsSection({ woId, parts, isAdmin, isClosed, canEdit }: Props) {
   const [isPending, startTransition] = useTransition()
   const [showForm, setShowForm] = useState(false)
   const [name, setName] = useState('')
@@ -80,7 +81,7 @@ export function PartsSection({ woId, parts, isAdmin, isClosed }: Props) {
             {totalCost.toLocaleString('es-ES', { style: 'currency', currency: 'EUR' })}
           </span>
         </p>
-        {!isClosed && (
+        {!isClosed && canEdit && (
           <button
             onClick={() => setShowForm((v) => !v)}
             className="rounded-lg bg-primary px-3 py-1.5 text-sm font-medium text-white hover:opacity-90"
@@ -223,7 +224,7 @@ export function PartsSection({ woId, parts, isAdmin, isClosed }: Props) {
                     {part.supplier ?? '—'}
                   </td>
                   <td className="px-4 py-3 text-right">
-                    {isAdmin && !isClosed && (
+                    {canEdit && isAdmin && !isClosed && (
                       <button
                         onClick={() => handleDelete(part.id)}
                         disabled={isPending}

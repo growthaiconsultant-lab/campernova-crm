@@ -11,13 +11,18 @@ vi.mock('@/lib/auth', () => ({
   requireCanEditTaller: vi.fn(),
 }))
 
+vi.mock('@/lib/locking', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/lib/locking')>()
+  return { ...actual, withLockedRoots: vi.fn() }
+})
+
 const { mockDb } = vi.hoisted(() => {
   const mockDb = {
-    workOrder: { create: vi.fn(), update: vi.fn(), findUnique: vi.fn() },
+    workOrder: { create: vi.fn(), update: vi.fn(), updateMany: vi.fn(), findUnique: vi.fn() },
     workOrderChecklist: { update: vi.fn(), findUnique: vi.fn() },
     workOrderTimeEntry: { create: vi.fn(), findUnique: vi.fn(), delete: vi.fn() },
     workOrderPart: { create: vi.fn(), findUnique: vi.fn(), delete: vi.fn() },
-    vehicleCost: { create: vi.fn() },
+    vehicleCost: { create: vi.fn(), upsert: vi.fn(), deleteMany: vi.fn() },
     vehicle: { findUnique: vi.fn() },
     activity: { create: vi.fn() },
     $transaction: vi.fn(),
@@ -29,6 +34,7 @@ vi.mock('@/lib/db', () => ({ db: mockDb }))
 
 import type { User } from '@prisma/client'
 import { requireAdmin, requireCanViewTaller, requireCanEditTaller } from '@/lib/auth'
+import { withLockedRoots } from '@/lib/locking'
 import {
   createWorkOrder,
   updateWorkOrderStatus,
@@ -37,6 +43,10 @@ import {
   addPart,
   deletePart,
   approveWorkOrder,
+  updateChecklistItem,
+  updateEstimatedCost,
+  scheduleWorkOrder,
+  reopenWorkOrder,
 } from './actions'
 
 const mockAdmin = { id: 'admin-1', role: 'ADMIN' as const, name: 'Admin' } as unknown as User
@@ -44,9 +54,27 @@ const mockAgent = { id: 'agent-1', role: 'AGENTE' as const, name: 'Agente' } as 
 
 beforeEach(() => {
   vi.clearAllMocks()
-  mockDb.$transaction.mockImplementation(async (ops: unknown[]) => {
-    const results = await Promise.all(ops)
-    return results
+  vi.mocked(withLockedRoots).mockImplementation(async (_roots, operation) =>
+    operation(mockDb as never)
+  )
+  mockDb.$transaction.mockImplementation(async (input: unknown) =>
+    typeof input === 'function'
+      ? (input as (tx: typeof mockDb) => Promise<unknown>)(mockDb)
+      : Promise.all(input as Promise<unknown>[])
+  )
+  mockDb.workOrder.updateMany.mockResolvedValue({ count: 1 })
+  mockDb.vehicleCost.upsert.mockResolvedValue({})
+  mockDb.vehicleCost.deleteMany.mockResolvedValue({ count: 0 })
+  mockDb.workOrder.findUnique.mockResolvedValue({
+    status: 'EN_CURSO',
+    kind: 'REPARACION',
+    approvalLevel: 'NO_REQUIERE',
+    vehicleId: 'v-1',
+    vehicle: { sellerLeadId: 'sl-1' },
+    startedAt: null,
+    timeEntries: [],
+    parts: [],
+    costs: [],
   })
 })
 
@@ -132,15 +160,18 @@ describe('updateWorkOrderStatus', () => {
     approvalLevel: 'NO_REQUIERE' as const,
     vehicleId: 'v-1',
     vehicle: { sellerLeadId: 'sl-1' },
+    kind: 'REPARACION' as const,
+    startedAt: null,
     timeEntries: [],
     parts: [],
+    costs: [],
   }
 
   it('transición válida: PENDIENTE → EN_DIAGNOSTICO', async () => {
     vi.mocked(requireCanViewTaller).mockResolvedValue(mockAgent)
     vi.mocked(requireCanEditTaller).mockResolvedValue(mockAgent)
     mockDb.workOrder.findUnique.mockResolvedValue(baseWo)
-    mockDb.workOrder.update.mockResolvedValue({})
+    mockDb.workOrder.updateMany.mockResolvedValue({ count: 1 })
     mockDb.activity.create.mockResolvedValue({})
 
     const result = await updateWorkOrderStatus('wo-1', 'EN_DIAGNOSTICO')
@@ -154,7 +185,7 @@ describe('updateWorkOrderStatus', () => {
 
     const result = await updateWorkOrderStatus('wo-1', 'COMPLETADA')
     expect(result.ok).toBe(false)
-    expect((result as { ok: false; error: string }).error).toContain('no permitida')
+    expect((result as { ok: false; error: string }).error).toContain('no está permitida')
   })
 
   it('bloquea EN_CURSO si requiere aprobación CEO', async () => {
@@ -180,18 +211,14 @@ describe('updateWorkOrderStatus', () => {
       timeEntries: [{ hours: 3, hourlyRate: 30 }],
       parts: [{ quantity: 2, unitCost: 50 }],
     })
-    mockDb.workOrder.update.mockResolvedValue({})
-    mockDb.vehicleCost.create.mockResolvedValue({})
+    mockDb.workOrder.updateMany.mockResolvedValue({ count: 1 })
+    mockDb.vehicleCost.upsert.mockResolvedValue({})
     mockDb.activity.create.mockResolvedValue({})
 
     const result = await updateWorkOrderStatus('wo-1', 'COMPLETADA')
     expect(result.ok).toBe(true)
 
-    // Should have created 2 vehicle costs (mano obra + piezas) + 1 activity
-    // All inside the $transaction call
-    const transactionArgs = mockDb.$transaction.mock.calls[0][0] as unknown[]
-    // 1 workOrder.update + 2 vehicleCost.create + 1 activity.create = 4 ops
-    expect(transactionArgs).toHaveLength(4)
+    expect(mockDb.vehicleCost.upsert).toHaveBeenCalledTimes(2)
   })
 
   it('no genera VehicleCost si no hay horas ni piezas al COMPLETADA', async () => {
@@ -203,15 +230,41 @@ describe('updateWorkOrderStatus', () => {
       timeEntries: [],
       parts: [],
     })
-    mockDb.workOrder.update.mockResolvedValue({})
+    mockDb.workOrder.updateMany.mockResolvedValue({ count: 1 })
     mockDb.activity.create.mockResolvedValue({})
 
     const result = await updateWorkOrderStatus('wo-1', 'COMPLETADA')
     expect(result.ok).toBe(true)
 
-    const transactionArgs = mockDb.$transaction.mock.calls[0][0] as unknown[]
-    // Only workOrder.update + activity = 2 ops
-    expect(transactionArgs).toHaveLength(2)
+    expect(mockDb.vehicleCost.upsert).not.toHaveBeenCalled()
+    expect(mockDb.vehicleCost.deleteMany).toHaveBeenCalledTimes(2)
+  })
+
+  it('exige motivo para retroceder un estado no terminal', async () => {
+    vi.mocked(requireCanEditTaller).mockResolvedValue(mockAgent)
+    mockDb.workOrder.findUnique.mockResolvedValue({
+      ...baseWo,
+      status: 'EN_DIAGNOSTICO',
+    })
+
+    const withoutReason = await updateWorkOrderStatus('wo-1', 'PENDIENTE')
+    expect(withoutReason.ok).toBe(false)
+
+    const withReason = await updateWorkOrderStatus('wo-1', 'PENDIENTE', 'Estado marcado por error')
+    expect(withReason.ok).toBe(true)
+  })
+
+  it('solo la acción administrativa reabre terminales y excluye inspecciones', async () => {
+    vi.mocked(requireAdmin).mockResolvedValue(mockAdmin)
+    mockDb.workOrder.findUnique.mockResolvedValue({
+      ...baseWo,
+      status: 'COMPLETADA',
+      kind: 'INSPECCION_ENTRADA',
+    })
+
+    const result = await reopenWorkOrder('wo-1', 'EN_CURSO', 'Revisión adicional')
+    expect(result.ok).toBe(false)
+    if (!result.ok) expect(result.error).toContain('inspección de entrada')
   })
 })
 
@@ -221,7 +274,11 @@ describe('addTimeEntry', () => {
   it('imputa horas correctamente', async () => {
     vi.mocked(requireCanViewTaller).mockResolvedValue(mockAgent)
     vi.mocked(requireCanEditTaller).mockResolvedValue(mockAgent)
-    mockDb.workOrder.findUnique.mockResolvedValue({ status: 'EN_CURSO' })
+    mockDb.workOrder.findUnique.mockResolvedValue({
+      status: 'EN_CURSO',
+      vehicleId: 'v-1',
+      vehicle: { sellerLeadId: 'sl-1' },
+    })
     mockDb.workOrderTimeEntry.create.mockResolvedValue({})
 
     const result = await addTimeEntry('wo-1', {
@@ -238,7 +295,11 @@ describe('addTimeEntry', () => {
   it('bloquea imputar horas en orden COMPLETADA', async () => {
     vi.mocked(requireCanViewTaller).mockResolvedValue(mockAgent)
     vi.mocked(requireCanEditTaller).mockResolvedValue(mockAgent)
-    mockDb.workOrder.findUnique.mockResolvedValue({ status: 'COMPLETADA' })
+    mockDb.workOrder.findUnique.mockResolvedValue({
+      status: 'COMPLETADA',
+      vehicleId: 'v-1',
+      vehicle: { sellerLeadId: 'sl-1' },
+    })
 
     const result = await addTimeEntry('wo-1', {
       hours: 1,
@@ -343,5 +404,36 @@ describe('approveWorkOrder', () => {
     const updateCall = mockDb.workOrder.update.mock.calls[0][0]
     expect(updateCall.data.approvalLevel).toBe('APROBADA_CEO')
     expect(updateCall.data.approvedById).toBe('admin-1')
+  })
+})
+
+describe('terminal write guards', () => {
+  beforeEach(() => {
+    vi.mocked(requireCanEditTaller).mockResolvedValue(mockAgent)
+    mockDb.workOrder.findUnique.mockResolvedValue({
+      status: 'COMPLETADA',
+      vehicleId: 'v-1',
+      vehicle: { sellerLeadId: 'sl-1' },
+    })
+  })
+
+  it('bloquea checklist, piezas, coste estimado y agenda en una orden cerrada', async () => {
+    mockDb.workOrderChecklist.findUnique.mockResolvedValue({ workOrderId: 'wo-1' })
+
+    const results = await Promise.all([
+      updateChecklistItem('item-1', { result: 'OK' }),
+      addPart('wo-1', { name: 'Filtro', quantity: 1, unitCost: 10 }),
+      updateEstimatedCost('wo-1', 100),
+      scheduleWorkOrder('wo-1', {
+        assignedToId: 'user-1',
+        scheduledStart: '2026-08-10',
+        scheduledEnd: '2026-08-11',
+      }),
+    ])
+
+    expect(results.every((result) => !result.ok)).toBe(true)
+    expect(mockDb.workOrderChecklist.update).not.toHaveBeenCalled()
+    expect(mockDb.workOrderPart.create).not.toHaveBeenCalled()
+    expect(mockDb.workOrder.update).not.toHaveBeenCalled()
   })
 })
