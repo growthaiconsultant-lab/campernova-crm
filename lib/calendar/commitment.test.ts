@@ -5,7 +5,7 @@ import {
   canReclassify,
   isCommitmentChoice,
   isCommitmentValidForType,
-  requiresExplicitCommitment,
+  supportsExplicitCommitment,
   resolveCommitment,
 } from './commitment'
 
@@ -31,10 +31,10 @@ describe('resolveCommitment — tipos con semántica propia', () => {
   })
 })
 
-describe('resolveCommitment — tipos que exigen elección', () => {
-  it.each(['LLAMADA', 'OTRO'] as const)('%s sin clasificación se rechaza', (type) => {
-    expect(resolveCommitment(type)).toEqual({ ok: false, reason: 'required' })
-    expect(resolveCommitment(type, null)).toEqual({ ok: false, reason: 'required' })
+describe('resolveCommitment — tipos con clasificación opcional', () => {
+  it.each(['LLAMADA', 'OTRO'] as const)('%s sin clasificación queda indeterminado', (type) => {
+    expect(resolveCommitment(type)).toEqual({ ok: true, value: 'INDETERMINADO' })
+    expect(resolveCommitment(type, null)).toEqual({ ok: true, value: 'INDETERMINADO' })
   })
 
   it.each(['LLAMADA', 'OTRO'] as const)('%s admite ambas clasificaciones explícitas', (type) => {
@@ -49,12 +49,12 @@ describe('resolveCommitment — tipos que exigen elección', () => {
     })
   })
 
-  it('requiresExplicitCommitment solo aplica a LLAMADA y OTRO', () => {
-    expect(requiresExplicitCommitment('LLAMADA')).toBe(true)
-    expect(requiresExplicitCommitment('OTRO')).toBe(true)
-    expect(requiresExplicitCommitment('CITA')).toBe(false)
-    expect(requiresExplicitCommitment('LIMPIEZA')).toBe(false)
-    expect(requiresExplicitCommitment('SEGUIMIENTO')).toBe(false)
+  it('supportsExplicitCommitment solo aplica a LLAMADA y OTRO', () => {
+    expect(supportsExplicitCommitment('LLAMADA')).toBe(true)
+    expect(supportsExplicitCommitment('OTRO')).toBe(true)
+    expect(supportsExplicitCommitment('CITA')).toBe(false)
+    expect(supportsExplicitCommitment('LIMPIEZA')).toBe(false)
+    expect(supportsExplicitCommitment('SEGUIMIENTO')).toBe(false)
   })
 })
 
@@ -80,9 +80,9 @@ describe('resolveCommitment — cambio de tipo', () => {
     expect(resolveCommitment('LIMPIEZA', null)).toEqual({ ok: true, value: 'INTERNO' })
   })
 
-  it('pasar a LLAMADA u OTRO vuelve a exigir elección explícita', () => {
-    expect(resolveCommitment('LLAMADA', null)).toEqual({ ok: false, reason: 'required' })
-    expect(resolveCommitment('OTRO', null)).toEqual({ ok: false, reason: 'required' })
+  it('pasar a LLAMADA u OTRO sin clasificación queda pendiente', () => {
+    expect(resolveCommitment('LLAMADA', null)).toEqual({ ok: true, value: 'INDETERMINADO' })
+    expect(resolveCommitment('OTRO', null)).toEqual({ ok: true, value: 'INDETERMINADO' })
   })
 })
 
@@ -93,7 +93,7 @@ describe('isCommitmentValidForType', () => {
     expect(isCommitmentValidForType('LIMPIEZA', 'INTERNO')).toBe(true)
     expect(isCommitmentValidForType('LIMPIEZA', 'INDETERMINADO')).toBe(false)
     expect(isCommitmentValidForType('LLAMADA', 'EXTERNO')).toBe(true)
-    expect(isCommitmentValidForType('LLAMADA', 'INDETERMINADO')).toBe(false)
+    expect(isCommitmentValidForType('LLAMADA', 'INDETERMINADO')).toBe(true)
     expect(isCommitmentValidForType('SEGUIMIENTO', 'INDETERMINADO')).toBe(true)
   })
 })

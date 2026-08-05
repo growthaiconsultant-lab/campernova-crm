@@ -123,10 +123,14 @@ describe('markBuyerLeadLost', () => {
     expect(mockDb.activity.create.mock.calls[0][0].data.content).toContain('Motivo: Precio')
   })
 
-  it('rechaza marcar sin motivo (CAM-61)', async () => {
+  it('permite marcar sin motivo y deja trazabilidad explícita', async () => {
+    mockDb.buyerLead.findUnique.mockResolvedValue({ status: 'NUEVO' })
     const res = await markBuyerLeadLost('b1')
-    expect(res.error).toContain('motivo')
-    expect(mockDb.buyerLead.update).not.toHaveBeenCalled()
+    expect(res).toEqual({ error: null })
+    expect(mockDb.buyerLead.update.mock.calls[0][0].data.lostReason).toBeNull()
+    expect(mockDb.activity.create.mock.calls[0][0].data.content).toContain(
+      'Motivo: sin especificar'
+    )
   })
 
   it('rechaza un motivo inválido', async () => {

@@ -770,10 +770,14 @@ describe('discardSellerLead', () => {
     expect(activity.content).toContain('Motivo: Precio')
   })
 
-  it('rechaza descartar sin motivo (CAM-61)', async () => {
+  it('permite descartar sin motivo y deja trazabilidad explícita', async () => {
+    mockDb.sellerLead.findUnique.mockResolvedValue({ status: 'NUEVO' })
     const res = await discardSellerLead('s1')
-    expect(res.error).toContain('motivo')
-    expect(mockDb.sellerLead.update).not.toHaveBeenCalled()
+    expect(res).toEqual({ error: null })
+    expect(mockDb.sellerLead.update.mock.calls[0][0].data.lostReason).toBeNull()
+    expect(mockDb.activity.create.mock.calls[0][0].data.content).toContain(
+      'Motivo: sin especificar'
+    )
   })
 
   it('rechaza un motivo inválido', async () => {

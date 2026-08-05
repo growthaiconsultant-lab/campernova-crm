@@ -36,10 +36,6 @@ export function BuyerTopbarActions({ leadId, isTerminal }: Props) {
   const router = useRouter()
 
   function handleMarkLost() {
-    if (!reason) {
-      setError('Selecciona el motivo de la pérdida')
-      return
-    }
     setError(null)
     startTransition(async () => {
       const result = await markBuyerLeadLost(leadId, reason, notes)
@@ -103,24 +99,23 @@ export function BuyerTopbarActions({ leadId, isTerminal }: Props) {
             <DialogTitle>Marcar comprador como perdido</DialogTitle>
             <DialogDescription>
               Es una <strong>pérdida comercial</strong>: el comprador pasará al estado{' '}
-              <strong>Perdido</strong> con el motivo que indiques. No se elimina ningún dato y el
-              registro <strong>seguirá visible</strong> en la bandeja y en la búsqueda (no se
-              archiva ni se oculta). <strong>Perdido es un estado final</strong>: no podrá
-              revertirse desde la ficha.
+              <strong>Perdido</strong>. El motivo es opcional. No se elimina ningún dato y el
+              registro
+              <strong>seguirá visible</strong> en la bandeja y en la búsqueda (no se archiva ni se
+              oculta). Esta clasificación podrá corregirse después desde el selector de estado.
             </DialogDescription>
           </DialogHeader>
-          {/* CAM-61: motivo estructurado */}
           <div className="space-y-3">
             <div>
               <label className="mb-1.5 block text-[13px] font-medium text-foreground">
-                Motivo de la pérdida <span className="text-red-500">*</span>
+                Motivo de la pérdida (opcional)
               </label>
               <select
                 value={reason}
                 onChange={(e) => setReason(e.target.value)}
                 className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-ring"
               >
-                <option value="">Selecciona un motivo…</option>
+                <option value="">Sin especificar por ahora</option>
                 {LOST_REASON_OPTIONS.map((o) => (
                   <option key={o.value} value={o.value}>
                     {o.label}

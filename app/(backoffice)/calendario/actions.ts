@@ -56,12 +56,7 @@ export async function createCalendarEvent(
   // La clasificación se decide SIEMPRE en el servidor: el valor del cliente es una propuesta.
   const commitment = resolveCommitment(d.type, d.commitment ?? null)
   if (!commitment.ok) {
-    return {
-      error:
-        commitment.reason === 'required'
-          ? 'Indica si el evento es un compromiso acordado con el cliente o una tarea interna'
-          : 'La clasificación no es compatible con el tipo de evento',
-    }
+    return { error: 'La clasificación no es compatible con el tipo de evento' }
   }
 
   const start = new Date(d.startAt)

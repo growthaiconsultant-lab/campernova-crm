@@ -9,7 +9,7 @@ import {
   COMMITMENT_HINTS,
   COMMITMENT_LABELS,
   FORCED_COMMITMENT_BY_TYPE,
-  requiresExplicitCommitment,
+  supportsExplicitCommitment,
 } from '@/lib/calendar/commitment'
 import type { CalendarEventType, EventCommitment } from '@prisma/client'
 
@@ -59,7 +59,7 @@ export function EventForm({ agents, buyers, vehicles, defaults }: Props) {
   const isLlamada = type === 'LLAMADA'
   const eventType = type as CalendarEventType
   const forcedCommitment = FORCED_COMMITMENT_BY_TYPE[eventType]
-  const needsCommitment = requiresExplicitCommitment(eventType)
+  const supportsCommitment = supportsExplicitCommitment(eventType)
 
   /** Al cambiar de tipo la clasificación anterior puede dejar de ser válida: se descarta. */
   function selectType(next: string) {
@@ -71,9 +71,6 @@ export function EventForm({ agents, buyers, vehicles, defaults }: Props) {
     setError(null)
     if (!title.trim()) return setError('El título es obligatorio')
     if (!date) return setError('Indica fecha y hora')
-    if (needsCommitment && !commitment) {
-      return setError('Indica si es un compromiso con el cliente o una tarea interna')
-    }
 
     const specificData = isCita
       ? {
@@ -131,14 +128,14 @@ export function EventForm({ agents, buyers, vehicles, defaults }: Props) {
       </div>
 
       {/* Naturaleza del compromiso */}
-      {needsCommitment ? (
+      {supportsCommitment ? (
         <div className="rounded-xl border border-border bg-card p-5">
           <p className="mb-1.5 font-mono text-[10px] uppercase tracking-[0.12em] text-muted-foreground">
-            Naturaleza *
+            Naturaleza (opcional)
           </p>
           <p className="mb-3 text-[13px] text-muted-foreground">
-            ¿Está acordado con el cliente? Lo usamos para no archivar un lead que mantiene un
-            compromiso pendiente.
+            Si todavía no está claro, puedes dejarlo pendiente y clasificarlo después desde la ficha
+            del evento.
           </p>
           <div className="flex flex-wrap gap-2">
             {COMMITMENT_CHOICES.map((c) => (
@@ -156,6 +153,18 @@ export function EventForm({ agents, buyers, vehicles, defaults }: Props) {
                 <span className="ml-2 font-normal opacity-70">{COMMITMENT_HINTS[c]}</span>
               </button>
             ))}
+            <button
+              type="button"
+              onClick={() => setCommitment(null)}
+              className={`rounded-lg border px-3 py-1.5 text-left text-[13px] font-medium transition-colors ${
+                commitment === null
+                  ? 'border-foreground bg-foreground text-background'
+                  : 'border-border text-muted-foreground hover:border-foreground/40'
+              }`}
+            >
+              Clasificar después
+              <span className="ml-2 font-normal opacity-70">Quedará pendiente</span>
+            </button>
           </div>
         </div>
       ) : forcedCommitment ? (

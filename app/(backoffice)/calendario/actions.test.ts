@@ -193,10 +193,10 @@ describe('createCalendarEvent — naturaleza del compromiso (I0)', () => {
     expect(mockDb.calendarEvent.create.mock.calls[0][0].data.commitment).toBe('INTERNO')
   })
 
-  it.each(['LLAMADA', 'OTRO'])('%s sin clasificar se rechaza y no escribe', async (type) => {
+  it.each(['LLAMADA', 'OTRO'])('%s sin clasificar se guarda como indeterminado', async (type) => {
     const res = await createCalendarEvent({ ...validInput, type })
-    expect(res.error).toContain('compromiso acordado')
-    expect(mockDb.calendarEvent.create).not.toHaveBeenCalled()
+    expect(res.error).toBeUndefined()
+    expect(mockDb.calendarEvent.create.mock.calls[0][0].data.commitment).toBe('INDETERMINADO')
   })
 
   it.each(['LLAMADA', 'OTRO'])('%s guarda la clasificación elegida', async (type) => {

@@ -11,7 +11,7 @@ import {
   isValidTransition,
 } from '@/lib/state-machine'
 import { isValidLostReason, LOST_REASON_LABELS } from '@/lib/lost-reason'
-import type { BuyerLeadStatus } from '@prisma/client'
+import type { BuyerLeadStatus, LostReason } from '@prisma/client'
 
 export async function updateBuyerLead(leadId: string, data: unknown) {
   const actor = await requireAgente()
@@ -164,7 +164,7 @@ export async function updateBuyerLead(leadId: string, data: unknown) {
 
 /**
  * Marca un comprador como perdido: decisión COMERCIAL que lleva el lead al estado terminal
- * `PERDIDO` con un motivo estructurado. NO archiva, NO oculta el registro de las bandejas y NO
+ * `PERDIDO` con un motivo estructurado opcional. NO archiva, NO oculta el registro de las bandejas y NO
  * elimina datos. El nombre `archive*` queda reservado para el archivado real (aún no implementado).
  */
 export async function markBuyerLeadLost(
@@ -174,9 +174,13 @@ export async function markBuyerLeadLost(
 ) {
   const actor = await requireAgente()
 
-  // CAM-61: motivo estructurado obligatorio al marcar como perdido
-  if (!lostReason || !isValidLostReason(lostReason)) {
-    return { error: 'Selecciona el motivo de la pérdida' }
+  let reason: LostReason | null = null
+  const reasonCandidate = lostReason?.trim()
+  if (reasonCandidate) {
+    if (!isValidLostReason(reasonCandidate)) {
+      return { error: 'Selecciona el motivo de la pérdida' }
+    }
+    reason = reasonCandidate
   }
   const notes = lostReasonNotes?.trim().slice(0, 500) || null
 
@@ -193,12 +197,12 @@ export async function markBuyerLeadLost(
   await db.$transaction(async (tx) => {
     await tx.buyerLead.update({
       where: { id: leadId },
-      data: { status: 'PERDIDO', lostReason, lostReasonNotes: notes },
+      data: { status: 'PERDIDO', lostReason: reason, lostReasonNotes: notes },
     })
     await tx.activity.create({
       data: {
         type: 'CAMBIO_ESTADO',
-        content: `Estado cambiado: ${BUYER_LEAD_STATUS_LABELS[lead.status as BuyerLeadStatus]} → ${BUYER_LEAD_STATUS_LABELS['PERDIDO']} · Motivo: ${LOST_REASON_LABELS[lostReason]}${notes ? ` — ${notes}` : ''}`,
+        content: `Estado cambiado: ${BUYER_LEAD_STATUS_LABELS[lead.status as BuyerLeadStatus]} → ${BUYER_LEAD_STATUS_LABELS['PERDIDO']} · Motivo: ${reason ? LOST_REASON_LABELS[reason] : 'sin especificar'}${notes ? ` — ${notes}` : ''}`,
         agentId: actor.id,
         buyerLeadId: leadId,
       },
