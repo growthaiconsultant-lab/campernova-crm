@@ -1,15 +1,15 @@
 # INTAKE-1 — Disponer de un cuestionario de recepción único por vehículo
 
-| Campo               | Valor                                                                              |
-| ------------------- | ---------------------------------------------------------------------------------- |
-| **Estado**          | APPROVED                                                                           |
-| **Owner**           | Product · Engineering · Operations                                                 |
-| **Ticket**          | [GitHub #172](https://github.com/growthaiconsultant-lab/campernova-crm/issues/172) |
-| **Rama / PR**       | `codex/intake-1-vehicle-reception-questionnaire` / sin PR                          |
-| **Categorías**      | C0 · C1 · C2 · C3 · C4 · C5 · C6                                                   |
-| **Riesgo**          | Alto, por PII, permisos compartidos, schema, migración y concurrencia entre roles  |
-| **Ruta SDD**        | Reforzada                                                                          |
-| **Última revisión** | 2026-08-07                                                                         |
+| Campo               | Valor                                                                                                                           |
+| ------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
+| **Estado**          | IMPLEMENTED                                                                                                                     |
+| **Owner**           | Product · Engineering · Operations                                                                                              |
+| **Ticket**          | [GitHub #172](https://github.com/growthaiconsultant-lab/campernova-crm/issues/172)                                              |
+| **Rama / PR**       | `codex/intake-1-vehicle-reception-questionnaire` / [PR #173](https://github.com/growthaiconsultant-lab/campernova-crm/pull/173) |
+| **Categorías**      | C0 · C1 · C2 · C3 · C4 · C5 · C6                                                                                                |
+| **Riesgo**          | Alto, por PII, permisos compartidos, schema, migración y concurrencia entre roles                                               |
+| **Ruta SDD**        | Reforzada                                                                                                                       |
+| **Última revisión** | 2026-08-07                                                                                                                      |
 
 ## Problema y evidencia (A. Objetivo)
 
@@ -404,22 +404,22 @@ mutables y se limita la validación a local/CI hasta resolver el entorno.
 
 ## Criterios de aceptación (T)
 
-- [ ] Un vehículo tiene como máximo un cuestionario y los vehículos existentes no requieren backfill.
-- [ ] Comercial y Taller editan el mismo cuestionario desde superficies autorizadas.
-- [ ] TALLER no recibe ni puede mutar PII, motivo de venta o precio mínimo.
-- [ ] Los campos del papel están disponibles salvo importe/fecha de compra y firma; existen `Extras`
+- [x] Un vehículo tiene como máximo un cuestionario y los vehículos existentes no requieren backfill.
+- [x] Comercial y Taller editan el mismo cuestionario desde superficies autorizadas.
+- [x] TALLER no recibe ni puede mutar PII, motivo de venta o precio mínimo.
+- [x] Los campos del papel están disponibles salvo importe/fecha de compra y firma; existen `Extras`
       y `Observaciones adicionales` separados.
-- [ ] Los campos canónicos no se duplican y los nuevos tienen tipo/unidad/nullabilidad explícitos.
-- [ ] El formulario guarda borradores y revisa cada sección sin convertir vacíos en respuestas
+- [x] Los campos canónicos no se duplican y los nuevos tienen tipo/unidad/nullabilidad explícitos.
+- [x] El formulario guarda borradores y revisa cada sección sin convertir vacíos en respuestas
       negativas.
-- [ ] Una edición posterior invalida sólo la revisión afectada.
-- [ ] CAS evita pérdida silenciosa y las carreras se prueban en PostgreSQL real.
-- [ ] `Vehicle.purchasePrice`, custodia de llaves, checklist, estados, tasación, matching y catálogo
+- [x] Una edición posterior invalida sólo la revisión afectada.
+- [x] CAS evita pérdida silenciosa y las carreras se prueban en PostgreSQL real.
+- [x] `Vehicle.purchasePrice`, custodia de llaves, checklist, estados, tasación, matching y catálogo
       no cambian como efecto colateral.
-- [ ] Migración aditiva, replay, parity, typecheck, lint, unitarios, integración y build quedan verdes.
+- [x] Migración aditiva, replay, parity, typecheck, lint, unitarios, integración y build quedan verdes.
 - [ ] Rollout respeta migración antes de código, staging antes de producción y autorizaciones
       independientes.
-- [ ] No se añaden secretos, dependencias, Storage, PostHog ni PII en observabilidad.
+- [x] No se añaden secretos, dependencias, Storage, PostHog ni PII en observabilidad.
 
 ## U. Revisión adversarial
 
@@ -458,39 +458,45 @@ mutables y se limita la validación a local/CI hasta resolver el entorno.
 
 ## Estado de autorización
 
-`PLAN APPROVED — LOCAL IMPLEMENTATION AUTHORIZED — REMOTE OPERATIONS NOT AUTHORIZED`
+`IMPLEMENTED IN PR #173 — NOT DEPLOYED — PRODUCTION OPERATIONS NOT AUTHORIZED`
 
-Joel aprobó la spec y autorizó la implementación local el 2026-08-07. La autorización cubre schema,
-código, migración local y pruebas seguras; no cubre commit, push, PR, mutaciones en Supabase,
-staging/producción, merge ni deploy.
+Joel aprobó la implementación local y posteriormente el commit, push y PR el 2026-08-07. No existe
+autorización para merge, migraciones en Supabase remoto, smoke sobre una base no aislada ni deploy a
+producción.
 
 ## Verificación de esta fase
 
-| Criterio           | Evidencia                                                                                | Resultado                               |
-| ------------------ | ---------------------------------------------------------------------------------------- | --------------------------------------- |
-| Baseline Git       | `HEAD == origin/main == 3f037db811b7dd6b0e2ee8fd96005b0a74deeb30` tras `git fetch`       | PASS                                    |
-| Trazabilidad       | GitHub #172 y rama local dedicada                                                        | PASS                                    |
-| Gobierno reforzado | SDD, calidad de planificación, proceso, seguridad, testing y migraciones leídos          | PASS                                    |
-| Spec               | `node scripts/check-sdd.mjs` y comprobación whitespace con `git diff --no-index --check` | PASS                                    |
-| Implementación     | Schema Prisma, migración aditiva, dominio, acciones, loaders por rol y UI compartida     | PASS local                              |
-| Unitarios          | `node node_modules/vitest/vitest.mjs run`: 115 archivos / 1.469 tests                    | PASS                                    |
-| Calidad estática   | Prisma validate, typecheck, lint, SDD y migration history (13 migraciones)               | PASS                                    |
-| Build              | `next build`: compilación, tipos y 60 rutas; incluye `/vehiculos/[id]/recepcion`         | PASS; pooler no accesible en prerender  |
-| PostgreSQL real    | `scripts/integration-prepare.ts`                                                         | NO EJECUTADO: falta `TEST_DATABASE_URL` |
-| Remoto             | Supabase, Vercel, staging y producción                                                   | Sin cambios                             |
+| Criterio           | Evidencia                                                                                | Resultado                              |
+| ------------------ | ---------------------------------------------------------------------------------------- | -------------------------------------- |
+| Baseline Git       | `HEAD == origin/main == 3f037db811b7dd6b0e2ee8fd96005b0a74deeb30` tras `git fetch`       | PASS                                   |
+| Trazabilidad       | GitHub #172 y rama local dedicada                                                        | PASS                                   |
+| Gobierno reforzado | SDD, calidad de planificación, proceso, seguridad, testing y migraciones leídos          | PASS                                   |
+| Spec               | `node scripts/check-sdd.mjs` y comprobación whitespace con `git diff --no-index --check` | PASS                                   |
+| Implementación     | Schema Prisma, migración aditiva, dominio, acciones, loaders por rol y UI compartida     | PASS local                             |
+| Unitarios          | `node node_modules/vitest/vitest.mjs run`: 115 archivos / 1.469 tests                    | PASS                                   |
+| Calidad estática   | Prisma validate, typecheck, lint, SDD y migration history (13 migraciones)               | PASS                                   |
+| Build              | `next build`: compilación, tipos y 60 rutas; incluye `/vehiculos/[id]/recepcion`         | PASS; pooler no accesible en prerender |
+| PostgreSQL real    | CI #31195165306: preparación, RLS, integración y remote-migration guard                  | PASS                                   |
+| Migration replay   | CI #31195165306: PostgreSQL 17, 13 migraciones, parity, catálogo e idempotencia          | PASS                                   |
+| Supabase local     | CI #31195165306: buckets, policies y pruebas reales de Storage en Docker local           | PASS                                   |
+| Remoto             | Rama, PR borrador y Preview Vercel automáticos                                           | PASS; sin merge ni producción          |
 
 ## Cierre
 
-- **Commit:** no realizado.
-- **PR:** no creado.
-- **CI:** no ejecutada.
-- **Deployment:** no realizado.
+- **Commit:** `e21b23e` (`feat(recepcion): añade cuestionario compartido por vehículo`).
+- **PR:** [#173](https://github.com/growthaiconsultant-lab/campernova-crm/pull/173), borrador.
+- **CI:** [run 31195165306](https://github.com/growthaiconsultant-lab/campernova-crm/actions/runs/31195165306), todos los jobs PASS.
+- **Deployment:** Preview Vercel automático construido; no probado contra datos. Producción sin
+  cambios.
 - **Validación:** Prisma, historial de migraciones, SDD, TypeScript, lint, 1.469 unitarios y build
   local PASS. La integración PostgreSQL no se ejecutó porque el entorno carece de
   `TEST_DATABASE_URL`, Docker y servicio PostgreSQL local; no se usó producción como sustituto.
 - **Avisos del build:** el prerender del catálogo no pudo alcanzar el pooler Supabase desde el
   sandbox, pero sus fallos controlados no abortaron el build. Persiste además el aviso deprecado de
   configuración Sentry ya existente.
-- **Deuda restante:** replay/parity y carreras en PostgreSQL efímero, revisión visual y smoke por
-  roles, preflight remoto de sólo lectura, CI, migración, rollout y observación. Cada operación
-  remota requiere autorización separada.
+- **Evidencia CI adicional:** replay/parity, RLS, idempotencia, carreras PostgreSQL y Supabase
+  Storage local PASS. El único aviso es la transición de acciones de GitHub desde Node 20 a Node 24;
+  no bloquea este cambio funcional.
+- **Deuda restante:** confirmar aislamiento del Preview antes de cualquier smoke mutable, revisión
+  visual por roles, preflight remoto de sólo lectura, migración, rollout y observación. Cada
+  operación remota requiere autorización separada.
