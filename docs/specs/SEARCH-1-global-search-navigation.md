@@ -1,15 +1,15 @@
 # SEARCH-1 — Navegación fiable y autorizada desde el buscador global
 
-| Campo               | Valor                                                                              |
-| ------------------- | ---------------------------------------------------------------------------------- |
-| **Estado**          | IMPLEMENTED                                                                        |
-| **Owner**           | Engineering                                                                        |
-| **Ticket**          | [GitHub #170](https://github.com/growthaiconsultant-lab/campernova-crm/issues/170) |
-| **Rama / PR**       | `codex/search-1-global-search-navigation` / pendiente                              |
-| **Categorías**      | C1 · C3 · C5                                                                       |
-| **Riesgo**          | Alto, acotado a navegación y visibilidad por rol                                   |
-| **Ruta SDD**        | Reforzada                                                                          |
-| **Última revisión** | 2026-08-07                                                                         |
+| Campo               | Valor                                                                                                                    |
+| ------------------- | ------------------------------------------------------------------------------------------------------------------------ |
+| **Estado**          | IMPLEMENTED                                                                                                              |
+| **Owner**           | Engineering                                                                                                              |
+| **Ticket**          | [GitHub #170](https://github.com/growthaiconsultant-lab/campernova-crm/issues/170)                                       |
+| **Rama / PR**       | `codex/search-1-global-search-navigation` / [PR #171](https://github.com/growthaiconsultant-lab/campernova-crm/pull/171) |
+| **Categorías**      | C1 · C3 · C5                                                                                                             |
+| **Riesgo**          | Alto, acotado a navegación y visibilidad por rol                                                                         |
+| **Ruta SDD**        | Reforzada                                                                                                                |
+| **Última revisión** | 2026-08-07                                                                                                               |
 
 ## Problema y evidencia (A. Objetivo)
 
@@ -231,9 +231,9 @@ gate será revisar la CI y solicitar autorización para fusionar.
 
 ## Cierre
 
-- **Commit:** no realizado
-- **PR:** no realizada
-- **CI:** no ejecutada; sólo validación local
+- **Commit:** `31730f1` (implementación)
+- **PR:** [#171](https://github.com/growthaiconsultant-lab/campernova-crm/pull/171)
+- **CI:** pendiente sobre la PR; validación local completa
 - **Deployment:** no realizado
 - **Validación:** implementación local verificada; el build omitió la consulta remota de migraciones. Sentry devolvió 401 al intentar subir sourcemaps sin credenciales, sin bloquear el build.
 - **Deuda restante:** ficha dedicada de vehículo fuera de alcance
