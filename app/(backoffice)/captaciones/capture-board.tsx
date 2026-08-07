@@ -1,11 +1,12 @@
 'use client'
 
-import { useState, useTransition } from 'react'
+import { useEffect, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import {
   CAPTURE_BOARD_COLUMNS,
   CAPTURE_STATUS_COLORS,
   CAPTURE_STATUS_LABELS,
+  captureAnchorId,
 } from '@/lib/captacion'
 import { updateCaptureStatus, scheduleEntrada } from './actions'
 import { CaptureCard, type CaptureCardData } from './capture-card'
@@ -23,7 +24,15 @@ const DIRECT_DROP: CaptureStatus[] = ['NO_CONTACTADO', 'CONTACTADO', 'EN_CURSO']
  * (requisito del modelo); CONVERTIDO no acepta drop (la conversión crea el
  * lead de vendedor y se hace desde el botón de la tarjeta).
  */
-export function CaptureBoard({ cards, agents }: { cards: CaptureCardData[]; agents: Agent[] }) {
+export function CaptureBoard({
+  cards,
+  agents,
+  focusId = null,
+}: {
+  cards: CaptureCardData[]
+  agents: Agent[]
+  focusId?: string | null
+}) {
   const router = useRouter()
   const [pending, startTransition] = useTransition()
   const [dragId, setDragId] = useState<string | null>(null)
@@ -31,6 +40,15 @@ export function CaptureBoard({ cards, agents }: { cards: CaptureCardData[]; agen
   const [scheduleFor, setScheduleFor] = useState<string | null>(null)
   const [entradaAt, setEntradaAt] = useState('')
   const [notice, setNotice] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (!focusId) return
+    document.getElementById(captureAnchorId(focusId))?.scrollIntoView({
+      behavior: 'smooth',
+      block: 'center',
+      inline: 'center',
+    })
+  }, [focusId])
 
   const byStatus = new Map<CaptureStatus, CaptureCardData[]>()
   for (const c of cards) {
@@ -142,7 +160,7 @@ export function CaptureBoard({ cards, agents }: { cards: CaptureCardData[]; agen
                         dragId === c.id && 'opacity-60'
                       )}
                     >
-                      <CaptureCard c={c} agents={agents} />
+                      <CaptureCard c={c} agents={agents} focused={focusId === c.id} />
                     </div>
                   ))
                 )}

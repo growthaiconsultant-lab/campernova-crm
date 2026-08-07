@@ -4,9 +4,14 @@ import { QuickAddCapture } from './quick-add-capture'
 import { CaptureCard, type CaptureCardData } from './capture-card'
 import { CaptureBoard } from './capture-board'
 import { Eyebrow } from '@/components/redesign'
+import { resolveCaptureFocusId } from '@/lib/captacion'
 import type { CaptureStatus } from '@prisma/client'
 
-export default async function CaptacionesPage() {
+export default async function CaptacionesPage({
+  searchParams,
+}: {
+  searchParams: { focus?: string }
+}) {
   await requireAgente()
 
   const [captures, agents] = await Promise.all([
@@ -45,6 +50,11 @@ export default async function CaptacionesPage() {
   }
   const rejected = byStatus.get('RECHAZADO') ?? []
   const activeCount = cards.filter((c) => c.status !== 'RECHAZADO').length
+  const focusId = resolveCaptureFocusId(
+    searchParams.focus,
+    cards.map((capture) => capture.id)
+  )
+  const focusesRejected = rejected.some((capture) => capture.id === focusId)
 
   return (
     <div>
@@ -77,17 +87,25 @@ export default async function CaptacionesPage() {
       </div>
 
       {/* Tablero por estado (CAP1) — tarjetas arrastrables entre columnas */}
-      <CaptureBoard cards={cards.filter((c) => c.status !== 'RECHAZADO')} agents={agents} />
+      <CaptureBoard
+        cards={cards.filter((c) => c.status !== 'RECHAZADO')}
+        agents={agents}
+        focusId={focusId}
+      />
 
       {/* Rechazadas */}
       {rejected.length > 0 && (
-        <details id="rechazadas" className="mt-4 rounded-[14px] border border-line bg-card">
+        <details
+          id="rechazadas"
+          open={focusesRejected ? true : undefined}
+          className="mt-4 rounded-[14px] border border-line bg-card"
+        >
           <summary className="cursor-pointer px-4 py-3 font-hanken text-[13px] font-semibold text-ink2">
             Rechazadas ({rejected.length})
           </summary>
           <div className="grid gap-2 p-3 sm:grid-cols-2 lg:grid-cols-3">
             {rejected.map((c) => (
-              <CaptureCard key={c.id} c={c} agents={agents} />
+              <CaptureCard key={c.id} c={c} agents={agents} focused={focusId === c.id} />
             ))}
           </div>
         </details>

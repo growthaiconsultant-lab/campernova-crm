@@ -17,7 +17,12 @@ import {
   updateCapture,
   updateCaptureStatus,
 } from './actions'
-import { CAPTURE_STATUS_COLORS, CAPTURE_STATUS_LABELS, PORTAL_LABELS } from '@/lib/captacion'
+import {
+  CAPTURE_STATUS_COLORS,
+  CAPTURE_STATUS_LABELS,
+  PORTAL_LABELS,
+  captureAnchorId,
+} from '@/lib/captacion'
 import { LOST_REASON_OPTIONS } from '@/lib/lost-reason'
 import { buildWhatsAppUrl } from '@/lib/whatsapp'
 import { cn } from '@/lib/utils'
@@ -62,7 +67,15 @@ function initialsOf(name: string) {
     .toUpperCase()
 }
 
-export function CaptureCard({ c, agents }: { c: CaptureCardData; agents: Agent[] }) {
+export function CaptureCard({
+  c,
+  agents,
+  focused = false,
+}: {
+  c: CaptureCardData
+  agents: Agent[]
+  focused?: boolean
+}) {
   const router = useRouter()
   const [pending, startTransition] = useTransition()
   const [rejecting, setRejecting] = useState(false)
@@ -137,7 +150,13 @@ export function CaptureCard({ c, agents }: { c: CaptureCardData; agents: Agent[]
   const idle = !editing && !rejecting && !scheduling
 
   return (
-    <div className="rounded-[11px] border border-line bg-card p-[11px] shadow-[0_1px_2px_rgba(20,25,34,0.04)]">
+    <div
+      id={captureAnchorId(c.id)}
+      className={cn(
+        'scroll-mt-24 rounded-[11px] border border-line bg-card p-[11px] shadow-[0_1px_2px_rgba(20,25,34,0.04)]',
+        focused && 'ring-2 ring-brand ring-offset-2 ring-offset-canvas'
+      )}
+    >
       {/* Portal + precio */}
       <div className="mb-1.5 flex items-center justify-between gap-2">
         <span className="rounded-[5px] bg-track px-1.5 py-[3px] font-mono text-[9px] font-semibold tracking-[0.03em] text-ink2">
