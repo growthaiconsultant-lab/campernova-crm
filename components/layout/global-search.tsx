@@ -1,7 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { useRouter } from 'next/navigation'
+import Link from 'next/link'
 import { Search, Loader2 } from 'lucide-react'
 import { globalSearch, type SearchResults } from '@/app/(backoffice)/search-actions'
 
@@ -18,7 +18,6 @@ const GROUPS: { key: keyof SearchResults; label: string }[] = [
 ]
 
 export function GlobalSearch() {
-  const router = useRouter()
   const [open, setOpen] = useState(false)
   const [query, setQuery] = useState('')
   const [results, setResults] = useState<SearchResults | null>(null)
@@ -68,11 +67,6 @@ export function GlobalSearch() {
       }
     }, 250)
   }, [])
-
-  function go(href: string) {
-    setOpen(false)
-    router.push(href)
-  }
 
   const total = results ? GROUPS.reduce((s, g) => s + results[g.key].length, 0) : 0
 
@@ -156,17 +150,17 @@ export function GlobalSearch() {
                         {label}
                       </div>
                       {hits.map((h) => (
-                        <button
+                        <Link
                           key={h.id}
-                          type="button"
-                          onClick={() => go(h.href)}
+                          href={h.href}
+                          onClick={() => setOpen(false)}
                           className="flex w-full items-center justify-between gap-3 px-4 py-2 text-left transition-colors hover:bg-line2"
                         >
                           <span className="truncate font-hanken text-[13px] font-semibold text-ink">
                             {h.label}
                           </span>
                           <span className="shrink-0 font-mono text-[11px] text-ink3">{h.sub}</span>
-                        </button>
+                        </Link>
                       ))}
                     </div>
                   )

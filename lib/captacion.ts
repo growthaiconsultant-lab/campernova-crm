@@ -57,6 +57,18 @@ export function isTerminalCaptureStatus(s: CaptureStatus): boolean {
   return s === 'CONVERTIDO' || s === 'RECHAZADO'
 }
 
+export function captureAnchorId(id: string): string {
+  return `captacion-${id}`
+}
+
+export function resolveCaptureFocusId(
+  requestedId: string | undefined,
+  availableIds: readonly string[]
+): string | null {
+  if (!requestedId) return null
+  return availableIds.includes(requestedId) ? requestedId : null
+}
+
 /**
  * F3: parte el título libre del anuncio en marca / modelo para prellenar el
  * Vehicle. Heurística simple: primera palabra = marca, resto = modelo. El

@@ -7,7 +7,8 @@ import { personLabel, vehicleLabel } from '@/lib/display'
 /**
  * Búsqueda global (⌘K): compradores, vendedores, vehículos y captaciones por
  * nombre/email/teléfono/marca/modelo/matrícula. Respeta el RBAC del sidebar:
- * leads/captaciones solo ADMIN+AGENTE; vehículos también TALLER y MARKETING.
+ * leads, captaciones y vehículos solo ADMIN+AGENTE, porque todos los destinos
+ * pertenecen al módulo comercial protegido por requireAgente.
  */
 export type SearchHit = {
   id: string
@@ -30,13 +31,12 @@ export async function globalSearch(query: string): Promise<SearchResults> {
   const q = query.trim()
   if (q.length < 2) return EMPTY
 
-  const canLeads = user.role === 'ADMIN' || user.role === 'AGENTE'
-  const canVehicles = ['ADMIN', 'AGENTE', 'TALLER', 'MARKETING'].includes(user.role)
+  const canSearchCommercial = user.role === 'ADMIN' || user.role === 'AGENTE'
 
   const contains = { contains: q, mode: 'insensitive' as const }
 
   const [buyers, sellers, vehicles, captures] = await Promise.all([
-    canLeads
+    canSearchCommercial
       ? db.buyerLead.findMany({
           where: { OR: [{ name: contains }, { email: contains }, { phone: contains }] },
           select: { id: true, name: true, phone: true, status: true },
@@ -44,7 +44,7 @@ export async function globalSearch(query: string): Promise<SearchResults> {
           take: 5,
         })
       : Promise.resolve([]),
-    canLeads
+    canSearchCommercial
       ? db.sellerLead.findMany({
           where: {
             OR: [
@@ -64,7 +64,7 @@ export async function globalSearch(query: string): Promise<SearchResults> {
           take: 5,
         })
       : Promise.resolve([]),
-    canVehicles
+    canSearchCommercial
       ? db.vehicle.findMany({
           where: { OR: [{ brand: contains }, { model: contains }, { plate: contains }] },
           select: {
@@ -80,10 +80,10 @@ export async function globalSearch(query: string): Promise<SearchResults> {
           take: 5,
         })
       : Promise.resolve([]),
-    canLeads
+    canSearchCommercial
       ? db.vehicleCapture.findMany({
           where: { OR: [{ title: contains }, { phone: contains }] },
-          select: { id: true, title: true, phone: true, status: true },
+          select: { id: true, title: true, phone: true, status: true, sellerLeadId: true },
           orderBy: { updatedAt: 'desc' },
           take: 3,
         })
@@ -113,7 +113,7 @@ export async function globalSearch(query: string): Promise<SearchResults> {
       id: c.id,
       label: c.title ?? 'Captación sin título',
       sub: c.phone ?? '',
-      href: '/captaciones',
+      href: c.sellerLeadId ? `/vendedores/${c.sellerLeadId}` : `/captaciones?focus=${c.id}`,
     })),
   }
 }

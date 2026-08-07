@@ -2,11 +2,13 @@ import { describe, expect, it } from 'vitest'
 import {
   CAPTURE_BOARD_COLUMNS,
   CAPTURE_STATUS_LABELS,
+  captureAnchorId,
   findDuplicateCaptureByPhone,
   isTerminalCaptureStatus,
   isValidCaptureStatus,
   isValidPortal,
   PORTAL_LABELS,
+  resolveCaptureFocusId,
   splitCaptureTitle,
 } from './captacion'
 
@@ -24,6 +26,18 @@ describe('labels/opciones', () => {
     expect(isValidPortal('EBAY')).toBe(false)
     expect(isValidCaptureStatus('EN_CURSO')).toBe(true)
     expect(isValidCaptureStatus('X')).toBe(false)
+  })
+})
+
+describe('foco de captación', () => {
+  it('resuelve sólo identificadores presentes en el conjunto autorizado', () => {
+    expect(resolveCaptureFocusId('capture-2', ['capture-1', 'capture-2'])).toBe('capture-2')
+    expect(resolveCaptureFocusId('capture-3', ['capture-1', 'capture-2'])).toBeNull()
+    expect(resolveCaptureFocusId(undefined, ['capture-1'])).toBeNull()
+  })
+
+  it('prefija el ancla para evitar colisiones con otros elementos', () => {
+    expect(captureAnchorId('capture-2')).toBe('captacion-capture-2')
   })
 })
 
