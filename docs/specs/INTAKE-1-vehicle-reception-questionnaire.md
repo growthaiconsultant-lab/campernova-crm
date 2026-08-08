@@ -458,12 +458,13 @@ mutables y se limita la validación a local/CI hasta resolver el entorno.
 
 ## Estado de autorización
 
-`STAGING MIGRATED — ADMIN SMOKE PASS — PREVIEW CALLBACK FIX LOCAL — PRODUCTION NOT AUTHORIZED`
+`STAGING MIGRATED — ADMIN SMOKE PASS — PREVIEW CALLBACK FIX 2 LOCAL — PRODUCTION NOT AUTHORIZED`
 
 Joel aprobó la implementación local, el commit, push y PR el 2026-08-07. El 2026-08-08 autorizó
 exclusivamente la rotación de credenciales de staging, las variables Vercel Preview, las cuatro
-migraciones pendientes contra `iatuhydsfwoeprpbklod`, el redeploy y el smoke de Preview. No existe
-autorización para merge, commit o push adicional, migración de producción ni deploy a producción.
+migraciones pendientes contra `iatuhydsfwoeprpbklod`, la corrección del callback con su evidencia en
+la rama, el redeploy y el smoke de Preview. No existe autorización para merge, migración de
+producción ni deploy a producción.
 
 ## Verificación de esta fase
 
@@ -481,8 +482,8 @@ autorización para merge, commit o push adicional, migración de producción ni 
 | Migration replay   | CI #31195165306: PostgreSQL 17, 13 migraciones, parity, catálogo e idempotencia          | PASS                                   |
 | Supabase local     | CI #31195165306: buckets, policies y pruebas reales de Storage en Docker local           | PASS                                   |
 | Staging DB         | Project ref `iatuhydsfwoeprpbklod`; 4 migraciones aplicadas; 13 locales / 40 remotas     | PASS; producción intacta               |
-| Preview            | Deployment `6sjseJffL6rWwN1THwLhm3WYqt44`; login ADMIN y guardado/limpieza de borrador   | PASS; callback manual                  |
-| Regresión login    | Helper puro: 4 tests; TypeScript, ESLint y Prettier                                      | PASS local; redeploy pendiente         |
+| Preview            | Deployments `6sjseJff…` y `2Rh7uNb…`; login ADMIN y guardado/limpieza de borrador        | PASS; callback manual                  |
+| Regresión login    | La URL efímera no coincide con el allowlist; alias estable de rama + 4 tests             | PASS local; redeploy pendiente         |
 | Remoto             | PR borrador y Preview aislado de producción                                              | PASS; sin merge ni producción          |
 
 ## Cierre
@@ -491,8 +492,9 @@ autorización para merge, commit o push adicional, migración de producción ni 
 - **PR:** [#173](https://github.com/growthaiconsultant-lab/campernova-crm/pull/173), borrador.
 - **CI:** [run 31195165306](https://github.com/growthaiconsultant-lab/campernova-crm/actions/runs/31195165306), todos los jobs PASS.
 - **Deployment:** Preview Vercel desplegado contra staging y probado con ADMIN. Producción sin
-  cambios. El smoke descubrió que el magic link heredaba `localhost`; existe una corrección local
-  con test de regresión que aún no se ha commiteado, subido ni redesplegado.
+  cambios. El segundo smoke confirmó que la URL efímera de Vercel no coincidía con el allowlist de
+  staging y Supabase aplicaba su `Site URL` de respaldo (`localhost`). La segunda corrección usa el
+  alias estable `VERCEL_BRANCH_URL`, ya cubierto por el allowlist, y está pendiente de publicar.
 - **Validación:** Prisma, historial de migraciones, SDD, TypeScript, lint, 1.469 unitarios y build
   local PASS. La integración PostgreSQL no se ejecutó porque el entorno carece de
   `TEST_DATABASE_URL`, Docker y servicio PostgreSQL local; no se usó producción como sustituto.

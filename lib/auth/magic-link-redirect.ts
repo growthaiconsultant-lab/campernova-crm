@@ -1,7 +1,7 @@
 type MagicLinkEnvironment = {
   NEXT_PUBLIC_APP_URL?: string
+  VERCEL_BRANCH_URL?: string
   VERCEL_ENV?: string
-  VERCEL_URL?: string
 }
 
 const LOCAL_APP_URL = 'http://localhost:3000'
@@ -16,19 +16,19 @@ function configuredAppUrl(value: string | undefined): URL {
 }
 
 /**
- * En Preview, cada despliegue necesita devolver el magic link al mismo origen que lo generó.
+ * En Preview, el magic link debe volver al alias estable de la misma rama que lo generó.
  * `NEXT_PUBLIC_APP_URL` sigue siendo la URL canónica para producción y desarrollo, mientras que
- * `VERCEL_URL` evita que un Preview herede por error `localhost` u otro dominio canónico.
+ * `VERCEL_BRANCH_URL` mantiene el callback en el alias estable y autorizado del Preview.
  */
 export function resolveMagicLinkRedirectUrl(
   env: MagicLinkEnvironment = {
     NEXT_PUBLIC_APP_URL: process.env.NEXT_PUBLIC_APP_URL,
+    VERCEL_BRANCH_URL: process.env.VERCEL_BRANCH_URL,
     VERCEL_ENV: process.env.VERCEL_ENV,
-    VERCEL_URL: process.env.VERCEL_URL,
   }
 ): string {
   const appUrl = configuredAppUrl(env.NEXT_PUBLIC_APP_URL)
-  const vercelHost = env.VERCEL_URL?.trim().toLowerCase()
+  const vercelHost = env.VERCEL_BRANCH_URL?.trim().toLowerCase()
 
   const origin =
     env.VERCEL_ENV === 'preview' && vercelHost && VERCEL_DEPLOYMENT_HOST.test(vercelHost)
