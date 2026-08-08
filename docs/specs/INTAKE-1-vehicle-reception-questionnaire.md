@@ -458,7 +458,7 @@ mutables y se limita la validación a local/CI hasta resolver el entorno.
 
 ## Estado de autorización
 
-`STAGING MIGRATED — ADMIN SMOKE PASS — PREVIEW CALLBACK FIX 2 LOCAL — PRODUCTION NOT AUTHORIZED`
+`STAGING MIGRATED — ADMIN SMOKE PASS — PREVIEW CALLBACK PASS — PRODUCTION NOT AUTHORIZED`
 
 Joel aprobó la implementación local, el commit, push y PR el 2026-08-07. El 2026-08-08 autorizó
 exclusivamente la rotación de credenciales de staging, las variables Vercel Preview, las cuatro
@@ -482,19 +482,21 @@ producción ni deploy a producción.
 | Migration replay   | CI #31195165306: PostgreSQL 17, 13 migraciones, parity, catálogo e idempotencia          | PASS                                   |
 | Supabase local     | CI #31195165306: buckets, policies y pruebas reales de Storage en Docker local           | PASS                                   |
 | Staging DB         | Project ref `iatuhydsfwoeprpbklod`; 4 migraciones aplicadas; 13 locales / 40 remotas     | PASS; producción intacta               |
-| Preview            | Deployments `6sjseJff…` y `2Rh7uNb…`; login ADMIN y guardado/limpieza de borrador        | PASS; callback manual                  |
-| Regresión login    | La URL efímera no coincide con el allowlist; alias estable de rama + 4 tests             | PASS local; redeploy pendiente         |
+| Preview            | Login ADMIN, guardado/limpieza de borrador y callback al alias estable de la rama        | PASS autenticado                       |
+| Regresión login    | La URL efímera no coincide con el allowlist; `VERCEL_BRANCH_URL` + 4 tests               | PASS desplegado y smoke                |
 | Remoto             | PR borrador y Preview aislado de producción                                              | PASS; sin merge ni producción          |
 
 ## Cierre
 
 - **Commit:** `e21b23e` (`feat(recepcion): añade cuestionario compartido por vehículo`).
+- **Correcciones de login:** `4b17eab` y `b778873`; el segundo usa el alias estable autorizado.
 - **PR:** [#173](https://github.com/growthaiconsultant-lab/campernova-crm/pull/173), borrador.
 - **CI:** [run 31195165306](https://github.com/growthaiconsultant-lab/campernova-crm/actions/runs/31195165306), todos los jobs PASS.
 - **Deployment:** Preview Vercel desplegado contra staging y probado con ADMIN. Producción sin
   cambios. El segundo smoke confirmó que la URL efímera de Vercel no coincidía con el allowlist de
   staging y Supabase aplicaba su `Site URL` de respaldo (`localhost`). La segunda corrección usa el
-  alias estable `VERCEL_BRANCH_URL`, ya cubierto por el allowlist, y está pendiente de publicar.
+  alias estable `VERCEL_BRANCH_URL`, ya cubierto por el allowlist; el enlace nuevo aterrizó en
+  `/dashboard` y completó la sesión ADMIN.
 - **Validación:** Prisma, historial de migraciones, SDD, TypeScript, lint, 1.469 unitarios y build
   local PASS. La integración PostgreSQL no se ejecutó porque el entorno carece de
   `TEST_DATABASE_URL`, Docker y servicio PostgreSQL local; no se usó producción como sustituto.
@@ -504,6 +506,6 @@ producción ni deploy a producción.
 - **Evidencia CI adicional:** replay/parity, RLS, idempotencia, carreras PostgreSQL y Supabase
   Storage local PASS. El único aviso es la transición de acciones de GitHub desde Node 20 a Node 24;
   no bloquea este cambio funcional.
-- **Deuda restante:** smoke TALLER/negativo, revisión móvil, publicar y verificar la corrección del
-  callback en Preview, autorización separada para cualquier operación de producción y ventana de
-  observación. No se crearán usuarios ni se cambiarán roles sólo para completar el smoke.
+- **Deuda restante:** smoke TALLER/negativo, revisión móvil, autorización separada para cualquier
+  operación de producción y ventana de observación. No se crearán usuarios ni se cambiarán roles
+  sólo para completar el smoke.
