@@ -18,6 +18,7 @@ import {
   isVehicleEligible,
   prismaMatchingDeps,
 } from '@/lib/matching'
+import { shouldShowPersistedMatch } from '@/lib/matching/visibility'
 import { classifyBuyerCriteria } from '@/lib/buyer-criteria'
 import type { BuyerMatchData } from '@/components/matches-section'
 import { ActivityTimeline } from '@/components/activity-timeline'
@@ -106,7 +107,8 @@ export default async function FichaCompradorPage({
           },
         },
         deliveries: {
-          orderBy: { createdAt: 'desc' },
+          where: { status: 'COMPLETADA' },
+          orderBy: { completedAt: 'desc' },
           take: 1,
           include: {
             vehicle: {
@@ -140,7 +142,7 @@ export default async function FichaCompradorPage({
               },
             },
           },
-          orderBy: { score: 'desc' },
+          orderBy: { score: { sort: 'desc', nulls: 'last' } },
           take: 10,
         },
         calendarEvents: {
@@ -179,7 +181,7 @@ export default async function FichaCompradorPage({
     status: lead.status,
     archivedAt: lead.archivedAt,
   })
-  const visibleMatches = subjectBuyerEligible
+  const eligibleMatches = subjectBuyerEligible
     ? lead.matches.filter((m) =>
         isVehicleEligible({
           status: m.vehicle.status,
@@ -189,6 +191,10 @@ export default async function FichaCompradorPage({
         })
       )
     : []
+  const eligibleMatchIds = new Set(eligibleMatches.map((match) => match.id))
+  const visibleMatches = lead.matches.filter((match) =>
+    shouldShowPersistedMatch(match, eligibleMatchIds.has(match.id))
+  )
 
   // Resumen de la necesidad — la unidad de trabajo del comprador
   const tipoLabel =
@@ -205,8 +211,10 @@ export default async function FichaCompradorPage({
     .filter(Boolean)
     .join(' · ')
 
-  const bestMatch = visibleMatches[0]
-  const bestMatchScore = bestMatch ? bestMatch.score : 0
+  const bestMatch = visibleMatches.find(
+    (match): match is (typeof visibleMatches)[number] & { score: number } => match.score !== null
+  )
+  const bestMatchScore = bestMatch?.score ?? 0
   const hasActiveOffer = lead.offers.some((o) => isActiveHold(o.status))
   const scoreResult = buyerScore({
     phone: lead.phone,
@@ -284,10 +292,12 @@ export default async function FichaCompradorPage({
   const matchExplanations = new Map<string, { reasons: string[]; risks: string[] }>()
   if (buyerMatchInput) {
     await Promise.all(
-      visibleMatches.map(async (m) => {
-        const v = await matchDeps.getVehicle(m.vehicle.id)
-        if (v) matchExplanations.set(m.id, buildMatchExplanation(v, buyerMatchInput))
-      })
+      visibleMatches
+        .filter((m) => m.score !== null)
+        .map(async (m) => {
+          const v = await matchDeps.getVehicle(m.vehicle.id)
+          if (v) matchExplanations.set(m.id, buildMatchExplanation(v, buyerMatchInput))
+        })
     )
   }
 
@@ -297,6 +307,10 @@ export default async function FichaCompradorPage({
       id: m.id,
       score: m.score,
       status: m.status,
+      generatedBy: m.generatedBy,
+      manualLinkReason: m.manualLinkReason,
+      manualLinkNotes: m.manualLinkNotes,
+      manualLinkedAt: m.manualLinkedAt?.toISOString() ?? null,
       explanation: matchExplanations.get(m.id) ?? null,
       vehicle: {
         id: m.vehicle.id,
@@ -312,7 +326,7 @@ export default async function FichaCompradorPage({
   })
 
   // Block 18 — ofertas del comprador + candidatos (vehículos matcheados)
-  const offerCandidates = visibleMatches.map((m) => ({
+  const offerCandidates = eligibleMatches.map((m) => ({
     id: m.vehicle.id,
     label: `${m.vehicle.brand} ${m.vehicle.model} (${m.vehicle.year})`,
   }))
@@ -379,7 +393,7 @@ export default async function FichaCompradorPage({
   const tabs: LeadTab[] = [
     { key: 'ficha', label: 'Ficha' },
     { key: 'actividad', label: 'Actividad', badge: activities.length },
-    { key: 'matches', label: 'Vehículos sugeridos', badge: visibleMatches.length },
+    { key: 'matches', label: 'Vehículos relacionados', badge: visibleMatches.length },
     { key: 'ofertas', label: 'Ofertas', badge: offerRows.length || undefined },
     ...(hasChat
       ? [{ key: 'conversacion', label: 'Conversación', badge: chatUserMsgCount } as LeadTab]
@@ -640,18 +654,7 @@ export default async function FichaCompradorPage({
 
           {/* ── TAB: MATCHES ── */}
           {activeTab === 'matches' && (
-            <>
-              {buyerMatches.length > 0 ? (
-                <MatchesSection side="buyer" matches={buyerMatches} defaultOpen />
-              ) : (
-                <div className="flex flex-col items-center justify-center rounded-xl border border-border bg-card py-16">
-                  <p className="text-[15px] font-medium text-foreground">Sin vehículos sugeridos</p>
-                  <p className="mt-1 text-[13px] text-muted-foreground">
-                    Los matches se calculan automáticamente cuando hay vehículos compatibles
-                  </p>
-                </div>
-              )}
-            </>
+            <MatchesSection side="buyer" fixedId={lead.id} matches={buyerMatches} defaultOpen />
           )}
 
           {/* ── TAB: OFERTAS ── */}
@@ -907,11 +910,11 @@ export default async function FichaCompradorPage({
               </div>
             )}
 
-            {/* Operación */}
+            {/* Compra canónica: sólo Delivery COMPLETADA */}
             {delivery && delivery.vehicle && (
               <div className="rounded-xl border border-border bg-card p-5">
                 <p className="mb-3 font-mono text-[10px] uppercase tracking-[0.12em] text-muted-foreground">
-                  Operación
+                  Vehículo comprado
                 </p>
                 <div className="space-y-2.5">
                   <div className="flex items-start justify-between gap-2">
@@ -947,8 +950,12 @@ export default async function FichaCompradorPage({
                     </div>
                   )}
                   <div className="flex items-center justify-between">
-                    <span className="text-[11px] text-muted-foreground">Días en pipeline</span>
-                    <span className="text-[12px] text-foreground">{daysInPipeline} días</span>
+                    <span className="text-[11px] text-muted-foreground">Entrega completada</span>
+                    <span className="text-[12px] text-foreground">
+                      {delivery.completedAt
+                        ? new Date(delivery.completedAt).toLocaleDateString('es-ES')
+                        : 'Fecha no registrada'}
+                    </span>
                   </div>
                   {delivery.vehicle.sellerLead?.id && (
                     <Link

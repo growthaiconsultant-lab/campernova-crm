@@ -21,7 +21,7 @@ describe('computeRecalcDiff', () => {
   it('actualiza score de matches SUGERIDO existentes', () => {
     const diff = computeRecalcDiff(
       [{ otherId: 'a', score: 95 }],
-      [{ otherId: 'a', status: 'SUGERIDO' }]
+      [{ otherId: 'a', status: 'SUGERIDO', manualLinkedAt: null }]
     )
     expect(diff.toCreate).toEqual([])
     expect(diff.toUpdateScore).toEqual([{ otherId: 'a', score: 95 }])
@@ -31,7 +31,7 @@ describe('computeRecalcDiff', () => {
   it('no toca matches en estado posterior aunque sigan en el top', () => {
     const diff = computeRecalcDiff(
       [{ otherId: 'a', score: 95 }],
-      [{ otherId: 'a', status: 'PROPUESTO_CLIENTE' }]
+      [{ otherId: 'a', status: 'PROPUESTO_CLIENTE', manualLinkedAt: null }]
     )
     expect(diff.toCreate).toEqual([])
     expect(diff.toUpdateScore).toEqual([])
@@ -42,8 +42,8 @@ describe('computeRecalcDiff', () => {
     const diff = computeRecalcDiff(
       [{ otherId: 'a', score: 90 }],
       [
-        { otherId: 'a', status: 'SUGERIDO' },
-        { otherId: 'b', status: 'SUGERIDO' },
+        { otherId: 'a', status: 'SUGERIDO', manualLinkedAt: null },
+        { otherId: 'b', status: 'SUGERIDO', manualLinkedAt: null },
       ]
     )
     expect(diff.toUpdateScore).toEqual([{ otherId: 'a', score: 90 }])
@@ -54,10 +54,10 @@ describe('computeRecalcDiff', () => {
     const diff = computeRecalcDiff(
       [{ otherId: 'a', score: 90 }],
       [
-        { otherId: 'a', status: 'SUGERIDO' },
-        { otherId: 'b', status: 'VISITA' },
-        { otherId: 'c', status: 'OFERTA' },
-        { otherId: 'd', status: 'RECHAZADO' },
+        { otherId: 'a', status: 'SUGERIDO', manualLinkedAt: null },
+        { otherId: 'b', status: 'VISITA', manualLinkedAt: null },
+        { otherId: 'c', status: 'OFERTA', manualLinkedAt: null },
+        { otherId: 'd', status: 'RECHAZADO', manualLinkedAt: null },
       ]
     )
     expect(diff.toDeleteSuggested).toEqual([])
@@ -71,10 +71,10 @@ describe('computeRecalcDiff', () => {
         { otherId: 'existe-avanzado', score: 60 },
       ],
       [
-        { otherId: 'existe-sugerido', status: 'SUGERIDO' },
-        { otherId: 'existe-avanzado', status: 'PROPUESTO_CLIENTE' },
-        { otherId: 'desaparecido-sugerido', status: 'SUGERIDO' },
-        { otherId: 'desaparecido-rechazado', status: 'RECHAZADO' },
+        { otherId: 'existe-sugerido', status: 'SUGERIDO', manualLinkedAt: null },
+        { otherId: 'existe-avanzado', status: 'PROPUESTO_CLIENTE', manualLinkedAt: null },
+        { otherId: 'desaparecido-sugerido', status: 'SUGERIDO', manualLinkedAt: null },
+        { otherId: 'desaparecido-rechazado', status: 'RECHAZADO', manualLinkedAt: null },
       ]
     )
     expect(diff.toCreate).toEqual([{ otherId: 'nuevo', score: 88 }])
@@ -86,13 +86,32 @@ describe('computeRecalcDiff', () => {
     const diff = computeRecalcDiff(
       [],
       [
-        { otherId: 'a', status: 'SUGERIDO' },
-        { otherId: 'b', status: 'SUGERIDO' },
-        { otherId: 'c', status: 'CERRADO' },
+        { otherId: 'a', status: 'SUGERIDO', manualLinkedAt: null },
+        { otherId: 'b', status: 'SUGERIDO', manualLinkedAt: null },
+        { otherId: 'c', status: 'CERRADO', manualLinkedAt: null },
       ]
     )
     expect(diff.toCreate).toEqual([])
     expect(diff.toUpdateScore).toEqual([])
     expect(diff.toDeleteSuggested).toEqual(['a', 'b'])
+  })
+
+  it('no borra una relación sugerida fijada manualmente aunque salga del top', () => {
+    const diff = computeRecalcDiff(
+      [],
+      [{ otherId: 'manual', status: 'SUGERIDO', manualLinkedAt: new Date('2026-08-08') }]
+    )
+
+    expect(diff.toDeleteSuggested).toEqual([])
+  })
+
+  it('actualiza el score de una relación manual si vuelve a entrar en el top', () => {
+    const diff = computeRecalcDiff(
+      [{ otherId: 'manual', score: 82 }],
+      [{ otherId: 'manual', status: 'SUGERIDO', manualLinkedAt: new Date('2026-08-08') }]
+    )
+
+    expect(diff.toUpdateScore).toEqual([{ otherId: 'manual', score: 82 }])
+    expect(diff.toDeleteSuggested).toEqual([])
   })
 })

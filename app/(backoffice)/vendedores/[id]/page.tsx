@@ -21,6 +21,7 @@ import {
   isVehicleEligible,
   prismaMatchingDeps,
 } from '@/lib/matching'
+import { shouldShowPersistedMatch } from '@/lib/matching/visibility'
 import { ActivityTimeline } from '@/components/activity-timeline'
 import type { ActivityItem } from '@/components/activity-timeline'
 import { NoteForm } from '@/components/note-form'
@@ -128,8 +129,16 @@ export default async function FichaVendedorPage({
                   },
                 },
               },
-              orderBy: { score: 'desc' },
+              orderBy: { score: { sort: 'desc', nulls: 'last' } },
               take: 10,
+            },
+            deliveries: {
+              where: { status: 'COMPLETADA' },
+              orderBy: { completedAt: 'desc' },
+              take: 1,
+              include: {
+                buyerLead: { select: { id: true, name: true } },
+              },
             },
             offers: {
               orderBy: { createdAt: 'desc' },
@@ -218,11 +227,15 @@ export default async function FichaVendedorPage({
         entryAnnulledAt: v.entryAnnulledAt,
       })
     : false
-  const visibleMatches = subjectVehicleEligible
+  const eligibleMatches = subjectVehicleEligible
     ? (v?.matches ?? []).filter((m) =>
         isBuyerEligible({ status: m.buyerLead.status, archivedAt: m.buyerLead.archivedAt })
       )
     : []
+  const eligibleMatchIds = new Set(eligibleMatches.map((match) => match.id))
+  const visibleMatches = (v?.matches ?? []).filter((match) =>
+    shouldShowPersistedMatch(match, eligibleMatchIds.has(match.id))
+  )
 
   // ── Cálculos derivados ────────────────────────────────────────────────────
   const daysPipeline = daysSince(lead.createdAt)
@@ -235,10 +248,12 @@ export default async function FichaVendedorPage({
   const matchExplanations = new Map<string, { reasons: string[]; risks: string[] }>()
   if (vehicleMatchInput) {
     await Promise.all(
-      visibleMatches.map(async (m) => {
-        const b = await matchDeps.getBuyer(m.buyerLead.id)
-        if (b) matchExplanations.set(m.id, buildMatchExplanation(vehicleMatchInput, b))
-      })
+      visibleMatches
+        .filter((m) => m.score !== null)
+        .map(async (m) => {
+          const b = await matchDeps.getBuyer(m.buyerLead.id)
+          if (b) matchExplanations.set(m.id, buildMatchExplanation(vehicleMatchInput, b))
+        })
     )
   }
 
@@ -246,6 +261,10 @@ export default async function FichaVendedorPage({
     id: m.id,
     score: m.score,
     status: m.status,
+    generatedBy: m.generatedBy,
+    manualLinkReason: m.manualLinkReason,
+    manualLinkNotes: m.manualLinkNotes,
+    manualLinkedAt: m.manualLinkedAt?.toISOString() ?? null,
     explanation: matchExplanations.get(m.id) ?? null,
     buyerLead: {
       id: m.buyerLead.id,
@@ -256,9 +275,12 @@ export default async function FichaVendedorPage({
       criticalEquipment: (m.buyerLead.criticalEquipment ?? {}) as Record<string, boolean>,
     },
   }))
+  const scoredVehicleMatches = vehicleMatches.filter(
+    (match): match is VehicleMatchData & { score: number } => match.score !== null
+  )
 
   // Block 18 — ofertas por el vehículo + candidatos (compradores matcheados)
-  const offerCandidates = visibleMatches.map((m) => ({
+  const offerCandidates = eligibleMatches.map((m) => ({
     id: m.buyerLead.id,
     label: personLabel(m.buyerLead.name, { role: 'Comprador sin identificar', id: m.buyerLead.id }),
   }))
@@ -276,8 +298,8 @@ export default async function FichaVendedorPage({
     counterpartHref: `/compradores/${o.buyerLead.id}`,
   }))
 
-  // Comprador de la operación (match cerrado) — para el cruce vehículo↔comprador
-  const closedMatch = vehicleMatches.find((m) => m.status === 'CERRADO') ?? null
+  // La compra se deriva exclusivamente de la entrega COMPLETADA de la pareja, nunca del Match.
+  const completedDelivery = v?.deliveries[0] ?? null
 
   // Legal / expediente
   const legalInput: VehicleLegalInput | null = v
@@ -323,8 +345,8 @@ export default async function FichaVendedorPage({
     photoCount: v?.photos.length ?? 0,
     hasDesiredPrice: !!v?.desiredPrice,
     conservationState: v?.conservationState ?? null,
-    matchCount: vehicleMatches.length,
-    bestMatchScore: vehicleMatches[0]?.score ?? 0,
+    matchCount: scoredVehicleMatches.length,
+    bestMatchScore: scoredVehicleMatches[0]?.score ?? 0,
     daysSinceLastActivity: daysSinceActivity,
     isPro: lead.canal === 'PRO',
     vehicleStatus: v?.status ?? null,
@@ -332,7 +354,7 @@ export default async function FichaVendedorPage({
 
   // Block 19 — demanda activa + score de captación
   const activeDemandCount = vehicleMatches.filter(
-    (m) => m.score >= ACTIVE_DEMAND_MATCH_THRESHOLD
+    (m) => m.score !== null && m.score >= ACTIVE_DEMAND_MATCH_THRESHOLD
   ).length
   const acquisition = sellerAcquisitionScore({
     desiredPrice: v?.desiredPrice ? Number(v.desiredPrice) : null,
@@ -361,9 +383,9 @@ export default async function FichaVendedorPage({
   const insightInput = {
     daysSinceLastActivity: daysSinceActivity,
     daysSincePipeline: daysPipeline,
-    matchCount: vehicleMatches.length,
-    topMatchScore: vehicleMatches[0]?.score ?? 0,
-    topMatchBuyerName: vehicleMatches[0]?.buyerLead.name ?? null,
+    matchCount: scoredVehicleMatches.length,
+    topMatchScore: scoredVehicleMatches[0]?.score ?? 0,
+    topMatchBuyerName: scoredVehicleMatches[0]?.buyerLead.name ?? null,
     desiredPrice: v?.desiredPrice ? Number(v.desiredPrice) : null,
     valuationRecommended: v?.valuationRecommended ? Number(v.valuationRecommended) : null,
     photoCount: v?.photos.length ?? 0,
@@ -379,7 +401,7 @@ export default async function FichaVendedorPage({
     leadStatus: lead.status,
     daysSincePipeline: daysPipeline,
     daysSinceLastActivity: daysSinceActivity,
-    matchCount: vehicleMatches.length,
+    matchCount: scoredVehicleMatches.length,
   })
 
   // Margen
@@ -877,11 +899,11 @@ export default async function FichaVendedorPage({
               )}
 
               {/* Matches resumen */}
-              {vehicleMatches.length > 0 && (
+              {scoredVehicleMatches.length > 0 && (
                 <div>
                   <div className="mb-2 flex items-center justify-between">
                     <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
-                      {vehicleMatches.length} compradores idóneos · Match automático
+                      {scoredVehicleMatches.length} compradores idóneos · Match automático
                     </p>
                     <Link
                       href={`/vendedores/${lead.id}?tab=compradores`}
@@ -892,7 +914,7 @@ export default async function FichaVendedorPage({
                   </div>
                   <p className="mb-3 font-medium">Posibles compradores</p>
                   <div className="space-y-2">
-                    {vehicleMatches.slice(0, 3).map((m) => (
+                    {scoredVehicleMatches.slice(0, 3).map((m) => (
                       <div
                         key={m.id}
                         className="flex items-center justify-between gap-3 rounded-lg border bg-card px-4 py-3"
@@ -1075,7 +1097,7 @@ export default async function FichaVendedorPage({
           {/* ─────────────── COMPRADORES ─────────────── */}
           {activeTab === 'compradores' && v && (
             <div className="space-y-5">
-              <MatchesSection side="vehicle" matches={vehicleMatches} defaultOpen />
+              <MatchesSection side="vehicle" fixedId={v.id} matches={vehicleMatches} defaultOpen />
               <OffersSection
                 side="vehicle"
                 fixedId={v.id}
@@ -1442,27 +1464,33 @@ export default async function FichaVendedorPage({
               />
             </div>
 
-            {/* Comprador / operación (match cerrado) — cruce vehículo↔comprador */}
-            {closedMatch && (
+            {/* Compra canónica: Delivery COMPLETADA de la pareja */}
+            {completedDelivery && (
               <div className="p-5">
                 <p className="mb-3 font-mono text-[10px] uppercase tracking-[0.12em] text-muted-foreground">
-                  Comprador
+                  Comprado por
                 </p>
                 <Link
-                  href={`/compradores/${closedMatch.buyerLead.id}`}
+                  href={`/compradores/${completedDelivery.buyerLead.id}`}
                   className="flex items-center gap-3 rounded-lg border border-border p-3 transition-colors hover:bg-muted"
                 >
                   <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-green-100 text-sm font-bold text-green-700">
-                    {initialOf(closedMatch.buyerLead.name)}
+                    {initialOf(completedDelivery.buyerLead.name)}
                   </div>
                   <div className="min-w-0">
                     <p className="truncate text-sm font-semibold text-foreground">
-                      {personLabel(closedMatch.buyerLead.name, {
+                      {personLabel(completedDelivery.buyerLead.name, {
                         role: 'Comprador sin identificar',
-                        id: closedMatch.buyerLead.id,
+                        id: completedDelivery.buyerLead.id,
                       })}
                     </p>
-                    <p className="text-xs text-muted-foreground">Operación cerrada · ver ficha →</p>
+                    <p className="text-xs text-muted-foreground">
+                      Entrega completada
+                      {completedDelivery.completedAt
+                        ? ` · ${completedDelivery.completedAt.toLocaleDateString('es-ES')}`
+                        : ''}
+                      {' · ver ficha →'}
+                    </p>
                   </div>
                 </Link>
               </div>

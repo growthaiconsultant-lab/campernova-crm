@@ -57,7 +57,8 @@ export default async function PipelinePage() {
         take: 1,
       },
       matches: {
-        orderBy: { score: 'desc' },
+        where: { score: { not: null } },
+        orderBy: { score: { sort: 'desc', nulls: 'last' } },
         take: 1,
         include: { vehicle: { select: { brand: true, model: true } } },
       },
@@ -190,7 +191,7 @@ export default async function PipelinePage() {
                               })}
                             </div>
                           )}
-                          {bestMatch && (
+                          {bestMatch && bestMatch.score !== null && (
                             <div className="mt-1.5 truncate font-hanken text-[11px] font-medium text-ink2">
                               ↳ {bestMatch.vehicle.brand} {bestMatch.vehicle.model} ·{' '}
                               <span className="text-brand">{bestMatch.score}</span>

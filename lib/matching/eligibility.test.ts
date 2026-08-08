@@ -99,10 +99,11 @@ describe('fragmentos where (misma política)', () => {
     })
   })
 
-  it('eligibleMatchWhere exige ambas contrapartes elegibles', () => {
+  it('eligibleMatchWhere exige ambas contrapartes elegibles y score real', () => {
     expect(eligibleMatchWhere).toEqual({
       vehicle: eligibleVehicleWhere,
       buyerLead: eligibleBuyerWhere,
+      score: { not: null },
     })
   })
 })

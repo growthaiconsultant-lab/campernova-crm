@@ -121,6 +121,16 @@ enum MatchStatus {
   RECHAZADO
 }
 
+/// Motivo comercial por el que un agente fija manualmente una relación comprador–vehículo.
+/// Es ortogonal a MatchStatus: el motivo explica el origen humano; el estado, la fase comercial.
+enum MatchLinkReason {
+  INTERES_COMPRADOR
+  RECOMENDACION_EQUIPO
+  SEGUIMIENTO_COMERCIAL
+  VISITA_RELACIONADA
+  OTRO
+}
+
 /// Ciclo de vida de una oferta comprador→vehículo (Transaction Layer, Block 18).
 /// Una oferta ACEPTADA con señal (`depositAmount`) es una reserva.
 enum OfferStatus {
@@ -571,6 +581,7 @@ model User {
   createdCaptures          VehicleCapture[]          @relation("CreatedCaptures")
   assignedCaptures         VehicleCapture[]          @relation("AssignedCaptures")
   createdOffers            Offer[]                   @relation("CreatedOffers")
+  manualMatchesLinked      Match[]                   @relation("ManualMatchLinks")
   kpiEvents                KpiEvent[]                @relation("KpiEventActor")
   documentVersionsUploaded DocumentVersion[]
   entryValidations         Vehicle[]                 @relation("EntryValidations")
@@ -966,24 +977,30 @@ model BuyerChatSession {
 }
 
 /// Sugerencia de match entre un vehículo y un comprador.
-/// score 0-100. Constraint único evita duplicados.
+/// Score automático 0-100; null para un vínculo manual sin score. Constraint único evita duplicados.
 model Match {
-  id          String      @id @default(cuid())
-  vehicleId   String      @map("vehicle_id")
-  buyerLeadId String      @map("buyer_lead_id")
-  score       Int
-  generatedBy String      @default("auto") @map("generated_by") // "auto" | "manual"
-  status      MatchStatus @default(SUGERIDO)
-  createdAt   DateTime    @default(now()) @map("created_at")
-  updatedAt   DateTime    @updatedAt @map("updated_at")
+  id               String           @id @default(cuid())
+  vehicleId        String           @map("vehicle_id")
+  buyerLeadId      String           @map("buyer_lead_id")
+  score            Int?
+  generatedBy      String           @default("auto") @map("generated_by") // "auto" | "manual"
+  status           MatchStatus      @default(SUGERIDO)
+  manualLinkReason MatchLinkReason? @map("manual_link_reason")
+  manualLinkNotes  String?          @map("manual_link_notes")
+  manualLinkedAt   DateTime?        @map("manual_linked_at")
+  manualLinkedById String?          @map("manual_linked_by_id")
+  createdAt        DateTime         @default(now()) @map("created_at")
+  updatedAt        DateTime         @updatedAt @map("updated_at")
 
   vehicle        Vehicle         @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
   buyerLead      BuyerLead       @relation(fields: [buyerLeadId], references: [id], onDelete: Cascade)
+  manualLinkedBy User?           @relation("ManualMatchLinks", fields: [manualLinkedById], references: [id], onDelete: SetNull)
   calendarEvents CalendarEvent[]
   offers         Offer[]
 
   @@unique([vehicleId, buyerLeadId])
   @@index([buyerLeadId])
+  @@index([manualLinkedById])
   @@map("matches")
 }
 

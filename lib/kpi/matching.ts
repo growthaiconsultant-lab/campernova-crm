@@ -94,11 +94,12 @@ export async function getMatchingKpis(
     { label: 'Cerrado', count: by(['CERRADO']) },
   ]
 
+  const scoredRows = scoreRows.filter((row): row is { score: number } => row.score !== null)
   const scoreBuckets: Bucket[] = [
-    { label: '80-100', count: scoreRows.filter((r) => r.score >= 80).length },
-    { label: '60-79', count: scoreRows.filter((r) => r.score >= 60 && r.score < 80).length },
-    { label: '40-59', count: scoreRows.filter((r) => r.score >= 40 && r.score < 60).length },
-    { label: '0-39', count: scoreRows.filter((r) => r.score < 40).length },
+    { label: '80-100', count: scoredRows.filter((r) => r.score >= 80).length },
+    { label: '60-79', count: scoredRows.filter((r) => r.score >= 60 && r.score < 80).length },
+    { label: '40-59', count: scoredRows.filter((r) => r.score >= 40 && r.score < 60).length },
+    { label: '0-39', count: scoredRows.filter((r) => r.score < 40).length },
   ]
 
   const matchesWithOffer = offersWithMatch.length

@@ -78,15 +78,18 @@ export const eligibleBuyerWhere: Prisma.BuyerLeadWhereInput = {
 /** Matches cuya CONTRAPARTE comprador es elegible (para contar desde un vehículo). */
 export const eligibleBuyerCounterpartMatchWhere: Prisma.MatchWhereInput = {
   buyerLead: eligibleBuyerWhere,
+  score: { not: null },
 }
 
 /** Matches cuya CONTRAPARTE vehículo es elegible (para contar desde un comprador). */
 export const eligibleVehicleCounterpartMatchWhere: Prisma.MatchWhereInput = {
   vehicle: eligibleVehicleWhere,
+  score: { not: null },
 }
 
 /** Matches con AMBAS partes elegibles (para KPIs de matching). */
 export const eligibleMatchWhere: Prisma.MatchWhereInput = {
   vehicle: eligibleVehicleWhere,
   buyerLead: eligibleBuyerWhere,
+  score: { not: null },
 }
