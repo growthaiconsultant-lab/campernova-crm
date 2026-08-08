@@ -1,13 +1,13 @@
 # Permisividad — Oleada 1 (saltos de estado libres + archivar con menos fricción)
 
-| Campo               | Valor                                                                                                     |
-| ------------------- | --------------------------------------------------------------------------------------------------------- |
-| **Estado**          | EN PRODUCCIÓN ✅ (PR #161, fusionado a `main` y desplegado el 2026-07-31)                                  |
-| **Migración**       | Ninguna (sin cambios de schema)                                                                            |
-| **Owner**           | Engineering                                                                                                |
-| **Decisión**        | Del dueño (Joel), 2026-07-31                                                                               |
-| **Alcance**         | Gates de **flujo** de bajo riesgo (orden del funnel) en leads, matches, calendario y archivado de leads.  |
-| **Fuera de alcance**| Tasación, ofertas/entregas/venta, vehículo→RESERVADO/VENDIDO, matching eligibility, autorización/roles.   |
+| Campo                | Valor                                                                                                    |
+| -------------------- | -------------------------------------------------------------------------------------------------------- |
+| **Estado**           | EN PRODUCCIÓN ✅ (PR #161, fusionado a `main` y desplegado el 2026-07-31)                                |
+| **Migración**        | Ninguna (sin cambios de schema)                                                                          |
+| **Owner**            | Engineering                                                                                              |
+| **Decisión**         | Del dueño (Joel), 2026-07-31                                                                             |
+| **Alcance**          | Gates de **flujo** de bajo riesgo (orden del funnel) en leads, matches, calendario y archivado de leads. |
+| **Fuera de alcance** | Tasación, ofertas/entregas/venta, vehículo→RESERVADO/VENDIDO, matching eligibility, autorización/roles.  |
 
 ## 1. Contexto (programa de permisividad)
 
@@ -47,7 +47,8 @@ Esta **Oleada 1** abre solo los muros de flujo de **bajo riesgo** (sin efecto so
 **Carve-outs de venta (protegen los KPIs):**
 
 - **Comprador → `CERRADO`** sigue exigiendo una `Delivery` COMPLETADA (`app/(backoffice)/compradores/[id]/actions.ts`). Se puede saltar libremente **salvo** a CERRADO.
-- **Match → `CERRADO`** sigue exigiendo una `Delivery` COMPLETADA del vehículo (`app/(backoffice)/matches/actions.ts`).
+- **Match → `CERRADO`** exige una `Delivery` COMPLETADA de la pareja exacta vehículo–comprador
+  (`app/(backoffice)/matches/actions.ts`).
 
 **Bloqueos de archivado que se mantienen (Oleada 2):** archivar sigue bloqueado si hay **ofertas/reservas vivas**, **entregas `PROGRAMADA/EN_CURSO`** o **stock `TASADO/PUBLICADO/RESERVADO`** (`lib/lead-archiving/domain.ts`).
 

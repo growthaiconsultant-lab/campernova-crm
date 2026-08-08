@@ -7,6 +7,7 @@ import { notifyHighScoreMatches } from './notify'
 export type ExistingMatch = {
   otherId: string
   status: MatchStatus
+  manualLinkedAt: Date | null
 }
 
 export type RecalcDiff = {
@@ -28,23 +29,25 @@ export function computeRecalcDiff(
   newTop: { otherId: string; score: number }[],
   existing: ExistingMatch[]
 ): RecalcDiff {
-  const existingMap = new Map(existing.map((m) => [m.otherId, m.status]))
+  const existingMap = new Map(existing.map((m) => [m.otherId, m]))
   const newTopIds = new Set(newTop.map((m) => m.otherId))
 
   const toCreate: { otherId: string; score: number }[] = []
   const toUpdateScore: { otherId: string; score: number }[] = []
 
   for (const match of newTop) {
-    const status = existingMap.get(match.otherId)
-    if (status === undefined) {
+    const current = existingMap.get(match.otherId)
+    if (current === undefined) {
       toCreate.push(match)
-    } else if (status === 'SUGERIDO') {
+    } else if (current.status === 'SUGERIDO') {
       toUpdateScore.push(match)
     }
   }
 
   const toDeleteSuggested = existing
-    .filter((m) => m.status === 'SUGERIDO' && !newTopIds.has(m.otherId))
+    .filter(
+      (m) => m.status === 'SUGERIDO' && m.manualLinkedAt === null && !newTopIds.has(m.otherId)
+    )
     .map((m) => m.otherId)
 
   return { toCreate, toUpdateScore, toDeleteSuggested }
@@ -71,12 +74,16 @@ export async function recalculateMatchesForVehicle(
 
     const existing = await db.match.findMany({
       where: { vehicleId },
-      select: { buyerLeadId: true, status: true },
+      select: { buyerLeadId: true, status: true, manualLinkedAt: true },
     })
 
     const diff = computeRecalcDiff(
       topToRecalcInput(top, 'buyer'),
-      existing.map((m) => ({ otherId: m.buyerLeadId, status: m.status }))
+      existing.map((m) => ({
+        otherId: m.buyerLeadId,
+        status: m.status,
+        manualLinkedAt: m.manualLinkedAt,
+      }))
     )
 
     for (const m of diff.toCreate) {
@@ -104,6 +111,7 @@ export async function recalculateMatchesForVehicle(
           vehicleId,
           buyerLeadId: { in: diff.toDeleteSuggested },
           status: 'SUGERIDO',
+          manualLinkedAt: null,
         },
       })
     }
@@ -128,12 +136,16 @@ export async function recalculateMatchesForBuyer(
 
     const existing = await db.match.findMany({
       where: { buyerLeadId },
-      select: { vehicleId: true, status: true },
+      select: { vehicleId: true, status: true, manualLinkedAt: true },
     })
 
     const diff = computeRecalcDiff(
       topToRecalcInput(top, 'vehicle'),
-      existing.map((m) => ({ otherId: m.vehicleId, status: m.status }))
+      existing.map((m) => ({
+        otherId: m.vehicleId,
+        status: m.status,
+        manualLinkedAt: m.manualLinkedAt,
+      }))
     )
 
     for (const m of diff.toCreate) {
@@ -161,6 +173,7 @@ export async function recalculateMatchesForBuyer(
           buyerLeadId,
           vehicleId: { in: diff.toDeleteSuggested },
           status: 'SUGERIDO',
+          manualLinkedAt: null,
         },
       })
     }

@@ -18,33 +18,33 @@
 
 Clasificación: **A** activo · **P** parcial/soporte · **L** legacy · **M** muerto.
 
-| Modelo                             | Cl.   | Propósito real                                                  | Relaciones clave                               | Destino recomendado                                 |
-| ---------------------------------- | ----- | --------------------------------------------------------------- | ---------------------------------------------- | --------------------------------------------------- |
-| User                               | A     | Usuario interno + rol global                                    | hub de ~26 relaciones                          | conservar (→ Membership futuro)                     |
-| SellerLead                         | A     | Lead de vendedor + condiciones de operación                     | 1:1 Vehicle; Activity; Capture                 | conservar; **dedup**                                |
-| Vehicle                            | A     | Activo + inventario + publicación + economía + trust (conflado) | 1:1 SellerLead; Match/Offer/Delivery/WorkOrder | conservar; + `commercializationMode`                |
-| VehiclePhoto                       | A     | Fotos (bucket público)                                          | Vehicle                                        | conservar                                           |
-| Valuation                          | A     | Histórico de tasación                                           | Vehicle                                        | conservar                                           |
-| BuyerLead                          | A     | Lead de comprador + preferencias RV + trade-in                  | Match/Offer/Delivery; chat                     | conservar; **dedup**; + `partyId` futuro            |
-| BuyerChatSession                   | A     | Sesión de chat de captación                                     | 1:1 BuyerLead                                  | conservar                                           |
-| Match                              | A     | Cruce vehículo↔comprador (score)                                | Vehicle, BuyerLead                             | conservar                                           |
-| Offer                              | A     | Oferta/reserva (importe + señal)                                | Vehicle, BuyerLead, Match                      | conservar; + `dealId` futuro                        |
-| Activity                           | A     | Timeline humano (polimórfico leads)                             | SellerLead XOR BuyerLead                       | conservar como timeline; dejar de parsear para KPIs |
-| Document                           | **M** | (adjunto legal genérico) — **0 CRUD**                           | —                                              | **retirar**                                         |
-| VehicleAd                          | P     | **Texto** de anuncio IA para portales externos                  | Vehicle                                        | conservar; absorber en Listing (futuro)             |
-| VehicleCost                        | A     | Proyección operativa de coste imputado al vehículo              | Vehicle, WorkOrder, PostventaTicket            | conservar; fuente operativa enlazada                |
-| WorkOrder (+ checklist/time/parts) | A     | Orden de taller                                                 | Vehicle                                        | conservar                                           |
-| Delivery (+ checklist/documents)   | A     | Entrega física + firma                                          | Vehicle, BuyerLead                             | conservar; + `dealId` futuro                        |
-| DeliveryDocument                   | A     | Documento de entrega (versionado)                               | Delivery, DocumentVersion                      | conservar (**gated** por rollout)                   |
-| DocumentVersion                    | A     | Versión física de documento (Fase 0)                            | VehicleDocument XOR DeliveryDocument           | conservar (**gated**)                               |
-| Warranty                           | A     | Garantía (1:1 vehicle/delivery/buyer)                           | tickets, followups                             | conservar                                           |
-| PostventaTicket (+ photos)         | A     | Incidencia de garantía                                          | Warranty                                       | conservar                                           |
-| PostventaFollowup                  | A     | Seguimiento día 7/30 (cron)                                     | Warranty                                       | conservar                                           |
-| CalendarEvent                      | A     | Evento de agenda operativa                                      | leads/vehicle/match                            | conservar                                           |
-| VehicleCapture                     | A     | Captación de portal (fase 0 del vendedor)                       | → SellerLead                                   | conservar                                           |
-| VehicleDocument                    | A     | Documento legal del vehículo (versionado)                       | Vehicle, DocumentVersion                       | conservar (**gated**)                               |
-| ReferencePrice                     | A     | Tabla de tasación (global)                                      | —                                              | conservar (platform-owned futuro)                   |
-| KpiEvent                           | P     | Log de eventos (**write-mostly**: 7 emisores, 1 lector)         | actor User?                                    | decidir (leer o dejar de escribir)                  |
+| Modelo                             | Cl.   | Propósito real                                                                  | Relaciones clave                               | Destino recomendado                                 |
+| ---------------------------------- | ----- | ------------------------------------------------------------------------------- | ---------------------------------------------- | --------------------------------------------------- |
+| User                               | A     | Usuario interno + rol global                                                    | hub de ~26 relaciones                          | conservar (→ Membership futuro)                     |
+| SellerLead                         | A     | Lead de vendedor + condiciones de operación                                     | 1:1 Vehicle; Activity; Capture                 | conservar; **dedup**                                |
+| Vehicle                            | A     | Activo + inventario + publicación + economía + trust (conflado)                 | 1:1 SellerLead; Match/Offer/Delivery/WorkOrder | conservar; + `commercializationMode`                |
+| VehiclePhoto                       | A     | Fotos (bucket público)                                                          | Vehicle                                        | conservar                                           |
+| Valuation                          | A     | Histórico de tasación                                                           | Vehicle                                        | conservar                                           |
+| BuyerLead                          | A     | Lead de comprador + preferencias RV + trade-in                                  | Match/Offer/Delivery; chat                     | conservar; **dedup**; + `partyId` futuro            |
+| BuyerChatSession                   | A     | Sesión de chat de captación                                                     | 1:1 BuyerLead                                  | conservar                                           |
+| Match                              | A     | Cruce vehículo↔comprador (score automático opcional o vínculo manual auditable) | Vehicle, BuyerLead, User (actor manual)        | conservar                                           |
+| Offer                              | A     | Oferta/reserva (importe + señal)                                                | Vehicle, BuyerLead, Match                      | conservar; + `dealId` futuro                        |
+| Activity                           | A     | Timeline humano (polimórfico leads)                                             | SellerLead XOR BuyerLead                       | conservar como timeline; dejar de parsear para KPIs |
+| Document                           | **M** | (adjunto legal genérico) — **0 CRUD**                                           | —                                              | **retirar**                                         |
+| VehicleAd                          | P     | **Texto** de anuncio IA para portales externos                                  | Vehicle                                        | conservar; absorber en Listing (futuro)             |
+| VehicleCost                        | A     | Proyección operativa de coste imputado al vehículo                              | Vehicle, WorkOrder, PostventaTicket            | conservar; fuente operativa enlazada                |
+| WorkOrder (+ checklist/time/parts) | A     | Orden de taller                                                                 | Vehicle                                        | conservar                                           |
+| Delivery (+ checklist/documents)   | A     | Entrega física + firma                                                          | Vehicle, BuyerLead                             | conservar; + `dealId` futuro                        |
+| DeliveryDocument                   | A     | Documento de entrega (versionado)                                               | Delivery, DocumentVersion                      | conservar (**gated** por rollout)                   |
+| DocumentVersion                    | A     | Versión física de documento (Fase 0)                                            | VehicleDocument XOR DeliveryDocument           | conservar (**gated**)                               |
+| Warranty                           | A     | Garantía (1:1 vehicle/delivery/buyer)                                           | tickets, followups                             | conservar                                           |
+| PostventaTicket (+ photos)         | A     | Incidencia de garantía                                                          | Warranty                                       | conservar                                           |
+| PostventaFollowup                  | A     | Seguimiento día 7/30 (cron)                                                     | Warranty                                       | conservar                                           |
+| CalendarEvent                      | A     | Evento de agenda operativa                                                      | leads/vehicle/match                            | conservar                                           |
+| VehicleCapture                     | A     | Captación de portal (fase 0 del vendedor)                                       | → SellerLead                                   | conservar                                           |
+| VehicleDocument                    | A     | Documento legal del vehículo (versionado)                                       | Vehicle, DocumentVersion                       | conservar (**gated**)                               |
+| ReferencePrice                     | A     | Tabla de tasación (global)                                                      | —                                              | conservar (platform-owned futuro)                   |
+| KpiEvent                           | P     | Log de eventos (**write-mostly**: 7 emisores, 1 lector)                         | actor User?                                    | decidir (leer o dejar de escribir)                  |
 
 **Resumen:** activos ~24 · parciales/soporte ~4 · legacy 1 enum (`DocumentType`) · **muerto 1**
 (`Document`).
@@ -58,7 +58,9 @@ Clasificación: **A** activo · **P** parcial/soporte · **L** legacy · **M** m
 - **Publicación:** `Vehicle.status = PUBLICADO` (no hay entidad `Listing`).
 - **Comprador:** chat `/comprar` (`BuyerChatSession`, tool-use crea `BuyerLead` en tx) o alta
   backoffice → preferencias RV.
-- **Matching:** `Match` (score 0-100, `lib/matching`, determinista).
+- **Matching:** `Match` (score automático nullable 0-100 o vínculo manual fijado con motivo/actor;
+  `lib/matching`, determinista para la parte puntuada). Una compra sólo se deriva de
+  `Delivery.status = COMPLETADA` para la pareja exacta.
 - **Oferta:** `Offer` (importe + señal opcional).
 - **Reserva:** **derivada**, no es una tabla — `Offer.status = ACEPTADA` + `depositAmount`
   (`isReservation`, `lib/offers.ts:57`); aceptar pone `Vehicle = RESERVADO` (CAS, PR2).

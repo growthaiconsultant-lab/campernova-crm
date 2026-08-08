@@ -5,10 +5,12 @@ import Link from 'next/link'
 import { ChevronDown, ChevronUp } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { ManualMatchDialog } from '@/components/manual-match-dialog'
 import { updateMatchStatus } from '@/app/(backoffice)/matches/actions'
 import { initialOf, personLabel, vehicleLabel } from '@/lib/display'
 import { formatEur } from '@/lib/format/currency'
-import type { MatchStatus } from '@prisma/client'
+import { MANUAL_MATCH_LINK_REASON_LABELS } from '@/lib/matching/manual-link-constants'
+import type { MatchLinkReason, MatchStatus } from '@prisma/client'
 
 // ─── Types (plain JS — sin Decimal de Prisma) ────────────────────────────────
 
@@ -16,8 +18,12 @@ export type MatchExplanationData = { reasons: string[]; risks: string[] } | null
 
 export type VehicleMatchData = {
   id: string
-  score: number
+  score: number | null
   status: string
+  generatedBy: string
+  manualLinkReason: MatchLinkReason | null
+  manualLinkNotes: string | null
+  manualLinkedAt: string | null
   explanation?: MatchExplanationData
   buyerLead: {
     id: string
@@ -31,8 +37,12 @@ export type VehicleMatchData = {
 
 export type BuyerMatchData = {
   id: string
-  score: number
+  score: number | null
   status: string
+  generatedBy: string
+  manualLinkReason: MatchLinkReason | null
+  manualLinkNotes: string | null
+  manualLinkedAt: string | null
   explanation?: MatchExplanationData
   vehicle: {
     id: string
@@ -131,6 +141,7 @@ function MatchExplanation({ explanation }: { explanation?: MatchExplanationData 
 
 function StatusButtons({ matchId, currentStatus }: { matchId: string; currentStatus: string }) {
   const [isPending, startTransition] = useTransition()
+  const [error, setError] = useState<string | null>(null)
   const transitions =
     currentStatus in MATCH_STATUS_LABELS
       ? MATCH_STATUS_ACTIONS.filter(({ status }) => status !== currentStatus)
@@ -139,24 +150,76 @@ function StatusButtons({ matchId, currentStatus }: { matchId: string; currentSta
   if (transitions.length === 0) return null
 
   return (
-    <div className="flex flex-wrap gap-1.5">
-      {transitions.map(({ status, label, destructive }) => (
-        <Button
-          key={status}
-          size="sm"
-          variant={destructive ? 'outline' : 'secondary'}
-          className={destructive ? 'text-destructive hover:text-destructive' : ''}
-          disabled={isPending}
-          onClick={() =>
-            startTransition(async () => {
-              await updateMatchStatus(matchId, status)
-            })
-          }
-        >
-          {label}
-        </Button>
-      ))}
+    <div className="space-y-1.5">
+      <div className="flex flex-wrap gap-1.5">
+        {transitions.map(({ status, label, destructive }) => (
+          <Button
+            key={status}
+            size="sm"
+            variant={destructive ? 'outline' : 'secondary'}
+            className={destructive ? 'text-destructive hover:text-destructive' : ''}
+            disabled={isPending}
+            onClick={() => {
+              setError(null)
+              startTransition(async () => {
+                const result = await updateMatchStatus(matchId, status)
+                if ('error' in result && result.error) setError(result.error)
+              })
+            }}
+          >
+            {label}
+          </Button>
+        ))}
+      </div>
+      {error && (
+        <p role="alert" className="text-xs text-destructive">
+          {error}
+        </p>
+      )}
     </div>
+  )
+}
+
+type ManualLinkData = Pick<
+  VehicleMatchData,
+  'generatedBy' | 'manualLinkedAt' | 'manualLinkReason' | 'manualLinkNotes'
+>
+
+function ManualLinkDetails({ match }: { match: ManualLinkData }) {
+  const isManual = match.manualLinkedAt !== null || match.generatedBy === 'manual'
+  if (!isManual) return null
+
+  const source = match.manualLinkedAt
+    ? match.generatedBy === 'auto'
+      ? 'Automático + fijado manualmente'
+      : 'Vinculado manualmente'
+    : 'Manual legado'
+
+  return (
+    <div className="rounded-md border border-indigo-200 bg-indigo-50/70 px-2.5 py-2 text-xs text-indigo-900 dark:border-indigo-900/50 dark:bg-indigo-950/30 dark:text-indigo-200">
+      <p className="font-medium">{source}</p>
+      <p className="mt-0.5">
+        {match.manualLinkReason
+          ? MANUAL_MATCH_LINK_REASON_LABELS[match.manualLinkReason]
+          : 'Motivo no registrado'}
+      </p>
+      {match.manualLinkNotes && <p className="mt-1 whitespace-pre-wrap">{match.manualLinkNotes}</p>}
+    </div>
+  )
+}
+
+function ScoreBadge({ score }: { score: number | null }) {
+  if (score === null) {
+    return (
+      <span className="rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-500">
+        Sin score
+      </span>
+    )
+  }
+  return (
+    <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${scoreBadgeClass(score)}`}>
+      {score}
+    </span>
   )
 }
 
@@ -192,11 +255,7 @@ function BuyerMatchCard({ match }: { match: VehicleMatchData }) {
         </div>
         {/* Badges */}
         <div className="flex shrink-0 items-center gap-1.5">
-          <span
-            className={`rounded-full px-2 py-0.5 text-xs font-medium ${scoreBadgeClass(match.score)}`}
-          >
-            {match.score}
-          </span>
+          <ScoreBadge score={match.score} />
           <span
             className={`rounded-full px-2 py-0.5 text-xs font-medium ${MATCH_STATUS_COLORS[match.status] ?? ''}`}
           >
@@ -223,6 +282,7 @@ function BuyerMatchCard({ match }: { match: VehicleMatchData }) {
       </div>
 
       <MatchExplanation explanation={match.explanation} />
+      <ManualLinkDetails match={match} />
 
       {/* Acciones */}
       <div className="flex items-center justify-between gap-2 pt-0.5">
@@ -268,11 +328,7 @@ function VehicleMatchCard({ match }: { match: BuyerMatchData }) {
           </div>
           {/* Badges */}
           <div className="flex shrink-0 items-center gap-1.5">
-            <span
-              className={`rounded-full px-2 py-0.5 text-xs font-medium ${scoreBadgeClass(match.score)}`}
-            >
-              {match.score}
-            </span>
+            <ScoreBadge score={match.score} />
             <span
               className={`rounded-full px-2 py-0.5 text-xs font-medium ${MATCH_STATUS_COLORS[match.status] ?? ''}`}
             >
@@ -283,6 +339,7 @@ function VehicleMatchCard({ match }: { match: BuyerMatchData }) {
       </div>
 
       <MatchExplanation explanation={match.explanation} />
+      <ManualLinkDetails match={match} />
 
       {/* Acciones */}
       <div className="flex items-center justify-between gap-2">
@@ -298,31 +355,39 @@ function VehicleMatchCard({ match }: { match: BuyerMatchData }) {
 // ─── Sección principal (colapsable) ──────────────────────────────────────────
 
 type MatchesSectionProps =
-  | { side: 'vehicle'; matches: VehicleMatchData[]; defaultOpen?: boolean }
-  | { side: 'buyer'; matches: BuyerMatchData[]; defaultOpen?: boolean }
+  | { side: 'vehicle'; fixedId: string; matches: VehicleMatchData[]; defaultOpen?: boolean }
+  | { side: 'buyer'; fixedId: string; matches: BuyerMatchData[]; defaultOpen?: boolean }
 
 export function MatchesSection(props: MatchesSectionProps) {
   const [open, setOpen] = useState(props.defaultOpen ?? false)
   const count = props.matches.length
-  const title = props.side === 'vehicle' ? 'Compradores interesados' : 'Vehículos sugeridos'
+  const title = props.side === 'vehicle' ? 'Compradores relacionados' : 'Vehículos relacionados'
 
   return (
     <Card>
-      <CardHeader className="cursor-pointer select-none py-4" onClick={() => setOpen((v) => !v)}>
-        <div className="flex items-center justify-between">
-          <CardTitle className="text-base">
-            {title}
-            {count > 0 && (
-              <span className="ml-2 rounded-full bg-muted px-2 py-0.5 text-xs font-normal text-muted-foreground">
-                {count}
-              </span>
+      <CardHeader className="py-4">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <button
+            type="button"
+            className="flex min-w-0 flex-1 items-center justify-between gap-2 text-left"
+            onClick={() => setOpen((v) => !v)}
+            aria-expanded={open}
+          >
+            <CardTitle className="text-base">
+              {title}
+              {count > 0 && (
+                <span className="ml-2 rounded-full bg-muted px-2 py-0.5 text-xs font-normal text-muted-foreground">
+                  {count}
+                </span>
+              )}
+            </CardTitle>
+            {open ? (
+              <ChevronUp className="h-4 w-4 shrink-0 text-muted-foreground" />
+            ) : (
+              <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground" />
             )}
-          </CardTitle>
-          {open ? (
-            <ChevronUp className="h-4 w-4 text-muted-foreground" />
-          ) : (
-            <ChevronDown className="h-4 w-4 text-muted-foreground" />
-          )}
+          </button>
+          <ManualMatchDialog side={props.side} fixedId={props.fixedId} />
         </div>
       </CardHeader>
 
@@ -330,7 +395,7 @@ export function MatchesSection(props: MatchesSectionProps) {
         <CardContent className="pt-0">
           {count === 0 ? (
             <p className="text-sm text-muted-foreground">
-              Sin matches aún. Se calculan automáticamente al guardar el vehículo o el comprador.
+              Sin relaciones todavía. Puedes vincular una manualmente; eso no registra una compra.
             </p>
           ) : (
             <div className="space-y-2">
