@@ -9,7 +9,7 @@
 | **Categorías**      | C0 · C1 · C2 · C3 · C4 · C5 · C6                                                                                                |
 | **Riesgo**          | Alto, por PII, permisos compartidos, schema, migración y concurrencia entre roles                                               |
 | **Ruta SDD**        | Reforzada                                                                                                                       |
-| **Última revisión** | 2026-08-07                                                                                                                      |
+| **Última revisión** | 2026-08-08                                                                                                                      |
 
 ## Problema y evidencia (A. Objetivo)
 
@@ -442,27 +442,28 @@ mutables y se limita la validación a local/CI hasta resolver el entorno.
 
 ## Matriz de completitud
 
-| Área                      | Revisada | Evidencia | Riesgo pendiente                            |
-| ------------------------- | -------- | --------- | ------------------------------------------- |
-| Dominio/estados           | Sí       | F, G      | Validar copy final con usuarios.            |
-| Inventario de campos      | Sí       | I, J      | Validación con usuarios pendiente.          |
-| Permisos/PII              | Sí       | H, M      | Smoke autenticado por rol pendiente.        |
-| Concurrencia/idempotencia | Sí       | L         | Ejecución de pruebas PostgreSQL pendiente.  |
-| Datos/legacy/migración    | Sí       | I, P      | Preflight remoto pendiente y no autorizado. |
-| Readers/writers           | Sí       | K         | Smoke integrado pendiente.                  |
-| UX/accesibilidad          | Sí       | N         | Validación visual/móvil pendiente.          |
-| Efectos externos/Storage  | Sí       | D, M      | No aplican en v1.                           |
-| Observabilidad/KPIs       | Sí       | R         | Ventana post-deploy pendiente.              |
-| Rollout/rollback          | Sí       | P, Q      | Requiere autorizaciones separadas.          |
-| Documentación             | Sí       | S         | Actualizar sólo tras evidencia.             |
+| Área                      | Revisada | Evidencia | Riesgo pendiente                           |
+| ------------------------- | -------- | --------- | ------------------------------------------ |
+| Dominio/estados           | Sí       | F, G      | Validar copy final con usuarios.           |
+| Inventario de campos      | Sí       | I, J      | Validación con usuarios pendiente.         |
+| Permisos/PII              | Sí       | H, M      | Smoke de TALLER y negativo pendiente.      |
+| Concurrencia/idempotencia | Sí       | L         | Verificado en PostgreSQL real por CI.      |
+| Datos/legacy/migración    | Sí       | I, P      | Staging migrado; producción no autorizada. |
+| Readers/writers           | Sí       | K         | Smoke ADMIN pasa; demás roles pendientes.  |
+| UX/accesibilidad          | Sí       | N         | Revisión móvil y por TALLER pendiente.     |
+| Efectos externos/Storage  | Sí       | D, M      | No aplican en v1.                          |
+| Observabilidad/KPIs       | Sí       | R         | Ventana post-deploy pendiente.             |
+| Rollout/rollback          | Sí       | P, Q      | Requiere autorizaciones separadas.         |
+| Documentación             | Sí       | S         | Actualizar sólo tras evidencia.            |
 
 ## Estado de autorización
 
-`IMPLEMENTED IN PR #173 — NOT DEPLOYED — PRODUCTION OPERATIONS NOT AUTHORIZED`
+`STAGING MIGRATED — ADMIN SMOKE PASS — PREVIEW CALLBACK FIX LOCAL — PRODUCTION NOT AUTHORIZED`
 
-Joel aprobó la implementación local y posteriormente el commit, push y PR el 2026-08-07. No existe
-autorización para merge, migraciones en Supabase remoto, smoke sobre una base no aislada ni deploy a
-producción.
+Joel aprobó la implementación local, el commit, push y PR el 2026-08-07. El 2026-08-08 autorizó
+exclusivamente la rotación de credenciales de staging, las variables Vercel Preview, las cuatro
+migraciones pendientes contra `iatuhydsfwoeprpbklod`, el redeploy y el smoke de Preview. No existe
+autorización para merge, commit o push adicional, migración de producción ni deploy a producción.
 
 ## Verificación de esta fase
 
@@ -479,15 +480,19 @@ producción.
 | PostgreSQL real    | CI #31195165306: preparación, RLS, integración y remote-migration guard                  | PASS                                   |
 | Migration replay   | CI #31195165306: PostgreSQL 17, 13 migraciones, parity, catálogo e idempotencia          | PASS                                   |
 | Supabase local     | CI #31195165306: buckets, policies y pruebas reales de Storage en Docker local           | PASS                                   |
-| Remoto             | Rama, PR borrador y Preview Vercel automáticos                                           | PASS; sin merge ni producción          |
+| Staging DB         | Project ref `iatuhydsfwoeprpbklod`; 4 migraciones aplicadas; 13 locales / 40 remotas     | PASS; producción intacta               |
+| Preview            | Deployment `6sjseJffL6rWwN1THwLhm3WYqt44`; login ADMIN y guardado/limpieza de borrador   | PASS; callback manual                  |
+| Regresión login    | Helper puro: 4 tests; TypeScript, ESLint y Prettier                                      | PASS local; redeploy pendiente         |
+| Remoto             | PR borrador y Preview aislado de producción                                              | PASS; sin merge ni producción          |
 
 ## Cierre
 
 - **Commit:** `e21b23e` (`feat(recepcion): añade cuestionario compartido por vehículo`).
 - **PR:** [#173](https://github.com/growthaiconsultant-lab/campernova-crm/pull/173), borrador.
 - **CI:** [run 31195165306](https://github.com/growthaiconsultant-lab/campernova-crm/actions/runs/31195165306), todos los jobs PASS.
-- **Deployment:** Preview Vercel automático construido; no probado contra datos. Producción sin
-  cambios.
+- **Deployment:** Preview Vercel desplegado contra staging y probado con ADMIN. Producción sin
+  cambios. El smoke descubrió que el magic link heredaba `localhost`; existe una corrección local
+  con test de regresión que aún no se ha commiteado, subido ni redesplegado.
 - **Validación:** Prisma, historial de migraciones, SDD, TypeScript, lint, 1.469 unitarios y build
   local PASS. La integración PostgreSQL no se ejecutó porque el entorno carece de
   `TEST_DATABASE_URL`, Docker y servicio PostgreSQL local; no se usó producción como sustituto.
@@ -497,6 +502,6 @@ producción.
 - **Evidencia CI adicional:** replay/parity, RLS, idempotencia, carreras PostgreSQL y Supabase
   Storage local PASS. El único aviso es la transición de acciones de GitHub desde Node 20 a Node 24;
   no bloquea este cambio funcional.
-- **Deuda restante:** confirmar aislamiento del Preview antes de cualquier smoke mutable, revisión
-  visual por roles, preflight remoto de sólo lectura, migración, rollout y observación. Cada
-  operación remota requiere autorización separada.
+- **Deuda restante:** smoke TALLER/negativo, revisión móvil, publicar y verificar la corrección del
+  callback en Preview, autorización separada para cualquier operación de producción y ventana de
+  observación. No se crearán usuarios ni se cambiarán roles sólo para completar el smoke.

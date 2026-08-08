@@ -2,6 +2,7 @@
 
 import { createClient } from '@/lib/supabase/server'
 import { db } from '@/lib/db'
+import { resolveMagicLinkRedirectUrl } from '@/lib/auth/magic-link-redirect'
 
 export async function sendMagicLink(email: string): Promise<{ error?: string }> {
   const user = await db.user.findUnique({ where: { email } })
@@ -19,7 +20,7 @@ export async function sendMagicLink(email: string): Promise<{ error?: string }> 
     email,
     options: {
       shouldCreateUser: true,
-      emailRedirectTo: `${process.env.NEXT_PUBLIC_APP_URL}/auth/callback`,
+      emailRedirectTo: resolveMagicLinkRedirectUrl(),
     },
   })
 
