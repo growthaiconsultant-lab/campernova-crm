@@ -1,6 +1,6 @@
 /** REL-1 · integración PostgreSQL real: unique, locks e idempotencia del vínculo manual. */
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest'
-import type { PrismaClient } from '@prisma/client'
+import type { Prisma, PrismaClient } from '@prisma/client'
 import { createGuardedTestPrisma, uniqueSuffix } from './db'
 import { withLockedRoots } from '@/lib/locking'
 import { createOrPinManualMatch } from '@/lib/matching/manual-link'
@@ -67,24 +67,30 @@ function link(
   client: PrismaClient,
   pair: { sellerId: string; vehicleId: string; buyerId: string }
 ) {
-  return withLockedRoots(
-    [
-      { type: 'vehicle', id: pair.vehicleId },
-      { type: 'sellerLead', id: pair.sellerId },
-      { type: 'buyerLead', id: pair.buyerId },
-    ],
-    (tx) =>
-      createOrPinManualMatch(tx, {
-        vehicleId: pair.vehicleId,
-        buyerLeadId: pair.buyerId,
-        resolvedSellerLeadId: pair.sellerId,
-        actorId,
-        reason: 'OTRO',
-        notes: null,
-        now: new Date('2026-08-08T10:00:00Z'),
-      }),
-    { client, lockTimeoutMs: 8_000 }
-  )
+  return withLockedRoots(rootsFor(pair), (tx) => createOrPinManualMatch(tx, paramsFor(pair)), {
+    client,
+    lockTimeoutMs: 8_000,
+  })
+}
+
+function rootsFor(pair: { sellerId: string; vehicleId: string; buyerId: string }) {
+  return [
+    { type: 'vehicle' as const, id: pair.vehicleId },
+    { type: 'sellerLead' as const, id: pair.sellerId },
+    { type: 'buyerLead' as const, id: pair.buyerId },
+  ]
+}
+
+function paramsFor(pair: { sellerId: string; vehicleId: string; buyerId: string }) {
+  return {
+    vehicleId: pair.vehicleId,
+    buyerLeadId: pair.buyerId,
+    resolvedSellerLeadId: pair.sellerId,
+    actorId,
+    reason: 'OTRO' as const,
+    notes: null,
+    now: new Date('2026-08-08T10:00:00Z'),
+  }
 }
 
 describe('REL-1 · vínculo manual concurrente', () => {
@@ -125,6 +131,84 @@ describe('REL-1 · vínculo manual concurrente', () => {
     expect(
       await prismaA.match.count({
         where: { vehicleId: pair.vehicleId, buyerLeadId: pair.buyerId },
+      })
+    ).toBe(0)
+  })
+
+  it('dos writers fijan el mismo match automático sin perder score ni estado', async () => {
+    const pair = await seedPair()
+    await prismaA.match.create({
+      data: {
+        vehicleId: pair.vehicleId,
+        buyerLeadId: pair.buyerId,
+        score: 72,
+        generatedBy: 'auto',
+        status: 'VISITA',
+      },
+    })
+
+    const results = await Promise.all([link(prismaA, pair), link(prismaB, pair)])
+
+    expect(results.map((result) => result.status).sort()).toEqual(['already_linked', 'pinned'])
+    expect(
+      await prismaA.match.findUnique({
+        where: {
+          vehicleId_buyerLeadId: {
+            vehicleId: pair.vehicleId,
+            buyerLeadId: pair.buyerId,
+          },
+        },
+        select: { score: true, generatedBy: true, status: true, manualLinkedAt: true },
+      })
+    ).toMatchObject({ score: 72, generatedBy: 'auto', status: 'VISITA' })
+    expect(
+      await prismaA.activity.count({
+        where: {
+          type: 'MATCH_CREADO',
+          OR: [{ sellerLeadId: pair.sellerId }, { buyerLeadId: pair.buyerId }],
+        },
+      })
+    ).toBe(2)
+  })
+
+  it('revierte match y primera Activity si falla la segunda escritura de auditoría', async () => {
+    const pair = await seedPair()
+
+    await expect(
+      withLockedRoots(
+        rootsFor(pair),
+        async (tx) => {
+          let activityWrites = 0
+          const interceptedTx = new Proxy(tx, {
+            get(target, property, receiver) {
+              if (property !== 'activity') return Reflect.get(target, property, receiver)
+              return {
+                create: async (args: Prisma.ActivityCreateArgs) => {
+                  activityWrites += 1
+                  if (activityWrites === 2) throw new Error('forced second Activity failure')
+                  return target.activity.create(args)
+                },
+              }
+            },
+          }) as Prisma.TransactionClient
+
+          return createOrPinManualMatch(interceptedTx, paramsFor(pair))
+        },
+        { client: prismaA, lockTimeoutMs: 8_000 }
+      )
+    ).rejects.toThrow('forced second Activity failure')
+
+    expect(
+      await prismaA.match.count({
+        where: { vehicleId: pair.vehicleId, buyerLeadId: pair.buyerId },
+      })
+    ).toBe(0)
+    expect(
+      await prismaA.activity.count({
+        where: {
+          type: 'MATCH_CREADO',
+          OR: [{ sellerLeadId: pair.sellerId }, { buyerLeadId: pair.buyerId }],
+        },
       })
     ).toBe(0)
   })

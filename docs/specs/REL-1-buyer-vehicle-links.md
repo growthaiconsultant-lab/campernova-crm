@@ -412,7 +412,7 @@ delegada. Aprobar la spec no autoriza modificar Supabase, Vercel ni producción.
 - [x] TALLER, ENTREGAS, MARKETING, usuario inactivo y anónimo quedan bloqueados por el guard
       server-side cubierto por unitarios; queda pendiente el smoke real.
 - [x] Motivo es obligatorio, nota es única/opcional y el cliente no puede fijar actor, score o estado.
-- [ ] Una pareja tiene una sola fila; retry/doble clic no duplica fila ni Activities.
+- [x] Una pareja tiene una sola fila; retry/doble clic no duplica fila ni Activities.
 - [x] Un match automático existente se fija sin perder score ni estado.
 - [x] El recalculador no elimina relaciones fijadas manualmente.
 - [x] Relaciones manuales permanecen visibles con entidades terminales y tras archivado, pero no se
@@ -425,7 +425,7 @@ delegada. Aprobar la spec no autoriza modificar Supabase, Vercel ni producción.
 - [x] Cerrar manualmente exige una Delivery completada del mismo vehículo y comprador.
 - [x] No se crean ofertas, reservas, entregas, garantías, emails, costes ni cambios de estado al
       vincular.
-- [ ] Migración replaya, no tiene drift, mantiene unique/FK/check y es compatible con cliente anterior.
+- [x] La migración replaya desde cero, mantiene paridad, unique/FK/check e idempotencia en CI.
 - [ ] Unitarios, PostgreSQL concurrente, auth negativa, UI, typecheck, lint, suite y build terminan con
       resultado conocido y documentado.
 - [ ] Smoke autorizado confirma ambos sentidos, responsive y separación relación/compra.
@@ -434,12 +434,13 @@ delegada. Aprobar la spec no autoriza modificar Supabase, Vercel ni producción.
 
 **PLAN READY FOR INDEPENDENT REVIEW**
 
-- Autorizado en este momento: implementar y validar REL-1 localmente en la rama aislada, incluida una
-  migración nueva no aplicada a entornos remotos y pruebas locales proporcionales.
-- No autorizado: stage, commit, push, PR, conectar o mutar Supabase, modificar variables Vercel,
-  desplegar Preview/staging, merge o producción.
-- Siguiente gate: autorización explícita para stage, commit, push y PR, seguida de CI con PostgreSQL
-  real. Cada entorno remoto conserva su propio gate posterior.
+- Ejecutado con autorización: implementación local, commits, push y PR borrador #174; CI efímera con
+  PostgreSQL y Supabase local. La integración Git de Vercel creó un Preview automático, no abierto ni
+  probado por el agente.
+- No autorizado: conectar o mutar Supabase remoto, modificar variables Vercel, usar Preview/staging,
+  marcar el PR listo, merge o producción.
+- Siguiente gate: revisión independiente del PR y autorización separada para verificar que Preview
+  apunta a staging, aplicar la migración sólo allí y ejecutar el smoke por rol.
 
 ## Revisión adversarial
 
@@ -463,12 +464,12 @@ delegada. Aprobar la spec no autoriza modificar Supabase, Vercel ni producción.
 | Dominio                    | Sí               | E–G: relación, motivo y compra son hechos separados       | Validación operativa pendiente             |
 | Estados                    | Sí               | G y baseline de Match/Delivery                            | No se rediseña toda la matriz MatchStatus  |
 | Permisos                   | Sí               | H y `lib/auth.ts:27-43`                                   | Smoke real por rol posterior               |
-| Concurrencia               | Sí               | K + test de integración implementado                      | Ejecución PostgreSQL real pendiente        |
-| Idempotencia               | Sí               | F/K + unitarios verdes; retry es no-op sin Activity       | Carrera PostgreSQL real pendiente          |
+| Concurrencia               | Sí               | Doble creación/promoción con PostgreSQL real en CI        | Carrera contra archivado no automatizada   |
+| Idempotencia               | Sí               | Retry concurrente y rollback transaccional verdes en CI   | Smoke UI de doble clic pendiente           |
 | Datos                      | Sí               | I: columnas nullable, FK y check                          | Preflight remoto no autorizado             |
 | Legacy                     | Sí               | B/I: manuales legacy desconocidos y sin backfill inferido | Recuento agregado pendiente                |
-| Migración                  | Sí               | SQL expand-only + historial local sin colisiones          | Replay PostgreSQL real pendiente           |
-| Compatibilidad             | Sí               | I/J: cliente anterior + lectores de score                 | Demostración CI pendiente                  |
+| Migración                  | Sí               | Replay, paridad, catálogo e idempotencia verdes en CI     | Preflight remoto no autorizado             |
+| Compatibilidad             | Sí               | I/J + build/readers compatibles con score nullable        | Release A aún no desplegado                |
 | Readers                    | Sí               | J: fichas, pipeline, inventario, KPIs, recálculo          | Smoke con datos reales pendiente           |
 | Efectos secundarios        | Sí               | L: Activity/revalidate; sin oferta/email/Storage          | Smoke posterior                            |
 | Caché/superficies públicas | Sí               | L: sólo revalidate de backoffice                          | Ninguno identificado                       |
@@ -484,18 +485,18 @@ delegada. Aprobar la spec no autoriza modificar Supabase, Vercel ni producción.
 | Baseline de código     | Schema, actions, readers, matching, permisos y entrega citados por línea        | Completado localmente                                                                                                                                                                                    |
 | Decisiones de producto | Relación manual independiente; compra por Delivery; motivo + nota; pareja única | Incorporadas                                                                                                                                                                                             |
 | SDD reforzado          | Secciones A–U, adversarial y matriz de completitud                              | PASS con `node scripts/check-sdd.mjs`; `git diff --check` PASS. El wrapper de `pnpm check:sdd` no ejecutó el check porque intentó reinstalar dependencias sin TTY; no se aceptó esa mutación incidental. |
-| Implementación         | Código, schema y migración                                                      | Completa localmente; sin commit ni despliegue                                                                                                                                                            |
+| Implementación         | Código, schema y migración                                                      | Implementada en los commits enlazados por el PR borrador #174                                                                                                                                            |
 | Prisma/migraciones     | Validate, generate e historial local                                            | PASS: Prisma 6.19.3; 13 migraciones activas sin colisiones                                                                                                                                               |
 | Estática y unitarios   | Typecheck, lint, suite Vitest y build                                           | PASS: 1.453 tests, lint limpio, typecheck y build exit 0                                                                                                                                                 |
-| PostgreSQL real        | Concurrencia, constraints, rollback y replay                                    | No ejecutado: no hay `TEST_DATABASE_URL`, Docker ni PostgreSQL local. El test de integración queda implementado.                                                                                         |
-| Entornos remotos       | Preflight, staging, Preview, producción                                         | No mutados / no autorizados. Durante el build, el catálogo público intentó una lectura contra el host configurado y recibió conexión rechazada; el build continuó y no hubo escritura.                   |
+| PostgreSQL real        | Concurrencia, constraints, rollback y replay                                    | PASS en CI efímera: integración, migraciones, RLS, paridad, catálogo, guard remoto e idempotencia. Un primer rerun falló antes del checkout al descargar Docker; el rerun selectivo pasó.                |
+| Supabase local         | Storage real, buckets, políticas y guard anti-remoto                            | PASS en CI con Supabase local efímero; sin enlace ni credenciales remotas.                                                                                                                               |
+| Entornos remotos       | Preflight, staging, Preview, producción                                         | Vercel creó automáticamente un Preview por la integración Git; el agente no lo abrió ni probó. Supabase remoto, staging y producción no se conectaron ni mutaron.                                        |
 
 ## Cierre
 
-- **Commit:** no creado.
-- **PR:** no creada.
-- **CI:** no ejecutada.
-- **Deployment:** no realizado.
-- **Validación:** schema, estática, unitarios y build locales PASS; PostgreSQL real pendiente.
-- **Deuda restante:** ticket, prueba PostgreSQL/replay, métricas estructuradas adicionales, smoke UI
-  y gates Git/remotos posteriores.
+- **Commits:** enlazados y revisables desde el PR #174.
+- **PR:** borrador #174.
+- **CI:** quality, integration PostgreSQL, migration-replay y Supabase local PASS.
+- **Deployment:** Preview creado automáticamente por Vercel; no probado ni autorizado para staging.
+- **Validación:** schema, estática, unitarios, build, PostgreSQL real y replay PASS; smoke UI pendiente.
+- **Deuda restante:** ticket, métricas estructuradas adicionales, smoke UI y gates de staging/producción.
