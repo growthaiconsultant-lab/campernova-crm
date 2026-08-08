@@ -40,6 +40,87 @@ enum VehicleCategory {
   INTEGRAL
 }
 
+/// Estado de camperización declarado durante la recepción. Permite representar un furgón base sin
+/// forzarlo dentro de VehicleType antes de que exista una camperización real.
+enum CamperizationState {
+  CAMPERIZADO
+  SIN_CAMPERIZAR
+}
+
+enum ReceptionTransmission {
+  MANUAL
+  AUTOMATICA
+}
+
+enum ReceptionDrivetrain {
+  DELANTERA
+  TRASERA
+  CUATRO_POR_CUATRO
+}
+
+enum ReceptionFuelType {
+  DIESEL
+  GASOLINA
+  HIBRIDO
+  ELECTRICO
+}
+
+enum ReceptionAccessStepType {
+  MANUAL
+  ELECTRICO
+  NINGUNO
+}
+
+enum ReceptionLiftBedType {
+  ELECTRICA
+  MANUAL
+  NINGUNA
+}
+
+enum ReceptionSwivelSeats {
+  CONDUCTOR
+  PASAJERO
+  AMBOS
+  NINGUNO
+}
+
+enum ReceptionDiningTableType {
+  FIJA
+  PLEGABLE
+  EXTRAIBLE
+}
+
+enum ReceptionCabBlackoutType {
+  REMIS
+  AISLANTE_NUEVE_CAPAS
+  NINGUNO
+}
+
+enum ReceptionFridgeType {
+  COMPRESOR
+  ABSORCION_TRIVALENTE
+  NINGUNA
+}
+
+enum ReceptionAuxBatteryType {
+  GEL_AGM
+  LITIO
+  OTRA
+  NINGUNA
+}
+
+enum ReceptionElectricalSystem {
+  V12
+  V220
+  AMBOS
+}
+
+enum ReceptionLivingAirConditioning {
+  V12
+  V230
+  NINGUNO
+}
+
 /// Distribución de la zona de descanso.
 enum BedLayout {
   TRANSVERSAL
@@ -546,37 +627,40 @@ model User {
   createdAt        DateTime  @default(now()) @map("created_at")
   updatedAt        DateTime  @updatedAt @map("updated_at")
 
-  sellerLeads              SellerLead[]              @relation("AgentSellerLeads")
-  buyerLeads               BuyerLead[]               @relation("AgentBuyerLeads")
-  archivedSellerLeads      SellerLead[]              @relation("ArchivedSellerLeads")
-  archivedBuyerLeads       BuyerLead[]               @relation("ArchivedBuyerLeads")
-  activities               Activity[]
-  valuations               Valuation[]
-  valuationAttempts        VehicleValuationAttempt[]
-  vehicleAds               VehicleAd[]
-  assignedWorkOrders       WorkOrder[]               @relation("AssignedWorkOrders")
-  approvedWorkOrders       WorkOrder[]               @relation("ApprovedWorkOrders")
-  workOrderTimeEntries     WorkOrderTimeEntry[]
-  vehicleCostsCreated      VehicleCost[]
-  deliveriesResponsable    Delivery[]                @relation("ResponsableDeliveries")
-  warrantiesExtended       Warranty[]
-  deliveryDocsUploaded     DeliveryDocument[]
-  postventaTicketsResp     PostventaTicket[]         @relation("ResponsibleTickets")
-  postventaPhotosUploaded  PostventaTicketPhoto[]
-  chargeChecksPerformed    Vehicle[]                 @relation("ChargeChecks")
-  trustVerifications       Vehicle[]                 @relation("TrustVerifications")
-  vehicleDocumentsUploaded VehicleDocument[]
-  createdCalendarEvents    CalendarEvent[]           @relation("CreatedCalendarEvents")
-  assignedCalendarEvents   CalendarEvent[]           @relation("AssignedCalendarEvents")
-  createdCaptures          VehicleCapture[]          @relation("CreatedCaptures")
-  assignedCaptures         VehicleCapture[]          @relation("AssignedCaptures")
-  createdOffers            Offer[]                   @relation("CreatedOffers")
-  kpiEvents                KpiEvent[]                @relation("KpiEventActor")
-  documentVersionsUploaded DocumentVersion[]
-  entryValidations         Vehicle[]                 @relation("EntryValidations")
-  entryAnnulments          Vehicle[]                 @relation("EntryAnnulments")
-  physicalArrivalsRecorded Vehicle[]                 @relation("PhysicalArrivals")
-  keysCustodyRecorded      Vehicle[]                 @relation("KeysCustody")
+  sellerLeads                SellerLead[]                    @relation("AgentSellerLeads")
+  buyerLeads                 BuyerLead[]                     @relation("AgentBuyerLeads")
+  archivedSellerLeads        SellerLead[]                    @relation("ArchivedSellerLeads")
+  archivedBuyerLeads         BuyerLead[]                     @relation("ArchivedBuyerLeads")
+  activities                 Activity[]
+  valuations                 Valuation[]
+  valuationAttempts          VehicleValuationAttempt[]
+  vehicleAds                 VehicleAd[]
+  assignedWorkOrders         WorkOrder[]                     @relation("AssignedWorkOrders")
+  approvedWorkOrders         WorkOrder[]                     @relation("ApprovedWorkOrders")
+  workOrderTimeEntries       WorkOrderTimeEntry[]
+  vehicleCostsCreated        VehicleCost[]
+  deliveriesResponsable      Delivery[]                      @relation("ResponsableDeliveries")
+  warrantiesExtended         Warranty[]
+  deliveryDocsUploaded       DeliveryDocument[]
+  postventaTicketsResp       PostventaTicket[]               @relation("ResponsibleTickets")
+  postventaPhotosUploaded    PostventaTicketPhoto[]
+  chargeChecksPerformed      Vehicle[]                       @relation("ChargeChecks")
+  trustVerifications         Vehicle[]                       @relation("TrustVerifications")
+  vehicleDocumentsUploaded   VehicleDocument[]
+  createdCalendarEvents      CalendarEvent[]                 @relation("CreatedCalendarEvents")
+  assignedCalendarEvents     CalendarEvent[]                 @relation("AssignedCalendarEvents")
+  createdCaptures            VehicleCapture[]                @relation("CreatedCaptures")
+  assignedCaptures           VehicleCapture[]                @relation("AssignedCaptures")
+  createdOffers              Offer[]                         @relation("CreatedOffers")
+  kpiEvents                  KpiEvent[]                      @relation("KpiEventActor")
+  documentVersionsUploaded   DocumentVersion[]
+  entryValidations           Vehicle[]                       @relation("EntryValidations")
+  entryAnnulments            Vehicle[]                       @relation("EntryAnnulments")
+  physicalArrivalsRecorded   Vehicle[]                       @relation("PhysicalArrivals")
+  keysCustodyRecorded        Vehicle[]                       @relation("KeysCustody")
+  commercialReceptionReviews VehicleReceptionQuestionnaire[] @relation("CommercialReceptionReviews")
+  technicalReceptionReviews  VehicleReceptionQuestionnaire[] @relation("TechnicalReceptionReviews")
+  completedReceptions        VehicleReceptionQuestionnaire[] @relation("CompletedReceptions")
 
   documentRequirementDispositions VehicleDocumentRequirementDisposition[]
 
@@ -676,6 +760,7 @@ model Vehicle {
   type                 VehicleType?
   // ── Taxonomía RV (Fase #3 v1) — nullable / additivo ──
   category             VehicleCategory?      @map("category")
+  camperizationState   CamperizationState?   @map("camperization_state")
   bedLayout            BedLayout?            @map("bed_layout")
   sleepingPlaces       Int?                  @map("sleeping_places") // plazas para dormir
   bathroomType         BathroomType?         @map("bathroom_type")
@@ -734,25 +819,26 @@ model Vehicle {
   createdAt            DateTime              @default(now()) @map("created_at")
   updatedAt            DateTime              @updatedAt @map("updated_at")
 
-  sellerLead        SellerLead                @relation(fields: [sellerLeadId], references: [id], onDelete: Cascade)
-  chargeCheckedBy   User?                     @relation("ChargeChecks", fields: [chargeCheckedById], references: [id])
-  trustVerifiedBy   User?                     @relation("TrustVerifications", fields: [trustVerifiedById], references: [id])
-  entryValidatedBy  User?                     @relation("EntryValidations", fields: [entryValidatedById], references: [id], onDelete: SetNull)
-  entryAnnulledBy   User?                     @relation("EntryAnnulments", fields: [entryAnnulledById], references: [id], onDelete: SetNull)
-  physicalArrivalBy User?                     @relation("PhysicalArrivals", fields: [physicalArrivalById], references: [id], onDelete: SetNull)
-  keysReceivedBy    User?                     @relation("KeysCustody", fields: [keysReceivedById], references: [id], onDelete: SetNull)
-  photos            VehiclePhoto[]
-  valuations        Valuation[]
-  valuationAttempts VehicleValuationAttempt[]
-  matches           Match[]
-  ads               VehicleAd[]
-  costs             VehicleCost[]
-  workOrders        WorkOrder[]
-  deliveries        Delivery[]
-  warranty          Warranty?
-  documents         VehicleDocument[]
-  calendarEvents    CalendarEvent[]
-  offers            Offer[]
+  sellerLead             SellerLead                     @relation(fields: [sellerLeadId], references: [id], onDelete: Cascade)
+  chargeCheckedBy        User?                          @relation("ChargeChecks", fields: [chargeCheckedById], references: [id])
+  trustVerifiedBy        User?                          @relation("TrustVerifications", fields: [trustVerifiedById], references: [id])
+  entryValidatedBy       User?                          @relation("EntryValidations", fields: [entryValidatedById], references: [id], onDelete: SetNull)
+  entryAnnulledBy        User?                          @relation("EntryAnnulments", fields: [entryAnnulledById], references: [id], onDelete: SetNull)
+  physicalArrivalBy      User?                          @relation("PhysicalArrivals", fields: [physicalArrivalById], references: [id], onDelete: SetNull)
+  keysReceivedBy         User?                          @relation("KeysCustody", fields: [keysReceivedById], references: [id], onDelete: SetNull)
+  photos                 VehiclePhoto[]
+  valuations             Valuation[]
+  valuationAttempts      VehicleValuationAttempt[]
+  matches                Match[]
+  ads                    VehicleAd[]
+  costs                  VehicleCost[]
+  workOrders             WorkOrder[]
+  deliveries             Delivery[]
+  warranty               Warranty?
+  documents              VehicleDocument[]
+  calendarEvents         CalendarEvent[]
+  offers                 Offer[]
+  receptionQuestionnaire VehicleReceptionQuestionnaire?
 
   documentRequirementDispositions VehicleDocumentRequirementDisposition[]
 
@@ -762,6 +848,96 @@ model Vehicle {
   @@index([plate])
   @@index([vin])
   @@map("vehicles")
+}
+
+/// Cuestionario progresivo de recepción/tasación. Los hechos que ya pertenecen a SellerLead o
+/// Vehicle se escriben en esas fuentes canónicas; aquí viven sólo los datos adicionales y la
+/// coordinación de revisiones entre Comercial y Taller.
+model VehicleReceptionQuestionnaire {
+  id        String @id @default(cuid())
+  vehicleId String @unique @map("vehicle_id")
+
+  receptionDate               DateTime? @map("reception_date") @db.Date
+  previousOwners              Int?      @map("previous_owners")
+  maintenanceHistoryAvailable Boolean?  @map("maintenance_history_available")
+  saleReason                  String?   @map("sale_reason")
+  lastServiceDate             DateTime? @map("last_service_date") @db.Date
+
+  modelVersion String?                @map("model_version")
+  engine       String?
+  powerCv      Int?                   @map("power_cv")
+  transmission ReceptionTransmission?
+  drivetrain   ReceptionDrivetrain?
+  fuelType     ReceptionFuelType?     @map("fuel_type")
+
+  externalDamageNotes String?                   @map("external_damage_notes")
+  internalDamageNotes String?                   @map("internal_damage_notes")
+  skylightCount       Int?                      @map("skylight_count")
+  windowCount         Int?                      @map("window_count")
+  hasSideAwning       Boolean?                  @map("has_side_awning")
+  hasBikeRack         Boolean?                  @map("has_bike_rack")
+  accessStepType      ReceptionAccessStepType?  @map("access_step_type")
+  hasOutdoorShower    Boolean?                  @map("has_outdoor_shower")
+  liftBedType         ReceptionLiftBedType?     @map("lift_bed_type")
+  hasBunkBeds         Boolean?                  @map("has_bunk_beds")
+  exteriorConnections String[]                  @default([]) @map("exterior_connections")
+  swivelSeats         ReceptionSwivelSeats?     @map("swivel_seats")
+  diningTableType     ReceptionDiningTableType? @map("dining_table_type")
+  hasInteriorLed      Boolean?                  @map("has_interior_led")
+  cabBlackoutType     ReceptionCabBlackoutType? @map("cab_blackout_type")
+  hasMultimediaTv     Boolean?                  @map("has_multimedia_tv")
+
+  fridgeType                 ReceptionFridgeType? @map("fridge_type")
+  kitchenPowerSources        String[]             @default([]) @map("kitchen_power_sources")
+  hasSink                    Boolean?             @map("has_sink")
+  hasFullBathroom            Boolean?             @map("has_full_bathroom")
+  hasRemovableCassetteToilet Boolean?             @map("has_removable_cassette_toilet")
+  freshWaterLiters           Int?                 @map("fresh_water_liters")
+  greyWaterLiters            Int?                 @map("grey_water_liters")
+  waterHeaterSources         String[]             @default([]) @map("water_heater_sources")
+  heatingSources             String[]             @default([]) @map("heating_sources")
+
+  auxBatteryType            ReceptionAuxBatteryType?   @map("aux_battery_type")
+  auxBatteryCapacityAh      Int?                       @map("aux_battery_capacity_ah")
+  electricalSystem          ReceptionElectricalSystem? @map("electrical_system")
+  hasSolarPanel             Boolean?                   @map("has_solar_panel")
+  solarPowerW               Int?                       @map("solar_power_w")
+  solarRegulatorPowerW      Int?                       @map("solar_regulator_power_w")
+  hasInverter               Boolean?                   @map("has_inverter")
+  hasExternal230vConnection Boolean?                   @map("has_external_230v_connection")
+  interiorSockets           String[]                   @default([]) @map("interior_sockets")
+
+  hasCabAirConditioning Boolean?                        @map("has_cab_air_conditioning")
+  livingAirConditioning ReceptionLivingAirConditioning? @map("living_air_conditioning")
+  hasFansExtractors     Boolean?                        @map("has_fans_extractors")
+
+  hasCamperizationHomologation Boolean? @map("has_camperization_homologation")
+  hasMaintenanceBook           Boolean? @map("has_maintenance_book")
+  declaredKeysCount            Int?     @map("declared_keys_count")
+  includedAccessories          String[] @default([]) @map("included_accessories")
+  accessoriesOther             String?  @map("accessories_other")
+  extrasNotes                  String?  @map("extras_notes")
+  additionalObservations       String?  @map("additional_observations")
+
+  commercialRevision         Int       @default(0) @map("commercial_revision")
+  technicalRevision          Int       @default(0) @map("technical_revision")
+  commercialReviewedRevision Int?      @map("commercial_reviewed_revision")
+  technicalReviewedRevision  Int?      @map("technical_reviewed_revision")
+  commercialReviewedAt       DateTime? @map("commercial_reviewed_at")
+  commercialReviewedById     String?   @map("commercial_reviewed_by_id")
+  technicalReviewedAt        DateTime? @map("technical_reviewed_at")
+  technicalReviewedById      String?   @map("technical_reviewed_by_id")
+  completedAt                DateTime? @map("completed_at")
+  completedById              String?   @map("completed_by_id")
+  createdAt                  DateTime  @default(now()) @map("created_at")
+  updatedAt                  DateTime  @updatedAt @map("updated_at")
+
+  vehicle              Vehicle @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+  commercialReviewedBy User?   @relation("CommercialReceptionReviews", fields: [commercialReviewedById], references: [id], onDelete: SetNull)
+  technicalReviewedBy  User?   @relation("TechnicalReceptionReviews", fields: [technicalReviewedById], references: [id], onDelete: SetNull)
+  completedBy          User?   @relation("CompletedReceptions", fields: [completedById], references: [id], onDelete: SetNull)
+
+  @@map("vehicle_reception_questionnaires")
 }
 
 /// Fotos del vehículo almacenadas en Supabase Storage (bucket vehicle-photos).

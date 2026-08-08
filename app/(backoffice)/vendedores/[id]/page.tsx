@@ -76,6 +76,8 @@ import { StatusPill } from '@/components/status-pill'
 import { AlertTriangle, Info, CheckCircle2, Phone, Mail, ChevronLeft } from 'lucide-react'
 import { QuickAdvanceButton } from './quick-advance-button'
 import { InfoTooltip } from '@/components/info-tooltip'
+import { VehicleReceptionQuestionnaire } from '@/components/vehicle-reception/questionnaire-form'
+import { loadReceptionQuestionnaire } from '@/lib/vehicle-reception/load'
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -406,6 +408,8 @@ export default async function FichaVendedorPage({
 
   // Tab activo
   const activeTab = searchParams.tab ?? 'resumen'
+  const receptionQuestionnaire =
+    activeTab === 'cuestionario' && v ? await loadReceptionQuestionnaire(currentUser, v.id) : null
 
   // Próxima transición de estado lead
   const nextLeadStatuses = SELLER_LEAD_TRANSITIONS[lead.status as SellerLeadStatus] ?? []
@@ -414,6 +418,7 @@ export default async function FichaVendedorPage({
   // ── Tabs definición ────────────────────────────────────────────────────────
   const tabs: LeadTab[] = [
     { key: 'resumen', label: 'Resumen' },
+    ...(v ? [{ key: 'cuestionario', label: 'Cuestionario' }] : []),
     ...(v
       ? [
           {
@@ -1032,6 +1037,10 @@ export default async function FichaVendedorPage({
           )}
 
           {/* ─────────────── PREPARACIÓN · datos ─────────────── */}
+          {activeTab === 'cuestionario' && receptionQuestionnaire && (
+            <VehicleReceptionQuestionnaire data={receptionQuestionnaire} />
+          )}
+
           {activeTab === 'preparacion' && (
             <div className="grid gap-6 lg:grid-cols-2">
               <Card>

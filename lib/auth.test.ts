@@ -23,6 +23,9 @@ import {
   requireAdmin,
   requireCanViewVehiculos,
   requireCanViewCalendario,
+  requireCanViewVehicleReception,
+  requireCanEditReceptionCommercial,
+  requireCanEditReceptionTechnical,
 } from './auth'
 
 function makeUser(role: User['role']): User {
@@ -139,6 +142,33 @@ describe('require* server-side guards', () => {
     })
     it('deniega a MARKETING', async () => {
       await expectForbidden(requireCanViewCalendario, 'MARKETING')
+    })
+  })
+
+  describe('cuestionario de recepción', () => {
+    it.each(['ADMIN', 'AGENTE', 'TALLER'] as const)('permite lectura a %s', async (role) => {
+      await expectAllowed(requireCanViewVehicleReception, role)
+    })
+    it.each(['ENTREGAS', 'MARKETING'] as const)('deniega lectura a %s', async (role) => {
+      await expectForbidden(requireCanViewVehicleReception, role)
+    })
+    it.each(['ADMIN', 'AGENTE'] as const)('permite sección Comercial a %s', async (role) => {
+      await expectAllowed(requireCanEditReceptionCommercial, role)
+    })
+    it.each(['TALLER', 'ENTREGAS', 'MARKETING'] as const)(
+      'deniega sección Comercial a %s',
+      async (role) => {
+        await expectForbidden(requireCanEditReceptionCommercial, role)
+      }
+    )
+    it.each(['ADMIN', 'AGENTE', 'TALLER'] as const)(
+      'permite sección Técnica a %s',
+      async (role) => {
+        await expectAllowed(requireCanEditReceptionTechnical, role)
+      }
+    )
+    it.each(['ENTREGAS', 'MARKETING'] as const)('deniega sección Técnica a %s', async (role) => {
+      await expectForbidden(requireCanEditReceptionTechnical, role)
     })
   })
 

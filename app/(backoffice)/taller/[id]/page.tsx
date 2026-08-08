@@ -201,6 +201,25 @@ export default async function WorkOrderPage({ params }: { params: { id: string }
         canEdit={canEdit}
       />
 
+      {wo.kind === 'INSPECCION_ENTRADA' && (
+        <div className="rounded-lg border border-cn-line bg-white p-4">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <p className="text-sm font-semibold text-cn-ink-700">Cuestionario de recepción</p>
+              <p className="mt-0.5 text-xs text-cn-ink-500">
+                Completa la ficha técnica compartida sin acceder a los datos comerciales.
+              </p>
+            </div>
+            <Link
+              href={`/vehiculos/${wo.vehicle.id}/recepcion`}
+              className="inline-flex h-9 items-center rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground hover:bg-primary/90"
+            >
+              Abrir cuestionario
+            </Link>
+          </div>
+        </div>
+      )}
+
       {!isClosed && wo.costs.length > 0 && (
         <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
           Coste contabilizado pendiente de refinalización. Se conserva el último importe y se

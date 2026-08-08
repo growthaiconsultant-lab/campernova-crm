@@ -63,6 +63,20 @@ export function requireCanViewTaller() {
   return requireRole(['ADMIN', 'AGENTE', 'TALLER'])
 }
 
+// Cuestionario de recepción: Comercial ve el agregado completo; Taller accede únicamente por el
+// loader técnico, que no selecciona PII ni condiciones económicas.
+export function requireCanViewVehicleReception() {
+  return requireRole(['ADMIN', 'AGENTE', 'TALLER'])
+}
+
+export function requireCanEditReceptionCommercial() {
+  return requireRole(['ADMIN', 'AGENTE'])
+}
+
+export function requireCanEditReceptionTechnical() {
+  return requireRole(['ADMIN', 'AGENTE', 'TALLER'])
+}
+
 // Taller: create/edit orders, checklist, hours, parts
 // ADMIN + TALLER
 export function requireCanEditTaller() {

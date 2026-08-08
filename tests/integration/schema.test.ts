@@ -42,7 +42,14 @@ describe('integración · estado de migraciones', () => {
   })
 
   it('8.2 · existen tablas núcleo esperadas del esquema migrado', async () => {
-    for (const table of ['users', 'vehicles', 'offers', 'calendar_events', 'kpi_events']) {
+    for (const table of [
+      'users',
+      'vehicles',
+      'vehicle_reception_questionnaires',
+      'offers',
+      'calendar_events',
+      'kpi_events',
+    ]) {
       expect(await tableExists(prisma, table)).toBe(true)
     }
   })

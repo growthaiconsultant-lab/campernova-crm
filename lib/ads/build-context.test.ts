@@ -15,6 +15,7 @@ function makeVehicle(overrides: Partial<VehicleWithRelations> = {}): VehicleWith
     length: 6.99,
     type: VehicleType.AUTOCARAVANA,
     category: null,
+    camperizationState: null,
     bedLayout: null,
     sleepingPlaces: null,
     bathroomType: null,
