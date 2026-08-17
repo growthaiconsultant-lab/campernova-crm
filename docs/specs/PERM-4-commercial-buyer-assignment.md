@@ -1,15 +1,15 @@
 # PERM-4 — Asignación manual de responsables de compradores por comerciales
 
-| Campo               | Valor                                                  |
-| ------------------- | ------------------------------------------------------ |
-| **Estado**          | IMPLEMENTED                                            |
-| **Owner**           | Commercial / Engineering                               |
-| **Ticket**          | Conversación de producto 2026-08-17                    |
-| **Rama / PR**       | `codex/perm-4-commercial-buyer-assignment` / pendiente |
-| **Categorías**      | C0, C1, C3, C5                                         |
-| **Riesgo**          | Alto                                                   |
-| **Ruta SDD**        | Reforzada                                              |
-| **Última revisión** | 2026-08-17                                             |
+| Campo               | Valor                                             |
+| ------------------- | ------------------------------------------------- |
+| **Estado**          | IMPLEMENTED                                       |
+| **Owner**           | Commercial / Engineering                          |
+| **Ticket**          | Conversación de producto 2026-08-17               |
+| **Rama / PR**       | `codex/perm-4-commercial-buyer-assignment` / #176 |
+| **Categorías**      | C0, C1, C3, C5                                    |
+| **Riesgo**          | Alto                                              |
+| **Ruta SDD**        | Reforzada                                         |
+| **Última revisión** | 2026-08-17                                        |
 
 ## Problema y evidencia
 
@@ -118,8 +118,8 @@ regla y cada cambio efectivo deja una actividad `LEAD_ASIGNADO`.
 
 ## Cierre
 
-- **Commit:** pendiente
-- **PR:** pendiente
+- **Commit:** `2d0d004`
+- **PR:** #176 (draft)
 - **CI:** pendiente
 - **Deployment:** no realizado
 - **Validación:** local completada; Preview/CI pendientes de publicación
