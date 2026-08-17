@@ -68,24 +68,109 @@ describe('updateBuyerLead', () => {
     expect(activityTypes).toContain('CAMBIO_ESTADO')
   })
 
-  it('bloquea el cambio de agente a un AGENTE no admin', async () => {
-    vi.mocked(requireAgente).mockResolvedValue(agent)
+  it.each([
+    ['ADMIN', admin],
+    ['AGENTE', agent],
+  ] as const)('permite a %s asignar a otro comercial y loguea LEAD_ASIGNADO', async (_, actor) => {
+    vi.mocked(requireAgente).mockResolvedValue(actor)
     mockDb.buyerLead.findUnique.mockResolvedValue({ status: 'NUEVO', agentId: null, agent: null })
-    const res = await updateBuyerLead('b1', { ...baseInput, status: 'NUEVO', agentId: 'other' })
-    expect((res as { error: { formErrors: string[] } }).error.formErrors[0]).toContain(
-      'Solo el admin'
+    mockDb.user.findUnique.mockResolvedValue({
+      name: 'Desirée',
+      active: true,
+      role: 'AGENTE',
+    })
+
+    const res = await updateBuyerLead('b1', {
+      ...baseInput,
+      status: 'NUEVO',
+      agentId: 'agent-9',
+    })
+
+    expect(res).toEqual({ ok: true })
+    expect(mockDb.buyerLead.update.mock.calls[0][0].data.agentId).toBe('agent-9')
+    expect(mockDb.activity.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          type: 'LEAD_ASIGNADO',
+          content: 'Asignado a Desirée',
+          agentId: actor.id,
+        }),
+      })
     )
-    expect(mockDb.buyerLead.update).not.toHaveBeenCalled()
   })
 
-  it('permite al ADMIN reasignar y loguea LEAD_ASIGNADO', async () => {
-    vi.mocked(requireAgente).mockResolvedValue(admin)
-    mockDb.buyerLead.findUnique.mockResolvedValue({ status: 'NUEVO', agentId: null, agent: null })
-    mockDb.user.findUnique.mockResolvedValue({ name: 'Desirée' })
-    const res = await updateBuyerLead('b1', { ...baseInput, status: 'NUEVO', agentId: 'agent-9' })
+  it('permite a un AGENTE reasignar un comprador a otro comercial', async () => {
+    mockDb.buyerLead.findUnique.mockResolvedValue({
+      status: 'NUEVO',
+      agentId: 'agent-old',
+      agent: { name: 'Agente anterior' },
+    })
+    mockDb.user.findUnique.mockResolvedValue({
+      name: 'Agente nuevo',
+      active: true,
+      role: 'AGENTE',
+    })
+
+    const res = await updateBuyerLead('b1', {
+      ...baseInput,
+      status: 'NUEVO',
+      agentId: 'agent-new',
+    })
+
     expect(res).toEqual({ ok: true })
-    const activityTypes = mockDb.activity.create.mock.calls.map((c) => c[0].data.type)
-    expect(activityTypes).toContain('LEAD_ASIGNADO')
+    expect(mockDb.activity.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          type: 'LEAD_ASIGNADO',
+          content: 'Reasignado de Agente anterior a Agente nuevo',
+          agentId: agent.id,
+        }),
+      })
+    )
+  })
+
+  it('permite a un AGENTE dejar el comprador sin asignar', async () => {
+    mockDb.buyerLead.findUnique.mockResolvedValue({
+      status: 'NUEVO',
+      agentId: 'agent-old',
+      agent: { name: 'Agente anterior' },
+    })
+
+    const res = await updateBuyerLead('b1', { ...baseInput, status: 'NUEVO', agentId: null })
+
+    expect(res).toEqual({ ok: true })
+    expect(mockDb.user.findUnique).not.toHaveBeenCalled()
+    expect(mockDb.buyerLead.update.mock.calls[0][0].data.agentId).toBeNull()
+    expect(mockDb.activity.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          type: 'LEAD_ASIGNADO',
+          content: 'Desasignado (antes: Agente anterior)',
+          agentId: agent.id,
+        }),
+      })
+    )
+  })
+
+  it.each([
+    ['inexistente', null],
+    ['inactivo', { name: 'Inactivo', active: false, role: 'AGENTE' }],
+    ['no comercial', { name: 'Taller', active: true, role: 'TALLER' }],
+  ])('rechaza como responsable a un usuario %s', async (_, target) => {
+    mockDb.buyerLead.findUnique.mockResolvedValue({ status: 'NUEVO', agentId: null, agent: null })
+    mockDb.user.findUnique.mockResolvedValue(target)
+
+    const res = await updateBuyerLead('b1', {
+      ...baseInput,
+      status: 'NUEVO',
+      agentId: 'invalid-user',
+    })
+
+    expect((res as { error: { formErrors: string[] } }).error.formErrors[0]).toContain(
+      'comercial activo'
+    )
+    expect(mockDb.buyerLead.update).not.toHaveBeenCalled()
+    expect(mockDb.activity.create).not.toHaveBeenCalled()
   })
 
   it('no permite CERRAR sin entrega completada', async () => {

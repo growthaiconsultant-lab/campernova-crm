@@ -157,7 +157,11 @@ export default async function FichaCompradorPage({
         },
       },
     }),
-    db.user.findMany({ select: { id: true, name: true }, orderBy: { name: 'asc' } }),
+    db.user.findMany({
+      where: { active: true, role: { in: ['ADMIN', 'AGENTE'] } },
+      select: { id: true, name: true },
+      orderBy: { name: 'asc' },
+    }),
     db.activity.findMany({
       where: { buyerLeadId: params.id },
       include: { agent: { select: { name: true } } },
@@ -168,7 +172,6 @@ export default async function FichaCompradorPage({
 
   if (!lead) notFound()
 
-  const isAdmin = currentUser.role === 'ADMIN'
   const isTerminal = !BUYER_LEAD_TRANSITIONS[lead.status as BuyerLeadStatus]
   const statusLabel = BUYER_LEAD_STATUS_LABELS[lead.status as BuyerLeadStatus] ?? lead.status
 
@@ -587,12 +590,7 @@ export default async function FichaCompradorPage({
           {/* ── TAB: FICHA ── */}
           {activeTab === 'ficha' && (
             <div className="space-y-4">
-              <BuyerLeadEditForm
-                leadId={lead.id}
-                defaultValues={defaultValues}
-                agents={agents}
-                isAdmin={isAdmin}
-              />
+              <BuyerLeadEditForm leadId={lead.id} defaultValues={defaultValues} agents={agents} />
               <TradeInCard
                 leadId={lead.id}
                 hasTradeIn={lead.hasTradeIn}
