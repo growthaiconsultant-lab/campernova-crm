@@ -83,16 +83,28 @@ export async function updateBuyerLead(leadId: string, data: unknown) {
   const agentChanging = agentId !== currentLead.agentId
   const statusChanging = status !== currentLead.status
 
-  if (agentChanging && actor.role !== 'ADMIN') {
-    return { error: { formErrors: ['Solo el admin puede reasignar el agente'], fieldErrors: {} } }
-  }
-
   let agentActivityContent: string | null = null
   if (agentChanging) {
-    const newAgentName = agentId
-      ? ((await db.user.findUnique({ where: { id: agentId }, select: { name: true } }))?.name ??
-        agentId)
-      : null
+    let newAgentName: string | null = null
+    if (agentId) {
+      const newAgent = await db.user.findUnique({
+        where: { id: agentId },
+        select: { name: true, active: true, role: true },
+      })
+      if (
+        !newAgent ||
+        !newAgent.active ||
+        (newAgent.role !== 'ADMIN' && newAgent.role !== 'AGENTE')
+      ) {
+        return {
+          error: {
+            formErrors: ['Selecciona un comercial activo'],
+            fieldErrors: { agentId: ['El responsable debe ser un comercial activo'] },
+          },
+        }
+      }
+      newAgentName = newAgent.name
+    }
     const oldAgentName = currentLead.agent?.name ?? null
 
     if (!oldAgentName && newAgentName) {

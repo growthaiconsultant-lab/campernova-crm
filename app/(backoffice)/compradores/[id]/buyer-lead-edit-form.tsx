@@ -56,7 +56,6 @@ type Props = {
   leadId: string
   defaultValues: UpdateBuyerLeadValues
   agents: Agent[]
-  isAdmin: boolean
 }
 
 // ── Styled primitives ─────────────────────────────────────────────────────────
@@ -74,7 +73,7 @@ const inputCls =
 
 // ── Component ─────────────────────────────────────────────────────────────────
 
-export function BuyerLeadEditForm({ leadId, defaultValues, agents, isAdmin }: Props) {
+export function BuyerLeadEditForm({ leadId, defaultValues, agents }: Props) {
   const [saved, setSaved] = useState(false)
   const [serverError, setServerError] = useState<string | null>(null)
 
@@ -212,7 +211,6 @@ export function BuyerLeadEditForm({ leadId, defaultValues, agents, isAdmin }: Pr
                     <Select
                       onValueChange={(v) => field.onChange(v === '__none__' ? null : v)}
                       value={field.value ?? '__none__'}
-                      disabled={!isAdmin}
                     >
                       <FormControl>
                         <SelectTrigger className="h-9 border-[#e6e9ee] bg-[#f8fafc] text-[13.5px] data-[disabled]:opacity-60">
@@ -251,11 +249,6 @@ export function BuyerLeadEditForm({ leadId, defaultValues, agents, isAdmin }: Pr
                         ))}
                       </SelectContent>
                     </Select>
-                    {!isAdmin && (
-                      <p className="mt-1 text-[10px] text-[#8b94a3]">
-                        Solo el admin puede reasignar
-                      </p>
-                    )}
                     <FormMessage className="text-[11px]" />
                   </FormItem>
                 )}
