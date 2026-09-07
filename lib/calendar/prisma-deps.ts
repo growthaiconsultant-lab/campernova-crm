@@ -9,6 +9,7 @@ import type {
   NextActionRow,
   WorkOrderRow,
 } from './aggregate'
+import { admittedSellerWhere } from '../seller-intake'
 
 const SELLER_ACTIVE = { notIn: ['CERRADO', 'DESCARTADO'] as ('CERRADO' | 'DESCARTADO')[] }
 const BUYER_ACTIVE = { notIn: ['CERRADO', 'PERDIDO'] as ('CERRADO' | 'PERDIDO')[] }
@@ -73,6 +74,7 @@ export function prismaCalendarDeps(db: PrismaClient): CalendarDeps {
       const [sellers, buyers] = await Promise.all([
         db.sellerLead.findMany({
           where: {
+            ...admittedSellerWhere,
             status: SELLER_ACTIVE,
             nextActionType: { not: null },
             nextActionDueAt: range,

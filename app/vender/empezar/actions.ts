@@ -146,6 +146,7 @@ export async function submitPublicLead(formData: FormData) {
       email,
       phone,
       canal: 'PRO',
+      intakeStatus: 'PENDIENTE',
       status: 'NUEVO',
       agentId: null,
       ...defaultNextActionData(),

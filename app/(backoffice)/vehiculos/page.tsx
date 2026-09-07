@@ -4,6 +4,7 @@ import { Suspense } from 'react'
 import { Package } from 'lucide-react'
 import { db } from '@/lib/db'
 import { requireCanViewVehiculos } from '@/lib/auth'
+import { admittedVehicleWhere } from '@/lib/seller-intake'
 import { vehicleLabel } from '@/lib/display'
 import { eligibleBuyerCounterpartMatchWhere, isVehicleEligible } from '@/lib/matching'
 import { VEHICLE_STATUS_LABELS } from '@/lib/state-machine'
@@ -45,7 +46,7 @@ type SearchParams = {
 }
 
 function buildWhere(sp: SearchParams): Prisma.VehicleWhereInput {
-  const conditions: Prisma.VehicleWhereInput[] = []
+  const conditions: Prisma.VehicleWhereInput[] = [admittedVehicleWhere]
 
   if (sp.brand) {
     const q = sp.brand.trim()

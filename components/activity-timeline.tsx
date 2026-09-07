@@ -73,6 +73,8 @@ const ACTIVITY_LABELS: Record<ActivityType, string> = {
   LLEGADA_REGISTRADA: 'Llegada física',
   // PUB-1: retirada de anuncio (PUBLICADO → TASADO).
   PUBLICACION_RETIRADA: 'Anuncio retirado',
+  SOLICITUD_WEB_ADMITIDA: 'Solicitud web admitida',
+  SOLICITUD_WEB_RECHAZADA: 'Solicitud web rechazada',
 }
 
 const ICON_CLASSES: Record<ActivityType, string> = {
@@ -130,6 +132,8 @@ const ICON_CLASSES: Record<ActivityType, string> = {
     'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300',
   LLEGADA_REGISTRADA: 'bg-teal-100 text-teal-700 dark:bg-teal-900/40 dark:text-teal-300',
   PUBLICACION_RETIRADA: 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300',
+  SOLICITUD_WEB_ADMITIDA: 'bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300',
+  SOLICITUD_WEB_RECHAZADA: 'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300',
 }
 
 function ActivityIcon({ type }: { type: ActivityType }) {
@@ -148,6 +152,7 @@ function ActivityIcon({ type }: { type: ActivityType }) {
     case 'MATCH_CREADO':
       return <Zap className={cls} />
     case 'LEAD_ASIGNADO':
+    case 'SOLICITUD_WEB_ADMITIDA':
       return <UserCheck className={cls} />
     case 'LEAD_CREADO_CHAT':
       return <MessageCircle className={cls} />
@@ -184,6 +189,7 @@ function ActivityIcon({ type }: { type: ActivityType }) {
     case 'TITULARIDAD_TRANSFERIDA':
       return <FileText className={cls} />
     case 'PUBLICACION_BLOQUEADA':
+    case 'SOLICITUD_WEB_RECHAZADA':
       return <Ban className={cls} />
     case 'PROXIMA_ACCION_ACTUALIZADA':
       return <CalendarCheck className={cls} />

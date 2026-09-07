@@ -25,6 +25,14 @@ enum LeadCanal {
   CN // Captación en oficina por agente
 }
 
+/// Decisión de admisión de una solicitud de vendedor en el flujo operativo.
+/// Es ortogonal al canal de origen y al estado comercial corregible del lead.
+enum SellerIntakeStatus {
+  PENDIENTE
+  ADMITIDO
+  RECHAZADO
+}
+
 enum VehicleType {
   CAMPER
   AUTOCARAVANA
@@ -192,6 +200,8 @@ enum ActivityType {
   // Despublicación de un anuncio (PUB-1): retirar del catálogo PUBLICADO → TASADO con motivo/actor.
   // Trazabilidad, NO fuente de verdad (el estado se lee de vehicles.status).
   PUBLICACION_RETIRADA
+  SOLICITUD_WEB_ADMITIDA
+  SOLICITUD_WEB_RECHAZADA
 }
 
 /// Categoría de una foto del vehículo (PUB-1). Permite exigir cobertura mínima (p. ej. exterior +
@@ -550,6 +560,7 @@ model User {
   buyerLeads               BuyerLead[]               @relation("AgentBuyerLeads")
   archivedSellerLeads      SellerLead[]              @relation("ArchivedSellerLeads")
   archivedBuyerLeads       BuyerLead[]               @relation("ArchivedBuyerLeads")
+  reviewedSellerIntakes    SellerLead[]              @relation("ReviewedSellerIntakes")
   activities               Activity[]
   valuations               Valuation[]
   valuationAttempts        VehicleValuationAttempt[]
@@ -610,52 +621,57 @@ model KpiEvent {
 
 /// Lead de vendedor — persona que quiere vender su vehículo.
 model SellerLead {
-  id              String           @id @default(cuid())
+  id                 String             @id @default(cuid())
   // CAP-1: captación progresiva — ningún campo de negocio es obligatorio al crear/editar.
   // La ausencia real se persiste como null (nunca placeholders). Los gates operativos (A2/A3/
   // publicación) siguen exigiendo lo suyo en sus hitos, no en la captación.
-  name            String?
-  email           String?
-  phone           String?
-  canal           LeadCanal        @default(PRO)
-  status          SellerLeadStatus @default(NUEVO)
-  source          String?
-  agentId         String?          @map("agent_id")
-  nextActionType  NextActionType?  @map("next_action_type")
-  nextActionDueAt DateTime?        @map("next_action_due_at")
-  lostReason      LostReason?      @map("lost_reason")
-  lostReasonNotes String?          @map("lost_reason_notes")
+  name               String?
+  email              String?
+  phone              String?
+  canal              LeadCanal          @default(PRO)
+  status             SellerLeadStatus   @default(NUEVO)
+  intakeStatus       SellerIntakeStatus @default(ADMITIDO) @map("intake_status")
+  intakeReviewedAt   DateTime?          @map("intake_reviewed_at")
+  intakeReviewedById String?            @map("intake_reviewed_by_id")
+  source             String?
+  agentId            String?            @map("agent_id")
+  nextActionType     NextActionType?    @map("next_action_type")
+  nextActionDueAt    DateTime?          @map("next_action_due_at")
+  lostReason         LostReason?        @map("lost_reason")
+  lostReasonNotes    String?            @map("lost_reason_notes")
   // ── Condiciones de la operación (Seller Supply Graph, Block 17) — nullable / additivo ──
-  minPrice        Decimal?         @map("min_price") @db.Decimal(10, 2) // precio mínimo aceptado
-  dealType        SellerDealType?  @map("deal_type") // modalidad de acuerdo
-  urgency         SellerUrgency?   @map("urgency") // urgencia real por cerrar
-  riskLevel       SellerRisk?      @map("risk_level") // riesgo mecánico/documental
-  riskNotes       String?          @map("risk_notes") // detalle del riesgo
-  gdprConsentAt   DateTime?        @map("gdpr_consent_at")
-  gdprConsentIp   String?          @map("gdpr_consent_ip")
+  minPrice           Decimal?           @map("min_price") @db.Decimal(10, 2) // precio mínimo aceptado
+  dealType           SellerDealType?    @map("deal_type") // modalidad de acuerdo
+  urgency            SellerUrgency?     @map("urgency") // urgencia real por cerrar
+  riskLevel          SellerRisk?        @map("risk_level") // riesgo mecánico/documental
+  riskNotes          String?            @map("risk_notes") // detalle del riesgo
+  gdprConsentAt      DateTime?          @map("gdpr_consent_at")
+  gdprConsentIp      String?            @map("gdpr_consent_ip")
   // ── Archivado real (PR B1) — ORTOGONAL al estado comercial, aditivo y reversible ──
   // `archivedAt == null` ⇔ no archivado. NO es soft-delete: el registro sigue existiendo y
   // se sigue encontrando en búsqueda. El backend que lo escribe llega en PR B2.
-  archivedAt      DateTime?        @map("archived_at")
-  archivedById    String?          @map("archived_by_id")
-  archiveReason   ArchiveReason?   @map("archive_reason")
-  archiveNotes    String?          @map("archive_notes")
-  createdAt       DateTime         @default(now()) @map("created_at")
-  updatedAt       DateTime         @updatedAt @map("updated_at")
+  archivedAt         DateTime?          @map("archived_at")
+  archivedById       String?            @map("archived_by_id")
+  archiveReason      ArchiveReason?     @map("archive_reason")
+  archiveNotes       String?            @map("archive_notes")
+  createdAt          DateTime           @default(now()) @map("created_at")
+  updatedAt          DateTime           @updatedAt @map("updated_at")
 
-  agent          User?           @relation("AgentSellerLeads", fields: [agentId], references: [id])
-  archivedBy     User?           @relation("ArchivedSellerLeads", fields: [archivedById], references: [id], onDelete: SetNull)
-  vehicle        Vehicle?
-  activities     Activity[]
-  documents      Document[]
-  tradeInBuyer   BuyerLead?      @relation("BuyerTradeIn")
-  calendarEvents CalendarEvent[]
-  capture        VehicleCapture?
+  agent            User?           @relation("AgentSellerLeads", fields: [agentId], references: [id])
+  archivedBy       User?           @relation("ArchivedSellerLeads", fields: [archivedById], references: [id], onDelete: SetNull)
+  intakeReviewedBy User?           @relation("ReviewedSellerIntakes", fields: [intakeReviewedById], references: [id], onDelete: SetNull)
+  vehicle          Vehicle?
+  activities       Activity[]
+  documents        Document[]
+  tradeInBuyer     BuyerLead?      @relation("BuyerTradeIn")
+  calendarEvents   CalendarEvent[]
+  capture          VehicleCapture?
 
   @@index([status])
   @@index([agentId])
   @@index([nextActionDueAt])
   @@index([archivedAt])
+  @@index([intakeStatus, createdAt])
   @@map("seller_leads")
 }
 

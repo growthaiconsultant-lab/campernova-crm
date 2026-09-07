@@ -40,6 +40,7 @@ export async function createSellerLead(data: unknown) {
       email,
       phone,
       canal: 'CN',
+      intakeStatus: 'ADMITIDO',
       status: 'NUEVO',
       agentId: null,
       ...defaultNextActionData(),

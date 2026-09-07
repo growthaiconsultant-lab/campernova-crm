@@ -137,6 +137,7 @@ export async function createSellerLeadFromTradeIn(
           email: buyer.email,
           phone: buyer.phone,
           canal: 'CN',
+          intakeStatus: 'ADMITIDO',
           status: 'NUEVO',
           ...defaultNextActionData(),
           vehicle: {
