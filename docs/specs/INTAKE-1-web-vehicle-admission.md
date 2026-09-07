@@ -1,15 +1,15 @@
 # INTAKE-1 — Separar solicitudes web del inventario operativo
 
-| Campo               | Valor                                      |
-| ------------------- | ------------------------------------------ |
-| **Estado**          | IMPLEMENTED                                |
-| **Owner**           | Product / Engineering                      |
-| **Ticket**          | INTAKE-1                                   |
-| **Rama / PR**       | `codex/intake-1-web-admission` / pendiente |
-| **Categorías**      | C0, C1, C2, C3, C4, C5                     |
-| **Riesgo**          | Alto                                       |
-| **Ruta SDD**        | Reforzada                                  |
-| **Última revisión** | 2026-09-07                                 |
+| Campo               | Valor                                 |
+| ------------------- | ------------------------------------- |
+| **Estado**          | IMPLEMENTED                           |
+| **Owner**           | Product / Engineering                 |
+| **Ticket**          | INTAKE-1                              |
+| **Rama / PR**       | `codex/intake-1-web-admission` / #178 |
+| **Categorías**      | C0, C1, C2, C3, C4, C5                |
+| **Riesgo**          | Alto                                  |
+| **Ruta SDD**        | Reforzada                             |
+| **Última revisión** | 2026-09-07                            |
 
 ## Problema
 
