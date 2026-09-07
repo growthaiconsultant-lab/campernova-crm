@@ -26,7 +26,7 @@ export default function PrivacidadPage() {
           </li>
           <li>
             <span className="font-medium text-foreground">Dirección:</span> Carrer Torre de Cellers,
-            08150 Barcelona
+            1, 08150 Barcelona
           </li>
           <li>
             <span className="font-medium text-foreground">Email:</span> info@campersnova.com

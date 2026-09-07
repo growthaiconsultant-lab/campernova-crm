@@ -7,6 +7,7 @@ import Image from 'next/image'
 import { PublicNav } from '@/components/public-nav'
 import { PublicFooter } from '@/components/public-footer'
 import { BUYER_GREETING } from '@/lib/chat/system-prompt'
+import { BUSINESS_MAPS_URL } from '@/lib/seo'
 
 type ChatMessage = { role: 'user' | 'assistant'; content: string; id: string }
 
@@ -586,13 +587,13 @@ export default function ComprarPage() {
                 </h5>
                 <p className="text-[13px] leading-relaxed" style={{ color: 'var(--cn-ink-700)' }}>
                   <a
-                    href="https://www.google.com/maps/dir//CAMPERS+NOVA,+SL,+Carrer+Torre+de+Cellers,+08150,+Barcelona/"
+                    href={BUSINESS_MAPS_URL}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="underline underline-offset-2"
                     style={{ color: 'var(--cn-teal-900)' }}
                   >
-                    Carrer Torre de Cellers · 08150 — Cómo llegar ↗
+                    Carrer Torre de Cellers, 1 · 08150 — Cómo llegar ↗
                   </a>
                   <br />
                   Lun–Vie 10:00–19:00 · Sáb 10:00–13:00

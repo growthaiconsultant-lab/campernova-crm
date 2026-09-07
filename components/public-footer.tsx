@@ -1,5 +1,6 @@
 import Link from 'next/link'
 import { LogoCampersNova } from '@/components/logo-campers-nova'
+import { BUSINESS_MAPS_URL } from '@/lib/seo'
 
 const NAV_LINKS = [
   { href: '/comprar', label: 'Comprar' },
@@ -140,12 +141,12 @@ export function PublicFooter() {
               </li>
               <li>
                 <a
-                  href="https://www.google.com/maps/dir//CAMPERS+NOVA,+SL,+Carrer+Torre+de+Cellers,+08150,+Barcelona"
+                  href={BUSINESS_MAPS_URL}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="text-sm leading-snug text-cn-ink-700 transition-colors hover:text-cn-teal-900"
                 >
-                  Carrer Torre de Cellers
+                  Carrer Torre de Cellers, 1
                   <br />
                   08150 Barcelona
                 </a>

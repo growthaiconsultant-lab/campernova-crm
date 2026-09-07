@@ -26,7 +26,7 @@ export function deliveryConfirmationHtml(p: DeliveryConfirmationParams): string 
     <tr><td style="padding:12px 16px;background:#f9fafb;font-weight:600;border-radius:8px 8px 0 0;border-bottom:1px solid #e5e7eb">Vehículo</td><td style="padding:12px 16px;border-bottom:1px solid #e5e7eb">${p.vehicleLabel}</td></tr>
     <tr><td style="padding:12px 16px;background:#f9fafb;font-weight:600;border-bottom:1px solid #e5e7eb">Fecha</td><td style="padding:12px 16px;border-bottom:1px solid #e5e7eb">${date}</td></tr>
     <tr><td style="padding:12px 16px;background:#f9fafb;font-weight:600;border-bottom:1px solid #e5e7eb">Hora</td><td style="padding:12px 16px;border-bottom:1px solid #e5e7eb">${time}</td></tr>
-    <tr><td style="padding:12px 16px;background:#f9fafb;font-weight:600">Dónde</td><td style="padding:12px 16px">Carrer Torre de Cellers, 08150 Barcelona</td></tr>
+    <tr><td style="padding:12px 16px;background:#f9fafb;font-weight:600">Dónde</td><td style="padding:12px 16px">Carrer Torre de Cellers, 1, 08150 Barcelona</td></tr>
   </table>
 
   <p style="background:#fef3c7;border-left:4px solid #f59e0b;padding:12px 16px;border-radius:0 6px 6px 0;margin:0">
@@ -36,7 +36,7 @@ export function deliveryConfirmationHtml(p: DeliveryConfirmationParams): string 
   <p style="margin-top:24px">Si tienes alguna duda llámanos al <a href="tel:+34645639185">645 63 91 85</a> o escríbenos por <a href="https://wa.me/34645639185">WhatsApp</a>.</p>
 
   <hr style="border:none;border-top:1px solid #e5e7eb;margin:32px 0">
-  <p style="font-size:12px;color:#9ca3af">CampersNova · Campers Nova S.L · B-22466874 · Carrer Torre de Cellers, 08150 Barcelona</p>
+  <p style="font-size:12px;color:#9ca3af">CampersNova · Campers Nova S.L · B-22466874 · Carrer Torre de Cellers, 1, 08150 Barcelona</p>
 </body>
 </html>`
 }
