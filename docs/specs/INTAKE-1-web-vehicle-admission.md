@@ -210,7 +210,7 @@ porque INTAKE-1 modifica columnas ortogonales y no promete coordinar con dinero,
 
 ## U. Estado de autorización
 
-`IMPLEMENTED — PR AND CI GREEN; STAGING VALIDATED; AUTH-1 REQUIRED BEFORE MERGE`
+`IMPLEMENTED — AUTH-1 DEPLOYED; PRODUCTION PREFLIGHT STOPPED SAFELY`
 
 La autorización posterior permitió el rollout únicamente de staging. El preflight confirmó que las
 migraciones previas estaban presentes, que INTAKE-1 era la única migración local pendiente y que no
@@ -221,10 +221,21 @@ se rotaron exclusivamente en Vercel Preview y el deployment `4iyrqdkWRetQdfm5Api
 `Ready` para el commit `c4118f0` en la rama de la PR. El smoke público, la redirección de una ruta
 protegida a `/login` y el acceso autenticado como QA AGENTE son correctos. La sesión confirmó 0
 solicitudes web, 3 vendedores internos admitidos y 3 vehículos en inventario. El enlace emitido por
-este commit todavía apuntó a localhost porque la corrección canónica está aislada en AUTH-1, PR
-#175, aún no fusionada; el código de un solo uso se canjeó manualmente en el callback del mismo
-Preview para completar el smoke. Stop condition: AUTH-1 debe integrarse antes de fusionar o
-desplegar INTAKE-1. Continúan prohibidos merge, `main` y cualquier cambio en producción.
+este commit todavía apuntó a localhost; el código de un solo uso se canjeó manualmente en el
+callback del mismo Preview para completar el smoke.
+
+AUTH-1 (#175) se sincronizó con `main`, repitió CI y Preview, se fusionó como `8ef0faa` y quedó
+desplegada en producción con CI `34142488970` verde. El smoke confirmó `/login`, la barrera de una
+ruta protegida y el envío de un magic link real con el nuevo comportamiento.
+
+El preflight read-only de producción detuvo correctamente el rollout de INTAKE-1: encontró 112
+vendedores (64 `PRO`, 48 `CN`), 0 candidatos a `RECHAZADO`, 62 candidatos al backfill `PENDIENTE`,
+0 migraciones fallidas y una señal operativa entre esos candidatos. La señal es una oferta
+`EXPIRADA`, sin reserva ni entrega. No se aplicó ninguna migración en producción. Como la primera
+migración ya está desplegada en staging y no puede editarse, se añade la migración correctiva
+`20260907184500_preserve_operational_web_intakes`: restaura de forma idempotente a `ADMITIDO` las
+solicitudes con estado, responsable, entrada, oferta o entrega. Debe superar replay, integración y
+un nuevo ciclo staging antes de solicitar autorización para producción.
 
 ## Revisión adversarial
 
@@ -240,18 +251,18 @@ desplegar INTAKE-1. Continúan prohibidos merge, `main` y cualquier cambio en pr
 
 ## Matriz de completitud
 
-| Área                      | Revisada | Evidencia                   | Riesgo pendiente                    |
-| ------------------------- | -------- | --------------------------- | ----------------------------------- |
-| Dominio/estados           | Sí       | F–G                         | ninguno material                    |
-| Permisos                  | Sí       | H + tests + smoke AGENTE    | smoke ADMIN no ejecutado            |
-| Concurrencia/idempotencia | Sí       | K + unitarios + integración | sin pendiente en staging para mutar |
-| Datos/legacy/migración    | Sí       | I, O, P + staging           | producción no autorizada            |
-| Compatibilidad            | Sí       | I + Preview                 | AUTH-1 #175 antes del merge         |
-| Readers/efectos           | Sí       | J–L                         | KPIs generales diferidos            |
-| Caché/superficie pública  | Sí       | L + smoke Preview           | ninguno en staging                  |
-| Observabilidad            | Sí       | Q                           | observación remota no autorizada    |
-| Rollout/rollback          | Sí       | O–P + staging               | producción no autorizada            |
-| Documentación             | Sí       | R                           | commit de evidencia pendiente       |
+| Área                      | Revisada | Evidencia                   | Riesgo pendiente                      |
+| ------------------------- | -------- | --------------------------- | ------------------------------------- |
+| Dominio/estados           | Sí       | F–G                         | ninguno material                      |
+| Permisos                  | Sí       | H + tests + smoke AGENTE    | smoke ADMIN no ejecutado              |
+| Concurrencia/idempotencia | Sí       | K + unitarios + integración | sin pendiente en staging para mutar   |
+| Datos/legacy/migración    | Sí       | I, O, P + staging + prod RO | validar migración correctiva          |
+| Compatibilidad            | Sí       | I + Preview + AUTH-1 prod   | repetir staging con la corrección     |
+| Readers/efectos           | Sí       | J–L                         | KPIs generales diferidos              |
+| Caché/superficie pública  | Sí       | L + smoke Preview           | ninguno en staging                    |
+| Observabilidad            | Sí       | Q                           | observación posterior al rollout      |
+| Rollout/rollback          | Sí       | O–P + staging + prod RO     | migración de producción no autorizada |
+| Documentación             | Sí       | R                           | registrar CI y segundo staging        |
 
 ## Cierre
 
@@ -267,12 +278,18 @@ desplegar INTAKE-1. Continúan prohibidos merge, `main` y cualquier cambio en pr
   carga y `/vendedores?view=leads-web` sin sesión redirige a `/login`. El smoke QA AGENTE confirmó
   dashboard, bandeja web vacía, 3 vendedores admitidos y 3 vehículos en inventario. El callback se
   completó en el dominio Preview reutilizando el código que el commit actual había enviado a
-  localhost; AUTH-1 (#175) es dependencia obligatoria para corregir la generación del enlace.
+  localhost. AUTH-1 (#175) ya está fusionada y desplegada en producción como `8ef0faa`; su CI de
+  `main` `34142488970` quedó verde y el smoke de acceso fue correcto.
+- **Preflight producción:** 112 vendedores; 64 `PRO`; 48 `CN`; 0 para `RECHAZADO`; 62 para
+  `PENDIENTE`; 0 migraciones fallidas. Una candidata tenía una oferta `EXPIRADA` (sin reserva ni
+  entrega), por lo que se activó la stop condition y no se aplicó la migración. Se añade una segunda
+  migración aditiva e idempotente para conservar como `ADMITIDO` cualquier historial operativo.
 - **Validación local:** Prisma validate/generate, SDD, formato, TypeScript, lint, 1.461 tests y
   build verdes. El build completó aunque el catálogo estático no pudo leer la base remota
   configurada; ese reader degradó de forma controlada.
-- **Validación CI:** replay completo de 13 migraciones, catálogo del schema, integración PostgreSQL
-  (incluida carrera de admisión) y Supabase Storage local verdes.
-- **No ejecutado:** smoke ADMIN ni mutación de admisión remota porque staging no contiene pendientes;
-  tampoco merge, migración o deployment de producción.
+- **Validación CI previa:** replay completo de 13 migraciones, catálogo del schema, integración
+  PostgreSQL (incluida carrera de admisión) y Supabase Storage local verdes. La migración correctiva
+  eleva el historial esperado a 14 y requiere un nuevo CI.
+- **No ejecutado:** nueva migración correctiva en staging o producción, smoke ADMIN ni mutación de
+  admisión remota. INTAKE-1 no está fusionada ni desplegada en producción.
 - **Deuda restante:** revisión de KPIs y definición futura de stock físico.
