@@ -210,12 +210,11 @@ porque INTAKE-1 modifica columnas ortogonales y no promete coordinar con dinero,
 
 ## U. Estado de autorización
 
-`IMPLEMENTED LOCALLY — READY FOR INDEPENDENT REVIEW`
+`IMPLEMENTED — PR AND CI GREEN; STAGING NOT AUTHORIZED`
 
-La instrucción «adelante» autoriza preparar la spec e implementación local en esta rama. Continúan
-prohibidos commit, push, PR, migración remota, backfill remoto, merge y cambios en staging o
-producción. El siguiente gate es la revisión del diff y la autorización explícita para commit/push y
-staging.
+La autorización posterior permitió commit, push, apertura de la PR #178 y ejecución de CI. Continúan
+prohibidos migración o backfill remotos, pruebas funcionales contra staging, merge y cambios en
+producción. El siguiente gate es una autorización específica para el preflight y rollout de staging.
 
 ## Revisión adversarial
 
@@ -231,28 +230,31 @@ staging.
 
 ## Matriz de completitud
 
-| Área                      | Revisada | Evidencia                  | Riesgo pendiente                   |
-| ------------------------- | -------- | -------------------------- | ---------------------------------- |
-| Dominio/estados           | Sí       | F–G                        | ninguno material                   |
-| Permisos                  | Sí       | H + tests de Server Action | smoke remoto pendiente             |
-| Concurrencia/idempotencia | Sí       | K + unitarios CAS          | integración PostgreSQL pendiente   |
-| Datos/legacy/migración    | Sí       | I, O, P                    | preflight remoto pendiente         |
-| Compatibilidad            | Sí       | I                          | orden DB→cliente obligatorio       |
-| Readers/efectos           | Sí       | J–L                        | KPIs generales diferidos           |
-| Caché/superficie pública  | Sí       | L                          | revalidación pendiente             |
-| Observabilidad            | Sí       | Q                          | observación remota no autorizada   |
-| Rollout/rollback          | Sí       | O–P                        | operaciones remotas no autorizadas |
-| Documentación             | Sí       | R                          | cierre posterior                   |
+| Área                      | Revisada | Evidencia                   | Riesgo pendiente                   |
+| ------------------------- | -------- | --------------------------- | ---------------------------------- |
+| Dominio/estados           | Sí       | F–G                         | ninguno material                   |
+| Permisos                  | Sí       | H + tests de Server Action  | smoke remoto pendiente             |
+| Concurrencia/idempotencia | Sí       | K + unitarios + integración | smoke funcional pendiente          |
+| Datos/legacy/migración    | Sí       | I, O, P                     | preflight remoto pendiente         |
+| Compatibilidad            | Sí       | I                           | orden DB→cliente obligatorio       |
+| Readers/efectos           | Sí       | J–L                         | KPIs generales diferidos           |
+| Caché/superficie pública  | Sí       | L                           | revalidación pendiente             |
+| Observabilidad            | Sí       | Q                           | observación remota no autorizada   |
+| Rollout/rollback          | Sí       | O–P                         | operaciones remotas no autorizadas |
+| Documentación             | Sí       | R                           | cierre posterior                   |
 
 ## Cierre
 
-- **Commit:** pendiente.
-- **PR:** pendiente.
-- **CI:** pendiente.
-- **Deployment:** pendiente.
+- **Commit de implementación:** `3915391`; actualizaciones documentales en el historial de la PR.
+- **PR:** #178 abierta contra `main`.
+- **CI:** verde en run `34133501070`: quality, integration, migration-replay y supabase-storage.
+- **Deployment:** build de Vercel Preview automático verde; no se ha aplicado la migración ni se ha
+  abierto o probado funcionalmente el Preview.
 - **Validación local:** Prisma validate/generate, SDD, formato, TypeScript, lint, 1.461 tests y
   build verdes. El build completó aunque el catálogo estático no pudo leer la base remota
   configurada; ese reader degradó de forma controlada.
-- **No ejecutado:** integración PostgreSQL, replay de migración, preflight ni smoke remoto por no
-  disponer de `TEST_DATABASE_URL`, Docker/PostgreSQL local ni autorización remota para INTAKE-1.
+- **Validación CI:** replay completo de 13 migraciones, catálogo del schema, integración PostgreSQL
+  (incluida carrera de admisión) y Supabase Storage local verdes.
+- **No ejecutado:** preflight, migración, postflight ni smoke de staging; tampoco ninguna operación
+  sobre producción.
 - **Deuda restante:** revisión de KPIs y definición futura de stock físico.
