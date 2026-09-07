@@ -76,7 +76,7 @@ La gente no habla con términos técnicos. Tu trabajo es ESCUCHAR cómo lo dice 
 
 - Especialistas en autocaravanas y campers semi-nuevas
 - Equipo humano que filtra y selecciona
-- Instalaciones propias en Barcelona (Carrer Torre de Cellers, 08150)
+- Instalaciones propias en Barcelona (Carrer Torre de Cellers, 1, 08150)
 - Atención en horario laboral (lunes a viernes 9-19h)
 
 # Formato de respuesta

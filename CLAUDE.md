@@ -7,7 +7,7 @@ CRM interno para gestionar la compraventa de autocaravanas y campers semi-nuevas
 - Marca comercial: **CampersNova**
 - Razón social: **Campers Nova S.L**
 - CIF: **B-22466874**
-- Domicilio fiscal/nave: **Carrer Torre de Cellers, 08150 Barcelona**
+- Domicilio fiscal/nave: **Carrer Torre de Cellers, 1, 08150 Barcelona**
 - Dominio: `campersnova.com`
 - Email contacto: `info@campersnova.com`
 - Teléfono: `645 63 91 85` · WhatsApp: `wa.me/34645639185`
@@ -826,7 +826,7 @@ Los textos legales (`/aviso-legal`, `/privacidad`) ya tienen los datos reales:
 
 - **Denominación social:** Campers Nova S.L
 - **CIF:** B-22466874
-- **Domicilio:** Carrer Torre de Cellers, 08150 Barcelona
+- **Domicilio:** Carrer Torre de Cellers, 1, 08150 Barcelona
 
 No quedan badges `[PENDIENTE_*]` en las páginas legales.
 
@@ -1952,7 +1952,7 @@ El enum `LeadCanal` en Prisma solo tiene `CN` y `PRO`. El valor `CHAT` no existe
 ## Pendientes externos
 
 - 🔲 Verificar dominio `campersnova.com` en Resend → Domains (DNS records) — CAM-18 y CAM-19 ya funcionales en sandbox; necesario para enviar desde `info@campersnova.com` en producción
-- ✅ Identidad legal — Campers Nova S.L · B-22466874 · Carrer Torre de Cellers, 08150 Barcelona (ya en aviso-legal y privacidad)
+- ✅ Identidad legal — Campers Nova S.L · B-22466874 · Carrer Torre de Cellers, 1, 08150 Barcelona (ya en aviso-legal y privacidad)
 - ✅ Número de teléfono/WhatsApp — actualizado a `645 63 91 85` / `wa.me/34645639185` en todo el proyecto
 - ✅ Extensión `vector` activa en Supabase (hecho en CAM-7)
 - ✅ Deploy Vercel — `campernova-crm.vercel.app` activo, env vars subidas, Supabase Auth URLs configuradas

@@ -37,12 +37,18 @@ export const BUSINESS = {
   phone: '+34645639185',
   phoneDisplay: '645 63 91 85',
   whatsapp: 'https://wa.me/34645639185',
-  street: 'Carrer Torre de Cellers',
+  street: 'Carrer Torre de Cellers, 1',
   city: 'Barcelona',
   region: 'Barcelona',
   postalCode: '08150',
   country: 'ES',
 } as const
+
+const BUSINESS_MAP_DESTINATION = `${BUSINESS.street}, ${BUSINESS.postalCode}, ${BUSINESS.city}`
+
+export const BUSINESS_MAPS_URL = `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(BUSINESS_MAP_DESTINATION)}`
+
+export const BUSINESS_MAP_EMBED_URL = `https://www.google.com/maps?q=${encodeURIComponent(BUSINESS_MAP_DESTINATION)}&output=embed`
 
 /** Rutas del backoffice/privadas que NO deben indexarse. */
 export const PRIVATE_PATH_PREFIXES = [
