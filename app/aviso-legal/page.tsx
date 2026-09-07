@@ -32,7 +32,7 @@ export default function AvisoLegalPage() {
           </li>
           <li>
             <span className="font-medium text-foreground">Domicilio:</span> Carrer Torre de Cellers,
-            08150 Barcelona
+            1, 08150 Barcelona
           </li>
           <li>
             <span className="font-medium text-foreground">Email de contacto:</span>{' '}

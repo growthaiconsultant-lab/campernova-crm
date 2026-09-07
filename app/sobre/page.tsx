@@ -5,7 +5,12 @@ import { Check, ArrowRight } from 'lucide-react'
 import { PublicNav } from '@/components/public-nav'
 import { PublicFooter } from '@/components/public-footer'
 import { JsonLd } from '@/components/json-ld'
-import { pageMetadata, autoDealerJsonLd } from '@/lib/seo'
+import {
+  pageMetadata,
+  autoDealerJsonLd,
+  BUSINESS_MAPS_URL,
+  BUSINESS_MAP_EMBED_URL,
+} from '@/lib/seo'
 
 export const metadata: Metadata = pageMetadata({
   title: 'Sobre nosotros',
@@ -13,9 +18,6 @@ export const metadata: Metadata = pageMetadata({
     'Conoce CampersNova: nacimos en 2019 especializándonos en compraventa de campers y autocaravanas desde Barcelona. +240 operaciones cerradas.',
   path: '/sobre',
 })
-
-const MAPS_URL =
-  'https://www.google.com/maps/dir//CAMPERS+NOVA,+SL,+Carrer+Torre+de+Cellers,+08150,+Barcelona/@41.4089216,2.1528576,10z/data=!4m8!4m7!1m0!1m5!1m1!1s0x12a4ebf0fa3704c3:0x5219e56327ff3bb7!2m2!1d2.2429082!2d41.5648851'
 
 const BENEFITS = [
   '+240 operaciones cerradas desde 2019',
@@ -155,7 +157,7 @@ export default function SobrePage() {
                       className="text-[14px] leading-relaxed"
                       style={{ color: 'var(--cn-ink-500)' }}
                     >
-                      Carrer Torre de Cellers
+                      Carrer Torre de Cellers, 1
                       <br />
                       08150 Barcelona
                     </p>
@@ -210,7 +212,7 @@ export default function SobrePage() {
 
                 <div className="mt-8 flex flex-wrap gap-3">
                   <a
-                    href={MAPS_URL}
+                    href={BUSINESS_MAPS_URL}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="inline-flex items-center gap-2 rounded-full px-6 py-3 text-[14px] font-semibold text-white transition hover:opacity-90"
@@ -235,11 +237,11 @@ export default function SobrePage() {
                 style={{ border: '1px solid var(--cn-line)' }}
               >
                 <iframe
-                  src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d2993!2d2.2429082!3d41.5648851!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x12a4ebf0fa3704c3%3A0x5219e56327ff3bb7!2sCampers%20Nova%2C%20SL!5e0!3m2!1ses!2ses!4v1747000000000!5m2!1ses!2ses"
+                  src={BUSINESS_MAP_EMBED_URL}
                   loading="lazy"
                   className="absolute inset-0 h-full w-full border-0"
                   allowFullScreen
-                  title="CampersNova · Carrer Torre de Cellers, 08150 Barcelona"
+                  title="CampersNova · Carrer Torre de Cellers, 1, 08150 Barcelona"
                 />
               </div>
             </div>
