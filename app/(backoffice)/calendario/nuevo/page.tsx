@@ -12,6 +12,7 @@ import {
 } from 'lucide-react'
 import { db } from '@/lib/db'
 import { requireAgente } from '@/lib/auth'
+import { admittedVehicleWhere } from '@/lib/seller-intake'
 import { personLabel, vehicleLabel } from '@/lib/display'
 import { NATIVE_EVENT_TYPES } from '@/lib/calendar/event-meta'
 import type { CalendarEventType } from '@prisma/client'
@@ -154,7 +155,10 @@ export default async function NuevoEventoPage({
       take: 200,
     }),
     db.vehicle.findMany({
-      where: { status: { in: ['TASADO', 'PUBLICADO', 'RESERVADO'] } },
+      where: {
+        ...admittedVehicleWhere,
+        status: { in: ['TASADO', 'PUBLICADO', 'RESERVADO'] },
+      },
       select: { id: true, brand: true, model: true, year: true },
       orderBy: { updatedAt: 'desc' },
       take: 200,

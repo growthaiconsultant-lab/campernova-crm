@@ -1,6 +1,7 @@
 import type { PrismaClient, BuyerLeadStatus, SellerLeadStatus } from '@prisma/client'
 import { personLabel, vehicleLabel } from '@/lib/display'
 import { NEXT_ACTION_LABELS } from '@/lib/next-action'
+import { admittedSellerWhere } from '@/lib/seller-intake'
 
 /**
  * Bloque F5 KPIs — Dashboard Comercial (día a día). Orientado a la acción del
@@ -49,7 +50,9 @@ export async function getComercialKpis(
   const dayStart = startOfToday()
   const dayEnd = endOfToday()
   const buyerWhere = agentId ? { agentId } : {}
-  const sellerWhere = agentId ? { agentId } : {}
+  // Las solicitudes web pendientes/rechazadas viven en su bandeja de admisión y no deben
+  // contaminar el trabajo diario (la web les crea una próxima acción por defecto).
+  const sellerWhere = { ...admittedSellerWhere, ...(agentId ? { agentId } : {}) }
 
   const [
     buyerTasksToday,

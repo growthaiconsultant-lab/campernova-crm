@@ -131,6 +131,7 @@ describe('createSellerLeadFromTradeIn · conversión atómica', () => {
     const [, params] = vi.mocked(convertTradeInTx).mock.calls[0]
     expect(params.buyerLeadId).toBe('b1')
     expect(params.sellerData.canal).toBe('CN')
+    expect(params.sellerData.intakeStatus).toBe('ADMITIDO')
     expect(
       (params.sellerData.vehicle as { create: { type: string; brand: string } }).create.type
     ).toBe('CAMPER')

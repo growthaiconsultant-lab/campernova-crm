@@ -187,6 +187,7 @@ export async function convertCaptureToSellerLead(
           email: null,
           phone: capture.phone,
           canal: 'CN',
+          intakeStatus: 'ADMITIDO',
           status: 'NUEVO',
           agentId: capture.assignedToId ?? actor.id,
           ...defaultNextActionData(),

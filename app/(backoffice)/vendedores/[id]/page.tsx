@@ -76,6 +76,7 @@ import { StatusPill } from '@/components/status-pill'
 import { AlertTriangle, Info, CheckCircle2, Phone, Mail, ChevronLeft } from 'lucide-react'
 import { QuickAdvanceButton } from './quick-advance-button'
 import { InfoTooltip } from '@/components/info-tooltip'
+import { SellerIntakePanel } from './seller-intake-panel'
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -404,15 +405,19 @@ export default async function FichaVendedorPage({
       })
     : null
 
-  // Tab activo
-  const activeTab = searchParams.tab ?? 'resumen'
+  const isAdmitted = lead.intakeStatus === 'ADMITIDO'
+
+  // Una solicitud todavía no admitida puede revisarse y conservar su actividad, pero no entra
+  // en las superficies operativas (preparación, publicación, matching o economía).
+  const requestedTab = searchParams.tab ?? 'resumen'
+  const activeTab = isAdmitted || requestedTab === 'actividad' ? requestedTab : 'resumen'
 
   // Próxima transición de estado lead
   const nextLeadStatuses = SELLER_LEAD_TRANSITIONS[lead.status as SellerLeadStatus] ?? []
   const primaryNextStatus = nextLeadStatuses.find((s) => s !== 'DESCARTADO') ?? null
 
   // ── Tabs definición ────────────────────────────────────────────────────────
-  const tabs: LeadTab[] = [
+  const admittedTabs: LeadTab[] = [
     { key: 'resumen', label: 'Resumen' },
     ...(v
       ? [
@@ -428,6 +433,12 @@ export default async function FichaVendedorPage({
     { key: 'actividad', label: 'Actividad', badge: activities.length },
     ...(v ? [{ key: 'economia', label: isAdmin ? 'Economía' : 'Tasación' }] : []),
   ]
+  const tabs: LeadTab[] = isAdmitted
+    ? admittedTabs
+    : [
+        { key: 'resumen', label: 'Resumen' },
+        { key: 'actividad', label: 'Actividad', badge: activities.length },
+      ]
 
   // ── Form default values ────────────────────────────────────────────────────
   const leadDefaultValues = {
@@ -506,7 +517,9 @@ export default async function FichaVendedorPage({
           </span>
         </nav>
         <div className="flex items-center gap-2">
-          <SellerTopbarActions leadId={lead.id} isTerminal={!nextLeadStatuses.length} />
+          {isAdmitted && (
+            <SellerTopbarActions leadId={lead.id} isTerminal={!nextLeadStatuses.length} />
+          )}
           {lead.phone && (
             <WhatsAppButton
               phone={lead.phone}
@@ -518,7 +531,7 @@ export default async function FichaVendedorPage({
               leadType="seller"
             />
           )}
-          {primaryNextStatus && (
+          {isAdmitted && primaryNextStatus && (
             <div className="hidden sm:block">
               <QuickAdvanceButton
                 leadId={lead.id}
@@ -530,6 +543,8 @@ export default async function FichaVendedorPage({
           )}
         </div>
       </header>
+
+      <SellerIntakePanel leadId={lead.id} status={lead.intakeStatus} />
 
       {/* ── Hero ── */}
       <section className="border-b border-border bg-background px-4 pb-0 pt-7 md:px-10">

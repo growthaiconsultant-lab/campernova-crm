@@ -15,11 +15,10 @@ import {
   type Column,
 } from '@/components/redesign'
 import { cn } from '@/lib/utils'
-import type { Prisma, SellerLeadStatus, LeadCanal, VehicleStatus } from '@prisma/client'
+import { buildSellerIntakeViewConditions } from '@/lib/seller-intake'
+import type { Prisma, SellerLeadStatus, LeadCanal } from '@prisma/client'
 
 const PAGE_SIZE = 50
-const TERMINAL_STATUSES: SellerLeadStatus[] = ['CERRADO', 'DESCARTADO']
-const STOCK_STATUSES: VehicleStatus[] = ['TASADO', 'PUBLICADO', 'RESERVADO']
 
 const STATUS_LABELS: Record<string, string> = {
   NUEVO: 'Nuevo',
@@ -68,35 +67,6 @@ type SearchParams = {
   dir?: string
   page?: string
   view?: string
-}
-
-function buildViewConditions(
-  view: string | null,
-  currentUserId: string,
-  twoDaysAgo: Date,
-  startOfWeek: Date
-): Prisma.SellerLeadWhereInput {
-  if (view === 'stock') return { vehicle: { status: { in: STOCK_STATUSES } } }
-  if (view === 'leads-web')
-    return {
-      canal: 'PRO',
-      status: { notIn: TERMINAL_STATUSES },
-      OR: [{ vehicle: null }, { vehicle: { valuationRecommended: null } }],
-    }
-  if (view === 'mis-leads') return { agentId: currentUserId, status: { notIn: TERMINAL_STATUSES } }
-  if (view === 'sin-asignar') return { agentId: null, status: { notIn: TERMINAL_STATUSES } }
-  if (view === 'sin-tasar')
-    return {
-      status: { notIn: TERMINAL_STATUSES },
-      OR: [{ vehicle: null }, { vehicle: { valuationRecommended: null } }],
-    }
-  if (view === 'necesitan-accion')
-    return {
-      status: { notIn: TERMINAL_STATUSES },
-      activities: { none: { createdAt: { gte: twoDaysAgo } } },
-    }
-  if (view === 'esta-semana') return { createdAt: { gte: startOfWeek } }
-  return {}
 }
 
 function buildWhere(
@@ -165,9 +135,10 @@ function buildOrderBy(sp: SearchParams): Prisma.SellerLeadOrderByWithRelationInp
 }
 
 const VIEWS = [
-  { key: 'todos', label: 'Todos' },
+  { key: 'todos', label: 'En gestión' },
   { key: 'stock', label: 'Stock' },
-  { key: 'leads-web', label: 'Leads web' },
+  { key: 'leads-web', label: 'Solicitudes web' },
+  { key: 'web-rechazadas', label: 'Rechazadas web' },
   { key: 'sin-tasar', label: 'Sin tasar' },
   { key: 'sin-asignar', label: 'Sin asignar' },
   { key: 'necesitan-accion', label: 'Necesitan acción' },
@@ -185,8 +156,8 @@ export default async function VendedoresPage({ searchParams }: { searchParams: S
   const startOfWeek = new Date()
   startOfWeek.setDate(startOfWeek.getDate() - 7)
 
-  const viewConditions = buildViewConditions(
-    view === 'todos' ? null : view,
+  const viewConditions = buildSellerIntakeViewConditions(
+    view,
     currentUser.id,
     twoDaysAgo,
     startOfWeek

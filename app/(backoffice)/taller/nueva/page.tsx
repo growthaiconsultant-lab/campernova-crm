@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import { db } from '@/lib/db'
 import { requireCanViewTaller } from '@/lib/auth'
+import { admittedVehicleWhere } from '@/lib/seller-intake'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { WorkOrderForm } from './work-order-form'
@@ -16,7 +17,10 @@ export default async function NuevaOrdenPage({
 
   const [vehicles, users] = await Promise.all([
     db.vehicle.findMany({
-      where: { status: { in: ['NUEVO', 'TASADO', 'PUBLICADO', 'RESERVADO'] } },
+      where: {
+        ...admittedVehicleWhere,
+        status: { in: ['NUEVO', 'TASADO', 'PUBLICADO', 'RESERVADO'] },
+      },
       include: { sellerLead: { select: { name: true } } },
       orderBy: { createdAt: 'desc' },
     }),

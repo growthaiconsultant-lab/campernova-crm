@@ -74,6 +74,7 @@ describe('convertCaptureToSellerLead · conversión atómica', () => {
     const [, params] = vi.mocked(convertCaptureTx).mock.calls[0]
     expect(params.captureId).toBe('cap-1')
     expect(params.sellerData.canal).toBe('CN')
+    expect(params.sellerData.intakeStatus).toBe('ADMITIDO')
     expect((params.sellerData.vehicle as { create: { brand: string } }).create.brand).toBe('Adria')
 
     expect(runAndSavePreliminaryValuation).toHaveBeenCalledWith(
