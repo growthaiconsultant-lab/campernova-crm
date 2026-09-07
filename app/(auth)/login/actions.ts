@@ -2,6 +2,8 @@
 
 import { createClient } from '@/lib/supabase/server'
 import { db } from '@/lib/db'
+import { GENERIC_MAGIC_LINK_ERROR, magicLinkErrorMessage } from '@/lib/auth/magic-link-messages'
+import { resolveMagicLinkRedirectUrl } from '@/lib/auth/magic-link-redirect'
 
 export async function sendMagicLink(email: string): Promise<{ error?: string }> {
   const user = await db.user.findUnique({ where: { email } })
@@ -14,17 +16,40 @@ export async function sendMagicLink(email: string): Promise<{ error?: string }> 
     return { error: 'Tu cuenta está desactivada. Contacta con el administrador.' }
   }
 
-  const supabase = createClient()
-  const { error } = await supabase.auth.signInWithOtp({
-    email,
-    options: {
-      shouldCreateUser: true,
-      emailRedirectTo: `${process.env.NEXT_PUBLIC_APP_URL}/auth/callback`,
-    },
-  })
+  let emailRedirectTo: string
 
-  if (error) {
-    return { error: 'No se pudo enviar el enlace. Inténtalo de nuevo.' }
+  try {
+    emailRedirectTo = resolveMagicLinkRedirectUrl()
+  } catch {
+    console.error('[auth] Magic link callback configuration is invalid', {
+      environment: process.env.VERCEL_ENV ?? process.env.NODE_ENV ?? 'unknown',
+    })
+    return { error: GENERIC_MAGIC_LINK_ERROR }
+  }
+
+  const supabase = createClient()
+  let providerError: unknown
+
+  try {
+    const { error } = await supabase.auth.signInWithOtp({
+      email,
+      options: {
+        shouldCreateUser: true,
+        emailRedirectTo,
+      },
+    })
+    providerError = error
+  } catch {
+    console.error('[auth] Magic link provider request failed unexpectedly')
+    return { error: GENERIC_MAGIC_LINK_ERROR }
+  }
+
+  if (providerError) {
+    const errorMessage = magicLinkErrorMessage(providerError)
+    if (errorMessage === GENERIC_MAGIC_LINK_ERROR) {
+      console.error('[auth] Magic link provider rejected the request')
+    }
+    return { error: errorMessage }
   }
 
   return {}

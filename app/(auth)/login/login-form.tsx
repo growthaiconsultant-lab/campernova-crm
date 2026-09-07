@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { sendMagicLink } from './actions'
+import { GENERIC_MAGIC_LINK_ERROR } from '@/lib/auth/magic-link-messages'
 
 interface LoginFormProps {
   callbackError?: string
@@ -19,13 +20,18 @@ export function LoginForm({ callbackError }: LoginFormProps) {
     setStatus('loading')
     setErrorMessage('')
 
-    const result = await sendMagicLink(email)
+    try {
+      const result = await sendMagicLink(email)
 
-    if (result.error) {
+      if (result.error) {
+        setStatus('error')
+        setErrorMessage(result.error)
+      } else {
+        setStatus('sent')
+      }
+    } catch {
       setStatus('error')
-      setErrorMessage(result.error)
-    } else {
-      setStatus('sent')
+      setErrorMessage(GENERIC_MAGIC_LINK_ERROR)
     }
   }
 
@@ -45,6 +51,10 @@ export function LoginForm({ callbackError }: LoginFormProps) {
               <p className="mt-1 text-gray-500">
                 Hemos enviado un enlace de acceso a{' '}
                 <span className="font-medium text-gray-700">{email}</span>.
+              </p>
+              <p className="mt-3 text-xs text-gray-500">
+                Usa únicamente el enlace más reciente: es de un solo uso. Si no aparece, revisa la
+                carpeta de spam.
               </p>
               <button
                 onClick={() => {
