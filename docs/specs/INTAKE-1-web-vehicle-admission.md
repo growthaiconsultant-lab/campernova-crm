@@ -205,16 +205,26 @@ porque INTAKE-1 modifica columnas ortogonales y no promete coordinar con dinero,
 - [x] ADMIN y AGENTE pueden admitir/rechazar; otros roles y sesión ausente no pueden.
 - [x] Admitir hace visible el mismo lead/vehículo sin duplicarlo.
 - [x] Reintentar una decisión no duplica Activity.
-- [ ] El histórico se clasifica sin pérdida y el preflight detecta excepciones operativas.
+- [x] El histórico se clasifica sin pérdida y el preflight detecta excepciones operativas.
 - [x] No cambian tasación, matching, ofertas, ventas, emails, Storage ni catálogo público.
 
 ## U. Estado de autorización
 
-`IMPLEMENTED — PR AND CI GREEN; STAGING NOT AUTHORIZED`
+`IMPLEMENTED — PR AND CI GREEN; STAGING VALIDATED; AUTH-1 REQUIRED BEFORE MERGE`
 
-La autorización posterior permitió commit, push, apertura de la PR #178 y ejecución de CI. Continúan
-prohibidos migración o backfill remotos, pruebas funcionales contra staging, merge y cambios en
-producción. El siguiente gate es una autorización específica para el preflight y rollout de staging.
+La autorización posterior permitió el rollout únicamente de staging. El preflight confirmó que las
+migraciones previas estaban presentes, que INTAKE-1 era la única migración local pendiente y que no
+había migraciones fallidas ni candidatos históricos con señales operativas. La migración se aplicó
+mediante `prisma migrate deploy` al proyecto staging `iatuhydsfwoeprpbklod`; el guard posterior
+confirmó las 13 migraciones locales coherentes con el historial remoto. `DATABASE_URL` y `DIRECT_URL`
+se rotaron exclusivamente en Vercel Preview y el deployment `4iyrqdkWRetQdfm5ApiZWiNjoe2S` quedó
+`Ready` para el commit `c4118f0` en la rama de la PR. El smoke público, la redirección de una ruta
+protegida a `/login` y el acceso autenticado como QA AGENTE son correctos. La sesión confirmó 0
+solicitudes web, 3 vendedores internos admitidos y 3 vehículos en inventario. El enlace emitido por
+este commit todavía apuntó a localhost porque la corrección canónica está aislada en AUTH-1, PR
+#175, aún no fusionada; el código de un solo uso se canjeó manualmente en el callback del mismo
+Preview para completar el smoke. Stop condition: AUTH-1 debe integrarse antes de fusionar o
+desplegar INTAKE-1. Continúan prohibidos merge, `main` y cualquier cambio en producción.
 
 ## Revisión adversarial
 
@@ -230,31 +240,39 @@ producción. El siguiente gate es una autorización específica para el prefligh
 
 ## Matriz de completitud
 
-| Área                      | Revisada | Evidencia                   | Riesgo pendiente                   |
-| ------------------------- | -------- | --------------------------- | ---------------------------------- |
-| Dominio/estados           | Sí       | F–G                         | ninguno material                   |
-| Permisos                  | Sí       | H + tests de Server Action  | smoke remoto pendiente             |
-| Concurrencia/idempotencia | Sí       | K + unitarios + integración | smoke funcional pendiente          |
-| Datos/legacy/migración    | Sí       | I, O, P                     | preflight remoto pendiente         |
-| Compatibilidad            | Sí       | I                           | orden DB→cliente obligatorio       |
-| Readers/efectos           | Sí       | J–L                         | KPIs generales diferidos           |
-| Caché/superficie pública  | Sí       | L                           | revalidación pendiente             |
-| Observabilidad            | Sí       | Q                           | observación remota no autorizada   |
-| Rollout/rollback          | Sí       | O–P                         | operaciones remotas no autorizadas |
-| Documentación             | Sí       | R                           | cierre posterior                   |
+| Área                      | Revisada | Evidencia                   | Riesgo pendiente                    |
+| ------------------------- | -------- | --------------------------- | ----------------------------------- |
+| Dominio/estados           | Sí       | F–G                         | ninguno material                    |
+| Permisos                  | Sí       | H + tests + smoke AGENTE    | smoke ADMIN no ejecutado            |
+| Concurrencia/idempotencia | Sí       | K + unitarios + integración | sin pendiente en staging para mutar |
+| Datos/legacy/migración    | Sí       | I, O, P + staging           | producción no autorizada            |
+| Compatibilidad            | Sí       | I + Preview                 | AUTH-1 #175 antes del merge         |
+| Readers/efectos           | Sí       | J–L                         | KPIs generales diferidos            |
+| Caché/superficie pública  | Sí       | L + smoke Preview           | ninguno en staging                  |
+| Observabilidad            | Sí       | Q                           | observación remota no autorizada    |
+| Rollout/rollback          | Sí       | O–P + staging               | producción no autorizada            |
+| Documentación             | Sí       | R                           | commit de evidencia pendiente       |
 
 ## Cierre
 
 - **Commit de implementación:** `3915391`; actualizaciones documentales en el historial de la PR.
 - **PR:** #178 abierta contra `main`.
-- **CI:** verde en run `34133501070`: quality, integration, migration-replay y supabase-storage.
-- **Deployment:** build de Vercel Preview automático verde; no se ha aplicado la migración ni se ha
-  abierto o probado funcionalmente el Preview.
+- **CI:** verde en run `34134002681`: quality, integration, migration-replay y supabase-storage.
+- **Staging:** preflight con 3 vendedores `CN`, 0 `PRO`, 0 candidatos a `PENDIENTE`, 0 candidatos de
+  riesgo y 0 migraciones fallidas. `20260907150000_add_seller_intake_admission` se aplicó con
+  `prisma migrate deploy`; el postflight confirmó 3 `ADMITIDO`, 0 `PENDIENTE`, 0 `RECHAZADO`, índice
+  y columna presentes, migración finalizada y 0 pendientes con señales operativas.
+- **Deployment:** Vercel Preview `4iyrqdkWRetQdfm5ApiZWiNjoe2S` `Ready`, commit `c4118f0`, rama
+  `codex/intake-1-web-admission`, usando las conexiones rotadas únicamente de Preview. `/vender`
+  carga y `/vendedores?view=leads-web` sin sesión redirige a `/login`. El smoke QA AGENTE confirmó
+  dashboard, bandeja web vacía, 3 vendedores admitidos y 3 vehículos en inventario. El callback se
+  completó en el dominio Preview reutilizando el código que el commit actual había enviado a
+  localhost; AUTH-1 (#175) es dependencia obligatoria para corregir la generación del enlace.
 - **Validación local:** Prisma validate/generate, SDD, formato, TypeScript, lint, 1.461 tests y
   build verdes. El build completó aunque el catálogo estático no pudo leer la base remota
   configurada; ese reader degradó de forma controlada.
 - **Validación CI:** replay completo de 13 migraciones, catálogo del schema, integración PostgreSQL
   (incluida carrera de admisión) y Supabase Storage local verdes.
-- **No ejecutado:** preflight, migración, postflight ni smoke de staging; tampoco ninguna operación
-  sobre producción.
+- **No ejecutado:** smoke ADMIN ni mutación de admisión remota porque staging no contiene pendientes;
+  tampoco merge, migración o deployment de producción.
 - **Deuda restante:** revisión de KPIs y definición futura de stock físico.
