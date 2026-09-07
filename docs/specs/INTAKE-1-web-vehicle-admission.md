@@ -210,7 +210,7 @@ porque INTAKE-1 modifica columnas ortogonales y no promete coordinar con dinero,
 
 ## U. Estado de autorización
 
-`IMPLEMENTED — AUTH-1 DEPLOYED; PRODUCTION PREFLIGHT STOPPED SAFELY`
+`IMPLEMENTED — STAGING VALIDATED; PRODUCTION PREFLIGHT PASS; PRODUCTION NOT AUTHORIZED`
 
 La autorización posterior permitió el rollout únicamente de staging. El preflight confirmó que las
 migraciones previas estaban presentes, que INTAKE-1 era la única migración local pendiente y que no
@@ -228,14 +228,26 @@ AUTH-1 (#175) se sincronizó con `main`, repitió CI y Preview, se fusionó como
 desplegada en producción con CI `34142488970` verde. El smoke confirmó `/login`, la barrera de una
 ruta protegida y el envío de un magic link real con el nuevo comportamiento.
 
-El preflight read-only de producción detuvo correctamente el rollout de INTAKE-1: encontró 112
-vendedores (64 `PRO`, 48 `CN`), 0 candidatos a `RECHAZADO`, 62 candidatos al backfill `PENDIENTE`,
-0 migraciones fallidas y una señal operativa entre esos candidatos. La señal es una oferta
-`EXPIRADA`, sin reserva ni entrega. No se aplicó ninguna migración en producción. Como la primera
-migración ya está desplegada en staging y no puede editarse, se añade la migración correctiva
-`20260907184500_preserve_operational_web_intakes`: restaura de forma idempotente a `ADMITIDO` las
-solicitudes con estado, responsable, entrada, oferta o entrega. Debe superar replay, integración y
-un nuevo ciclo staging antes de solicitar autorización para producción.
+El primer preflight read-only de producción detuvo correctamente el rollout de INTAKE-1: encontró
+una solicitud candidata a pendiente con una oferta `EXPIRADA`, sin reserva ni entrega. No se aplicó
+ninguna migración en producción. Como la primera migración ya estaba desplegada en staging y no
+podía editarse, se añadió la migración correctiva
+`20260907184500_preserve_operational_web_intakes`, que restaura de forma idempotente a `ADMITIDO`
+las solicitudes con estado, responsable, entrada, oferta o entrega.
+
+La corrección superó replay, integración y un segundo ciclo completo de staging: el preflight
+detectó únicamente esa migración pendiente, `prisma migrate deploy` la aplicó y el postflight
+confirmó 14 migraciones locales coherentes con 43 registros remotos, 3 vendedores `ADMITIDO` y cero
+pendientes con señales operativas. El Preview del commit `10d5e9d` quedó `Ready` y el smoke
+autenticado como QA AGENTE confirmó dashboard, bandeja web vacía, 3 vendedores admitidos y 3
+vehículos en inventario.
+
+El preflight fresco de producción del 2026-09-07 sigue siendo exclusivamente de lectura: 112
+vendedores (64 `PRO`, 48 `CN`), 0 para `RECHAZADO`, 62 candidatos iniciales a `PENDIENTE`, 1
+restaurado por la corrección y 61 pendientes finales; por tanto, quedan 0 pendientes con señales
+operativas. Las 12 migraciones locales anteriores están aplicadas y sus checksums son coherentes;
+faltan exactamente las dos migraciones INTAKE-1, sin registros remotos inconclusos ni revertidos.
+Producción permanece sin cambios y requiere autorización separada.
 
 ## Revisión adversarial
 
@@ -256,40 +268,42 @@ un nuevo ciclo staging antes de solicitar autorización para producción.
 | Dominio/estados           | Sí       | F–G                         | ninguno material                      |
 | Permisos                  | Sí       | H + tests + smoke AGENTE    | smoke ADMIN no ejecutado              |
 | Concurrencia/idempotencia | Sí       | K + unitarios + integración | sin pendiente en staging para mutar   |
-| Datos/legacy/migración    | Sí       | I, O, P + staging + prod RO | validar migración correctiva          |
-| Compatibilidad            | Sí       | I + Preview + AUTH-1 prod   | repetir staging con la corrección     |
+| Datos/legacy/migración    | Sí       | I, O, P + staging + prod RO | producción no autorizada              |
+| Compatibilidad            | Sí       | I + Preview + AUTH-1 prod   | ninguno material antes del rollout    |
 | Readers/efectos           | Sí       | J–L                         | KPIs generales diferidos              |
 | Caché/superficie pública  | Sí       | L + smoke Preview           | ninguno en staging                    |
 | Observabilidad            | Sí       | Q                           | observación posterior al rollout      |
 | Rollout/rollback          | Sí       | O–P + staging + prod RO     | migración de producción no autorizada |
-| Documentación             | Sí       | R                           | registrar CI y segundo staging        |
+| Documentación             | Sí       | R                           | cierre final tras producción          |
 
 ## Cierre
 
-- **Commit de implementación:** `3915391`; actualizaciones documentales en el historial de la PR.
-- **PR:** #178 abierta contra `main`.
-- **CI:** verde en run `34134002681`: quality, integration, migration-replay y supabase-storage.
+- **Commits:** implementación `3915391`; corrección conservadora de datos `10d5e9d`; actualizaciones
+  documentales en el historial de la PR.
+- **PR:** #178 abierta contra `main`, fusionable y sin retraso respecto a la base en el preflight
+  de producción.
+- **CI:** verde en run `34143975653`: quality, integration, migration-replay y supabase-storage;
+  Vercel Preview Comments también finalizó correctamente.
 - **Staging:** preflight con 3 vendedores `CN`, 0 `PRO`, 0 candidatos a `PENDIENTE`, 0 candidatos de
   riesgo y 0 migraciones fallidas. `20260907150000_add_seller_intake_admission` se aplicó con
   `prisma migrate deploy`; el postflight confirmó 3 `ADMITIDO`, 0 `PENDIENTE`, 0 `RECHAZADO`, índice
   y columna presentes, migración finalizada y 0 pendientes con señales operativas.
-- **Deployment:** Vercel Preview `4iyrqdkWRetQdfm5ApiZWiNjoe2S` `Ready`, commit `c4118f0`, rama
-  `codex/intake-1-web-admission`, usando las conexiones rotadas únicamente de Preview. `/vender`
-  carga y `/vendedores?view=leads-web` sin sesión redirige a `/login`. El smoke QA AGENTE confirmó
-  dashboard, bandeja web vacía, 3 vendedores admitidos y 3 vehículos en inventario. El callback se
-  completó en el dominio Preview reutilizando el código que el commit actual había enviado a
-  localhost. AUTH-1 (#175) ya está fusionada y desplegada en producción como `8ef0faa`; su CI de
-  `main` `34142488970` quedó verde y el smoke de acceso fue correcto.
-- **Preflight producción:** 112 vendedores; 64 `PRO`; 48 `CN`; 0 para `RECHAZADO`; 62 para
-  `PENDIENTE`; 0 migraciones fallidas. Una candidata tenía una oferta `EXPIRADA` (sin reserva ni
-  entrega), por lo que se activó la stop condition y no se aplicó la migración. Se añade una segunda
-  migración aditiva e idempotente para conservar como `ADMITIDO` cualquier historial operativo.
-- **Validación local:** Prisma validate/generate, SDD, formato, TypeScript, lint, 1.461 tests y
+- **Staging correctivo:** `20260907184500_preserve_operational_web_intakes` se aplicó mediante
+  `prisma migrate deploy`; el postflight confirmó 14 migraciones locales coherentes con 43 registros
+  remotos, 3 `ADMITIDO` y 0 pendientes con señales operativas.
+- **Deployment:** Vercel Preview `J797bgJX5jHCcUv3jmVQ8nPNUu3h` `Ready`, commit `10d5e9d`, rama
+  `codex/intake-1-web-admission`, usando exclusivamente staging. El smoke QA AGENTE confirmó
+  dashboard, bandeja web vacía, 3 vendedores admitidos y 3 vehículos; una ruta protegida sin sesión
+  redirigió a `/login`. AUTH-1 (#175) ya está fusionada y desplegada en producción como `8ef0faa`.
+- **Preflight producción actualizado:** 112 vendedores; 64 `PRO`; 48 `CN`; 0 para `RECHAZADO`; 62
+  candidatos iniciales a `PENDIENTE`; 1 protegido por la migración correctiva; 61 pendientes finales
+  y 0 pendientes finales con señales operativas. Hay 12 migraciones locales aplicadas y coherentes;
+  faltan exactamente las dos de INTAKE-1, sin migraciones inconclusas o revertidas.
+- **Validación local:** Prisma validate/generate, SDD, formato, TypeScript, lint, 1.484 tests y
   build verdes. El build completó aunque el catálogo estático no pudo leer la base remota
   configurada; ese reader degradó de forma controlada.
-- **Validación CI previa:** replay completo de 13 migraciones, catálogo del schema, integración
-  PostgreSQL (incluida carrera de admisión) y Supabase Storage local verdes. La migración correctiva
-  eleva el historial esperado a 14 y requiere un nuevo CI.
-- **No ejecutado:** nueva migración correctiva en staging o producción, smoke ADMIN ni mutación de
+- **Validación CI actual:** replay completo de 14 migraciones, catálogo del schema, integración
+  PostgreSQL (incluida la regresión del backfill y la carrera de admisión) y Supabase Storage verdes.
+- **No ejecutado:** migraciones, merge, deploy o smoke de producción; smoke ADMIN y mutación de
   admisión remota. INTAKE-1 no está fusionada ni desplegada en producción.
 - **Deuda restante:** revisión de KPIs y definición futura de stock físico.
