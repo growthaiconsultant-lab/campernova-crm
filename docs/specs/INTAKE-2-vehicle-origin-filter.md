@@ -1,15 +1,15 @@
 # INTAKE-2 — Distinguir el origen en el inventario de vehículos
 
-| Campo               | Valor                                              |
-| ------------------- | -------------------------------------------------- |
-| **Estado**          | IMPLEMENTED                                        |
-| **Owner**           | Product / Engineering                              |
-| **Ticket**          | INTAKE-2                                           |
-| **Rama / PR**       | `codex/intake-2-vehicle-origin-filter` / pendiente |
-| **Categorías**      | C0, C1                                             |
-| **Riesgo**          | Bajo                                               |
-| **Ruta SDD**        | Estándar                                           |
-| **Última revisión** | 2026-09-08                                         |
+| Campo               | Valor                                         |
+| ------------------- | --------------------------------------------- |
+| **Estado**          | IMPLEMENTED                                   |
+| **Owner**           | Product / Engineering                         |
+| **Ticket**          | INTAKE-2                                      |
+| **Rama / PR**       | `codex/intake-2-vehicle-origin-filter` / #179 |
+| **Categorías**      | C0, C1                                        |
+| **Riesgo**          | Bajo                                          |
+| **Ruta SDD**        | Estándar                                      |
+| **Última revisión** | 2026-09-08                                    |
 
 ## Problema y evidencia
 
@@ -71,12 +71,12 @@ misma etiqueta de origen. El valor por defecto conserva todos los vehículos adm
 
 ## Verificación
 
-| Criterio                | Evidencia prevista                       | Resultado                      |
-| ----------------------- | ---------------------------------------- | ------------------------------ |
-| Query segura por origen | 11 unitarios verdes; integración añadida | Integración pendiente de CI    |
-| Filtro y etiqueta       | Typecheck, lint y build                  | Verde; smoke pendiente Preview |
-| No regresión            | 1.487 tests Vitest                       | Verde                          |
-| Gobierno y formato      | `check:sdd`, Prettier, `diff --check`    | Verde                          |
+| Criterio                | Evidencia prevista                     | Resultado   |
+| ----------------------- | -------------------------------------- | ----------- |
+| Query segura por origen | 11 unitarios + integración PostgreSQL  | Verde en CI |
+| Filtro y etiqueta       | Typecheck, lint, build y smoke Preview | Verde       |
+| No regresión            | 1.487 tests Vitest                     | Verde       |
+| Gobierno y formato      | `check:sdd`, Prettier, `diff --check`  | Verde       |
 
 ## Rollout, rollback y stop conditions
 
@@ -97,10 +97,15 @@ misma etiqueta de origen. El valor por defecto conserva todos los vehículos adm
 
 ## Cierre
 
-- **Commit:** pendiente.
-- **PR:** pendiente.
-- **CI:** pendiente.
-- **Deployment:** no autorizado.
-- **Validación:** local verde; integración PostgreSQL y smoke de Preview pendientes del siguiente
-  gate.
+- **Commit:** `3e13d70`.
+- **PR:** #179, abierta y sin fusionar.
+- **CI:** PASS — quality, integration, migration-replay y supabase-storage.
+- **Deployment:** Vercel Preview PASS; producción no autorizada ni modificada.
+- **Validación:** smoke autenticado PASS el 2026-09-08 sobre el alias estable del Preview. `Todos`
+  mostró 3 vehículos internos; `Alta interna`, los mismos 3; `Web admitida`, 0 con estado vacío;
+  limpiar filtros restauró los 3. Staging no contiene actualmente un vehículo web admitido, por lo
+  que el caso positivo PRO queda cubierto por la integración PostgreSQL verde de CI.
+- **Precondición operativa del smoke:** se activó SMTP dedicado de Resend exclusivamente en Supabase
+  staging con una clave restringida a envío y al dominio `campersnova.com`; el límite quedó en 30
+  emails/h. No se registraron secretos en Git ni se modificó producción.
 - **Deuda restante:** ninguna conocida dentro del alcance.
