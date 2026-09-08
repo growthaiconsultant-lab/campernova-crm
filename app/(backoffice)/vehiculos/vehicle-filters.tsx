@@ -26,6 +26,11 @@ const TYPE_OPTIONS = [
   { value: 'AUTOCARAVANA', label: 'Autocaravana' },
 ]
 
+const ORIGIN_OPTIONS = [
+  { value: 'CN', label: 'Alta interna' },
+  { value: 'PRO', label: 'Web admitida' },
+]
+
 const SORT_OPTIONS = [
   { value: 'createdAt', label: 'Fecha entrada' },
   { value: 'year', label: 'Año' },
@@ -64,7 +69,8 @@ export function VehicleFilters() {
     params.has('yearMin') ||
     params.has('yearMax') ||
     params.has('kmMax') ||
-    params.has('priceMax')
+    params.has('priceMax') ||
+    params.has('origin')
 
   return (
     <div className="flex flex-wrap items-end gap-3">
@@ -110,6 +116,24 @@ export function VehicleFilters() {
         <SelectContent>
           <SelectItem value="__all__">Todos los tipos</SelectItem>
           {TYPE_OPTIONS.map((o) => (
+            <SelectItem key={o.value} value={o.value}>
+              {o.label}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+
+      {/* Origen */}
+      <Select
+        value={params.get('origin') ?? ''}
+        onValueChange={(v) => push('origin', v === '__all__' ? '' : v)}
+      >
+        <SelectTrigger className="w-40">
+          <SelectValue placeholder="Origen" />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="__all__">Todos los orígenes</SelectItem>
+          {ORIGIN_OPTIONS.map((o) => (
             <SelectItem key={o.value} value={o.value}>
               {o.label}
             </SelectItem>

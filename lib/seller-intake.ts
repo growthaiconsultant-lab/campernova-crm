@@ -1,4 +1,4 @@
-import type { Prisma, SellerIntakeStatus } from '@prisma/client'
+import type { LeadCanal, Prisma, SellerIntakeStatus } from '@prisma/client'
 
 const TERMINAL_SELLER_STATUSES = ['CERRADO', 'DESCARTADO'] as const
 const STOCK_VEHICLE_STATUSES = ['TASADO', 'PUBLICADO', 'RESERVADO'] as const
@@ -13,9 +13,23 @@ export const admittedSellerWhere = {
   intakeStatus: 'ADMITIDO',
 } satisfies Prisma.SellerLeadWhereInput
 
-export const admittedVehicleWhere = {
-  sellerLead: admittedSellerWhere,
-} satisfies Prisma.VehicleWhereInput
+export const VEHICLE_ORIGIN_LABELS: Record<LeadCanal, string> = {
+  CN: 'Alta interna',
+  PRO: 'Web admitida',
+}
+
+export function buildAdmittedVehicleWhere(origin?: string): Prisma.VehicleWhereInput {
+  const canal = origin === 'CN' || origin === 'PRO' ? origin : undefined
+
+  return {
+    sellerLead: {
+      ...admittedSellerWhere,
+      ...(canal ? { canal } : {}),
+    },
+  }
+}
+
+export const admittedVehicleWhere = buildAdmittedVehicleWhere()
 
 export function buildSellerIntakeViewConditions(
   view: string,

@@ -4,7 +4,7 @@ import { Suspense } from 'react'
 import { Package } from 'lucide-react'
 import { db } from '@/lib/db'
 import { requireCanViewVehiculos } from '@/lib/auth'
-import { admittedVehicleWhere } from '@/lib/seller-intake'
+import { buildAdmittedVehicleWhere, VEHICLE_ORIGIN_LABELS } from '@/lib/seller-intake'
 import { vehicleLabel } from '@/lib/display'
 import { eligibleBuyerCounterpartMatchWhere, isVehicleEligible } from '@/lib/matching'
 import { VEHICLE_STATUS_LABELS } from '@/lib/state-machine'
@@ -40,13 +40,14 @@ type SearchParams = {
   yearMax?: string
   kmMax?: string
   priceMax?: string
+  origin?: string
   sort?: string
   dir?: string
   page?: string
 }
 
 function buildWhere(sp: SearchParams): Prisma.VehicleWhereInput {
-  const conditions: Prisma.VehicleWhereInput[] = [admittedVehicleWhere]
+  const conditions: Prisma.VehicleWhereInput[] = [buildAdmittedVehicleWhere(sp.origin)]
 
   if (sp.brand) {
     const q = sp.brand.trim()
@@ -119,7 +120,7 @@ export default async function VehiculosPage({ searchParams }: { searchParams: Se
       skip: (page - 1) * PAGE_SIZE,
       take: PAGE_SIZE,
       include: {
-        sellerLead: { select: { id: true, name: true, archivedAt: true } },
+        sellerLead: { select: { id: true, name: true, archivedAt: true, canal: true } },
         photos: { take: 1, orderBy: { order: 'asc' } },
         // M1: solo cuenta matches cuya contraparte comprador es elegible.
         _count: { select: { matches: { where: eligibleBuyerCounterpartMatchWhere } } },
@@ -221,6 +222,17 @@ export default async function VehiculosPage({ searchParams }: { searchParams: Se
                   <div className="mt-0.5 font-mono text-[11px] text-ink3">
                     {v.type ? (TYPE_LABELS[v.type] ?? v.type) : 'Sin tipo'}
                     {v.km != null ? ` · ${v.km.toLocaleString('es-ES')} km` : ''}
+                  </div>
+                  <div className="mt-1.5">
+                    <span
+                      className={`inline-flex rounded-[6px] px-2 py-[3px] font-hanken text-[10.5px] font-semibold ${
+                        v.sellerLead.canal === 'PRO'
+                          ? 'bg-brand-tint text-brand'
+                          : 'bg-track text-ink2'
+                      }`}
+                    >
+                      {VEHICLE_ORIGIN_LABELS[v.sellerLead.canal]}
+                    </span>
                   </div>
                   <div className="mt-2 flex items-center justify-between gap-2">
                     <span className="font-hanken text-[15px] font-bold text-ink">
