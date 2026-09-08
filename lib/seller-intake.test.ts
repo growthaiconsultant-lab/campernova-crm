@@ -2,8 +2,10 @@ import { describe, expect, it } from 'vitest'
 import {
   admittedSellerWhere,
   admittedVehicleWhere,
+  buildAdmittedVehicleWhere,
   buildSellerIntakeViewConditions,
   canDecideSellerIntake,
+  VEHICLE_ORIGIN_LABELS,
 } from './seller-intake'
 
 const TWO_DAYS_AGO = new Date('2026-09-05T00:00:00.000Z')
@@ -34,6 +36,20 @@ describe('seller intake · separación de bandejas', () => {
 
   it('el inventario operativo exige un vendedor admitido', () => {
     expect(admittedVehicleWhere).toEqual({ sellerLead: { intakeStatus: 'ADMITIDO' } })
+  })
+
+  it.each([
+    ['CN', 'Alta interna'],
+    ['PRO', 'Web admitida'],
+  ] as const)('filtra el inventario admitido por origen %s', (canal, label) => {
+    expect(buildAdmittedVehicleWhere(canal)).toEqual({
+      sellerLead: { intakeStatus: 'ADMITIDO', canal },
+    })
+    expect(VEHICLE_ORIGIN_LABELS[canal]).toBe(label)
+  })
+
+  it('ignora un origen desconocido sin retirar el gate de admisión', () => {
+    expect(buildAdmittedVehicleWhere('desconocido')).toEqual(admittedVehicleWhere)
   })
 
   it('Solicitudes web incluye todas las pendientes sin depender de la tasación', () => {

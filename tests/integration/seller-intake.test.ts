@@ -13,11 +13,16 @@ vi.mock('@/lib/db', async () => {
 
 import { db } from '@/lib/db'
 import { decideSellerIntake } from '@/app/(backoffice)/vendedores/intake-actions'
+import { buildAdmittedVehicleWhere } from '@/lib/seller-intake'
 import { uniqueSuffix } from './db'
 
 const prisma = db as PrismaClient
 let leadId = ''
 let vehicleId = ''
+let internalLeadId = ''
+let internalVehicleId = ''
+let admittedWebLeadId = ''
+let admittedWebVehicleId = ''
 
 beforeAll(async () => {
   const suffix = uniqueSuffix()
@@ -47,12 +52,64 @@ beforeAll(async () => {
   })
   leadId = lead.id
   vehicleId = lead.vehicle!.id
+
+  const internalLead = await prisma.sellerLead.create({
+    data: {
+      name: `Alta interna ${suffix}`,
+      email: `internal_${suffix}@integ.test`,
+      phone: `633${suffix.slice(0, 6)}`,
+      canal: 'CN',
+      intakeStatus: 'ADMITIDO',
+      vehicle: {
+        create: {
+          brand: 'Hymer',
+          model: 'Grand Canyon',
+          type: 'CAMPER',
+          year: 2022,
+          km: 24000,
+          seats: 4,
+          status: 'NUEVO',
+        },
+      },
+    },
+    include: { vehicle: true },
+  })
+  internalLeadId = internalLead.id
+  internalVehicleId = internalLead.vehicle!.id
+
+  const admittedWebLead = await prisma.sellerLead.create({
+    data: {
+      name: `Web admitida ${suffix}`,
+      email: `web_admitted_${suffix}@integ.test`,
+      phone: `644${suffix.slice(0, 6)}`,
+      canal: 'PRO',
+      intakeStatus: 'ADMITIDO',
+      vehicle: {
+        create: {
+          brand: 'Knaus',
+          model: 'Boxstar',
+          type: 'CAMPER',
+          year: 2023,
+          km: 12000,
+          seats: 4,
+          status: 'NUEVO',
+        },
+      },
+    },
+    include: { vehicle: true },
+  })
+  admittedWebLeadId = admittedWebLead.id
+  admittedWebVehicleId = admittedWebLead.vehicle!.id
 })
 
 afterAll(async () => {
   if (leadId) await prisma.activity.deleteMany({ where: { sellerLeadId: leadId } })
-  if (vehicleId) await prisma.vehicle.deleteMany({ where: { id: vehicleId } })
-  if (leadId) await prisma.sellerLead.deleteMany({ where: { id: leadId } })
+  await prisma.vehicle.deleteMany({
+    where: { id: { in: [vehicleId, internalVehicleId, admittedWebVehicleId].filter(Boolean) } },
+  })
+  await prisma.sellerLead.deleteMany({
+    where: { id: { in: [leadId, internalLeadId, admittedWebLeadId].filter(Boolean) } },
+  })
   if (authHolder.user?.id) await prisma.user.deleteMany({ where: { id: authHolder.user.id } })
   await prisma.$disconnect()
 })
@@ -64,6 +121,32 @@ describe('integración · admisión de solicitudes web', () => {
         where: { id: vehicleId, sellerLead: { intakeStatus: 'ADMITIDO' } },
       })
     ).toBe(0)
+  })
+
+  it('segmenta el inventario admitido por origen sin dejar entrar solicitudes pendientes', async () => {
+    const scopedVehicleIds = [vehicleId, internalVehicleId, admittedWebVehicleId]
+
+    expect(
+      await prisma.vehicle.count({
+        where: {
+          AND: [{ id: { in: scopedVehicleIds } }, buildAdmittedVehicleWhere('CN')],
+        },
+      })
+    ).toBe(1)
+    expect(
+      await prisma.vehicle.count({
+        where: {
+          AND: [{ id: { in: scopedVehicleIds } }, buildAdmittedVehicleWhere('PRO')],
+        },
+      })
+    ).toBe(1)
+    expect(
+      await prisma.vehicle.count({
+        where: {
+          AND: [{ id: { in: scopedVehicleIds } }, buildAdmittedVehicleWhere('desconocido')],
+        },
+      })
+    ).toBe(2)
   })
 
   it('dos decisiones concurrentes admiten una sola vez y crean una sola Activity', async () => {
