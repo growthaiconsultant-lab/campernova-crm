@@ -5,7 +5,7 @@
 | **Título**                       | Gobierno de CI y puertas de calidad                                                                               |
 | **Estado**                       | ACTIVE                                                                                                            |
 | **Owner**                        | Engineering                                                                                                       |
-| **Última revisión**              | 2026-08-03                                                                                                        |
+| **Última revisión**              | 2026-09-08 (acciones compatibles con Node 24 y fijadas por SHA)                                                   |
 | **Fuente de verdad relacionada** | [`.github/workflows/ci.yml`](../../.github/workflows/ci.yml). Este documento describe la intención y el gobierno. |
 | **Alcance**                      | Los 4 jobs de CI y la política de branch protection y de acciones.                                                |
 | **Fuera de alcance**             | Cambios reales en branch protection (acción de gobierno del repo, no de este PR).                                 |
@@ -70,9 +70,10 @@ no un cambio de código.
 
 ## Política de acciones y workflows
 
-- **Acciones fijadas a tags mayores** (`actions/checkout@v4`, `pnpm/action-setup@v4`,
-  `actions/setup-node@v4`, `supabase/setup-cli@v1`). **Recomendación:** SHA-pin de las acciones de
-  **terceros** (p. ej. `supabase/setup-cli`) para reducir exposición de cadena de suministro.
+- **Acciones fijadas por SHA inmutable**, con la release legible en comentario: `actions/checkout`
+  `v7.0.1`, `actions/setup-node` `v7.0.0`, `pnpm/action-setup` `v6.1.0` y
+  `supabase/setup-cli` `v3.0.0`. Estas releases ejecutan sus acciones con un runtime compatible con
+  Node 24; esto no cambia el Node 20 con el que se instala y prueba la aplicación.
 - **Supabase CLI:** `version: latest` (flotante, no determinista). **Recomendación:** pin a una
   release conocida y bump deliberado.
 - **`permissions`:** CI declara `contents: read` a nivel de workflow. Cualquier grant adicional debe
@@ -81,12 +82,10 @@ no un cambio de código.
   probado.
 - **Cambios en workflows:** revisión explícita; nunca introducir `continue-on-error` en gates.
 
-> Estas recomendaciones son **deuda de hardening**, no bloqueos de cierre técnico. Ninguna afecta a
-> la corrección de las migraciones ni a las invariantes de RLS/catálogo. Están registradas como
-> riesgos residuales en
-> [`../architecture/fase-0-final-state.md`](../architecture/fase-0-final-state.md#55-riesgos-residuales):
-> R3 (CLI `version: latest`), R5 (acciones por tag mutable), R6 (jobs no _required_) y R17 (sin
-> bloque `permissions:`).
+> Las recomendaciones pendientes son **deuda de hardening**, no bloqueos de cierre técnico. Ninguna
+> afecta a la corrección de las migraciones ni a las invariantes de RLS/catálogo. Permanecen R3
+> (CLI `version: latest`) y R6 (jobs no _required_). R5 queda mitigado con SHA-pin y el workflow ya
+> declara `permissions: contents: read`, por lo que R17 no describe el estado actual.
 
 ---
 
