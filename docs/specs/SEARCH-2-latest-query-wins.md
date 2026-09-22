@@ -1,15 +1,15 @@
 # SEARCH-2 — El buscador global conserva únicamente la consulta más reciente
 
-| Campo               | Valor                                          |
-| ------------------- | ---------------------------------------------- |
-| **Estado**          | IMPLEMENTED                                    |
-| **Owner**           | Engineering                                    |
-| **Ticket**          | SEARCH-2                                       |
-| **Rama / PR**       | `codex/search-2-latest-query-wins` / pendiente |
-| **Categorías**      | C0, C1, C5                                     |
-| **Riesgo**          | Bajo                                           |
-| **Ruta SDD**        | Estándar                                       |
-| **Última revisión** | 2026-09-22                                     |
+| Campo               | Valor                                     |
+| ------------------- | ----------------------------------------- |
+| **Estado**          | IMPLEMENTED                               |
+| **Owner**           | Engineering                               |
+| **Ticket**          | SEARCH-2                                  |
+| **Rama / PR**       | `codex/search-2-latest-query-wins` / #181 |
+| **Categorías**      | C0, C1, C5                                |
+| **Riesgo**          | Bajo                                      |
+| **Ruta SDD**        | Estándar                                  |
+| **Última revisión** | 2026-09-22                                |
 
 ## Problema y evidencia
 
@@ -76,6 +76,8 @@ cualquier respuesta pendiente.
 | Integridad estática      | `check:sdd`, `typecheck`, `lint` y `git diff --check` | Verde, sin avisos        |
 | Regresión                | `pnpm test`                                           | 1.489/1.489 tests verdes |
 | Compilación              | `pnpm build`                                          | Verde                    |
+| CI remoto                | Quality, integration, migration replay y Storage      | Verde                    |
+| Vercel Preview           | Rama correcta y variables Preview separadas           | Ready, login accesible   |
 
 ## Rollout, rollback y stop conditions
 
@@ -95,9 +97,9 @@ cualquier respuesta pendiente.
 
 ## Cierre
 
-- **Commit:** pendiente.
-- **PR:** pendiente.
-- **CI:** pendiente.
-- **Deployment:** no realizado.
-- **Validación:** local completa; pendiente CI y smoke autenticado en Preview.
+- **Commit:** `6da0984`.
+- **PR:** #181, abierta contra `main`.
+- **CI:** verde en quality, integration, migration replay y Supabase Storage.
+- **Deployment:** Vercel Preview Ready; no se ha desplegado en producción.
+- **Validación:** local completa y login de Preview accesible; pendiente smoke autenticado.
 - **Deuda restante:** smoke autenticado posterior al despliegue.
