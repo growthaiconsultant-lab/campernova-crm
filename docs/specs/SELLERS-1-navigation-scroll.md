@@ -30,7 +30,8 @@ contiene el desplazamiento al llegar a sus límites.
 - Conservar filtros y orden al paginar; desempatar el orden por ID para evitar saltos entre páginas.
 - Normalizar páginas inválidas y acotar páginas que ya no existen al último resultado disponible.
 - Mantener enlaces nativos, accesibilidad de teclado, permisos y separación web/backoffice.
-- Autorización actual: implementación y validación local. Publicación requiere autorización propia.
+- Autorización actual: implementación, commit, push, PR, CI y Preview (confirmada el 2026-09-22).
+  Merge y producción requieren autorización propia.
 
 ## Fuera de alcance
 
@@ -99,6 +100,8 @@ filtros con espacios, registros con mismo nombre, teclado y viewport móvil.
 
 ## Cierre
 
-Implementación local lista para revisión en rama aislada; sin commit, push, PR ni deploy.
-Próximo gate: autorizar commit/push/PR y ejecutar CI (incluida integración) y Preview.
+Implementación publicada en [PR #182](https://github.com/growthaiconsultant-lab/campernova-crm/pull/182),
+commit funcional `746837d06c8af23f5652e83490fbabe834c7a366`.
+CI y Preview en curso: consultar los checks de la PR para su estado vivo.
+Próximo gate: integración PostgreSQL y smoke autenticado de Preview antes de solicitar merge.
 El flujo de autorización proviene de AGENTS.md §7. Producción no está modificada.
