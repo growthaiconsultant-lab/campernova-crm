@@ -16,9 +16,9 @@ import {
 } from '@/components/redesign'
 import { cn } from '@/lib/utils'
 import { buildSellerIntakeViewConditions } from '@/lib/seller-intake'
+import { SELLERS_PAGE_SIZE, sellerPagination } from '@/lib/seller-pagination'
+import { SellerPagination } from './seller-pagination'
 import type { Prisma, SellerLeadStatus, LeadCanal } from '@prisma/client'
-
-const PAGE_SIZE = 50
 
 const STATUS_LABELS: Record<string, string> = {
   NUEVO: 'Nuevo',
@@ -148,7 +148,6 @@ const VIEWS = [
 
 export default async function VendedoresPage({ searchParams }: { searchParams: SearchParams }) {
   const currentUser = await requireAgente()
-  const page = Math.max(1, parseInt(searchParams.page ?? '1', 10) || 1)
   const view = searchParams.view ?? 'todos'
 
   const twoDaysAgo = new Date()
@@ -165,39 +164,36 @@ export default async function VendedoresPage({ searchParams }: { searchParams: S
   const where = buildWhere(searchParams, viewConditions)
   const orderBy = buildOrderBy(searchParams)
 
-  const [total, leads, agents] = await Promise.all([
+  const [total, agents] = await Promise.all([
     db.sellerLead.count({ where }),
-    db.sellerLead.findMany({
-      where,
-      orderBy,
-      skip: (page - 1) * PAGE_SIZE,
-      take: PAGE_SIZE,
-      include: {
-        agent: { select: { id: true, name: true } },
-        vehicle: {
-          select: {
-            brand: true,
-            model: true,
-            year: true,
-            type: true,
-            desiredPrice: true,
-            valuationRecommended: true,
-            valuationMax: true,
-            status: true,
-          },
-        },
-      },
-    }),
     db.user.findMany({
       where: { active: true },
       select: { id: true, name: true },
       orderBy: { name: 'asc' },
     }),
   ])
-
-  const totalPages = Math.ceil(total / PAGE_SIZE)
-  const from = total === 0 ? 0 : (page - 1) * PAGE_SIZE + 1
-  const to = Math.min(page * PAGE_SIZE, total)
+  const pagination = sellerPagination(searchParams.page, total)
+  const leads = await db.sellerLead.findMany({
+    where,
+    orderBy: [orderBy, { id: 'asc' }],
+    skip: pagination.skip,
+    take: SELLERS_PAGE_SIZE,
+    include: {
+      agent: { select: { id: true, name: true } },
+      vehicle: {
+        select: {
+          brand: true,
+          model: true,
+          year: true,
+          type: true,
+          desiredPrice: true,
+          valuationRecommended: true,
+          valuationMax: true,
+          status: true,
+        },
+      },
+    },
+  })
 
   function viewUrl(v: string) {
     const sp = new URLSearchParams()
@@ -205,14 +201,6 @@ export default async function VendedoresPage({ searchParams }: { searchParams: S
     if (searchParams.status) sp.set('status', searchParams.status)
     if (searchParams.agentId) sp.set('agentId', searchParams.agentId)
     if (v !== 'todos') sp.set('view', v)
-    const qs = sp.toString()
-    return `/vendedores${qs ? `?${qs}` : ''}`
-  }
-
-  function pageUrl(p: number) {
-    const sp = new URLSearchParams(searchParams as Record<string, string>)
-    if (p > 1) sp.set('page', String(p))
-    else sp.delete('page')
     const qs = sp.toString()
     return `/vendedores${qs ? `?${qs}` : ''}`
   }
@@ -351,6 +339,7 @@ export default async function VendedoresPage({ searchParams }: { searchParams: S
         <LeadsFilters agents={agents} />
       </div>
 
+      <SellerPagination {...pagination} total={total} params={searchParams} position="superior" />
       <Card pad={false}>
         <ActionableTable
           columns={columns}
@@ -405,33 +394,8 @@ export default async function VendedoresPage({ searchParams }: { searchParams: S
         />
       </Card>
 
-      {total > PAGE_SIZE && (
-        <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
-          <p className="font-hanken text-[12.5px] text-ink2">
-            {from}–{to} de {total}
-          </p>
-          <div className="flex items-center gap-2">
-            {page > 1 && (
-              <Link
-                href={pageUrl(page - 1)}
-                className="rounded-[9px] border border-line bg-card px-3 py-1.5 font-hanken text-[12.5px] font-semibold text-ink2 hover:bg-canvas"
-              >
-                Anterior
-              </Link>
-            )}
-            <span className="font-mono text-[12px] text-ink3">
-              {page} / {totalPages}
-            </span>
-            {page < totalPages && (
-              <Link
-                href={pageUrl(page + 1)}
-                className="rounded-[9px] border border-line bg-card px-3 py-1.5 font-hanken text-[12.5px] font-semibold text-ink2 hover:bg-canvas"
-              >
-                Siguiente
-              </Link>
-            )}
-          </div>
-        </div>
+      {pagination.totalPages > 1 && (
+        <SellerPagination {...pagination} total={total} params={searchParams} position="inferior" />
       )}
     </div>
   )
