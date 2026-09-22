@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { Search, Loader2 } from 'lucide-react'
 import { globalSearch, type SearchResults } from '@/app/(backoffice)/search-actions'
+import { createLatestSearchRequest } from '@/lib/latest-search-request'
 
 /**
  * Buscador global del header (ESPEC §5): overlay con resultados agrupados por
@@ -22,6 +23,7 @@ export function GlobalSearch() {
   const [query, setQuery] = useState('')
   const [results, setResults] = useState<SearchResults | null>(null)
   const [loading, setLoading] = useState(false)
+  const [requestGate] = useState(createLatestSearchRequest)
   const inputRef = useRef<HTMLInputElement>(null)
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
@@ -43,30 +45,48 @@ export function GlobalSearch() {
     if (open) {
       inputRef.current?.focus()
     } else {
+      requestGate.invalidate()
+      if (timer.current) clearTimeout(timer.current)
+      timer.current = null
       setQuery('')
       setResults(null)
-    }
-  }, [open])
-
-  const search = useCallback((value: string) => {
-    if (timer.current) clearTimeout(timer.current)
-    if (value.trim().length < 2) {
-      setResults(null)
       setLoading(false)
-      return
     }
-    setLoading(true)
-    timer.current = setTimeout(async () => {
-      try {
-        const res = await globalSearch(value)
-        setResults(res)
-      } catch {
+  }, [open, requestGate])
+
+  useEffect(
+    () => () => {
+      requestGate.invalidate()
+      if (timer.current) clearTimeout(timer.current)
+    },
+    [requestGate]
+  )
+
+  const search = useCallback(
+    (value: string) => {
+      const requestId = requestGate.begin()
+      if (timer.current) clearTimeout(timer.current)
+      timer.current = null
+      if (value.trim().length < 2) {
         setResults(null)
-      } finally {
         setLoading(false)
+        return
       }
-    }, 250)
-  }, [])
+      setLoading(true)
+      timer.current = setTimeout(async () => {
+        timer.current = null
+        try {
+          const res = await globalSearch(value)
+          if (requestGate.isCurrent(requestId)) setResults(res)
+        } catch {
+          if (requestGate.isCurrent(requestId)) setResults(null)
+        } finally {
+          if (requestGate.isCurrent(requestId)) setLoading(false)
+        }
+      }, 250)
+    },
+    [requestGate]
+  )
 
   const total = results ? GROUPS.reduce((s, g) => s + results[g.key].length, 0) : 0
 
