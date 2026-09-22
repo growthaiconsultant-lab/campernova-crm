@@ -19,10 +19,10 @@ export default async function BackofficeLayout({ children }: { children: React.R
   const roleLabel = ROLE_LABELS[user.role] ?? user.role
 
   return (
-    <div className="crm-theme flex h-screen overflow-hidden bg-background font-sans text-foreground">
+    <div className="crm-theme flex h-dvh overflow-hidden bg-background font-sans text-foreground">
       <Sidebar userRole={user.role} userName={user.name} roleLabel={roleLabel} />
 
-      <div className="flex flex-1 flex-col overflow-hidden">
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
         {/* Header del shell (mockup 60px): buscador ⌘K + Nuevo lead + campana.
             En móvil, `leading` inyecta la hamburguesa del drawer. */}
         <Topbar
@@ -35,7 +35,9 @@ export default async function BackofficeLayout({ children }: { children: React.R
         />
 
         {/* En móvil, hueco inferior para la tab bar fija (~84px con safe area) */}
-        <main className="flex-1 overflow-y-auto bg-canvas p-6 pb-[96px] lg:pb-6">{children}</main>
+        <main className="min-h-0 min-w-0 flex-1 overflow-y-auto overscroll-y-contain bg-canvas p-6 pb-[96px] lg:pb-6">
+          {children}
+        </main>
       </div>
       {/* Tab bar inferior — solo móvil (mockups M*) */}
       <CrmMobileTabBar userRole={user.role} />

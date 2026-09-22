@@ -11,6 +11,7 @@ import path from 'node:path'
  * SERIE (comparten la misma base) con timeouts amplios.
  */
 export default defineConfig({
+  oxc: { jsx: { runtime: 'automatic' } },
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './'),
