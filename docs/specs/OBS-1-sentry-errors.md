@@ -28,7 +28,7 @@ del feed y del detalle tienen ventanas diferentes; no equivalen a usuarios afect
 | [CRM-1C](https://ai-marketing-solutions.sentry.io/issues/146973404/) / [CRM-1D](https://ai-marketing-solutions.sentry.io/issues/146973841/) / [CRM-1E](https://ai-marketing-solutions.sentry.io/issues/146973865/) | Misma traza de Chrome iOS, /vender y /como-funciona, 14/09; recursión Nk/Pk en scripts de documento | Posible traducción/inyección del navegador (título traducido en breadcrumbs); pendiente reproducción y fuente. No desactivar traducción ni filtrar RangeError. |
 | [CRM-G](https://ai-marketing-solutions.sentry.io/issues/127403552/)                                                                                                                                                | Hidratación de home, Edge, última muestra 19/09; detalle sin diff HTML ni stack                     | Pendiente reproducción; no suppressHydrationWarning global.                                                                                                    |
 | [CRM-18](https://ai-marketing-solutions.sentry.io/issues/139262921/)                                                                                                                                               | UPDATE por foto con 13 spans repetidos; coincide con photo-actions.ts                               | Actualización parametrizada en lote, validación de conjunto y atomicidad.                                                                                      |
-| [CRM-C](https://ai-marketing-solutions.sentry.io/issues/125491589/)                                                                                                                                                | GET /\_next/image, 453560 bytes; sin URL original en evidencia                                      | Aviso de rendimiento, no caída. Identificar imagen antes de degradar calidad de todo el catálogo.                                                              |
+| [CRM-C](https://ai-marketing-solutions.sentry.io/issues/125491589/)                                                                                                                                                | GET /\_next/image, 453560 bytes; identificado en breadcrumbs como hero de portada a 1080 px, q=75   | Aviso de rendimiento, no caída. Evaluar derivado optimizado sólo de esta imagen; no degradar el catálogo.                                                      |
 
 En el código base se verificó además que los tres SDK usaban NODE_ENV: un Preview compilado se etiquetaba
 incorrectamente como production. Las muestras originales de chunks compartidos no estaban
@@ -297,14 +297,14 @@ documentos privados y producción; abortar si el catálogo contradice el diagnó
 Responsable técnico de los siguientes pasos: Engineering. No se han modificado asignaciones,
 prioridades o estados en Sentry. Consulta del feed del 23/09: diez incidencias abiertas en 14 días.
 
-| Incidencia               | Estado técnico                                                                                                          | Próxima evidencia necesaria para cerrar                                                                                              |
-| ------------------------ | ----------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
-| CRM-18                   | Corrección validada en PostgreSQL efímero y smoke Chrome/Preview; tres fotos QA reordenadas y persistentes tras recarga | Pendientes promoción autorizada y traza de un único UPDATE en el entorno objetivo.                                                   |
-| CRM-6 / CRM-1G           | Recuperación mitigada en Preview; causa inicial del loader desconocida                                                  | Reproducción de navegación/recuperación entre releases, stack desminificado y observación del release autorizado en producción.      |
-| CRM-A / CRM-D            | Origen observado en código inyectado Android; no equivale a CRM corregido                                               | Reproducción en navegador integrado y Chrome externo, atribuir frames y comprobar si el flujo visible falla. No filtro global.       |
-| CRM-1C / CRM-1D / CRM-1E | Hipótesis de traducción/inyección, sin causa probada                                                                    | iOS real, mismo recorrido con/sin traducción, stack y test de regresión antes de modificar código.                                   |
-| CRM-G                    | Diff HTML recuperado: mutaciones externas compatibles con traducción antes de hidratar; sin reproducción controlada     | Reproducir en Edge con/sin traducción y aislar el primer nodo divergente; no deshabilitar traducción ni ocultar alertas globalmente. |
-| CRM-C                    | Rendimiento, recurso todavía sin identificar                                                                            | URL del recurso afectado y comparación de bytes/calidad; no rebajar todo el catálogo especulativamente.                              |
+| Incidencia               | Estado técnico                                                                                                          | Próxima evidencia necesaria para cerrar                                                                                                           |
+| ------------------------ | ----------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
+| CRM-18                   | Corrección validada en PostgreSQL efímero y smoke Chrome/Preview; tres fotos QA reordenadas y persistentes tras recarga | Pendientes promoción autorizada y traza de un único UPDATE en el entorno objetivo.                                                                |
+| CRM-6 / CRM-1G           | Recuperación mitigada en Preview; causa inicial del loader desconocida                                                  | Reproducción de navegación/recuperación entre releases, stack desminificado y observación del release autorizado en producción.                   |
+| CRM-A / CRM-D            | Origen observado en código inyectado Android; no equivale a CRM corregido                                               | Reproducción en navegador integrado y Chrome externo, atribuir frames y comprobar si el flujo visible falla. No filtro global.                    |
+| CRM-1C / CRM-1D / CRM-1E | Hipótesis de traducción/inyección, sin causa probada                                                                    | iOS real, mismo recorrido con/sin traducción, stack y test de regresión antes de modificar código.                                                |
+| CRM-G                    | Diff HTML recuperado: mutaciones externas compatibles con traducción antes de hidratar; sin reproducción controlada     | Reproducir en Edge con/sin traducción y aislar el primer nodo divergente; no deshabilitar traducción ni ocultar alertas globalmente.              |
+| CRM-C                    | Recurso identificado: hero de portada a 1080 px, q=75; 453560 B en breadcrumb HTTP                                      | Comparar formato/peso/aspecto de un derivado local, comprobar negociación y petición en Preview. No atribuir la descarga adicional sin evidencia. |
 
 Nueva muestra de CRM-A revisada: evento `411ab85122104054b127ae28c879ab62`, 23/09
 07:59:07.909 UTC, production release `72dbc47af1f3`, Android 17. El origen sigue siendo
@@ -312,6 +312,59 @@ Nueva muestra de CRM-A revisada: evento `411ab85122104054b127ae28c879ab62`, 23/0
 pero aparece también un frame de chunk del sitio en la envoltura `addEventListener`, aún minificado.
 Por tanto, la descripción inicial de «únicamente frames externos» sólo aplica a la muestra anterior;
 no se generaliza a todos los eventos ni se declara inocuo sin reproducir el flujo.
+
+### Evidencia adicional: Chrome traducido y recurso CRM-C
+
+- CI del commit documental `c2f48043b36c0ac5899d80144c91526be95972e7`:
+  [35855368571](https://github.com/growthaiconsultant-lab/campernova-crm/actions/runs/35855368571),
+  cuatro jobs SUCCESS. Preview `2DMsgZf7tC6zdJupmzcEM6E8Qxx3` SUCCESS. Sin merge.
+- Chrome con traducción real al inglés activada por el usuario: cambio To buy → For sale →
+  To buy, contenido/selección y navegación a `/como-funciona` y `/vender` correctos. Cero
+  warn/error capturados en esa muestra. La recarga en `/vender` volvió al castellano: no demuestra
+  ausencia de carrera de traducción durante hidratación. No sustituye Edge/iOS ni cierra CRM-G.
+  [Evidencia en PR](https://github.com/growthaiconsultant-lab/campernova-crm/pull/183#issuecomment-5794565757).
+- CRM-C: la revisión posterior de Latest → View Full Trace → Breadcrumbs del evento
+  `7d941e5365244ab588720c5fc6fb03a0`, traza `7b010e83a12341ddbdccd53382337c18`, permite
+  identificar el recurso antes desconocido: `/images/landing/ChatGPT Image 4 may 2026, 09_40_45.png`,
+  hero de `components/landing/hero.tsx`, `w=1080&q=75`. A las 10:46:31.567 UTC del 16/09 el
+  breadcrumb Fetch registra HTTP 200 y `response_body_size: 453560`, exactamente la alerta.
+- La misma visita (Instagram Android, release `05167ce25220`) registra otra petición Fetch de
+  ese recurso a 1200 px, 543132 B, 10:46:32.062 UTC. El span resource.link
+  `ae7a0312a0d24e4a` de 1200 px registra por separado 157026 B de contenido y 157326 B
+  transferidos. Es evidencia de peticiones/mediciones distintas, no prueba suficiente de su
+  iniciador ni del formato negociado. No se atribuye todavía al preload o a código inyectado.
+- El original local mide 2995726 B, 1536×1024. Experimento aislado en memoria con el optimizador
+  Next instalado, sin red ni escrituras: salida a 1080 px PNG q75/q60 = 1381688 B en ambos;
+  WebP q75 = 137706 B y q60 = 115076 B. `sharp` no está disponible en este workspace y se usó
+  el fallback; estas cifras no reproducen el entorno de Vercel ni sustituyen mediciones remotas.
+  El proceso se interrumpió tras emitir los cuatro resultados porque sus workers seguían activos;
+  no se contabiliza como suite de tests ni se generaron archivos.
+- Siguiente experimento acotado: derivado WebP local de la imagen identificada, conservar original,
+  comparar aspecto y pesos, mantener `priority`/`sizes` y verificar en Preview. Sin modificar
+  configuración global de imágenes, catálogo, datos o producción. El usuario autorizó con «ok»
+  la conversión local sin IA generativa y su preparación/publicación sólo en Preview.
+
+#### Plan acotado CRM-C: derivado de portada (ruta estándar, riesgo bajo)
+
+- Fuente original inmutable; derivado `public/images/landing/hero-mountain.webp`, WebP q75,
+  1536×1024. Script manual `scripts/optimize-landing-hero.mjs` usa el codificador Next instalado,
+  no instala dependencias, no accede a red y rechaza sobrescribir un derivado existente.
+- Cambiar únicamente `src` en HeroSection; mantener `fill`, `priority`, `sizes="100vw"`, alt,
+  encuadre, enlaces y configuración global. Las fotos del CRM y el resto de imágenes no cambian.
+- Aceptación: derivado ≤350 KiB a resolución original, formato real WebP y dimensiones conservadas;
+  srcset sólo usa el derivado; original disponible. Inspección visual local y desktop/móvil en
+  Preview, imagen visible y sin nuevas excepciones. Medir la respuesta servida si la herramienta
+  expone cabeceras; no atribuir a Vercel cifras del codificador local.
+- Rollback: revertir sólo el `src` al PNG conservado. Detener ante artefactos visibles, imagen rota,
+  regresión de carga o fallo de CI/build. Sin migraciones, permisos, datos remotos ni producción.
+- Regresión previa al cambio: 2 tests fallan al detectar PNG y srcset antiguo; 1 pasa preservando
+  el original. Después del cambio deben pasar formato/peso/dimensiones y carga responsive prioritaria.
+- Derivado generado: 234208 B frente a 2995726 B originales (92,18% menos en archivo fuente),
+  1536×1024. No es una medición de ahorro de red real ni prueba de cierre de CRM-C.
+- Validación local de este incremento: inspección visual original/derivado, tres pruebas específicas,
+  typecheck y suite completa (125 archivos, 1565 tests) PASS. Lint sin warnings/errores, check:sdd
+  y diff check PASS. El generador rechaza una segunda ejecución con EEXIST, sin sobrescribir.
+  Original sin cambios. Build y smoke del nuevo derivado pendientes del deployment Preview.
 
 ### Aprendizajes aplicados
 

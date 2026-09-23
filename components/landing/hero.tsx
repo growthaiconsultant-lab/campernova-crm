@@ -6,7 +6,7 @@ export function HeroSection() {
     <section id="main-content" className="relative min-h-[88vh] overflow-hidden">
       {/* Background image */}
       <Image
-        src="/images/landing/ChatGPT Image 4 may 2026, 09_40_45.png"
+        src="/images/landing/hero-mountain.webp"
         alt="Camper y autocaravana en la montaña — CampersNova"
         fill
         className="object-cover object-center"
