@@ -99,6 +99,74 @@ No se autorizan producción, merge, cambios de variables, migraciones ni datos e
 Estado de autorización del plan: `PLAN READY FOR INDEPENDENT REVIEW`; ejecución de este alcance
 aprobada expresamente por el usuario. Evidencia y resultados se añadirán tras ejecutarlos.
 
+### Reconciliación de fotos staging autorizada (23/09)
+
+Ampliación separada C5/C7, ruta reforzada, riesgo alto: usuario autoriza únicamente políticas y
+límites de `vehicle-photos` en staging y repetición del smoke QA. No producción, merge, documentos
+privados, schema Prisma ni edición/borrado de datos preexistentes. Responsable: Engineering.
+
+| Área del plan                        | Evidencia, decisión y verificación                                                                                                                                                                                                                                                                                                                                                                                                |
+| ------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| A–B Objetivo/baseline                | Resolver rechazo RLS del upload. VERIFICADO EN ENTORNO mediante SELECT en el editor SQL del proyecto `iatuhydsfwoeprpbklod`: dos buckets, 0 objetos, 0 políticas Storage, RLS activo; fotos públicas y documentos privados, límites/MIME nulos en ambos. Respaldo de metadatos sin secretos en `.artifacts/obs-1/staging-storage-preflight.json` (ignorado). Main `72dbc47`; PR #183 `8de9822`, cuatro jobs CI y Preview SUCCESS. |
+| C–E Alcance/decisión                 | DECISIÓN DOCUMENTADA: aplicar sólo contrato de fotos de `20260713000000_storage_buckets_and_policies.sql`; el archivo completo NO se ejecuta. Confirmación recibida del usuario; el navegador exige además confirmación inmediatamente antes de aplicar acceso.                                                                                                                                                                   |
+| F–I Flujo/invariantes/permisos/datos | Lectura pública; INSERT/UPDATE/DELETE sólo authenticated y sólo bucket de fotos, igual que fuente versionada. No es autorización por rol/propietario del CRM: los guards Prisma siguen en Server Actions y ese límite preexistente queda explícito. Fotos hasta 2 MiB, JPEG/PNG/WebP; RLS sigue activo; documentos sin cambios ni políticas. Ningún objeto se modifica por la reconciliación.                                     |
+| J Consumers                          | `photo-actions.ts`: subida/borrado con sesión Supabase; reordenado en Prisma no cambia. `vehicle-photo-uploader.tsx`: carga y drag/drop. Readers de fotos públicas conservan URLs; clientes antiguos respetan mismos límites ya validados por servidor. No readers de documentos afectados.                                                                                                                                       |
+| K Concurrencia/reintentos            | Transacción única, lock de objetos y filas de los dos buckets; lock timeout 5 s y statement timeout 15 s. Guard exige exactamente baseline, incluido cero objetos/políticas. Reejecución aborta sin duplicar efectos; ante resultado incierto consultar catálogo, nunca repetir ciegamente.                                                                                                                                       |
+| L–M Efectos/UX                       | Sin emails, contratos, publicación, matching, KPIs nuevos ni cambios de estado por configurar Storage. QA conserva estado NUEVO. Upload rechazado debe pasar a tres imágenes visibles; error explícito detiene el smoke.                                                                                                                                                                                                          |
+| N–O Tests/rollout                    | Contrato existente probado por supabase-storage CI 35849036364; no equivale a remoto. Preflight → confirmación de acceso → transacción con postflight interno → consulta de catálogo → smoke QA en Preview → recarga y persistencia. No se fuerza redeploy por un cambio de Storage.                                                                                                                                              |
+| P Rollback/stop                      | Error de transacción revierte todo. Tras commit, detener subidas y solicitar reversión controlada de las cuatro políticas y límites previos si hay regresión; nunca borrar fotos. Abortar ante otro project ref, catálogo distinto, RLS desactivado, sesión perdida o permisos no aprobados.                                                                                                                                      |
+| Q–T Evidencia/riesgos/aceptación     | Registrar resultado y entorno, sin claves, objetos ni PII. Aceptación: cuatro políticas de fotos exactas, límites correctos, bucket privado inalterado, subida QA y orden persistente. Ventana inmediata, no 24 h; resto de incidencias Sentry conserva estado anterior.                                                                                                                                                          |
+| U Autorización                       | `PLAN READY FOR INDEPENDENT REVIEW`; alcance operativo aprobado por usuario y reconfirmado antes de Run mediante respuesta «si considereas que es lo mejor adelante» a la pregunta con las cuatro políticas y límites exactos.                                                                                                                                                                                                    |
+
+Revisión adversarial: ejecutar el SQL completo tocaría documentos privados → SQL específico de
+fotos; carrera tras preflight → lock y guard dentro de transacción; permisos autenticados no equivalen
+a ADMIN → limitación explícita del contrato existente, sin prometer aislamiento por rol; secretos
+para tooling → no exportarlos, usar sesión de dashboard staging. No aplicar nada sobre el conector
+Supabase configurado para producción.
+
+Matriz de completitud: dominio/estados/legacy sin cambio (C–M); permisos y datos revisados (F–I);
+concurrencia/idempotencia (K); migración operativa/compatibilidad/readers (F–J); efectos y superficie
+pública (L); observabilidad/documentación (Q–T); rollout/rollback (N–P). Configuración y smoke
+de fotos verificados posteriormente, como se detalla a continuación.
+
+Resultado ejecutado del 23/09: transacción confirmada en el SQL Editor de staging con
+`OBS-1 vehicle-photos staging reconciliation committed`. El postflight independiente devuelve
+exactamente cuatro políticas acotadas a `vehicle-photos`, SELECT público e INSERT/UPDATE/DELETE
+condicionados por `auth.role()='authenticated'`; RLS continúa activo. Bucket de fotos público,
+límite 2097152 y MIME JPEG/PNG/WebP. `vehicle-documents` continúa privado, sin políticas y con
+límites/MIME nulos previos; no se intentó reconciliarlo. Cero objetos antes y después del cambio.
+Respaldo y postflight locales ignorados bajo `.artifacts/obs-1/`; ningún secreto exportado.
+
+Primer intento de smoke tras la reconciliación: ficha QA existente abierta, autenticada, 0/30 fotos. El selector
+automático sí se obtuvo (`multiple=true`), pero `setFiles` para las tres imágenes sintéticas
+locales fue rechazado con `Not allowed`. No se repitió ni se sorteó la protección. Según la guía
+de Chrome del control de navegador, el usuario debe habilitar acceso a URLs de archivo en la
+extensión ChatGPT antes de repetir. Ese intento quedó BLOQUEADO; no invalida el postflight de
+configuración ni demuestra un nuevo error de Supabase.
+
+Smoke completado el 23/09 tras la confirmación «listo» del usuario sobre el permiso de Chrome:
+
+- Subida única de tres PNG sintéticos (rojo, verde y azul) al vehículo QA existente; contador
+  pasó de 0/30 a 3/30. Las tres URLs de imágenes observadas en DOM corresponden al host de
+  staging `iatuhydsfwoeprpbklod.supabase.co`; no se registran sus rutas.
+- Arrastre real en Chrome de la tercera foto a la primera posición: orden inicial rojo → verde
+  → azul; orden final azul → rojo → verde, comprobado comparando las tres fuentes del DOM.
+- Recarga completa: persisten las tres fotos en orden azul → rojo → verde. Comprobación visual
+  de la galería confirma las tres imágenes y el contador 3/30; alerta vacía, sin error visible.
+  La foto azul también pasa a portada de la ficha. Las imágenes de la galería se cargan al
+  acercarlas al viewport; la primera lectura inmediatamente tras recargar no bastaba para
+  validar su carga visual.
+- Preview comprobado: `8de9822`, deployment `7M1H4qZpzSXYTFRW4eEu9bNyGTKf`; mismo código de
+  aplicación/preflight que `0fcdedf` (el commit posterior sólo documenta). Resultado de este
+  smoke: PASS; no equivale a validación de producción ni a cerrar CRM-18 en Sentry.
+- Se conserva la ficha QA y sus tres fotos por autorización. Sin publicar, borrar archivos,
+  tocar registros comerciales existentes, documentos privados o producción.
+
+CI y Preview del commit documental `8de9822` comprobados: cuatro jobs SUCCESS en
+[35849036364](https://github.com/growthaiconsultant-lab/campernova-crm/actions/runs/35849036364) y
+[Preview 7M1H4qZpzSXYTFRW4eEu9bNyGTKf](https://vercel.com/growthaiconsultant-8035s-projects/campernova-crm/7M1H4qZpzSXYTFRW4eEu9bNyGTKf)
+SUCCESS. No merge, cambios en producción, datos comerciales, variables ni documentos privados.
+
 ### Implementación original
 
 1. Capturar inventario, separar hechos/hipótesis; revisar código en rama aislada.
@@ -127,7 +195,7 @@ aprobada expresamente por el usuario. Evidencia y resultados se añadirán tras 
 - [x] Reordenado válido hace un UPDATE, base cero, sin tocar otros vehículos (unitarios e integración real en CI).
 - [x] Vacíos, duplicados, IDs ajenos o faltantes no escriben; permisos se verifican primero (unitarios).
 - [x] PostgreSQL real verifica persistencia, repetición y carrera en CI antes de promoción.
-- [ ] Smoke de reordenado con fotos en Preview, tras verificar aislamiento de la base de datos.
+- [x] Smoke de subida y reordenado con tres fotos sintéticas en Chrome/Preview, tras verificar aislamiento; orden persistente después de recargar (23/09).
 - [ ] Reproducción móvil e hidratación, validación de producción autorizada y ventana de observación.
 - [x] Inventario deja explícitas las incidencias externas/no reproducidas; ninguna se oculta.
 
@@ -183,7 +251,9 @@ Código evaluado: `afcfbf6cfb15383ba67074073c52452b083a7789`. Main sigue en
 | Reordenado en UI        | No ejecutado: la ficha QA inspeccionada tiene 0 fotos. Sin uploads ni escrituras sobre datos remotos.                                                                                                                                                                                                 |
 | Producción / móvil real | No desplegado OBS-1 en producción; no ejecutadas pruebas en Android/iOS reales ni observación de 24 h.                                                                                                                                                                                                |
 
-### Preflight y prueba QA del 23/09/2026
+### Histórico del preflight y primer intento QA del 23/09/2026
+
+El bloqueo descrito en esta subsección se superó con la reconciliación y el smoke detallados arriba.
 
 Código evaluado: `0fcdedf1f9140dadfe9f99acbdf6edb638a04be0`, sólo Preview.
 
@@ -216,7 +286,7 @@ Código evaluado: `0fcdedf1f9140dadfe9f99acbdf6edb638a04be0`, sólo Preview.
   Se respetó el bloqueo; la inspección posterior se limitó a metadatos de la variable pública y
   no reveló su valor. No se cambiaron variables, credenciales, permisos, migraciones ni producción.
 
-Siguiente gate: autorización separada y preflight para reconciliar exclusivamente la configuración
+Gate identificado en aquel intento (ya superado): autorización separada y preflight para reconciliar exclusivamente la configuración
 de `vehicle-photos` en staging con el contrato versionado; comprobar catálogo y repetir subida y
 persistencia del orden con imágenes sintéticas. No aplicar el archivo completo a remoto: también
 incluye el bucket privado y fue diseñado para entornos nuevos/local/CI. Preservar datos, RLS,
@@ -227,14 +297,14 @@ documentos privados y producción; abortar si el catálogo contradice el diagnó
 Responsable técnico de los siguientes pasos: Engineering. No se han modificado asignaciones,
 prioridades o estados en Sentry. Consulta del feed del 23/09: diez incidencias abiertas en 14 días.
 
-| Incidencia               | Estado técnico                                                                       | Próxima evidencia necesaria para cerrar                                                                                              |
-| ------------------------ | ------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------ |
-| CRM-18                   | Corrección implementada y validada en PostgreSQL efímero; desplegada sólo en Preview | Aislamiento Prisma verificado; fixture con fotos y comprobación UI de persistencia; promoción autorizada y traza de un único UPDATE. |
-| CRM-6 / CRM-1G           | Recuperación mitigada en Preview; causa inicial del loader desconocida               | Reproducción de navegación/recuperación entre releases, stack desminificado y observación del release autorizado en producción.      |
-| CRM-A / CRM-D            | Origen observado en código inyectado Android; no equivale a CRM corregido            | Reproducción en navegador integrado y Chrome externo, atribuir frames y comprobar si el flujo visible falla. No filtro global.       |
-| CRM-1C / CRM-1D / CRM-1E | Hipótesis de traducción/inyección, sin causa probada                                 | iOS real, mismo recorrido con/sin traducción, stack y test de regresión antes de modificar código.                                   |
-| CRM-G                    | Hidratación sin reproducción ni diff HTML                                            | Reproducir SSR/hidratación con contexto de navegador y aislar componente; regresión determinista.                                    |
-| CRM-C                    | Rendimiento, recurso todavía sin identificar                                         | URL del recurso afectado y comparación de bytes/calidad; no rebajar todo el catálogo especulativamente.                              |
+| Incidencia               | Estado técnico                                                                                                          | Próxima evidencia necesaria para cerrar                                                                                              |
+| ------------------------ | ----------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
+| CRM-18                   | Corrección validada en PostgreSQL efímero y smoke Chrome/Preview; tres fotos QA reordenadas y persistentes tras recarga | Pendientes promoción autorizada y traza de un único UPDATE en el entorno objetivo.                                                   |
+| CRM-6 / CRM-1G           | Recuperación mitigada en Preview; causa inicial del loader desconocida                                                  | Reproducción de navegación/recuperación entre releases, stack desminificado y observación del release autorizado en producción.      |
+| CRM-A / CRM-D            | Origen observado en código inyectado Android; no equivale a CRM corregido                                               | Reproducción en navegador integrado y Chrome externo, atribuir frames y comprobar si el flujo visible falla. No filtro global.       |
+| CRM-1C / CRM-1D / CRM-1E | Hipótesis de traducción/inyección, sin causa probada                                                                    | iOS real, mismo recorrido con/sin traducción, stack y test de regresión antes de modificar código.                                   |
+| CRM-G                    | Diff HTML recuperado: mutaciones externas compatibles con traducción antes de hidratar; sin reproducción controlada     | Reproducir en Edge con/sin traducción y aislar el primer nodo divergente; no deshabilitar traducción ni ocultar alertas globalmente. |
+| CRM-C                    | Rendimiento, recurso todavía sin identificar                                                                            | URL del recurso afectado y comparación de bytes/calidad; no rebajar todo el catálogo especulativamente.                              |
 
 Nueva muestra de CRM-A revisada: evento `411ab85122104054b127ae28c879ab62`, 23/09
 07:59:07.909 UTC, production release `72dbc47af1f3`, Android 17. El origen sigue siendo
@@ -244,6 +314,34 @@ Por tanto, la descripción inicial de «únicamente frames externos» sólo apli
 no se generaliza a todos los eventos ni se declara inocuo sin reproducir el flujo.
 
 ### Aprendizajes aplicados
+
+Continuación del diagnóstico del 23/09, posterior al smoke de fotos:
+
+- El feed de Sentry sigue mostrando diez incidencias abiertas en 14 días. CRM-6/1G tienen última
+  actividad el 22/09; CRM-G el 19/09; CRM-C el 16/09. La revisión no cerró ni archivó ninguna.
+- CRM-G: tras seleccionar Latest, se pudo cargar `Open Diff Viewer` → `HTML Diff` y `Mutations`
+  del evento `aa414613d616493e8829ed0a0970c865`, release `05167ce25220`, Edge 140.0.0.
+  La evidencia anterior de «sin diff» queda superada, no borrada: el DOM anterior al error contiene
+  atributos `_msthash`, `_msttexthash` y nodos `font` con `_mstmutation`, mientras el posterior
+  vuelve a contener texto directo en navegación y CTAs. El registro de mutaciones incluye
+  sustituciones a 1284 ms y una nueva modificación de atributos del enlace flotante a 1285 ms.
+- Hecho: esas marcas/nodos no aparecen en `app/` ni `components/`; `app/layout.tsx` ya declara
+  `lang="es"`. Inferencia: modificación externa compatible con traducción previa a hidratación,
+  no un idioma ausente en el layout. No basta para generalizar la causa a los 91 eventos históricos
+  ni demostrar una corrección. La documentación de [Next.js](https://nextjs.org/docs/messages/react-hydration-error)
+  reconoce modificaciones externas de HTML como una causa de desajuste de hidratación.
+- No se implementa `notranslate`, `suppressHydrationWarning`, monkey patch del DOM ni filtro
+  Sentry: impedirían diagnosticar o alterarían la experiencia sin reproducción validada. El
+  siguiente experimento necesita Edge con traducción real; Chrome sin traducir no lo sustituye.
+- CRM-C conserva la muestra de 453560 bytes y release antiguo; no hay evidencia nueva suficiente
+  para identificar el recurso original. No se modifica la compresión de todo el catálogo.
+- Smoke público adicional en Chrome/Preview `8de9822`: home cargada, pestaña Para vender muestra
+  Depósito en instalaciones y selección correcta; regreso a Para comprar correcto. Navegación por
+  enlaces a `/como-funciona` y `/vender` comprobada por URL y contenido. Cero mensajes warn/error
+  capturados por la consola de esa pestaña. Sin formularios enviados ni escrituras. Es una muestra
+  desktop sin traducción; no reproduce ni descarta el problema en Edge/iOS.
+
+Aprendizajes:
 
 - Build READY no demuestra que los mapas se hayan subido: exigir logs y paquetes del mismo SHA.
 - NODE_ENV identifica compilación, no Preview/Production: etiqueta explícita y recepción real.
@@ -259,6 +357,8 @@ no se generaliza a todos los eventos ni se declara inocuo sin reproducir el fluj
   El preflight de DATABASE_URL/DIRECT_URL tampoco valida Storage: son gates independientes.
 - Un timeout del selector no prueba un problema de la extensión. Contrastar la UI y las acciones
   manuales del usuario antes de atribuir el fallo; no reintentar una subida rechazada por RLS.
+- Separar tres comprobaciones: upload aceptado, orden persistente tras recarga e imágenes visibles.
+  La carga diferida fuera del viewport no demuestra por sí sola un fallo de Storage.
 
 Procedimiento reutilizable: [runbook de diagnóstico Sentry](../runbooks/sentry-incident-triage.md).
 
@@ -295,8 +395,9 @@ Implementación y CI completados, desplegados en Preview con mapas y telemetría
 autenticado de lectura completado. Estado DEPLOYED, no VALIDATED ni «todos resueltos».
 
 El aislamiento Prisma está verificado por el preflight de Preview y la ficha QA está creada.
-Siguiente gate: reconciliación autorizada de Storage staging (fotos sin políticas), seguida del
-smoke de subida/reordenado; completar comprobación remota de privacidad y reproducción móvil.
+Storage staging de fotos está reconciliado y verificado por consulta de catálogo; documentos intactos.
+Smoke de subida/reordenado completado en Chrome: tres imágenes QA visibles y nuevo orden persistente
+tras recarga. Pendientes comprobación remota de privacidad y reproducción móvil.
 Merge y producción requieren
 aprobación separada. La ventana posterior de observación aún no está cumplida.
 CRM-18 tiene corrección candidata; CRM-6 una mitigación, no una causa inicial resuelta. CRM-A/D tienen
