@@ -69,6 +69,38 @@ instalación de dependencias nuevas, modificación de producción, correcciones 
 
 ## Plan técnico
 
+### Ampliación autorizada: preflight Preview y fixture QA (23/09)
+
+Hecho verificado: Vercel protege DATABASE_URL y DIRECT_URL como Secret de Preview y deshabilita
+su copia. Decisión aprobada por el usuario: verificar ambas dentro de Preview sin extraerlas y,
+sólo si corresponden a staging, crear un vehículo QA con fotos sintéticas y conservarlo para QA.
+No se autorizan producción, merge, cambios de variables, migraciones ni datos existentes.
+
+- Implementación: helper puro y script al inicio del build, antes de Prisma/Next. Sólo activo con
+  VERCEL_ENV=preview; fuera de Preview retorna sin leer conexiones. Sin endpoint público, red,
+  exportación de secretos, librerías nuevas ni cambios al guard de migraciones de producción.
+- Criterio: ambas URLs PostgreSQL deben identificar exactamente staging: host directo y usuario,
+  o dominio pooler de Supabase y usuario con project ref. Base postgres, puertos esperados,
+  parámetros acotados; rechazar ausencia, conexión mixta, host impostor y overrides. No basta
+  encontrar el project ref en una contraseña o parámetro. Sólo se imprime PASS o BLOCKED seguro.
+- Validación: unitarios de formatos válidos, mezclas producción/staging, spoofing, errores de parseo
+  y ausencia de lectura en producción; CI y señal de build del deployment exacto. Verificar también
+  Supabase Auth/Storage de staging antes de subir fotos. PASS verifica configuración, no disponibilidad.
+- Smoke posterior: crear ficha inequívoca QA OBS-1 sin contacto real, sin publicar ni ejecutar
+  acciones comerciales; subir fotos sintéticas distintas, cambiar su orden en UI, recargar y
+  verificar persistencia. Conservar registro QA autorizado; no borrar ni tocar registros existentes.
+- Stop conditions: guard bloqueado, destino desconocido, pérdida de sesión o fallo de autorización.
+  No relajar el guard para hacer verde el build. Rollback: revert del preflight sólo con aprobación;
+  no afecta schema. La fixture se conserva identificada y nunca se publica en el catálogo.
+- Alcance de revisión reforzada: datos nuevos QA y Storage, guard de build y pruebas. Dinero,
+  contratos, permisos y migraciones no cambian. Efectos existentes de crear ficha deben revisarse
+  antes de ejecutar. Identificar fixture antes de repetir tras timeout para evitar duplicados.
+
+Estado de autorización del plan: `PLAN READY FOR INDEPENDENT REVIEW`; ejecución de este alcance
+aprobada expresamente por el usuario. Evidencia y resultados se añadirán tras ejecutarlos.
+
+### Implementación original
+
 1. Capturar inventario, separar hechos/hipótesis; revisar código en rama aislada.
 2. Recuperación global y configuración de observabilidad con unitarios.
 3. Adapter de reordenado por lote, validación Zod server-side, unitarios e integración real preparada.
