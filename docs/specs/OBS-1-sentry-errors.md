@@ -297,14 +297,14 @@ documentos privados y producción; abortar si el catálogo contradice el diagnó
 Responsable técnico de los siguientes pasos: Engineering. No se han modificado asignaciones,
 prioridades o estados en Sentry. Consulta del feed del 23/09: diez incidencias abiertas en 14 días.
 
-| Incidencia               | Estado técnico                                                                                                          | Próxima evidencia necesaria para cerrar                                                                                                           |
-| ------------------------ | ----------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
-| CRM-18                   | Corrección validada en PostgreSQL efímero y smoke Chrome/Preview; tres fotos QA reordenadas y persistentes tras recarga | Pendientes promoción autorizada y traza de un único UPDATE en el entorno objetivo.                                                                |
-| CRM-6 / CRM-1G           | Recuperación mitigada en Preview; causa inicial del loader desconocida                                                  | Reproducción de navegación/recuperación entre releases, stack desminificado y observación del release autorizado en producción.                   |
-| CRM-A / CRM-D            | Origen observado en código inyectado Android; no equivale a CRM corregido                                               | Reproducción en navegador integrado y Chrome externo, atribuir frames y comprobar si el flujo visible falla. No filtro global.                    |
-| CRM-1C / CRM-1D / CRM-1E | Hipótesis de traducción/inyección, sin causa probada                                                                    | iOS real, mismo recorrido con/sin traducción, stack y test de regresión antes de modificar código.                                                |
-| CRM-G                    | Diff HTML recuperado: mutaciones externas compatibles con traducción antes de hidratar; sin reproducción controlada     | Reproducir en Edge con/sin traducción y aislar el primer nodo divergente; no deshabilitar traducción ni ocultar alertas globalmente.              |
-| CRM-C                    | Recurso identificado: hero de portada a 1080 px, q=75; 453560 B en breadcrumb HTTP                                      | Comparar formato/peso/aspecto de un derivado local, comprobar negociación y petición en Preview. No atribuir la descarga adicional sin evidencia. |
+| Incidencia               | Estado técnico                                                                                                          | Próxima evidencia necesaria para cerrar                                                                                                             |
+| ------------------------ | ----------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
+| CRM-18                   | Corrección validada en PostgreSQL efímero y smoke Chrome/Preview; tres fotos QA reordenadas y persistentes tras recarga | Pendientes promoción autorizada y traza de un único UPDATE en el entorno objetivo.                                                                  |
+| CRM-6 / CRM-1G           | Recuperación mitigada en Preview; causa inicial del loader desconocida                                                  | Reproducción de navegación/recuperación entre releases, stack desminificado y observación del release autorizado en producción.                     |
+| CRM-A / CRM-D            | Origen observado en código inyectado Android; no equivale a CRM corregido                                               | Reproducción en navegador integrado y Chrome externo, atribuir frames y comprobar si el flujo visible falla. No filtro global.                      |
+| CRM-1C / CRM-1D / CRM-1E | Hipótesis de traducción/inyección, sin causa probada                                                                    | iOS real, mismo recorrido con/sin traducción, stack y test de regresión antes de modificar código.                                                  |
+| CRM-G                    | Diff HTML recuperado: mutaciones externas compatibles con traducción antes de hidratar; sin reproducción controlada     | Reproducir en Edge con/sin traducción y aislar el primer nodo divergente; no deshabilitar traducción ni ocultar alertas globalmente.                |
+| CRM-C                    | Derivado WebP desplegado en Preview; respuesta inspeccionada de 225910 B, desktop correcto                              | Pendientes ancho móvil, navegador afectado y observación del entorno objetivo. No comparar porcentajes entre peticiones de distinto tamaño/formato. |
 
 Nueva muestra de CRM-A revisada: evento `411ab85122104054b127ae28c879ab62`, 23/09
 07:59:07.909 UTC, production release `72dbc47af1f3`, Android 17. El origen sigue siendo
@@ -364,7 +364,32 @@ no se generaliza a todos los eventos ni se declara inocuo sin reproducir el fluj
 - Validación local de este incremento: inspección visual original/derivado, tres pruebas específicas,
   typecheck y suite completa (125 archivos, 1565 tests) PASS. Lint sin warnings/errores, check:sdd
   y diff check PASS. El generador rechaza una segunda ejecución con EEXIST, sin sobrescribir.
-  Original sin cambios. Build y smoke del nuevo derivado pendientes del deployment Preview.
+  Original sin cambios. Los resultados posteriores de build y smoke se registran a continuación.
+
+#### Evidencia remota del derivado de portada (23/09)
+
+- Código comprobado: `af3ae123e210e9ffacedca2a76b4c254c60bf067`.
+  [CI 35876155732](https://github.com/growthaiconsultant-lab/campernova-crm/actions/runs/35876155732):
+  quality, integration, migration-replay y supabase-storage SUCCESS.
+- [Preview 9XQtyjAYsv6RtwHmeXMGYTEYV2h9](https://vercel.com/growthaiconsultant-8035s-projects/campernova-crm/9XQtyjAYsv6RtwHmeXMGYTEYV2h9)
+  READY, mismo SHA. Chrome muestra el derivado, texto y botones legibles; ancho de contenido y
+  scroll horizontal de 1425 px, sin desbordamiento. Cero warn/error capturados durante esa muestra.
+  [Registro inicial](https://github.com/growthaiconsultant-lab/campernova-crm/pull/183#issuecomment-5797035501).
+- Inspección posterior del recurso observado por Chrome en ese Preview:
+  `/_next/image?url=%2Fimages%2Flanding%2Fhero-mountain.webp&w=3840&q=75`.
+  La exportación acotada del único asset devuelve `Content-Type: image/webp`; el cuerpo descargado
+  mide **225910 B**. Es una respuesta remota del recurso, no una medición del total transferido por
+  la visita ni del LCP. No incluye cabeceras y no reproduce la petición de 1080 px de Instagram.
+  No se exportaron cookies ni credenciales. El artefacto temporal permanece fuera de Git.
+- La petición HTTP anónima previa al deployment inmutable devolvió 302; no se siguieron
+  redirecciones ni se eludió la protección de Preview. No se contó como comprobación de imagen.
+- Prueba móvil pendiente: el ajuste de viewport fue aceptado por la herramienta, pero tanto la
+  pestaña existente como una nueva conservaron 1425 px. Se restableció el ajuste y se cerró la
+  pestaña duplicada. No se contabiliza como móvil PASS. El intento manual tampoco se completó;
+  no se requiere que el usuario continúe con pasos técnicos. Queda pendiente de un entorno de
+  prueba que permita verificar realmente el ancho. Tampoco sustituye Edge/iOS/Instagram reales.
+- Sin merge, cambios en producción, cierres ni filtros de incidencias Sentry. CRM-C conserva
+  corrección candidata, no resolución confirmada en el navegador/entorno de la alerta.
 
 ### Aprendizajes aplicados
 
@@ -386,8 +411,9 @@ Continuación del diagnóstico del 23/09, posterior al smoke de fotos:
 - No se implementa `notranslate`, `suppressHydrationWarning`, monkey patch del DOM ni filtro
   Sentry: impedirían diagnosticar o alterarían la experiencia sin reproducción validada. El
   siguiente experimento necesita Edge con traducción real; Chrome sin traducir no lo sustituye.
-- CRM-C conserva la muestra de 453560 bytes y release antiguo; no hay evidencia nueva suficiente
-  para identificar el recurso original. No se modifica la compresión de todo el catálogo.
+- En este punto histórico CRM-C conservaba la muestra de 453560 bytes y release antiguo sin
+  recurso atribuido. La investigación posterior y el derivado acotado están registrados arriba;
+  no se modifica la compresión de todo el catálogo.
 - Smoke público adicional en Chrome/Preview `8de9822`: home cargada, pestaña Para vender muestra
   Depósito en instalaciones y selección correcta; regreso a Para comprar correcto. Navegación por
   enlaces a `/como-funciona` y `/vender` comprobada por URL y contenido. Cero mensajes warn/error
@@ -412,6 +438,10 @@ Aprendizajes:
   manuales del usuario antes de atribuir el fallo; no reintentar una subida rechazada por RLS.
 - Separar tres comprobaciones: upload aceptado, orden persistente tras recarga e imágenes visibles.
   La carga diferida fuera del viewport no demuestra por sí sola un fallo de Storage.
+- Un ajuste de viewport aceptado no demuestra un cambio de ancho: verificar dimensiones reales
+  antes de etiquetar un smoke como móvil. Si la herramienta no lo aplica, registrar el límite.
+- Separar peso del archivo fuente, cuerpo servido, bytes transferidos y LCP. La compresión local
+  no prueba el ahorro de una visita ni permite comparar peticiones con negociación distinta.
 
 Procedimiento reutilizable: [runbook de diagnóstico Sentry](../runbooks/sentry-incident-triage.md).
 
@@ -444,6 +474,14 @@ resolución mediante `pnpm exec` falló. Ningún fallo de herramienta se contabi
 
 ## Cierre
 
+Revisión de preparación del 23/09: PR #183 OPEN/MERGEABLE, head `af3ae123e210`, cuatro jobs de
+CI y Vercel SUCCESS. Main remoto continúa en `72dbc47af1f337e58e62475e79d5e991a769b032`;
+no hay una nueva base que integrar. Este cierre documental no cambia código ni autoriza promoción.
+Gates aún abiertos: ancho móvil de la portada, comprobación remota de privacidad de mapas y
+reproducción en los navegadores afectados. La aprobación de producción y su observación posterior
+son pasos distintos: ninguna comprobación de Preview los sustituye. No se recomienda marcar
+OBS-1 como VALIDATED ni resolver todas las incidencias con la evidencia actual.
+
 Implementación y CI completados, desplegados en Preview con mapas y telemetría recibidos; smoke
 autenticado de lectura completado. Estado DEPLOYED, no VALIDATED ni «todos resueltos».
 
@@ -454,5 +492,7 @@ tras recarga. Pendientes comprobación remota de privacidad y reproducción móv
 Merge y producción requieren
 aprobación separada. La ventana posterior de observación aún no está cumplida.
 CRM-18 tiene corrección candidata; CRM-6 una mitigación, no una causa inicial resuelta. CRM-A/D tienen
-origen externo observado, con los límites descritos arriba. CRM-1G/1C/1D/1E/G/C conservan diagnóstico pendiente. Ninguna incidencia se ha cerrado,
+origen externo observado, con los límites descritos arriba. CRM-C tiene un derivado optimizado
+comprobado en Preview desktop, con móvil y observación pendientes. CRM-1G/1C/1D/1E/G conservan
+diagnóstico pendiente. Ninguna incidencia se ha cerrado,
 archivado o filtrado en Sentry. No se declara «todos resueltos».
