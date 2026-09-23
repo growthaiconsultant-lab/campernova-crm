@@ -4,6 +4,7 @@ import { revalidatePath } from 'next/cache'
 import { randomUUID } from 'node:crypto'
 import { db } from '@/lib/db'
 import { requireCanGenerateAds } from '@/lib/auth'
+import { persistVehiclePhotoOrder } from '@/lib/vehicle-photo-order'
 import { createClient } from '@/lib/supabase/server'
 import {
   VEHICLE_PHOTOS_BUCKET,
@@ -149,28 +150,9 @@ export async function reorderVehiclePhotos(
 ): Promise<Ok | ActionError> {
   await requireCanGenerateAds()
 
-  if (!Array.isArray(orderedIds) || orderedIds.length === 0) {
-    return { error: 'Orden inválido' }
-  }
-
-  const photos = await db.vehiclePhoto.findMany({
-    where: { vehicleId },
-    select: { id: true },
-  })
-  const existingIds = new Set(photos.map((p) => p.id))
-  if (orderedIds.length !== photos.length || !orderedIds.every((id) => existingIds.has(id))) {
-    return { error: 'IDs no coinciden con las fotos del vehículo' }
-  }
-
-  await db.$transaction(
-    orderedIds.map((id, index) => db.vehiclePhoto.update({ where: { id }, data: { order: index } }))
-  )
-
-  const v = await db.vehicle.findUnique({
-    where: { id: vehicleId },
-    select: { sellerLeadId: true },
-  })
-  if (v) revalidatePath(`/vendedores/${v.sellerLeadId}`)
+  const result = await persistVehiclePhotoOrder(db, vehicleId, orderedIds)
+  if ('error' in result) return result
+  revalidatePath(`/vendedores/${result.sellerLeadId}`)
 
   return { ok: true }
 }

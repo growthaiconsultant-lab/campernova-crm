@@ -107,6 +107,8 @@ marketplace y multiempresa están **diferidos**.
   checklist ejecutivo para pasar el cierre operativo de `PENDING` a `PASS`.
 - [`runbooks/document-storage-rollout.md`](runbooks/document-storage-rollout.md) — runbook operativo
   detallado del rollout documental (staging → producción).
+- [`runbooks/sentry-incident-triage.md`](runbooks/sentry-incident-triage.md) — diagnóstico, evidencia,
+  privacidad y condiciones de cierre de incidencias; aprendizajes de OBS-1.
 
 ## Referencia de infraestructura (existente)
 

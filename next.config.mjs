@@ -1,7 +1,14 @@
 import { withSentryConfig } from '@sentry/nextjs'
+import { observabilityEnvironment } from './lib/observability-environment.mjs'
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  env: {
+    NEXT_PUBLIC_OBSERVABILITY_ENV: observabilityEnvironment(
+      process.env.VERCEL_ENV,
+      process.env.NODE_ENV
+    ),
+  },
   images: {
     remotePatterns: [
       {
@@ -23,6 +30,7 @@ export default withSentryConfig(nextConfig, {
 
   // Auth token para subir source maps (añadir en Vercel env vars)
   authToken: process.env.SENTRY_AUTH_TOKEN,
+  widenClientFileUpload: true,
 
   // Sube source maps al build y los elimina del bundle público
   sourcemaps: {
