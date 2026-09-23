@@ -183,6 +183,45 @@ Código evaluado: `afcfbf6cfb15383ba67074073c52452b083a7789`. Main sigue en
 | Reordenado en UI        | No ejecutado: la ficha QA inspeccionada tiene 0 fotos. Sin uploads ni escrituras sobre datos remotos.                                                                                                                                                                                                 |
 | Producción / móvil real | No desplegado OBS-1 en producción; no ejecutadas pruebas en Android/iOS reales ni observación de 24 h.                                                                                                                                                                                                |
 
+### Preflight y prueba QA del 23/09/2026
+
+Código evaluado: `0fcdedf1f9140dadfe9f99acbdf6edb638a04be0`, sólo Preview.
+
+- Validación local: typecheck, lint, check:sdd y diff check PASS; 124 archivos y 1562 tests
+  unitarios PASS, incluidos 28 casos del preflight. Sin dependencias nuevas ni cambios de schema.
+- [CI 35847735284](https://github.com/growthaiconsultant-lab/campernova-crm/actions/runs/35847735284):
+  quality, integration, migration-replay y supabase-storage SUCCESS.
+- [Preview Wa33tGP6XrePsoxXyyioeYXHuzmr](https://vercel.com/growthaiconsultant-8035s-projects/campernova-crm/Wa33tGP6XrePsoxXyyioeYXHuzmr)
+  READY a las 10:18:52 UTC, mismo SHA. Build a las 10:15:36 UTC:
+  `preview-db-preflight: PASS — staging correcto (DATABASE_URL y DIRECT_URL)`.
+  Las credenciales permanecieron dentro de Vercel: no se exportaron, mostraron ni persistieron.
+- Chrome autenticado recargó ese Preview. Creada una única ficha nueva
+  `QA OBS-1 · Orden de fotos · 2026-09-23`, vehículo `QA OBS-1 FOTOS SINTETICAS`, sin email,
+  teléfono ni publicación; estado NUEVO y sin agente. Se conserva para QA por autorización.
+  No se editaron registros preexistentes.
+- El selector automático de archivos terminó en timeout antes de entregar archivos al agente.
+  El usuario confirmó haber seleccionado él un archivo. La interfaz mostró
+  `Error al subir: new row violates row-level security policy` y mantuvo 0/30 fotos.
+  No se atribuye el timeout a permisos de la extensión: no está demostrado. No se repitió la
+  escritura ni se ejecutó reordenado; el smoke permanece BLOQUEADO, no PASS.
+- Diagnóstico de sólo lectura en el panel del proyecto staging `iatuhydsfwoeprpbklod`:
+  `vehicle-photos` es público, con 0 políticas, límite sin configurar (50 MB) y MIME Any.
+  Policies confirma ausencia de políticas para ese bucket y de otras políticas en storage.objects.
+  El repositorio define cuatro políticas de fotos, 2 MiB y allowlist JPEG/PNG/WebP en
+  `supabase/migrations/20260713000000_storage_buckets_and_policies.sql`.
+  La ausencia de políticas explica el rechazo RLS observado; no se ha reconciliado remotamente.
+- `vehicle-documents` aparece privado y sin políticas: la ausencia de políticas allí es deliberada
+  en el diseño, no se debe copiar la solución de fotos a documentos privados. No se modificó.
+- Una lectura amplia de la pantalla de variables fue bloqueada por la revisión de seguridad.
+  Se respetó el bloqueo; la inspección posterior se limitó a metadatos de la variable pública y
+  no reveló su valor. No se cambiaron variables, credenciales, permisos, migraciones ni producción.
+
+Siguiente gate: autorización separada y preflight para reconciliar exclusivamente la configuración
+de `vehicle-photos` en staging con el contrato versionado; comprobar catálogo y repetir subida y
+persistencia del orden con imágenes sintéticas. No aplicar el archivo completo a remoto: también
+incluye el bucket privado y fue diseñado para entornos nuevos/local/CI. Preservar datos, RLS,
+documentos privados y producción; abortar si el catálogo contradice el diagnóstico.
+
 ### Seguimiento de incidencias y condiciones de cierre
 
 Responsable técnico de los siguientes pasos: Engineering. No se han modificado asignaciones,
@@ -216,6 +255,10 @@ no se generaliza a todos los eventos ni se declara inocuo sin reproducir el fluj
 - Cero errores durante una visita no cierra diez incidencias. Diferenciar corrección, mitigación,
   causa externa probable y diagnóstico pendiente; no silenciar para conseguir un panel vacío.
 - Actualizar spec y PR al superar cada gate, sin mantener bloqueos históricos como estado actual.
+- CI de Storage valida un Supabase efímero, no la paridad de políticas del proyecto remoto.
+  El preflight de DATABASE_URL/DIRECT_URL tampoco valida Storage: son gates independientes.
+- Un timeout del selector no prueba un problema de la extensión. Contrastar la UI y las acciones
+  manuales del usuario antes de atribuir el fallo; no reintentar una subida rechazada por RLS.
 
 Procedimiento reutilizable: [runbook de diagnóstico Sentry](../runbooks/sentry-incident-triage.md).
 
@@ -251,8 +294,10 @@ resolución mediante `pnpm exec` falló. Ningún fallo de herramienta se contabi
 Implementación y CI completados, desplegados en Preview con mapas y telemetría recibidos; smoke
 autenticado de lectura completado. Estado DEPLOYED, no VALIDATED ni «todos resueltos».
 
-Siguiente gate: verificar aislamiento Prisma y preparar fixture de fotos para smoke de escritura;
-completar comprobación remota de privacidad y reproducción móvil. Merge y producción requieren
+El aislamiento Prisma está verificado por el preflight de Preview y la ficha QA está creada.
+Siguiente gate: reconciliación autorizada de Storage staging (fotos sin políticas), seguida del
+smoke de subida/reordenado; completar comprobación remota de privacidad y reproducción móvil.
+Merge y producción requieren
 aprobación separada. La ventana posterior de observación aún no está cumplida.
 CRM-18 tiene corrección candidata; CRM-6 una mitigación, no una causa inicial resuelta. CRM-A/D tienen
 origen externo observado, con los límites descritos arriba. CRM-1G/1C/1D/1E/G/C conservan diagnóstico pendiente. Ninguna incidencia se ha cerrado,
