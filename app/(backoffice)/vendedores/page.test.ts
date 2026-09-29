@@ -91,4 +91,21 @@ describe('seller list', () => {
     expect(mocks.count).not.toHaveBeenCalled()
     expect(mocks.findMany).not.toHaveBeenCalled()
   })
+
+  it('searches the vehicle plate and keeps the same count/list filter', async () => {
+    await VendedoresPage({ searchParams: { q: '1234ABC', status: 'NUEVO', canal: 'CN' } })
+    const where = mocks.findMany.mock.calls[0][0].where
+    expect(mocks.count.mock.calls[0][0].where).toEqual(where)
+    expect(where.AND).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          OR: expect.arrayContaining([
+            { vehicle: { plate: { contains: '1234ABC', mode: 'insensitive' } } },
+          ]),
+        }),
+        { status: 'NUEVO' },
+        { canal: 'CN' },
+      ])
+    )
+  })
 })
