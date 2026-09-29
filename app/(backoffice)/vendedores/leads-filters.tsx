@@ -125,7 +125,7 @@ export function LeadsFilters({ agents }: Props) {
         <input
           ref={searchRef}
           defaultValue={currentQ}
-          placeholder="Buscar por nombre, email, teléfono o marca…"
+          placeholder="Nombre, email, teléfono, marca, modelo o matrícula…"
           className="flex-1 border-none bg-transparent py-2 text-[13.5px] text-[#141922] placeholder-[#586173] outline-none"
         />
         <button type="submit" className="sr-only">

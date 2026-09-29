@@ -15,6 +15,7 @@ import {
   type Column,
 } from '@/components/redesign'
 import { cn } from '@/lib/utils'
+import { vehiclePlateSearchConditions } from '@/lib/vehicle-plate-search'
 import { buildSellerIntakeViewConditions } from '@/lib/seller-intake'
 import { SELLERS_PAGE_SIZE, sellerPagination } from '@/lib/seller-pagination'
 import { SellerPagination } from './seller-pagination'
@@ -84,6 +85,7 @@ function buildWhere(
         { phone: { contains: q, mode: 'insensitive' } },
         { vehicle: { brand: { contains: q, mode: 'insensitive' } } },
         { vehicle: { model: { contains: q, mode: 'insensitive' } } },
+        ...vehiclePlateSearchConditions(q).map((vehicle) => ({ vehicle })),
       ],
     })
   }
