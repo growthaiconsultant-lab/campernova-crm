@@ -32,9 +32,14 @@ function assertServerOnly(): void {
  * Devuelve el cliente `service_role` (memoizado). Lanza si se llama desde el navegador o si
  * falta configuración. No expone la clave; el cliente encapsula la credencial.
  */
-export function getSupabaseAdminClient(): SupabaseClient {
+export function getSupabaseAdminClient(options?: { timeoutMs: number }): SupabaseClient {
   assertServerOnly()
-  if (cachedAdminClient) return cachedAdminClient
+  if (!options && cachedAdminClient) return cachedAdminClient
+  if (
+    options &&
+    (!Number.isInteger(options.timeoutMs) || options.timeoutMs < 1 || options.timeoutMs > 60_000)
+  )
+    throw new Error('Timeout de Storage inválido.')
 
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL
   const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY
@@ -45,10 +50,31 @@ export function getSupabaseAdminClient(): SupabaseClient {
     )
   }
 
-  cachedAdminClient = createClient(url, serviceRoleKey, {
+  const client = createClient(url, serviceRoleKey, {
     auth: { persistSession: false, autoRefreshToken: false },
+    ...(options
+      ? {
+          global: {
+            fetch: async (input: RequestInfo | URL, init?: RequestInit) => {
+              const controller = new AbortController()
+              const previous = init?.signal ?? (input instanceof Request ? input.signal : undefined)
+              const abort = () => controller.abort()
+              if (previous?.aborted) abort()
+              previous?.addEventListener('abort', abort, { once: true })
+              const timer = setTimeout(abort, options.timeoutMs)
+              try {
+                return await fetch(input, { ...init, signal: controller.signal })
+              } finally {
+                clearTimeout(timer)
+                previous?.removeEventListener('abort', abort)
+              }
+            },
+          },
+        }
+      : {}),
   })
-  return cachedAdminClient
+  if (!options) cachedAdminClient = client
+  return client
 }
 
 /** Solo para tests: descarta el cliente memoizado para reevaluar la configuración. */

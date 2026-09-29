@@ -18,9 +18,12 @@ export async function createWarrantyForDelivery(
 ): Promise<{ warrantyId: string }> {
   const delivery = await db.delivery.findUnique({
     where: { id: deliveryId },
-    select: { vehicleId: true, buyerLeadId: true, completedAt: true },
+    select: { vehicleId: true, buyerLeadId: true, completedAt: true, kind: true },
   })
   if (!delivery?.completedAt) throw new Error('Delivery not completed')
+  if (delivery.kind !== 'VENTA' || !delivery.buyerLeadId) {
+    throw new Error('Warranty requires a sale delivery with a buyer')
+  }
 
   const startDate = delivery.completedAt
   const endDate = new Date(startDate)

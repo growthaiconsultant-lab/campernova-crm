@@ -164,7 +164,7 @@ export async function createDelivery(formData: unknown): Promise<ActionResult<{ 
       vehicle: { select: { brand: true, model: true } },
     },
   })
-  if (detail && detail.buyerLead.email) {
+  if (detail?.buyerLead?.email) {
     sendDeliveryConfirmation({
       buyerName: detail.buyerLead.name ?? 'Comprador sin identificar',
       buyerEmail: detail.buyerLead.email,
@@ -462,11 +462,14 @@ export async function uploadDeliveryDocument(
 
   const delivery = await db.delivery.findUnique({
     where: { id: deliveryId },
-    select: { status: true },
+    select: { status: true, kind: true, offerId: true, buyerLeadId: true },
   })
   if (!delivery) return { ok: false, error: 'Entrega no encontrada' }
   if (delivery.status === 'COMPLETADA' || delivery.status === 'CANCELADA') {
     return { ok: false, error: 'La entrega ya está cerrada.' }
+  }
+  if (delivery.kind !== 'VENTA' || !delivery.offerId || !delivery.buyerLeadId) {
+    return { ok: false, error: 'La gestión de esta entrega manual todavía no está activada.' }
   }
 
   const documentId = randomUUID()

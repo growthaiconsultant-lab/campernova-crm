@@ -68,6 +68,17 @@ const event: EventRow = {
 }
 
 describe('mappers', () => {
+  it('una devolución muestra su tipo y vendedor receptor aunque no haya comprador', () => {
+    const item = deliveryToItem({
+      ...delivery,
+      kind: 'DEVOLUCION_VENDEDOR',
+      buyerLead: null,
+      recipientSellerLead: { name: 'Receptor QA' },
+    })
+    expect(item.kindLabel).toBe('Devolución al vendedor')
+    expect(item.contextLabel).toBe('Receptor QA')
+    expect(item.href).toBe('/entregas/d1')
+  })
   it('capture → item Entrada con href a /captaciones', () => {
     const item = captureToItem({
       id: 'cap1',

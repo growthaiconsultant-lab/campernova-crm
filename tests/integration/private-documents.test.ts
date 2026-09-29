@@ -113,7 +113,7 @@ describe('integración · metadatos de VehicleDocument', () => {
 
     expect(doc.url).toBe(path)
     expect(doc.url.startsWith('http')).toBe(false)
-    expect(doc.vehicle.id).toBe(seeded.vehicleId)
+    expect(doc.vehicle?.id).toBe(seeded.vehicleId)
     expect(doc.uploadedBy?.id).toBe(seeded.userId)
   })
 

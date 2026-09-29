@@ -35,6 +35,7 @@ export type DeliveryTransitionErrorCode =
   | 'DELIVERY_ALREADY_CANCELLED'
   | 'DELIVERY_ALREADY_COMPLETED'
   | 'CANCELLATION_REASON_REQUIRED'
+  | 'MANUAL_DELIVERY_NOT_ENABLED'
 
 /** Mensajes visibles: sin ids, estado interno, SQL, Prisma, stack ni PII. */
 export const DELIVERY_TRANSITION_ERROR_MESSAGES: Record<DeliveryTransitionErrorCode, string> = {
@@ -48,6 +49,7 @@ export const DELIVERY_TRANSITION_ERROR_MESSAGES: Record<DeliveryTransitionErrorC
   DELIVERY_ALREADY_CANCELLED: 'La entrega ya está cancelada.',
   DELIVERY_ALREADY_COMPLETED: 'La entrega ya está completada.',
   CANCELLATION_REASON_REQUIRED: 'Indica el motivo de la cancelación.',
+  MANUAL_DELIVERY_NOT_ENABLED: 'La gestión de esta entrega manual todavía no está activada.',
 }
 
 /** Conflicto de negocio esperado en una transición de entrega. No es un error técnico. */
@@ -89,7 +91,7 @@ export const CANCELLATION_REASON_MAX = 500
 export type TransitionDeliveryParams = {
   deliveryId: string
   vehicleId: string
-  buyerLeadId: string
+  buyerLeadId: string | null
   /** `sellerLeadId` observado en la lectura preliminar; detecta cambio de raíz. */
   resolvedSellerLeadId: string | null
   expectedCurrentStatus: DeliveryTransitionSource
@@ -122,9 +124,12 @@ export async function transitionDeliveryTx(
   // (1) Relectura de la entrega y consistencia de raíz.
   const delivery = await tx.delivery.findUnique({
     where: { id: p.deliveryId },
-    select: { status: true, vehicleId: true, buyerLeadId: true },
+    select: { status: true, vehicleId: true, buyerLeadId: true, kind: true, offerId: true },
   })
   if (!delivery) throw new DeliveryTransitionError('DELIVERY_NOT_FOUND')
+  if (delivery.kind !== 'VENTA' || !delivery.offerId || !p.buyerLeadId) {
+    throw new DeliveryTransitionError('MANUAL_DELIVERY_NOT_ENABLED')
+  }
   if (delivery.vehicleId !== p.vehicleId || delivery.buyerLeadId !== p.buyerLeadId) {
     throw new DeliveryTransitionError('DELIVERY_ROOT_CHANGED')
   }

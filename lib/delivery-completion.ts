@@ -28,6 +28,7 @@ export type DeliveryCompletionErrorCode =
   | 'DELIVERY_STATUS_CHANGED'
   | 'CHECKLIST_INCOMPLETE'
   | 'SIGNATURE_REQUIRED'
+  | 'MANUAL_DELIVERY_NOT_ENABLED'
 
 /** Mensajes visibles: sin ids, estado interno, SQL, Prisma ni PII. */
 export const DELIVERY_COMPLETION_ERROR_MESSAGES: Record<DeliveryCompletionErrorCode, string> = {
@@ -41,6 +42,7 @@ export const DELIVERY_COMPLETION_ERROR_MESSAGES: Record<DeliveryCompletionErrorC
     'El estado de la entrega cambió mientras se procesaba. Vuelve a intentarlo.',
   CHECKLIST_INCOMPLETE: 'Hay ítems pendientes en el checklist de la entrega.',
   SIGNATURE_REQUIRED: 'La entrega requiere firma antes de completarse.',
+  MANUAL_DELIVERY_NOT_ENABLED: 'La gestión de esta entrega manual todavía no está activada.',
 }
 
 /** Conflicto de negocio esperado al completar (validación pre-CAS). No es un error técnico. */
@@ -84,7 +86,7 @@ export const DELIVERABLE_VEHICLE_STATUSES: VehicleStatus[] = ['PUBLICADO', 'RESE
 export type CompleteDeliveryParams = {
   deliveryId: string
   vehicleId: string
-  buyerLeadId: string
+  buyerLeadId: string | null
   /** `sellerLeadId` observado en la lectura preliminar; detecta cambio de raíz. */
   resolvedSellerLeadId: string | null
   actorId: string
@@ -119,6 +121,7 @@ export async function completeDeliveryTx(
       vehicleId: true,
       buyerLeadId: true,
       offerId: true,
+      kind: true,
       signedByName: true,
       signedByDni: true,
       signatureUrl: true,
@@ -126,6 +129,11 @@ export async function completeDeliveryTx(
     },
   })
   if (!delivery) throw new DeliveryCompletionError('DELIVERY_NOT_FOUND')
+
+  // Versión puente: puede leer entregas manuales pero jamás completarlas como una venta legacy.
+  if (delivery.kind !== 'VENTA' || !delivery.buyerLeadId || !delivery.offerId || !p.buyerLeadId) {
+    throw new DeliveryCompletionError('MANUAL_DELIVERY_NOT_ENABLED')
+  }
 
   // (2) Coherencia de raíces: la entrega sigue colgando del mismo vehículo y comprador.
   if (delivery.vehicleId !== p.vehicleId || delivery.buyerLeadId !== p.buyerLeadId) {

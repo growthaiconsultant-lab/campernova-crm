@@ -13,6 +13,8 @@ import {
 const COMPLETED_AT = new Date('2026-06-01T10:00:00Z')
 
 type TxOpts = {
+  kind?: 'VENTA' | 'DEVOLUCION_VENDEDOR' | 'ENTREGA_TALLER'
+  offerId?: string | null
   status?: string
   checklist?: Array<{ result: string }>
   signed?: boolean
@@ -28,10 +30,11 @@ type TxOpts = {
 function makeTx(o: TxOpts = {}) {
   const signed = o.signed ?? true
   const delivery = {
+    kind: o.kind ?? 'VENTA',
     status: o.status ?? 'EN_CURSO',
     vehicleId: 'veh-1',
     buyerLeadId: 'buyer-1',
-    offerId: 'offer-1',
+    offerId: o.offerId === undefined ? 'offer-1' : o.offerId,
     signedByName: signed ? 'Cliente' : null,
     signedByDni: signed ? '12345678Z' : null,
     signatureUrl: signed ? 'sig.png' : null,
@@ -96,6 +99,24 @@ async function code(p: Promise<unknown>): Promise<string | null> {
 }
 
 describe('completeDeliveryTx · camino feliz', () => {
+  it.each(['DEVOLUCION_VENDEDOR', 'ENTREGA_TALLER'] as const)(
+    'el escritor legacy no convierte %s en venta',
+    async (kind) => {
+      const tx = makeTx({ kind })
+      expect(await code(completeDeliveryTx(asTx(tx), baseParams))).toBe(
+        'MANUAL_DELIVERY_NOT_ENABLED'
+      )
+      expect(tx.vehicle.updateMany).not.toHaveBeenCalled()
+      expect(tx.delivery.updateMany).not.toHaveBeenCalled()
+      expect(tx.warranty.create).not.toHaveBeenCalled()
+    }
+  )
+  it('el escritor legacy rechaza venta sin oferta de forma controlada', async () => {
+    const tx = makeTx({ offerId: null })
+    expect(await code(completeDeliveryTx(asTx(tx), baseParams))).toBe('MANUAL_DELIVERY_NOT_ENABLED')
+    expect(tx.offer.findUnique).not.toHaveBeenCalled()
+    expect(tx.vehicle.updateMany).not.toHaveBeenCalled()
+  })
   it('completa entrega + vehículo + comprador + garantía + seguimientos + 3 trazas de forma atómica', async () => {
     const tx = makeTx()
     const res = await completeDeliveryTx(asTx(tx), baseParams)

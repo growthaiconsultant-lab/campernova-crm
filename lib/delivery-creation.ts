@@ -98,12 +98,16 @@ export function isPotentialActiveDeliveryVehicleConflict(err: unknown): boolean 
 export function buildDeliveryCreationRoots(p: {
   vehicleId: string
   sellerLeadId: string | null
-  buyerLeadId: string
+  buyerLeadId: string | null
+  recipientSellerLeadId?: string | null
 }): LockRoot[] {
   return [
     { type: 'vehicle', id: p.vehicleId },
     ...(p.sellerLeadId ? ([{ type: 'sellerLead', id: p.sellerLeadId }] as LockRoot[]) : []),
-    { type: 'buyerLead', id: p.buyerLeadId },
+    ...(p.recipientSellerLeadId && p.recipientSellerLeadId !== p.sellerLeadId
+      ? ([{ type: 'sellerLead', id: p.recipientSellerLeadId }] as LockRoot[])
+      : []),
+    ...(p.buyerLeadId ? ([{ type: 'buyerLead', id: p.buyerLeadId }] as LockRoot[]) : []),
   ]
 }
 
@@ -183,7 +187,7 @@ export async function createDeliveryTx(
   })
   if (active > 0) throw new DeliveryCreationError('DELIVERY_ALREADY_ACTIVE')
   const completed = await tx.delivery.count({
-    where: { vehicleId: p.vehicleId, status: 'COMPLETADA' },
+    where: { vehicleId: p.vehicleId, kind: 'VENTA', status: 'COMPLETADA' },
   })
   if (completed > 0) throw new DeliveryCreationError('VEHICLE_ALREADY_DELIVERED')
 

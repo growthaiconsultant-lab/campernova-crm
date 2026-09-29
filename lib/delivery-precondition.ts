@@ -28,6 +28,7 @@ export type DeliveryPreconditionErrorCode =
   | 'CHECKLIST_ITEM_NOT_FOUND'
   | 'CHECKLIST_ITEM_MISMATCH'
   | 'SIGNATURE_FORBIDDEN'
+  | 'MANUAL_DELIVERY_NOT_ENABLED'
 
 /** Mensajes visibles: sin ids, estado interno, SQL, Prisma ni PII. */
 export const DELIVERY_PRECONDITION_ERROR_MESSAGES: Record<DeliveryPreconditionErrorCode, string> = {
@@ -39,6 +40,7 @@ export const DELIVERY_PRECONDITION_ERROR_MESSAGES: Record<DeliveryPreconditionEr
   CHECKLIST_ITEM_NOT_FOUND: 'Ítem de checklist no encontrado',
   CHECKLIST_ITEM_MISMATCH: 'El ítem no pertenece a esta entrega.',
   SIGNATURE_FORBIDDEN: 'Solo el responsable de la entrega o un admin puede firmar.',
+  MANUAL_DELIVERY_NOT_ENABLED: 'La gestión de esta entrega manual todavía no está activada.',
 }
 
 export class DeliveryPreconditionError extends Error {
@@ -57,7 +59,7 @@ export function isDeliveryPreconditionError(err: unknown): err is DeliveryPrecon
 type ResolvedRoots = {
   deliveryId: string
   vehicleId: string
-  buyerLeadId: string
+  buyerLeadId: string | null
   /** `sellerLeadId` observado en la lectura preliminar; detecta cambio de raíz bajo el lock. */
   resolvedSellerLeadId: string | null
 }
@@ -73,9 +75,19 @@ async function readEditableDeliveryUnderLock(
 ): Promise<{ status: string; responsableId: string | null }> {
   const delivery = await tx.delivery.findUnique({
     where: { id: roots.deliveryId },
-    select: { status: true, vehicleId: true, buyerLeadId: true, responsableId: true },
+    select: {
+      status: true,
+      vehicleId: true,
+      buyerLeadId: true,
+      responsableId: true,
+      kind: true,
+      offerId: true,
+    },
   })
   if (!delivery) throw new DeliveryPreconditionError('DELIVERY_NOT_FOUND')
+  if (delivery.kind !== 'VENTA' || !delivery.buyerLeadId || !delivery.offerId) {
+    throw new DeliveryPreconditionError('MANUAL_DELIVERY_NOT_ENABLED')
+  }
 
   // Coherencia de raíces: la entrega sigue colgando del mismo vehículo y comprador...
   if (delivery.vehicleId !== roots.vehicleId || delivery.buyerLeadId !== roots.buyerLeadId) {

@@ -143,6 +143,12 @@ export default async function WorkOrderPage({ params }: { params: { id: string }
           Orden #{wo.id.slice(-8).toUpperCase()}
         </span>
       </nav>
+      <Link
+        className="inline-block text-sm text-primary underline"
+        href={`/operaciones/documentos?type=vehicle&id=${wo.vehicleId}`}
+      >
+        Presupuestos y documentos operativos del vehículo
+      </Link>
 
       {/* Cabecera */}
       <div className="flex flex-wrap items-start justify-between gap-3">

@@ -2,6 +2,8 @@ import { withSentryConfig } from '@sentry/nextjs'
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  // Adjuntos operativos de hasta 3 MiB más multipart, bajo el límite de Vercel (4,5 MB).
+  experimental: { serverActions: { bodySizeLimit: '4mb' } },
   images: {
     remotePatterns: [
       {

@@ -42,7 +42,12 @@ export async function updateMatchStatus(matchId: string, newStatus: MatchStatus)
 
   if (newStatus === 'CERRADO' && match.status !== 'CERRADO') {
     const delivery = await db.delivery.findFirst({
-      where: { vehicleId: match.vehicleId, status: 'COMPLETADA' },
+      where: {
+        vehicleId: match.vehicleId,
+        buyerLeadId: match.buyerLeadId,
+        kind: 'VENTA',
+        status: 'COMPLETADA',
+      },
     })
     if (!delivery) {
       return { error: 'El match no puede cerrarse sin una entrega completada del vehículo.' }

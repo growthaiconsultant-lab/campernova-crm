@@ -78,3 +78,13 @@ entran en el mismo protocolo de root locks que la compleción; ambas carreras (g
 gana-writer) están demostradas con PostgreSQL real (`waitUntilBlocked`). No queda ventana en la que
 una entrega `COMPLETADA` conviva con checklist incompleto ni firma escrita tras el terminal. Ninguno
 de los gaps restantes se presenta como bloqueo de producción.
+
+# OPS-1 — incremento local 2026-09-29 (no desplegado)
+
+Las garantías del nuevo writer están en `tests/integration/operational-flows.test.ts`: tres tipos
+sin oferta/firma/checklist, entrega de taller tras venta, reintento con clave y fingerprint,
+creación concurrente con contención observada, completar/completar y completar/cancelar, rollback
+antes/después de garantía, compromiso económico y raíz cambiada. Guard real por rol en
+`lib/auth.test.ts`; acciones y pausa de contingencia en `/operaciones/actions.test.ts`.
+Los tests históricos siguientes siguen ejecutándose para el writer legacy. No se confunden con
+validación de Preview o Storage. Estado/evidencia actual: [OPS-1](../specs/OPS-1-taller-documentos-entregas-manuales.md).

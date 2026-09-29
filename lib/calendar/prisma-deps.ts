@@ -26,6 +26,8 @@ export function prismaCalendarDeps(db: PrismaClient): CalendarDeps {
           status: true,
           vehicle: { select: { brand: true, model: true } },
           buyerLead: { select: { name: true } },
+          kind: true,
+          recipientSellerLead: { select: { name: true } },
           responsable: { select: { id: true, name: true } },
         },
       })
