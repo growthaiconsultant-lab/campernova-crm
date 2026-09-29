@@ -1,19 +1,19 @@
 # OPS-1 — Documentos operativos y entregas manuales para Taller
 
-| Campo               | Valor                                                  |
-| ------------------- | ------------------------------------------------------ |
-| **Estado**          | APPROVED                                               |
-| **Owner**           | Engineering / Operaciones                              |
-| **Ticket**          | OPS-1; seguimiento externo no creado                   |
-| **Rama / PR**       | `codex/ops-1-taller-documentos-entregas`; sin PR       |
-| **Categorías**      | C0, C1, C2, C3, C4, C5, C6, C7                         |
-| **Riesgo**          | Alto: documentos privados, permisos y efectos de venta |
-| **Ruta SDD**        | Reforzada                                              |
-| **Última revisión** | 2026-09-29                                             |
+| Campo               | Valor                                                                                                                              |
+| ------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
+| **Estado**          | APPROVED                                                                                                                           |
+| **Owner**           | Engineering / Operaciones                                                                                                          |
+| **Ticket**          | OPS-1; seguimiento técnico en PR #185; Linear pendiente                                                                            |
+| **Rama / PR**       | `codex/ops-1-taller-documentos-entregas`; [PR #185](https://github.com/growthaiconsultant-lab/campernova-crm/pull/185) en borrador |
+| **Categorías**      | C0, C1, C2, C3, C4, C5, C6, C7                                                                                                     |
+| **Riesgo**          | Alto: documentos privados, permisos y efectos de venta                                                                             |
+| **Ruta SDD**        | Reforzada                                                                                                                          |
+| **Última revisión** | 2026-09-29                                                                                                                         |
 
 ## Problema y evidencia — A. Objetivo / B. Baseline
 
-> **Estado vivo (2026-09-29): implementación funcional local, no publicada.** La excepción
+> **Estado vivo (2026-09-29): implementación local publicada en PR #185; no activada remotamente.** La excepción
 > documental fue autorizada expresamente en este chat (respuesta «claro que acepto»): sólo código
 > y QA locales, conservando históricos. No cierra el gate operativo Fase 0 ni autoriza remoto.
 > Ahora existen adjuntos por vehículo/comprador/vendedor y entregas independientes para TALLER.
@@ -321,7 +321,8 @@ resultado real cuando exista autorización de publicación.
 
 ### Implementación funcional y evidencia local vigente (2026-09-29)
 
-- Rama `codex/ops-1-taller-documentos-entregas`, base `72dbc47`; cambios sin commit.
+- Rama `codex/ops-1-taller-documentos-entregas`, base `72dbc47`; implementación `cf90235`, subida
+  a GitHub y PR #185 en borrador. Hooks completos PASS (sin omitir): lint-staged, tipos y 1.570 tests.
 - Adjuntos: `/operaciones/documentos`, fichas de comprador/vendedor/vehículo y enlace desde Taller.
   Categorías PRESUPUESTO/OPERATIVO, destino exclusivo, archivo privado versionado, checksum,
   cabecera MIME, hasta 3 MiB, firma bajo demanda 300 s. TALLER no accede a DNI/contratos históricos.
@@ -343,12 +344,14 @@ resultado real cuando exista autorización de publicación.
   credenciales ficticias locales, sin tocar remoto. Primera compilación falló en la lectura de una
   URL de Google Fonts; comprobación de las cinco familias y repetición normal PASS, sin parchear
   dependencias ni sustituir fuentes. Avisos existentes Prisma/Sentry/Webpack no bloqueantes.
-- **No ejecutados:** Supabase Storage real (sin Docker/Supabase local), E2E autenticado, CI remoto,
-  Preview, staging, producción y observación. Tests con Storage simulado no sustituyen ese gate.
+- **En curso al registrar esta evidencia:** CI y generación de Preview de PR #185; resultados vivos
+  en sus checks de GitHub. No equivalen a validación funcional remota.
+- **No ejecutados localmente:** Supabase Storage real (sin Docker/Supabase local), E2E autenticado,
+  pruebas en staging, producción y observación. Tests con Storage simulado no sustituyen ese gate.
 - **Autorizados posteriormente:** commit/push/PR, CI y generación de Vercel Preview, mediante
   confirmación expresa «si autorizo» del usuario. PR en borrador hasta cerrar los gates pendientes.
 - **No autorizados:** migraciones o configuración remotas, merge ni despliegue de producción.
-- **Siguiente gate:** ejecutar publicación y CI (incluye job Storage local del runner);
+- **Siguiente gate:** confirmar CI (incluye job Storage local del runner) y resultado de Preview;
   revisión del rollout documental antes de migrar staging; pruebas QA con TALLER y roles negativos.
   Producción necesita autorización independiente. No llamar terminado/desplegado al alcance remoto.
 
