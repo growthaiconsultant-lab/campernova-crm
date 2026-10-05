@@ -1,69 +1,46 @@
-name: E2E
-
-# E2E autenticado contra STAGING. No bloquea el merge (necesita secretos + DB viva).
-# Se lanza a mano (workflow_dispatch) o cada noche (schedule).
-#
-# Comportamiento sin staging: si el secreto `E2E_BASE_URL` no está configurado, el
-# job NO falla — un paso guarda detecta que no hay entorno de staging y se salta el
-# resto (el run queda en verde). Así no llegan emails de fallo hasta que se monte
-# staging (ver Fase 4 / README § Entornos / handoff en CLAUDE.md).
-#
-# Requiere estos secrets del repo para ejecutarse de verdad (entorno de staging):
-#   E2E_BASE_URL                     URL de la app de staging (p.ej. preview de Vercel)
-#   STAGING_NEXT_PUBLIC_SUPABASE_URL
-#   STAGING_SUPABASE_SERVICE_ROLE_KEY
-#   E2E_USER_EMAIL                   usuario sembrado en staging (rol ADMIN)
+name: OPS-1 credential-free staging connectivity
 on:
   workflow_dispatch:
-  schedule:
-    - cron: '0 5 * * *' # 05:00 UTC diario
-
+permissions: {}
 jobs:
-  e2e:
-    name: playwright
+  connectivity:
+    if: github.repository == 'growthaiconsultant-lab/campernova-crm' && github.ref == 'refs/heads/codex/ops-1-staging-connectivity-check'
     runs-on: ubuntu-latest
-    # Solo corre si el secreto base está configurado (evita fallos en forks/sin staging).
-    if: ${{ github.repository_owner == 'growthaiconsultant-lab' }}
-    env:
-      E2E_BASE_URL: ${{ secrets.E2E_BASE_URL }}
-      NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.STAGING_NEXT_PUBLIC_SUPABASE_URL }}
-      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.STAGING_SUPABASE_SERVICE_ROLE_KEY }}
-      E2E_USER_EMAIL: ${{ secrets.E2E_USER_EMAIL }}
+    timeout-minutes: 2
     steps:
-      # Si no hay staging configurado, saltamos el resto SIN fallar (run en verde).
-      - name: Comprobar configuración de staging
-        id: guard
+      - name: Probe PostgreSQL SSL negotiation without authentication
+        shell: bash
         run: |
-          if [ -z "$E2E_BASE_URL" ]; then
-            echo "::notice::Staging no configurado (secret E2E_BASE_URL vacío). Se omite el E2E."
-            echo "run=false" >> "$GITHUB_OUTPUT"
-          else
-            echo "run=true" >> "$GITHUB_OUTPUT"
-          fi
-
-      - name: Checkout
-        if: steps.guard.outputs.run == 'true'
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-
-      - name: Setup pnpm
-        if: steps.guard.outputs.run == 'true'
-        uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
-
-      - name: Setup Node
-        if: steps.guard.outputs.run == 'true'
-        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
-        with:
-          node-version: 20
-          cache: pnpm
-
-      - name: Install dependencies
-        if: steps.guard.outputs.run == 'true'
-        run: pnpm install --frozen-lockfile
-
-      - name: Install Playwright browsers
-        if: steps.guard.outputs.run == 'true'
-        run: pnpm exec playwright install --with-deps chromium
-
-      - name: Run E2E (vs staging)
-        if: steps.guard.outputs.run == 'true'
-        run: pnpm test:e2e
+          node <<'NODE'
+          const net = require('node:net');
+          const dns = require('node:dns').promises;
+          async function probe(host, port, label) {
+            return new Promise(resolve => {
+              const socket = net.connect({host, port});
+              let done = false;
+              const finish = result => {
+                if (done) return;
+                done = true;
+                clearTimeout(timer);
+                socket.destroy();
+                console.log(JSON.stringify({label, port, result}));
+                resolve();
+              };
+              const timer = setTimeout(() => finish('TIMEOUT'), 10000);
+              socket.on('connect', () => {
+                const request = Buffer.alloc(8);
+                request.writeInt32BE(8, 0);
+                request.writeInt32BE(80877103, 4);
+                socket.write(request);
+              });
+              socket.once('data', bytes => finish(bytes[0] === 83 ? 'SSL_ACCEPTED' : 'SSL_RESPONSE_' + bytes[0]));
+              socket.on('error', error => finish(error.code));
+            });
+          }
+          (async () => {
+            const pool = 'aws-1-eu-central-1.pooler.supabase.com';
+            const addresses = await dns.resolve4(pool);
+            await Promise.all(addresses.flatMap((host, index) => [5432, 6543].map(port => probe(host, port, 'staging-pool-' + index))));
+            await probe('db.iatuhydsfwoeprpbklod.supabase.co', 5432, 'staging-direct');
+          })().catch(error => { console.log('DIAGNOSTIC_ERROR_' + error.code); process.exitCode = 1; });
+          NODE
