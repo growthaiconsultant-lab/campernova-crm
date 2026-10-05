@@ -1,46 +1,18 @@
-name: OPS-1 credential-free staging connectivity
+name: OPS-1 read-only staging authentication
 on:
   workflow_dispatch:
 permissions: {}
 jobs:
-  connectivity:
+  readonly:
     if: github.repository == 'growthaiconsultant-lab/campernova-crm' && github.ref == 'refs/heads/codex/ops-1-staging-connectivity-check'
     runs-on: ubuntu-latest
-    timeout-minutes: 2
+    timeout-minutes: 3
     steps:
-      - name: Probe PostgreSQL SSL negotiation without authentication
-        shell: bash
+      - name: Read migration history only
+        env:
+          PGDATABASE: ${{ secrets.OPS1_TEMP_STAGING_CONNECTION }}
+          PGCONNECT_TIMEOUT: '15'
+          PGOPTIONS: '-c default_transaction_read_only=on -c statement_timeout=15000'
         run: |
-          node <<'NODE'
-          const net = require('node:net');
-          const dns = require('node:dns').promises;
-          async function probe(host, port, label) {
-            return new Promise(resolve => {
-              const socket = net.connect({host, port});
-              let done = false;
-              const finish = result => {
-                if (done) return;
-                done = true;
-                clearTimeout(timer);
-                socket.destroy();
-                console.log(JSON.stringify({label, port, result}));
-                resolve();
-              };
-              const timer = setTimeout(() => finish('TIMEOUT'), 10000);
-              socket.on('connect', () => {
-                const request = Buffer.alloc(8);
-                request.writeInt32BE(8, 0);
-                request.writeInt32BE(80877103, 4);
-                socket.write(request);
-              });
-              socket.once('data', bytes => finish(bytes[0] === 83 ? 'SSL_ACCEPTED' : 'SSL_RESPONSE_' + bytes[0]));
-              socket.on('error', error => finish(error.code));
-            });
-          }
-          (async () => {
-            const pool = 'aws-1-eu-central-1.pooler.supabase.com';
-            const addresses = await dns.resolve4(pool);
-            await Promise.all(addresses.flatMap((host, index) => [5432, 6543].map(port => probe(host, port, 'staging-pool-' + index))));
-            await probe('db.iatuhydsfwoeprpbklod.supabase.co', 5432, 'staging-direct');
-          })().catch(error => { console.log('DIAGNOSTIC_ERROR_' + error.code); process.exitCode = 1; });
-          NODE
+          test -n "$PGDATABASE"
+          psql -X -w -A -t -v ON_ERROR_STOP=1 -c "SELECT json_build_object('history', coalesce(json_agg(json_build_object('name',migration_name,'checksum',checksum,'finished',finished_at IS NOT NULL,'rolledBack',rolled_back_at IS NOT NULL) ORDER BY migration_name), '[]'::json)) FROM public._prisma_migrations;"
