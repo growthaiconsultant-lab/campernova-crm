@@ -2,25 +2,24 @@
 
 | Campo               | Valor                                                                                                                              |
 | ------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
-| **Estado**          | APPROVED                                                                                                                           |
+| **Estado**          | IMPLEMENTED                                                                                                                        |
 | **Owner**           | Engineering / Operaciones                                                                                                          |
 | **Ticket**          | OPS-1; seguimiento técnico en PR #185; Linear pendiente                                                                            |
 | **Rama / PR**       | `codex/ops-1-taller-documentos-entregas`; [PR #185](https://github.com/growthaiconsultant-lab/campernova-crm/pull/185) en borrador |
 | **Categorías**      | C0, C1, C2, C3, C4, C5, C6, C7                                                                                                     |
 | **Riesgo**          | Alto: documentos privados, permisos y efectos de venta                                                                             |
 | **Ruta SDD**        | Reforzada                                                                                                                          |
-| **Última revisión** | 2026-09-29                                                                                                                         |
+| **Última revisión** | 2026-10-05                                                                                                                         |
 
 ## Problema y evidencia — A. Objetivo / B. Baseline
 
-> **Estado vivo (2026-09-29): implementación local publicada en PR #185; no activada remotamente.** La excepción
-> documental fue autorizada expresamente en este chat (respuesta «claro que acepto»): sólo código
-> y QA locales, conservando históricos. No cierra el gate operativo Fase 0 ni autoriza remoto.
-> Ahora existen adjuntos por vehículo/comprador/vendedor y entregas independientes para TALLER.
-> APPROVED se mantiene hasta verificar Storage real y UI autenticada. Las notas iniciales de §U
-> se conservan como historial; ya no son el estado de implementación.
-> Publicación autorizada posteriormente: commit, push, PR, CI y generación de Vercel Preview.
-> No autoriza migraciones remotas, cambios de configuración, merge ni producción.
+> **Estado vivo (2026-10-05): implementado, CI y pruebas funcionales en Preview/staging realizadas;
+> producción en rollout autorizado, todavía no declarada desplegada.** Evidencia y límites en §U.
+> El usuario autorizó continuar hasta aplicar las tres migraciones OPS-1, fusionar PR #185,
+> desplegar y comprobar producción. Las restricciones anteriores de las notas históricas quedan
+> sustituidas únicamente para este alcance. No autoriza backfills, borrados ni cambios ajenos.
+> Las pruebas remotas MARKETING/inactivo quedan PENDIENTES / NO EJECUTADAS por decisión del usuario.
+> No se presenta esa excepción como una prueba superada ni se cierra todo el programa documental.
 
 Operaciones necesita adjuntar presupuestos/documentos a cualquier vehículo o cliente concreto y
 gestionar entregas físicas sin tener que construir antes un match, oferta o reserva. El usuario
@@ -318,6 +317,195 @@ resultado real cuando exista autorización de publicación.
 | Retirar freeze creando un almacenamiento paralelo      | Prohibido; resolver gate, no eludirlo.                                         |
 
 ## Cierre y estado de autorización — U
+
+### Rollout producción autorizado (2026-10-05)
+
+- Autorización expresa: «sigue hasta que esté todo y los cambios en produccion». Alcance:
+  tres expansiones OPS-1, postflight, documentación, merge PR #185, despliegue y smoke.
+- Preflight de sólo lectura: identidad `bbmglaatlyilxutzomxd`, 239 documentos, cero entregas,
+  cero referencias actuales incoherentes; RLS activa y bucket documental privado. Historial
+  completado sin fallos activos; faltaban exclusivamente las tres migraciones OPS-1.
+- Respaldo cifrado del schema public y datos, run privado `37358877723`, descargado y verificado
+  mediante descifrado, SHA-256 y lectura completa de pg_restore. No incluye Auth ni archivos
+  Storage; no se ha probado restauración de filas reales. Clave de recuperación protegida por
+  Windows DPAPI del usuario. Copia y clave locales fuera de Git; cero artefactos y secretos
+  remotos tras limpieza; workflow de backup desactivado. No publicar datos ni secretos.
+- Conectividad local falló antes de autenticación. No se restablecieron contraseñas ni se
+  redujeron protecciones; el respaldo se ejecutó en repositorio privado dedicado autorizado.
+- Comparación local **sólo de estructura** del respaldo contra replay: baseline y resultado
+  posterior OPS-1 PASS, objetos ajenos preservados. Se mantienen explícitamente los órdenes
+  históricos de CalendarEventType y UserRole, respaldados por las migraciones originales
+  conservadas en `5ce93d6`. No se corrige ese orden en producción.
+- CI de `f135d96` PASS: quality, integration, migration-replay, supabase-storage. Preview
+  `Gt8QqEzKaCrWje8vCbN1YJSsv9XG` READY y comprobado en staging; evidencias detalladas debajo.
+- Ejecutor de producción preparado con commit fuente fijo, identidad exacta, conjunto pendiente
+  exacto, checksums, paridad antes/después, cuatro CHECKs validados y conteos conservados.
+  En curso: run privado `37360263055`. No inferir migración completada de su mero inicio.
+- Rollback: conservar schema y datos; ante incidencia usar `OPS1_PAUSE_WRITES=true` con este
+  build compatible. No volver al cliente antiguo después de crear destinos documentales cliente.
+- Pendientes al registrar: resultado de migración, merge/deploy, smoke de producción y ventana
+  de observación. MARKETING/inactivo remotos siguen diferidos; Linear sigue pendiente.
+
+### Operación staging autorizada (2026-10-05; sustituye los límites históricos de remoto)
+
+- El usuario autoriza copia cifrada de staging `iatuhydsfwoeprpbklod`, descarga local,
+  las tres migraciones OPS-1 mediante Prisma y postflight; secreto temporal de GitHub Actions
+  y eliminación posterior del secreto y artefacto remoto. Este paso no toca producción.
+- CI del commit `f135d96f649c64c561fb1043070e1508135da99b`: cuatro jobs SUCCESS,
+  run `36604835402`. Lectura autenticada de staging PASS en run `37319825478` del
+  repositorio `growthaiconsultant-lab/campernova-crm`; secreto temporal eliminado.
+- Historial contrastado con SQL local: exactamente tres pendientes OPS-1, cero diferencias
+  de checksum y cero intentos fallidos activos. Esto no sustituye el preflight de esquema/datos.
+- Desde el equipo, el puerto 5432 no negocia PostgreSQL; GitHub sí responde en 5432/6543.
+  La causa local concreta sigue sin determinarse. No se cambian controles de red.
+- Rama operativa aislada `codex/ops-1-staging-connectivity-check`, despliegues desactivados;
+  no fusionar esta rama. Flujo corregido preparado `ff9d1bd90b1c1c1bd6152fcd3a0155d1dac53901`:
+  exportar sólo schema/datos `public`, cifrar AES-GCM con clave envuelta RSA-OAEP,
+  descargar, verificar descifrado/checksum y archivo con pg_restore; sólo entonces
+  disparar la fase de migraciones contra el commit de OPS-1 fijado.
+- Clave de recuperación privada protegida con DPAPI del usuario de Windows. Copia en
+  almacenamiento local fuera del repositorio. No incluye objetos de Storage ni un backup
+  completo de Auth/plataforma; esas superficies no se modifican en estas migraciones.
+- Stop por identidad incorrecta, backup inválido, drift, pendientes inesperadas, fallo de
+  migración o postflight. No resolve, backfill, borrado de datos ni rollback automático.
+- Preparación verificada: sintaxis YAML/JS/PowerShell, roundtrip de cifrado con datos sintéticos,
+  protección/recuperación de clave local y guardas de historial. **Todavía no ejecutado**:
+  backup real, migración remota, postflight, redeploy y smoke autenticado de OPS-1.
+- Ensayo remoto **exclusivamente sintético** `37324604687` SUCCESS: PostgreSQL 17,
+  exportación, cifrado y descarga. Restauración local a una base QA nueva PASS, con
+  comprobación exacta de las dos filas originales; copia alterada rechazada. Protección
+  DPAPI comprobada tres veces por ejecución. Artefacto remoto sintético eliminado;
+  copia cifrada local conservada, clúster QA detenido y secreto temporal ausente.
+- El intento real `37323597783` falló antes de migrar. Se elimina la dependencia de una
+  ruta de pg_dump supuestamente instalada: se usa PostgreSQL 17 en contenedor del runner,
+  probado por el ensayo anterior. La restauración sintética no certifica el backup real
+  de staging ni sustituye su preflight y validación funcional pendientes.
+- Actualización posterior: backup real `37333580066` SUCCESS, cifrado descargado y
+  descifrado/checksum/archive verificados localmente; artefacto remoto y secreto temporal
+  eliminados y ausencia verificada. No se han restaurado filas de staging en QA local.
+- Preflight `37333721440` detenido antes de `prisma migrate deploy`. Reproducción local
+  usando únicamente el esquema del backup: Prisma diff devuelve 2 frente al baseline
+  `72dbc47`; staging conserva `vehicle_reception_questionnaires`, enums de recepción,
+  `vehicles.camperization_state` y campos de vínculo manual en `matches` que el baseline
+  no contiene. Es drift real, no contraseña incorrecta. No borrar esos objetos ni ignorar
+  el diff: reconciliar explícitamente el baseline antes de reintentar. Las tres migraciones
+  OPS-1 siguen sin aplicar; producción intacta. El indicador local `migrationStarted`
+  significa job despachado, no que se ejecutara SQL de migración.
+- Reconciliación autorizada por el usuario: preservación, sin borrar datos ni incorporar
+  funcionalidades de otras ramas a producción. Reconstrucción local desde migraciones base
+  más `20260807170000_add_vehicle_reception_questionnaire` (`e21b23e`) y
+  `20260808120000_add_manual_buyer_vehicle_links` (`14db084`). Comparación de tablas,
+  columnas, defaults, nullability, FKs/CHECKs, índices, enums y RLS/policies PASS con una
+  diferencia histórica explícita: CalendarEventType conserva en staging el orden
+  LIMPIEZA/SEGUIMIENTO/OTRO/LLAMADA, distinto al del squash. OPS-1 no lo modifica.
+- Aplicación local de los tres SQL originales sobre una restauración **sólo de esquema**
+  y sobre la reconstrucción independiente: catálogo final equivalente PASS; todos los
+  objetos fuera de deliveries/vehicle_documents y los enums OPS permanecen iguales.
+  No se han copiado filas reales a la base QA. Esto no sustituye Prisma deploy remoto.
+- Pre/postflight preparado con hashes del catálogo reconciliado y checksums de las dos
+  migraciones históricas; cualquier diferencia adicional falla. Se conserva el guard de
+  exactamente tres pendientes, identidad, backup, filas, constraints y postflight. No se
+  suprime la verificación: se reemplaza la comparación contra main incompleto para este
+  staging por su contrato explícito. No reutilizar este contrato para producción.
+- **Staging aplicado y postflight PASS (2026-10-05):** backup `37338076381` SUCCESS;
+  migraciones `37338217619` SUCCESS, workflow `b826e299e4e7858acf842e86b659018b8c39e865`.
+  Preflight de identidad/historial/catálogo PASS, exactamente las tres migraciones OPS-1
+  aplicadas mediante Prisma, catálogo final reconciliado PASS, cuatro CHECKs validados y
+  recuentos de entregas/documentos/versiones sin cambios. Backup cifrado local conservado;
+  artefacto remoto y secreto temporal eliminados, ausencia comprobada. Esta evidencia
+  sustituye las notas anteriores de migraciones pendientes, no las pruebas funcionales:
+  Preview autenticado con TALLER y permisos negativos todavía pendiente. Sin merge ni
+  modificación de producción.
+- Con autorización posterior del usuario, configurado `SUPABASE_SERVICE_ROLE_KEY` como
+  secreto únicamente en Vercel Preview. Ref y rol del JWT de origen comprobados en memoria:
+  staging `iatuhydsfwoeprpbklod`, `service_role`; valor no impreso ni persistido localmente.
+  Confirmación UI y listado CLI del ámbito Preview. Variable de producción sin cambios.
+  Redespliegue Preview `dpl_3P4T3kosSyBg1aCLDoNB2e5ccbaJ` confirmado READY; ruta privada
+  redirige al login sin sesión. No es todavía smoke autenticado. Bucket staging vehicle-documents privado existente, cero policies
+  directas; no se han cambiado sus permisos ni contenido. Las variables sensibles de Vercel
+  no devuelven valores al endpoint de lectura: identidad/conectividad efectiva de DB y smoke
+  autenticado siguen pendientes; no confundir presencia de variables con configuración válida.
+- Login Preview del 2026-10-05 16:25 UTC: error Prisma de autenticación de base de datos
+  antes de solicitar el magic link. Corrección operativa autorizada: DATABASE_URL y DIRECT_URL
+  exclusivamente Preview actualizadas mediante entrada privada de la contraseña vigente;
+  endpoints fijados a staging, secreto sólo en memoria/almacenamiento cifrado de Vercel.
+  Tests de alcance exclusivo y codificación de contraseña PASS. Nuevo Preview solicitado:
+  `dpl_Gt8QqEzKaCrWje8vCbN1YJSsv9XG`; no repite migraciones ni altera producción.
+  Aprendizaje: tras cambiar credenciales, actualizar sus consumidores y verificar una consulta
+  real antes de pedir al usuario probar el correo. Un build READY no demuestra conexión a DB.
+- `dpl_Gt8QqEzKaCrWje8vCbN1YJSsv9XG` confirmado READY. Tras recargar el alias de rama,
+  un único intento con la cuenta QA TALLER muestra «Revisa tu correo / Hemos enviado un
+  enlace de acceso». La consulta inicial a la base y la petición de envío ya no fallan.
+  Recepción/apertura del correo, callback, sesión y pruebas de entregas/adjuntos pendientes;
+  no considerar esta respuesta de envío como prueba completa de autenticación.
+- Smoke autenticado Chrome/Preview con QA TALLER (2026-10-05): dashboard y documentos
+  operativos accesibles; presupuesto PNG sintético asociado al vehículo QA, guardado/listado
+  PASS; descarga autorizada PASS y SHA-256 idéntico al fixture original. Sólo datos QA.
+  Creación de salida de taller QA sin oferta/match/reserva/responsable, checklist 0/2 y
+  sin firma PASS, estado Programada confirmado al leer la ficha en una pestaña nueva.
+  La confirmación nativa tuvo un timeout del control del navegador. Tras intervención del
+  usuario y recarga posterior, cierre persistido PASS: Completada, checklist 0/2 y garantía
+  ausente en la ficha. No sustituye la reconciliación de efectos comerciales en DB.
+  Subida de presupuesto sintético al vendedor QA PASS: guardado y listado; cambiar a
+  Comprador elimina la selección y la lista anterior. Búsqueda QA de compradores sin
+  resultados: pendiente preparar un comprador QA, sin usar clientes existentes.
+  Prueba negativa TALLER sobre /compradores PASS: redirección a /dashboard?error=forbidden.
+  Pendientes: otros tipos/destinos, resto de permisos negativos remotos y logs.
+- Sesión ADMIN del usuario confirmada en el mismo Preview (2026-10-05). Creado comprador
+  sintético `cmuvi8pk20001js04rj4z4q9r`, identificado QA OPS-1, sin asignación ni matches.
+  Presupuesto PNG sintético guardado/listado desde su ficha: PASS con ADMIN. No equivale
+  a validación TALLER para este destino; pendiente volver a esa sesión y comprobarlo.
+- Devolución QA `cmuvil0x00006jy04bzk4i8cx`: creación y cierre directo con ADMIN PASS;
+  después de confirmación manual del usuario y recarga aparece Completada, checklist 0/2
+  y garantía ausente en ficha. Pendiente reconciliación independiente de efectos en DB.
+  Entrega VENTA QA `cmuvini6j0001k10419jknocs` creada sin oferta/match, comprador sintético,
+  responsable vacío y checklist 0/2. Tras confirmación del usuario, recarga confirma Completada
+  y garantía Activa. Ficha de garantía `cmuvip8yh0007k104tnjyjd22`: comprador y vehículo QA
+  correctos, vigencia 2026-10-05 a 2027-10-05, seguimientos pendientes día 7 y día 30.
+  PASS funcional con ADMIN; no certifica por sí solo unicidad/concurrencia remota ni rol TALLER.
+- Sesión QA TALLER restablecida y rol visible confirmado en Preview: búsqueda y selección
+  del comprador sintético PASS, lectura del presupuesto creado por ADMIN PASS y nueva
+  subida PNG «QA OPS-1 adjunto comprador desde TALLER» PASS (Documento guardado y ambos
+  documentos listados). Con esto hay subida real con TALLER a los tres destinos QA.
+  No sustituye pruebas pendientes de descarga por destino, otros formatos, permisos
+  negativos completos, reconciliación DB y revisión de logs; producción sin cambios.
+- Reconciliación SQL de sólo lectura en panel staging (2026-10-05): las tres entregas QA
+  COMPLETADA, offer_id y signature_url nulos, cero ítems de checklist resueltos. VENTA:
+  exactamente una garantía y dos seguimientos; DEVOLUCION_VENDEDOR y ENTREGA_TALLER:
+  cero garantías y cero seguimientos. No se repitieron mutaciones para obtener esta evidencia.
+  Panel staging Healthy: última hora observada 248 peticiones, 100% success, cero errores
+  indicados en Auth/Postgres/Storage/API Gateway. No equivale a revisión de Vercel/Sentry.
+  Consulta de integridad documental pendiente: editor concatenó texto y devolvió syntax error
+  antes de ejecutar; recuperación de selección del editor agotó el control del navegador.
+  CLI Vercel anterior no disponible; conector Supabase identificado como producción y no
+  utilizado para consultar QA. No reutilizar credenciales ni entorno de producción.
+- Recuperación posterior de la consulta documental PASS: comprador 2 documentos, vehículo 1,
+  vendedor 1; los cuatro tienen versión ACTIVE vinculada, objeto presente en Storage,
+  bucket privado y checksum presente. Consulta agregada sin descargar contenido ni mostrar paths.
+  RLS activa comprobada en deliveries, vehicle_documents, document_versions y storage.objects.
+  Cero policies en las tres tablas públicas revisadas; las cuatro policies de storage.objects
+  se limitan expresamente a vehicle-photos, sin concesión para vehicle-documents.
+  Es revisión de configuración efectiva, no un test HTTP con cada rol.
+  Checks PR #185 consultados de nuevo: quality, integration, migration-replay,
+  supabase-storage y Vercel PASS (run 36604835402 / deployment Gt8QqEzKaCrWje8vCbN1YJSsv9XG).
+- Observabilidad Preview: Vercel filtrado por deployment Gt8QqEzKaCrWje8vCbN1YJSsv9XG,
+  ventana aproximada 18:53–19:53 Europe/Madrid del 2026-10-05, Warning/Error/Fatal = 0.
+  Sentry proyecto campernova-crm (4511315528581200), environment preview, últimos 14 días,
+  sin filtro de estado: ninguna incidencia encontrada. No prueba entrega de telemetría ni
+  sustituye observación 24 h. No se cerraron ni silenciaron incidencias.
+  Acceso anónimo de la app: /operaciones/documentos y /entregas/nueva en dominio único
+  del mismo deployment redirigen a /login, sin mostrar contenido privado. Las peticiones
+  externas sin cookies al alias devuelven SSO de Vercel: barrera independiente, no authz CRM.
+  MARKETING/inactivo no comprobados remotamente: no hay sesión QA de esos perfiles disponible;
+  conservar la distinción frente a su cobertura automatizada, sin cambiar roles de usuarios reales.
+- Decisión explícita del usuario (2026-10-05): no crear las cuentas QA MARKETING/inactivo;
+  dejar sus pruebas negativas remotas **PENDIENTES / NO EJECUTADAS**. La cobertura automatizada
+  no sustituye esta evidencia remota. No marcar este gate como PASS ni modificar cuentas
+  existentes. Esta decisión no autoriza por sí sola merge, despliegue ni cambios en producción.
+
+Aprendizajes operativos: seleccionar explícitamente la cuenta GitHub antes del uso; especificar
+la URI mediante `psql --dbname` (no asumir expansión de URI en PGDATABASE); separar conectividad,
+autenticación, historial, paridad y prueba funcional. Ninguna fase verde certifica las siguientes.
 
 ### Implementación funcional y evidencia local vigente (2026-09-29)
 
