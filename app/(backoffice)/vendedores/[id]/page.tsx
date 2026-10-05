@@ -1,6 +1,7 @@
 import { notFound } from 'next/navigation'
 import { Suspense } from 'react'
 import Link from 'next/link'
+import { DocumentsPanel } from '@/components/operations/documents-panel'
 import { db } from '@/lib/db'
 import { requireAgente } from '@/lib/auth'
 import { initialOf, personLabel, vehicleLabel } from '@/lib/display'
@@ -1121,6 +1122,26 @@ export default async function FichaVendedorPage({
           )}
 
           {/* ─────────────── PREPARACIÓN · expediente ─────────────── */}
+          {activeTab === 'preparacion' && isAgente && (
+            <div className="space-y-5 pb-5">
+              {v && (
+                <>
+                  <h3 className="font-medium">Documentos vinculados al vehículo</h3>
+                  <DocumentsPanel
+                    key={v.id}
+                    initialTarget={{ type: 'vehicle', id: v.id }}
+                    fixedTarget
+                  />
+                </>
+              )}
+              <h3 className="font-medium">Documentos vinculados al vendedor</h3>
+              <DocumentsPanel
+                key={params.id}
+                initialTarget={{ type: 'sellerLead', id: params.id }}
+                fixedTarget
+              />
+            </div>
+          )}
           {activeTab === 'preparacion' && v && legalInput && isAgente && (
             <Card>
               <CardHeader>

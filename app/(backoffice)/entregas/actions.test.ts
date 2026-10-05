@@ -140,7 +140,12 @@ beforeEach(() => {
 
 describe('uploadDeliveryDocument · subida server-side', () => {
   it('sube server-side y guarda el PATH interno seguro (no un path del cliente)', async () => {
-    mockDb.delivery.findUnique.mockResolvedValue({ status: 'EN_CURSO' })
+    mockDb.delivery.findUnique.mockResolvedValue({
+      status: 'EN_CURSO',
+      kind: 'VENTA',
+      offerId: 'offer-1',
+      buyerLeadId: 'buyer-1',
+    })
     const res = await uploadDeliveryDocument('del-1', docFormData())
     expect(res).toEqual({ ok: true })
 
@@ -154,7 +159,12 @@ describe('uploadDeliveryDocument · subida server-side', () => {
   })
 
   it('rechaza un archivo de tipo no permitido (validación server-side) sin crear metadatos', async () => {
-    mockDb.delivery.findUnique.mockResolvedValue({ status: 'EN_CURSO' })
+    mockDb.delivery.findUnique.mockResolvedValue({
+      status: 'EN_CURSO',
+      kind: 'VENTA',
+      offerId: 'offer-1',
+      buyerLeadId: 'buyer-1',
+    })
     const res = await uploadDeliveryDocument(
       'del-1',
       docFormData({ name: 'x.svg', type: 'image/svg+xml' })
@@ -296,6 +306,8 @@ describe('updateDeliveryStatus · finalización atómica (COMPLETADA)', () => {
 describe('I3C2 · transiciones coordinadas (EN_CURSO / CANCELADA)', () => {
   // El núcleo real corre contra mockDb dentro del withLockedRoots mockeado.
   const coordinatedShape = {
+    kind: 'VENTA',
+    offerId: 'offer-1',
     status: 'PROGRAMADA' as const,
     vehicleId: 'veh-1',
     buyerLeadId: 'buyer-1',

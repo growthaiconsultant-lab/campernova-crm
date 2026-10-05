@@ -7,7 +7,7 @@
  *   · el índice `deliveries_active_vehicle_key` rechaza dos Deliveries activas por vehículo;
  *   · la FK Delivery.offer_id es NO ACTION: borrar la Offer directamente falla, borrar el Vehicle
  *     padre elimina Offer y Delivery en cascada convergente;
- *   · tras el contract I3C1B (offer_id NOT NULL) un INSERT que omite offer_id es rechazado.
+ *   · OPS-1A permite offer_id NULL en el schema; el escritor legacy sigue exigiendo oferta.
  *
  * Barreras deterministas y varias conexiones; sin `sleep` como mecanismo de sincronización.
  */
@@ -419,29 +419,23 @@ describe('FK Delivery.offer_id · NoAction y cascada convergente', () => {
   })
 })
 
-describe('contract I3C1B: un INSERT sin offer_id es rechazado (prueba física)', () => {
-  // `INSERT WITHOUT offer_id IS REJECTED AFTER I3C1B`. Tras el contract la columna es NOT NULL, así
-  // que un INSERT directo que omite `offer_id` falla en PostgreSQL. El cliente pre-I3C1A (que no
-  // conoce la columna) ya no puede crear Deliveries: esa incompatibilidad histórica es esperada, no
-  // un fallo. La compatibilidad del cliente ACTUALMENTE desplegado se demuestra aparte en
-  // `old-client-compat.test.ts`, generando el cliente de `aa739cc` (que sí persiste `offerId`).
-  it('un INSERT que omite offer_id es rechazado por NOT NULL, sin fila creada', async () => {
+describe('OPS-1A: expansión de oferta opcional (prueba física)', () => {
+  // La migración histórica SET NOT NULL conserva sus pruebas aisladas en contract-migration*.
+  // El schema actual se expande expresamente: no equivale a activar el writer manual de la app.
+  it('un INSERT válido sin offer_id se conserva como VENTA, sin efectos comerciales', async () => {
     const f = await seed()
     const before = await counts(f)
-    const err = await prismaA.$queryRaw`
+    const rows = await prismaA.$queryRaw<Array<{ id: string; offer_id: string | null }>>`
       INSERT INTO "deliveries" ("id","vehicle_id","buyer_lead_id","scheduled_at","status","created_at","updated_at")
       VALUES (${'legacy_' + uniqueSuffix()}, ${f.vehicleId}, ${f.buyerId}, ${new Date()}, 'PROGRAMADA'::"DeliveryStatus", ${new Date()}, ${new Date()})
-      RETURNING "id", "offer_id"`.catch((e) => e)
-    // Error NOT NULL real de PostgreSQL (SQLSTATE 23502). Prisma en raw NO incluye el nombre de la
-    // columna; devuelve el código 23502 y "Failing row contains (…, null, …)".
-    expect(err).toBeInstanceOf(Error)
-    const message = err instanceof Error ? err.message : String(err)
-    expect(message).toContain('23502')
-    expect(message.toLowerCase()).toContain('null')
-    // Ninguna Delivery creada; ninguna Activity; ninguna mutación parcial.
+      RETURNING "id", "offer_id"`
+    expect(rows).toHaveLength(1)
+    expect(rows[0].offer_id).toBeNull()
+    expect((await prismaA.delivery.findUniqueOrThrow({ where: { id: rows[0].id } })).kind).toBe(
+      'VENTA'
+    )
     const after = await counts(f)
-    expect(after.deliveries).toBe(before.deliveries)
-    expect(after.deliveries).toBe(0)
+    expect(after.deliveries).toBe(before.deliveries + 1)
     expect(after.activities).toBe(0)
   })
 })

@@ -69,10 +69,10 @@ export function requireCanEditTaller() {
   return requireRole(['ADMIN', 'TALLER'])
 }
 
-// Entregas: read + create
-// ADMIN + AGENTE + ENTREGAS
+// Entregas: lectura. Las mutaciones operativas usan su propio guard (sin AGENTE).
+// ADMIN + AGENTE + ENTREGAS + TALLER
 export function requireCanViewEntregas() {
-  return requireRole(['ADMIN', 'AGENTE', 'ENTREGAS'])
+  return requireRole(['ADMIN', 'AGENTE', 'ENTREGAS', 'TALLER'])
 }
 
 // Entregas: edit checklist, sign, upload docs

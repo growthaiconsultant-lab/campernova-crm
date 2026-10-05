@@ -24,6 +24,41 @@ afterEach(() => {
 })
 
 describe('getSupabaseAdminClient', () => {
+  it('OPS-1 acota la espera y aborta fetch sin alterar el cliente histórico', async () => {
+    vi.useFakeTimers()
+    const fetchMock = vi.fn(
+      (_input: unknown, init?: RequestInit) =>
+        new Promise<Response>((_resolve, reject) => {
+          init?.signal?.addEventListener('abort', () => reject(new Error('aborted')), {
+            once: true,
+          })
+        })
+    )
+    vi.stubGlobal('fetch', fetchMock)
+    try {
+      getSupabaseAdminClient({ timeoutMs: 15000 })
+      const options = (
+        createClientMock.mock.calls[0] as unknown as [
+          string,
+          string,
+          { global: { fetch: typeof fetch } },
+        ]
+      )[2]
+      const pending = expect(options.global.fetch('http://127.0.0.1:54321/test')).rejects.toThrow(
+        'aborted'
+      )
+      await vi.advanceTimersByTimeAsync(15000)
+      await pending
+      expect(fetchMock.mock.calls[0][1]?.signal?.aborted).toBe(true)
+      getSupabaseAdminClient()
+      getSupabaseAdminClient()
+      expect(createClientMock).toHaveBeenCalledTimes(2)
+    } finally {
+      vi.useRealTimers()
+      vi.unstubAllGlobals()
+    }
+  })
+
   it('crea el cliente con service_role sin persistir sesión, y lo memoiza', () => {
     const a = getSupabaseAdminClient()
     const b = getSupabaseAdminClient()

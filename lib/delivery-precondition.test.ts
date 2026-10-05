@@ -27,6 +27,8 @@ function makeTx(o: TxOpts = {}) {
     o.status === '__missing__'
       ? null
       : {
+          kind: 'VENTA',
+          offerId: 'offer-1',
           status: o.status ?? 'EN_CURSO',
           vehicleId: o.deliveryVehicleId ?? 'veh-1',
           buyerLeadId: o.deliveryBuyerId ?? 'buyer-1',

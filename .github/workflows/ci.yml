@@ -182,8 +182,8 @@ jobs:
           count=$(psql "$PSQL_URL" -tAc "SELECT count(*) FROM _prisma_migrations WHERE finished_at IS NOT NULL")
           names=$(psql "$PSQL_URL" -tAc "SELECT string_agg(migration_name, ',' ORDER BY migration_name) FROM _prisma_migrations WHERE finished_at IS NOT NULL")
           echo "migraciones aplicadas: $count · nombres: $names"
-          test "$count" = "14" || { echo "esperado 14 migraciones aplicadas (baseline + PR5B1 + archivado + commitment + delivery_offer_link_expand + delivery_offer_link_required + vehicle_entry_foundations + official_entry_activity_and_inspection_index + valuation_purpose_and_attempts + cap1_business_fields_nullable + add_photo_category_and_unpublish + perm3_status_corrections + seller_intake_admission + preserve_operational_web_intakes)"; exit 1; }
-          test "$names" = "000000000000_squashed_migrations,20260712000000_add_versioned_document_model,20260719120000_add_lead_archiving_model,20260720000000_add_calendar_event_commitment,20260721100000_add_delivery_offer_link_expand,20260721200000_make_delivery_offer_link_required,20260726000000_add_vehicle_entry_foundations,20260726120000_add_official_entry_activity_and_inspection_index,20260727000000_add_valuation_purpose_and_attempts,20260728130000_cap1_business_fields_nullable,20260729130000_add_photo_category_and_unpublish,20260805160000_perm3_status_corrections,20260907150000_add_seller_intake_admission,20260907184500_preserve_operational_web_intakes" || { echo "conjunto u orden de migraciones inesperado"; exit 1; }
+          test "$count" = "17" || { echo "esperado 17 migraciones aplicadas, incluidas las tres expansiones OPS-1"; exit 1; }
+          test "$names" = "000000000000_squashed_migrations,20260712000000_add_versioned_document_model,20260719120000_add_lead_archiving_model,20260720000000_add_calendar_event_commitment,20260721100000_add_delivery_offer_link_expand,20260721200000_make_delivery_offer_link_required,20260726000000_add_vehicle_entry_foundations,20260726120000_add_official_entry_activity_and_inspection_index,20260727000000_add_valuation_purpose_and_attempts,20260728130000_cap1_business_fields_nullable,20260729130000_add_photo_category_and_unpublish,20260805160000_perm3_status_corrections,20260907150000_add_seller_intake_admission,20260907184500_preserve_operational_web_intakes,20260929120000_expand_typed_manual_deliveries,20260929130000_add_delivery_operation_keys,20260929140000_expand_operational_document_targets" || { echo "conjunto u orden de migraciones inesperado"; exit 1; }
 
       - name: Prisma migrate status (must be up to date)
         run: pnpm prisma migrate status
@@ -290,13 +290,17 @@ jobs:
           #   foreign_keys 78 → 79 (+1: intake_reviewed_by_id→users SET NULL)
           #   indexes     126 → 127 (+1: intake_status+created_at)
           # preserve_operational_web_intakes corrige únicamente el backfill; no cambia catálogo.
-          assert offer_id_not_null "$(psql "$PSQL_URL" -tAc "SELECT is_nullable FROM information_schema.columns WHERE table_schema='public' AND table_name='deliveries' AND column_name='offer_id'")" NO
+          # OPS-1: tipos/destinatarios, claves de operación y documentos con destino exclusivo.
+          assert offer_id_nullable "$(psql "$PSQL_URL" -tAc "SELECT is_nullable FROM information_schema.columns WHERE table_schema='public' AND table_name='deliveries' AND column_name='offer_id'")" YES
+          assert delivery_recipient_check "$(psql "$PSQL_URL" -tAc "SELECT count(*) FROM pg_constraint WHERE conname='deliveries_kind_recipient_check' AND convalidated")" 1
           assert tables "$tables" 33
-          assert columns "$columns" 485
-          assert enums "$enums" 57
-          assert enum_values "$enum_values" 303
-          assert foreign_keys "$fks" 79
-          assert indexes "$indexes" 127
+          assert columns "$columns" 493
+          assert enums "$enums" 58
+          assert enum_values "$enum_values" 308
+          assert foreign_keys "$fks" 82
+          assert indexes "$indexes" 132
+          assert document_target_check "$(psql "$PSQL_URL" -tAc "SELECT count(*) FROM pg_constraint WHERE conname='vehicle_documents_target_check' AND convalidated")" 1
+          assert operation_key_checks "$(psql "$PSQL_URL" -tAc "SELECT count(*) FROM pg_constraint WHERE conname IN ('vehicle_documents_operation_key_check','deliveries_operation_key_check') AND convalidated")" 2
           assert tables_without_rls "$without_rls" 0
           assert tables_forced_rls "$forced" 0
           assert policies "$policies" 0

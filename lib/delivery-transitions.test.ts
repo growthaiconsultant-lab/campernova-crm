@@ -22,7 +22,13 @@ describe('isI3C2Transition — subconjunto sin COMPLETADA', () => {
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 function makeTx(cfg: {
-  delivery?: { status: string; vehicleId: string; buyerLeadId: string } | null
+  delivery?: {
+    status: string
+    vehicleId: string
+    buyerLeadId: string
+    kind?: string
+    offerId?: string | null
+  } | null
   deliveryAfterCas?: { status: string } | null
   vehicle?: { sellerLeadId: string | null } | null
   seller?: { archivedAt: Date | null } | null
@@ -30,8 +36,10 @@ function makeTx(cfg: {
   casCount?: number
 }) {
   const deliveryFind = vi.fn()
-  deliveryFind.mockResolvedValueOnce(
+  const delivery =
     'delivery' in cfg ? cfg.delivery : { status: 'PROGRAMADA', vehicleId: 'v1', buyerLeadId: 'b1' }
+  deliveryFind.mockResolvedValueOnce(
+    delivery ? { kind: 'VENTA', offerId: 'o1', ...delivery } : null
   )
   if ('deliveryAfterCas' in cfg) deliveryFind.mockResolvedValueOnce(cfg.deliveryAfterCas)
   const updateMany = vi.fn().mockResolvedValue({ count: cfg.casCount ?? 1 })
@@ -71,6 +79,19 @@ async function expectCode(p: Promise<unknown>, code: string) {
 }
 
 describe('transitionDeliveryTx — clasificación fail-closed', () => {
+  it('el puente no permite iniciar una entrega manual mediante la acción legacy', async () => {
+    const { tx, updateMany } = makeTx({
+      delivery: {
+        status: 'PROGRAMADA',
+        vehicleId: 'v1',
+        buyerLeadId: 'b1',
+        kind: 'ENTREGA_TALLER',
+        offerId: null,
+      },
+    })
+    await expectCode(transitionDeliveryTx(tx, base), 'MANUAL_DELIVERY_NOT_ENABLED')
+    expect(updateMany).not.toHaveBeenCalled()
+  })
   it('DELIVERY_NOT_FOUND si no existe', async () => {
     const { tx } = makeTx({ delivery: null })
     await expectCode(transitionDeliveryTx(tx, base), 'DELIVERY_NOT_FOUND')

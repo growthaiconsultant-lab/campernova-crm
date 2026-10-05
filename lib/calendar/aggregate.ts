@@ -1,7 +1,13 @@
 import { vehicleLabel } from '../display'
 import { NEXT_ACTION_LABELS } from '../next-action'
 import { EVENT_STATUS_LABELS, EVENT_TYPE_LABELS } from './event-meta'
-import type { CalendarEventStatus, CalendarEventType, NextActionType } from '@prisma/client'
+import type {
+  CalendarEventStatus,
+  CalendarEventType,
+  NextActionType,
+  DeliveryKind,
+} from '@prisma/client'
+import { DELIVERY_KIND_LABELS } from '../delivery-kind'
 import type { CalendarFilters, CalendarItem, CalendarTone } from './types'
 
 /**
@@ -9,6 +15,8 @@ import type { CalendarFilters, CalendarItem, CalendarTone } from './types'
  * Mantener el shape aquí permite testear los mappers sin base de datos.
  */
 export type DeliveryRow = {
+  kind?: DeliveryKind
+  recipientSellerLead?: { name: string | null } | null
   id: string
   scheduledAt: Date
   status: 'PROGRAMADA' | 'EN_CURSO' | 'COMPLETADA' | 'CANCELADA'
@@ -99,8 +107,8 @@ export function deliveryToItem(r: DeliveryRow): CalendarItem {
   return {
     id: `delivery:${r.id}`,
     source: 'delivery',
-    kindLabel: 'Entrega',
-    title: `Entrega · ${veh}`,
+    kindLabel: r.kind ? DELIVERY_KIND_LABELS[r.kind] : 'Entrega',
+    title: `${r.kind ? DELIVERY_KIND_LABELS[r.kind] : 'Entrega'} · ${veh}`,
     start: r.scheduledAt,
     end: null,
     allDay: false,
@@ -109,7 +117,7 @@ export function deliveryToItem(r: DeliveryRow): CalendarItem {
     href: `/entregas/${r.id}`,
     assigneeId: r.responsable?.id ?? null,
     assigneeName: r.responsable?.name ?? null,
-    contextLabel: r.buyerLead?.name ?? null,
+    contextLabel: r.buyerLead?.name ?? r.recipientSellerLead?.name ?? null,
   }
 }
 

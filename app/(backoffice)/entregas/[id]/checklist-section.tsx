@@ -1,7 +1,7 @@
 'use client'
 
-import { useTransition } from 'react'
-import { updateDeliveryChecklistItem } from '../actions'
+import { useState } from 'react'
+import { updateOperationalChecklist as updateDeliveryChecklistItem } from '../../operaciones/actions'
 import type { DeliveryChecklistCategory, DeliveryChecklistResult } from '@prisma/client'
 
 interface ChecklistItem {
@@ -33,17 +33,31 @@ const RESULT_BADGE: Record<DeliveryChecklistResult, string> = {
 }
 
 function ChecklistRow({ item, disabled }: { item: ChecklistItem; disabled: boolean }) {
-  const [, startTransition] = useTransition()
+  const [pending, setPending] = useState(false)
+  const [error, setError] = useState('')
 
-  function handleChange(result: DeliveryChecklistResult) {
-    startTransition(async () => {
-      await updateDeliveryChecklistItem(item.id, { result })
-    })
+  async function handleChange(result: DeliveryChecklistResult) {
+    if (pending || disabled) return
+    setPending(true)
+    setError('')
+    try {
+      const response = await updateDeliveryChecklistItem(item.id, { result })
+      if (!response.ok) setError(response.error)
+    } catch {
+      setError('No se pudo guardar el checklist. Inténtalo de nuevo.')
+    } finally {
+      setPending(false)
+    }
   }
 
   return (
     <div className="flex items-center justify-between gap-3 py-2.5">
       <span className="text-sm text-cn-ink-700">{item.item}</span>
+      {error && (
+        <span role="alert" className="text-sm text-red-700">
+          {error}
+        </span>
+      )}
       {disabled ? (
         <span
           className={`shrink-0 rounded-full px-2.5 py-0.5 text-xs font-medium ${RESULT_BADGE[item.result]}`}
@@ -52,6 +66,7 @@ function ChecklistRow({ item, disabled }: { item: ChecklistItem; disabled: boole
         </span>
       ) : (
         <select
+          disabled={pending}
           value={item.result}
           onChange={(e) => handleChange(e.target.value as DeliveryChecklistResult)}
           className="h-8 rounded-lg border border-cn-line bg-white px-2 text-xs focus:outline-none"

@@ -16,6 +16,23 @@
 
 ## 1. Entidades y campos clave
 
+> **OPS-1 en desarrollo local (no desplegado):** el contrato nuevo está definido en
+> [OPS-1](../specs/OPS-1-taller-documentos-entregas-manuales.md), con núcleos
+> `lib/operational-deliveries.ts` y acciones `/operaciones/actions.ts`. TALLER/ENTREGAS/ADMIN pueden
+> crear/iniciar/completar/cancelar; sólo VENTA genera venta/garantía, con destinatario comprador.
+> DEVOLUCION_VENDEDOR y ENTREGA_TALLER no generan efectos comerciales. Oferta, firma y checklist
+> dejan de ser prerequisitos. PROGRAMADA puede completar directamente; reintento al mismo terminal
+> devuelve el resultado sin nuevos efectos. Locks, CAS, una activa y conflictos económicos siguen
+> protegidos. El contrato de las secciones siguientes es el histórico de main, no el nuevo writer.
+> Contingencia OPS-1: `OPS1_PAUSE_WRITES=true` mantiene este reader compatible; no volver a un
+> cliente no nullable cuando existan filas manuales. Evidencia y límites por entorno en OPS-1 §U.
+
+> **Cambio en preparación, no desplegado:** [OPS-2](../specs/OPS-2-entregas-compatibilidad-tipos.md)
+> prepara tipos de entrega y readers nullable como primer incremento de OPS-1. La migración nueva
+> permite oferta opcional y destinatario vendedor con CHECK de coherencia; el writer legacy mantiene
+> sus requisitos hasta la activación independiente del flujo manual. El contrato histórico descrito
+> debajo no debe usarse como postflight de OPS-2 ni como prueba de que se haya desplegado.
+
 - **`Delivery`**: `id`, `vehicleId`, `buyerLeadId`, **`offerId` (obligatorio, `NOT NULL`)**,
   `status` (`DeliveryStatus`), `scheduledAt`, `startedAt?`, `completedAt?`, `cancellationReason?`,
   firma (`signedByName?`/`signedByDni?`/`signatureUrl?`), `checklist[]`, `documents[]`, `warranty?`.

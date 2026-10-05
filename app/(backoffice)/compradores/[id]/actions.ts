@@ -66,7 +66,7 @@ export async function updateBuyerLead(leadId: string, data: unknown) {
 
   if (status === 'CERRADO' && currentLead.status !== 'CERRADO') {
     const delivery = await db.delivery.findFirst({
-      where: { buyerLeadId: leadId, status: 'COMPLETADA' },
+      where: { buyerLeadId: leadId, kind: 'VENTA', status: 'COMPLETADA' },
     })
     if (!delivery) {
       return {

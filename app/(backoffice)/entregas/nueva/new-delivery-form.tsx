@@ -1,151 +1,163 @@
 'use client'
-
-import { useState, useTransition } from 'react'
+import { useState, useRef } from 'react'
 import { useRouter } from 'next/navigation'
-import { createDelivery } from '../actions'
-
-interface Operation {
-  offerId: string
-  vehicleId: string
-  buyerLeadId: string
-  label: string
-}
-
-interface User {
-  id: string
-  name: string
-}
-
-interface Props {
-  operations: Operation[]
-  users: User[]
-}
-
-export function NewDeliveryForm({ operations, users }: Props) {
-  const router = useRouter()
-  const [isPending, startTransition] = useTransition()
-  const [error, setError] = useState<string | null>(null)
-
-  function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
+import Link from 'next/link'
+import type { DeliveryKind } from '@prisma/client'
+import { createManualDelivery } from '../../operaciones/actions'
+import { TargetPicker } from '@/components/operations/target-picker'
+import { DELIVERY_KIND_LABELS } from '@/lib/delivery-kind'
+export function NewDeliveryForm({ users }: { users: { id: string; name: string }[] }) {
+  const router = useRouter(),
+    operationId = useRef<string>('')
+  const [pending, setPending] = useState(false),
+    [error, setError] = useState('')
+  const [kind, setKind] = useState<DeliveryKind | ''>(''),
+    [vehicleId, setVehicleId] = useState('')
+  const [recipientType, setRecipientType] = useState<'buyerLead' | 'sellerLead'>('sellerLead'),
+    [recipientId, setRecipientId] = useState('')
+  async function submit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()
-    const fd = new FormData(e.currentTarget)
-    const offerId = fd.get('offerId') as string
-    const op = operations.find((o) => o.offerId === offerId)
-    if (!op) {
-      setError('Selecciona una operación válida.')
+    if (pending) return
+    setError('')
+    const fd = new FormData(e.currentTarget),
+      date = new Date(String(fd.get('scheduledAt')))
+    if (!vehicleId || !kind || !recipientId || !Number.isFinite(date.getTime())) {
+      setError('Selecciona vehículo, tipo, destinatario y fecha.')
       return
     }
-    const data = {
-      vehicleId: op.vehicleId,
-      buyerLeadId: op.buyerLeadId,
-      offerId: op.offerId,
-      scheduledAt: fd.get('scheduledAt') as string,
-      responsableId: (fd.get('responsableId') as string) || null,
-      notes: (fd.get('notes') as string) || null,
+    if (!operationId.current) operationId.current = crypto.randomUUID()
+    const payload = {
+      operationId: operationId.current,
+      vehicleId,
+      kind,
+      recipient: { type: recipientType, id: recipientId },
+      scheduledAt: date.toISOString(),
+      responsableId: fd.get('responsableId') || null,
+      notes: fd.get('notes') || null,
     }
-
-    startTransition(async () => {
-      const res = await createDelivery(data)
-      if (!res.ok) {
-        setError(res.error)
-      } else {
-        router.push(`/entregas/${res.data!.id}`)
-      }
-    })
+    setPending(true)
+    try {
+      const result = await createManualDelivery(payload)
+      if (!result.ok) setError(result.error)
+      else router.push(`/entregas/${result.id}`)
+    } catch {
+      setError(
+        'No se pudo confirmar el guardado. Reintenta sin cambiar los datos para evitar duplicados.'
+      )
+    } finally {
+      setPending(false)
+    }
   }
-
   return (
-    <form
-      onSubmit={handleSubmit}
-      className="space-y-5 rounded-xl border border-cn-line bg-white p-6"
-    >
-      {error && <div className="rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>}
-
-      {operations.length === 0 ? (
-        <div className="rounded-lg bg-cn-cream-50 px-4 py-3 text-sm text-muted-foreground">
-          No hay ventas cerradas pendientes de entrega. Una entrega se programa desde una oferta
-          convertida con el vehículo reservado.
-        </div>
-      ) : (
-        <div className="space-y-1.5">
-          <label htmlFor="offerId" className="block text-sm font-medium">
-            Operación (venta cerrada) <span className="text-red-500">*</span>
-          </label>
+    <form onSubmit={submit} className="space-y-5 rounded-xl border bg-white p-6">
+      {error && (
+        <p role="alert" className="rounded bg-red-50 p-3 text-red-700">
+          {error}
+        </p>
+      )}
+      <fieldset disabled={pending} className="space-y-4">
+        <TargetPicker type="vehicle" label="Vehículo" value={vehicleId} onChange={setVehicleId} />
+        <label className="block">
+          Tipo de entrega
           <select
-            id="offerId"
-            name="offerId"
             required
-            className="h-10 w-full rounded-lg border border-cn-line bg-white px-3 text-sm focus:outline-none"
+            className="mt-1 w-full rounded border p-2"
+            value={kind}
+            onChange={(e) => {
+              const k = e.target.value as DeliveryKind
+              setKind(k)
+              setRecipientType(k === 'VENTA' ? 'buyerLead' : 'sellerLead')
+              setRecipientId('')
+            }}
           >
-            <option value="">Seleccionar operación…</option>
-            {operations.map((o) => (
-              <option key={o.offerId} value={o.offerId}>
-                {o.label}
+            <option value="">Selecciona el tipo</option>
+            {Object.entries(DELIVERY_KIND_LABELS).map(([v, l]) => (
+              <option key={v} value={v}>
+                {l}
               </option>
             ))}
           </select>
+        </label>
+        {kind === 'ENTREGA_TALLER' && (
+          <label className="block">
+            Destinatario
+            <select
+              className="ml-2 rounded border p-2"
+              value={recipientType}
+              onChange={(e) => {
+                setRecipientType(e.target.value as typeof recipientType)
+                setRecipientId('')
+              }}
+            >
+              <option value="sellerLead">Vendedor</option>
+              <option value="buyerLead">Comprador</option>
+            </select>
+          </label>
+        )}
+        {kind && (
+          <TargetPicker
+            key={recipientType}
+            type={recipientType}
+            label={recipientType === 'buyerLead' ? 'Comprador' : 'Vendedor'}
+            value={recipientId}
+            onChange={setRecipientId}
+          />
+        )}
+        <p className="text-sm text-muted-foreground">
+          {kind === 'VENTA'
+            ? 'Al completar: se registra la venta y se activa su garantía. No se permite duplicar una venta existente.'
+            : 'La entrega física no modifica ventas ni garantías.'}
+        </p>
+        <label className="block">
+          Fecha y hora
+          <input
+            name="scheduledAt"
+            type="datetime-local"
+            required
+            className="mt-1 w-full rounded border p-2"
+          />
+        </label>
+        <label className="block">
+          Responsable (opcional)
+          <select name="responsableId" className="mt-1 w-full rounded border p-2">
+            <option value="">Sin asignar</option>
+            {users.map((u) => (
+              <option key={u.id} value={u.id}>
+                {u.name}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="block">
+          Notas
+          <textarea name="notes" maxLength={2000} className="mt-1 w-full rounded border p-2" />
+        </label>
+        <div className="flex justify-end gap-4">
+          <Link href="/entregas">Cancelar</Link>
+          <button type="submit" className="rounded bg-primary px-4 py-2 text-white">
+            {pending ? 'Guardando…' : 'Crear entrega'}
+          </button>
         </div>
-      )}
-
-      <div className="space-y-1.5">
-        <label htmlFor="scheduledAt" className="block text-sm font-medium">
-          Fecha y hora <span className="text-red-500">*</span>
-        </label>
-        <input
-          id="scheduledAt"
-          name="scheduledAt"
-          type="datetime-local"
-          required
-          className="h-10 w-full rounded-lg border border-cn-line bg-white px-3 text-sm focus:outline-none"
-        />
-      </div>
-
-      <div className="space-y-1.5">
-        <label htmlFor="responsableId" className="block text-sm font-medium">
-          Responsable (Javi)
-        </label>
-        <select
-          id="responsableId"
-          name="responsableId"
-          className="h-10 w-full rounded-lg border border-cn-line bg-white px-3 text-sm focus:outline-none"
-        >
-          <option value="">Sin asignar</option>
-          {users.map((u) => (
-            <option key={u.id} value={u.id}>
-              {u.name}
-            </option>
-          ))}
-        </select>
-      </div>
-
-      <div className="space-y-1.5">
-        <label htmlFor="notes" className="block text-sm font-medium">
-          Notas internas
-        </label>
-        <textarea
-          id="notes"
-          name="notes"
-          rows={3}
-          placeholder="Observaciones, instrucciones especiales…"
-          className="w-full rounded-lg border border-cn-line bg-white px-3 py-2.5 text-sm focus:outline-none"
-        />
-      </div>
-
-      <div className="flex justify-end gap-3 border-t border-cn-line pt-4">
-        <a
-          href="/entregas"
-          className="inline-flex h-10 items-center rounded-lg border border-cn-line px-4 text-sm font-medium hover:bg-cn-cream-50"
-        >
-          Cancelar
-        </a>
+      </fieldset>
+      {error && (
         <button
-          type="submit"
-          disabled={isPending || operations.length === 0}
-          className="inline-flex h-10 items-center rounded-lg bg-primary px-5 text-sm font-medium text-white hover:opacity-90 disabled:opacity-50"
+          type="button"
+          disabled={pending}
+          className="text-sm underline"
+          onClick={() => {
+            if (
+              confirm(
+                'Comprueba antes que la entrega no se haya creado. ¿Iniciar una solicitud diferente?'
+              )
+            ) {
+              operationId.current = ''
+              setError('')
+            }
+          }}
         >
-          {isPending ? 'Creando…' : 'Crear entrega'}
+          Iniciar una solicitud diferente
         </button>
-      </div>
+      )}
     </form>
   )
 }

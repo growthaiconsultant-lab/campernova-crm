@@ -344,6 +344,8 @@ enum CalendarEventPriority {
 }
 
 enum VehicleDocumentCategory {
+  PRESUPUESTO
+  OPERATIVO
   DNI_VENDEDOR
   CONTRATO_COMPRAVENTA
   /// Contrato de gestión de venta (PR-A1). Distinto de CONTRATO_COMPRAVENTA: precede a la
@@ -476,6 +478,12 @@ enum DocumentType {
   ITV
   CONTRATO
   OTROS
+}
+
+enum DeliveryKind {
+  VENTA
+  DEVOLUCION_VENDEDOR
+  ENTREGA_TALLER
 }
 
 enum DeliveryStatus {
@@ -657,15 +665,17 @@ model SellerLead {
   createdAt          DateTime           @default(now()) @map("created_at")
   updatedAt          DateTime           @updatedAt @map("updated_at")
 
-  agent            User?           @relation("AgentSellerLeads", fields: [agentId], references: [id])
-  archivedBy       User?           @relation("ArchivedSellerLeads", fields: [archivedById], references: [id], onDelete: SetNull)
-  intakeReviewedBy User?           @relation("ReviewedSellerIntakes", fields: [intakeReviewedById], references: [id], onDelete: SetNull)
-  vehicle          Vehicle?
-  activities       Activity[]
-  documents        Document[]
-  tradeInBuyer     BuyerLead?      @relation("BuyerTradeIn")
-  calendarEvents   CalendarEvent[]
-  capture          VehicleCapture?
+  agent                User?             @relation("AgentSellerLeads", fields: [agentId], references: [id])
+  archivedBy           User?             @relation("ArchivedSellerLeads", fields: [archivedById], references: [id], onDelete: SetNull)
+  intakeReviewedBy     User?             @relation("ReviewedSellerIntakes", fields: [intakeReviewedById], references: [id], onDelete: SetNull)
+  vehicle              Vehicle?
+  activities           Activity[]
+  documents            Document[]
+  tradeInBuyer         BuyerLead?        @relation("BuyerTradeIn")
+  calendarEvents       CalendarEvent[]
+  capture              VehicleCapture?
+  receivedDeliveries   Delivery[]        @relation("DeliveryRecipientSeller")
+  operationalDocuments VehicleDocument[] @relation("SellerOperationalDocuments")
 
   @@index([status])
   @@index([agentId])
@@ -922,17 +932,18 @@ model BuyerLead {
   createdAt              DateTime            @default(now()) @map("created_at")
   updatedAt              DateTime            @updatedAt @map("updated_at")
 
-  agent             User?             @relation("AgentBuyerLeads", fields: [agentId], references: [id])
-  archivedBy        User?             @relation("ArchivedBuyerLeads", fields: [archivedById], references: [id], onDelete: SetNull)
-  matches           Match[]
-  activities        Activity[]
-  documents         Document[]
-  chatSession       BuyerChatSession?
-  deliveries        Delivery[]
-  warranty          Warranty?
-  tradeInSellerLead SellerLead?       @relation("BuyerTradeIn", fields: [tradeInSellerLeadId], references: [id])
-  calendarEvents    CalendarEvent[]
-  offers            Offer[]
+  agent                User?             @relation("AgentBuyerLeads", fields: [agentId], references: [id])
+  archivedBy           User?             @relation("ArchivedBuyerLeads", fields: [archivedById], references: [id], onDelete: SetNull)
+  matches              Match[]
+  activities           Activity[]
+  documents            Document[]
+  operationalDocuments VehicleDocument[] @relation("BuyerOperationalDocuments")
+  chatSession          BuyerChatSession?
+  deliveries           Delivery[]
+  warranty             Warranty?
+  tradeInSellerLead    SellerLead?       @relation("BuyerTradeIn", fields: [tradeInSellerLeadId], references: [id])
+  calendarEvents       CalendarEvent[]
+  offers               Offer[]
 
   @@index([status])
   @@index([agentId])
@@ -1210,40 +1221,45 @@ model WorkOrderPart {
   @@map("work_order_parts")
 }
 
-/// Entrega física del vehículo al comprador. Ligada a un Vehicle + BuyerLead.
+/// Entrega física tipada. OPS-1: readers compatibles antes de activar creación manual.
 model Delivery {
-  id                 String         @id @default(cuid())
-  vehicleId          String         @map("vehicle_id")
-  buyerLeadId        String         @map("buyer_lead_id")
-  // I3C1B makes offerId physically required (SET NOT NULL). Every Delivery is linked to the Offer
-  // (CONVERTIDA) it fulfils; all productive writers persist offerId.
-  offerId            String         @map("offer_id")
-  responsableId      String?        @map("responsable_id")
-  scheduledAt        DateTime       @map("scheduled_at")
-  startedAt          DateTime?      @map("started_at")
-  completedAt        DateTime?      @map("completed_at")
-  status             DeliveryStatus @default(PROGRAMADA)
-  signedByName       String?        @map("signed_by_name")
-  signedByDni        String?        @map("signed_by_dni")
-  signatureUrl       String?        @map("signature_url")
-  notes              String?
-  cancellationReason String?        @map("cancellation_reason")
-  createdAt          DateTime       @default(now()) @map("created_at")
-  updatedAt          DateTime       @updatedAt @map("updated_at")
+  creationKey           String?        @unique @map("creation_key")
+  creationFingerprint   String?        @map("creation_fingerprint")
+  id                    String         @id @default(cuid())
+  vehicleId             String         @map("vehicle_id")
+  kind                  DeliveryKind   @default(VENTA)
+  buyerLeadId           String?        @map("buyer_lead_id")
+  recipientSellerLeadId String?        @map("recipient_seller_lead_id")
+  // FK opcional para permitir entregas manuales; no fabricar una oferta ficticia.
+  offerId               String?        @map("offer_id")
+  responsableId         String?        @map("responsable_id")
+  scheduledAt           DateTime       @map("scheduled_at")
+  startedAt             DateTime?      @map("started_at")
+  completedAt           DateTime?      @map("completed_at")
+  status                DeliveryStatus @default(PROGRAMADA)
+  signedByName          String?        @map("signed_by_name")
+  signedByDni           String?        @map("signed_by_dni")
+  signatureUrl          String?        @map("signature_url")
+  notes                 String?
+  cancellationReason    String?        @map("cancellation_reason")
+  createdAt             DateTime       @default(now()) @map("created_at")
+  updatedAt             DateTime       @updatedAt @map("updated_at")
 
-  vehicle     Vehicle                 @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
-  buyerLead   BuyerLead               @relation(fields: [buyerLeadId], references: [id])
+  vehicle             Vehicle                 @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+  buyerLead           BuyerLead?              @relation(fields: [buyerLeadId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  recipientSellerLead SellerLead?             @relation("DeliveryRecipientSeller", fields: [recipientSellerLeadId], references: [id], onDelete: NoAction, onUpdate: Cascade)
   // NoAction (no Restrict): borrar la Offer directamente falla si tiene Delivery, pero borrar el
   // Vehicle padre puede eliminar Offer y Delivery en cascada convergente (verificación diferida).
-  offer       Offer                   @relation("OfferDeliveries", fields: [offerId], references: [id], onDelete: NoAction, onUpdate: Cascade)
-  responsable User?                   @relation("ResponsableDeliveries", fields: [responsableId], references: [id])
-  checklist   DeliveryChecklistItem[]
-  documents   DeliveryDocument[]
-  warranty    Warranty?
+  offer               Offer?                  @relation("OfferDeliveries", fields: [offerId], references: [id], onDelete: NoAction, onUpdate: Cascade)
+  responsable         User?                   @relation("ResponsableDeliveries", fields: [responsableId], references: [id])
+  checklist           DeliveryChecklistItem[]
+  documents           DeliveryDocument[]
+  warranty            Warranty?
 
   @@index([vehicleId])
   @@index([buyerLeadId])
   @@index([offerId])
+  @@index([recipientSellerLeadId])
   @@index([responsableId, status])
   @@index([status, scheduledAt])
   // At most one PROGRAMADA or EN_CURSO Delivery per Vehicle is enforced by the
@@ -1514,22 +1530,28 @@ model VehicleCapture {
   @@map("vehicle_captures")
 }
 
-/// Documento legal asociado al expediente del vehículo (DNI, contratos, ITV, etc.)
+/// Raíz documental privada/versionada. Legal: vehículo; operativa: un vehículo o cliente (XOR SQL).
 model VehicleDocument {
-  id               String                  @id @default(cuid())
-  vehicleId        String                  @map("vehicle_id")
-  category         VehicleDocumentCategory
-  name             String
-  url              String
-  fileSize         Int?                    @map("file_size")
-  mimeType         String?                 @map("mime_type")
-  notes            String?
-  uploadedById     String?                 @map("uploaded_by_id")
-  currentVersionId String?                 @map("current_version_id")
-  versionSequence  Int                     @default(0) @map("version_sequence")
-  createdAt        DateTime                @default(now()) @map("created_at")
+  id                  String                  @id @default(cuid())
+  vehicleId           String?                 @map("vehicle_id")
+  buyerLeadId         String?                 @map("buyer_lead_id")
+  sellerLeadId        String?                 @map("seller_lead_id")
+  creationKey         String?                 @unique @map("creation_key")
+  creationFingerprint String?                 @map("creation_fingerprint")
+  category            VehicleDocumentCategory
+  name                String
+  url                 String
+  fileSize            Int?                    @map("file_size")
+  mimeType            String?                 @map("mime_type")
+  notes               String?
+  uploadedById        String?                 @map("uploaded_by_id")
+  currentVersionId    String?                 @map("current_version_id")
+  versionSequence     Int                     @default(0) @map("version_sequence")
+  createdAt           DateTime                @default(now()) @map("created_at")
 
-  vehicle        Vehicle           @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+  vehicle        Vehicle?          @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+  buyerLead      BuyerLead?        @relation("BuyerOperationalDocuments", fields: [buyerLeadId], references: [id], onDelete: NoAction)
+  sellerLead     SellerLead?       @relation("SellerOperationalDocuments", fields: [sellerLeadId], references: [id], onDelete: NoAction)
   uploadedBy     User?             @relation(fields: [uploadedById], references: [id])
   versions       DocumentVersion[] @relation("VehicleDocumentVersions")
   // FK compuesta: la versión actual DEBE pertenecer a esta misma raíz (vehicleDocumentId = id).
@@ -1537,6 +1559,8 @@ model VehicleDocument {
 
   @@unique([id, currentVersionId])
   @@index([vehicleId, category])
+  @@index([buyerLeadId])
+  @@index([sellerLeadId])
   @@map("vehicle_documents")
 }
 

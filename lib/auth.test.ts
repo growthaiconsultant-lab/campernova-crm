@@ -23,7 +23,11 @@ import {
   requireAdmin,
   requireCanViewVehiculos,
   requireCanViewCalendario,
+  requireCanViewEntregas,
+  requireCanEditEntregas,
+  requireRole,
 } from './auth'
+import { OPERATIONAL_DOCUMENT_ROLES, OPERATIONAL_DELIVERY_ROLES } from './operations-policy'
 
 function makeUser(role: User['role']): User {
   return {
@@ -113,6 +117,30 @@ async function expectForbidden(guard: () => Promise<User>, role: User['role']) {
 describe('require* server-side guards', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+  })
+
+  describe('OPS-1: guards reales, alcance operativo y legado separado', () => {
+    it.each(ALL_ROLES)('matriz de rol %s', async (role) => {
+      const docGuard = () => requireRole(OPERATIONAL_DOCUMENT_ROLES)
+      const deliveryGuard = () => requireRole(OPERATIONAL_DELIVERY_ROLES)
+      await (OPERATIONAL_DOCUMENT_ROLES.includes(role)
+        ? expectAllowed(docGuard, role)
+        : expectForbidden(docGuard, role))
+      await (OPERATIONAL_DELIVERY_ROLES.includes(role)
+        ? expectAllowed(deliveryGuard, role)
+        : expectForbidden(deliveryGuard, role))
+    })
+    it('TALLER ve entregas pero no gana acceso a firma y documentos históricos', async () => {
+      await expectAllowed(requireCanViewEntregas, 'TALLER')
+      await expectForbidden(requireCanEditEntregas, 'TALLER')
+    })
+    it('deniega operaciones sin sesión e inactivas', async () => {
+      mockAuth.getUser.mockResolvedValue({ data: { user: null } })
+      await expect(requireRole(OPERATIONAL_DOCUMENT_ROLES)).rejects.toThrow('REDIRECT:/login')
+      loginAs('TALLER')
+      mockDb.user.findUnique.mockResolvedValue({ ...makeUser('TALLER'), active: false })
+      await expect(requireRole(OPERATIONAL_DELIVERY_ROLES)).rejects.toThrow('REDIRECT:/login')
+    })
   })
 
   describe('requireCanViewVehiculos (inventario comercial → ADMIN + AGENTE)', () => {

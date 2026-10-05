@@ -1,6 +1,7 @@
 import { notFound } from 'next/navigation'
 import { Suspense } from 'react'
 import Link from 'next/link'
+import { DocumentsPanel } from '@/components/operations/documents-panel'
 import { db } from '@/lib/db'
 import { requireAgente } from '@/lib/auth'
 import { BuyerLeadEditForm } from './buyer-lead-edit-form'
@@ -816,12 +817,11 @@ export default async function FichaCompradorPage({
 
           {/* ── TAB: DOCUMENTOS ── */}
           {activeTab === 'documentos' && (
-            <div className="flex flex-col items-center justify-center rounded-xl border border-border bg-card py-16">
-              <p className="text-[15px] font-medium text-foreground">Próximamente</p>
-              <p className="mt-1 text-[13px] text-muted-foreground">
-                La gestión documental del comprador estará disponible en una próxima versión
-              </p>
-            </div>
+            <DocumentsPanel
+              key={lead.id}
+              initialTarget={{ type: 'buyerLead', id: lead.id }}
+              fixedTarget
+            />
           )}
         </div>
 

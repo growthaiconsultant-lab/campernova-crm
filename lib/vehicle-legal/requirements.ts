@@ -27,6 +27,8 @@ export const PUBLICADO_MIN_PHOTOS = 5
 export const TASADO_MIN_PHOTOS = 1
 
 export const DOC_LABELS: Record<VehicleDocumentCategory, string> = {
+  PRESUPUESTO: 'Presupuesto',
+  OPERATIVO: 'Documento operativo',
   DNI_VENDEDOR: 'DNI/NIE del vendedor',
   CONTRATO_COMPRAVENTA: 'Contrato de compraventa firmado',
   // PR-A1: etiqueta necesaria por exhaustividad del Record. La categoría NO está en

@@ -9,8 +9,10 @@ import { DeliveryTabs, TabPanel } from './delivery-tabs'
 import { ChecklistSection } from './checklist-section'
 import { DocumentsSection } from './documents-section'
 import { SignForm } from './sign-form'
-import { CancelDeliveryButton } from './cancel-delivery-button'
+import { DeliveryControls } from '@/components/operations/delivery-controls'
+import { canManageOperationalDeliveries, canUseOperationalDocuments } from '@/lib/operations-policy'
 import type { DeliveryStatus } from '@prisma/client'
+import { DELIVERY_KIND_LABELS } from '@/lib/delivery-kind'
 
 const STATUS_LABELS: Record<DeliveryStatus, string> = {
   PROGRAMADA: 'Programada',
@@ -44,11 +46,13 @@ export default async function EntregaDetailPage({ params }: { params: { id: stri
         },
       },
       buyerLead: { select: { id: true, name: true, email: true, phone: true } },
+      recipientSellerLead: { select: { id: true, name: true, email: true, phone: true } },
       responsable: { select: { id: true, name: true } },
       checklist: {
         orderBy: [{ category: 'asc' }, { createdAt: 'asc' }],
       },
       documents: {
+        where: currentUser.role === 'TALLER' ? { id: { in: [] } } : {},
         include: {
           uploadedBy: { select: { name: true } },
           currentVersion: { select: { objectPath: true } },
@@ -61,9 +65,21 @@ export default async function EntregaDetailPage({ params }: { params: { id: stri
 
   if (!delivery) notFound()
 
+  const recipient = delivery.buyerLead ?? delivery.recipientSellerLead
+  const recipientHref =
+    currentUser.role === 'TALLER' && recipient
+      ? `/operaciones/documentos?type=${delivery.buyerLead ? 'buyerLead' : 'sellerLead'}&id=${recipient.id}`
+      : delivery.buyerLead
+        ? `/compradores/${delivery.buyerLead.id}`
+        : delivery.recipientSellerLead
+          ? `/vendedores/${delivery.recipientSellerLead.id}`
+          : null
+  // La firma y los adjuntos históricos conservan su canal y permisos originales.
+  const legacyEditable = delivery.kind === 'VENTA' && !!delivery.offerId && !!delivery.buyerLeadId
+
   const pendingChecklist = delivery.checklist.filter((c) => c.result === 'PENDIENTE').length
   const isSigned = !!(delivery.signedByName && delivery.signedByDni && delivery.signatureUrl)
-  const canComplete = pendingChecklist === 0 && isSigned
+  const canEdit = canManageOperationalDeliveries(currentUser)
   const isTerminal = delivery.status === 'COMPLETADA' || delivery.status === 'CANCELADA'
   const isAdmin = currentUser.role === 'ADMIN'
 
@@ -160,25 +176,9 @@ export default async function EntregaDetailPage({ params }: { params: { id: stri
           </div>
         </div>
         <div className="flex items-center gap-2.5">
-          {delivery.status === 'PROGRAMADA' && (
-            <form
-              action={async () => {
-                'use server'
-                const { updateDeliveryStatus } = await import('../actions')
-                // I3C2: envía el estado esperado (defensa anti-obsoleto + CAS en el servidor).
-                await updateDeliveryStatus(delivery.id, 'EN_CURSO', 'PROGRAMADA')
-              }}
-            >
-              <button
-                type="submit"
-                className="inline-flex h-10 items-center rounded-[10px] bg-brand px-[15px] font-hanken text-[13px] font-semibold text-white transition-colors hover:bg-brand2"
-              >
-                Iniciar entrega
-              </button>
-            </form>
+          {canEdit && (
+            <DeliveryControls id={delivery.id} kind={delivery.kind} status={delivery.status} />
           )}
-          {/* I3C2: cancelación con confirmación + motivo obligatorio (PROGRAMADA/EN_CURSO). */}
-          <CancelDeliveryButton deliveryId={delivery.id} currentStatus={delivery.status} />
         </div>
       </div>
 
@@ -189,8 +189,10 @@ export default async function EntregaDetailPage({ params }: { params: { id: stri
             Al completar
           </div>
           <p className="mt-1.5 font-hanken text-[12px] leading-[1.5] text-ink2">
-            Se activa automáticamente la <b className="text-ink">garantía de 12 meses</b> y los
-            follow-ups de los días 7 y 30. Requiere checklist completo y firma del receptor.
+            {delivery.kind === 'VENTA'
+              ? 'Esta entrega por venta activa una garantía de 12 meses y los seguimientos de los días 7 y 30.'
+              : 'Esta entrega física no registra una venta ni activa una garantía.'}{' '}
+            Checklist y firma son opcionales; puedes completar desde Programada o En curso.
           </p>
         </div>
       )}
@@ -220,12 +222,20 @@ export default async function EntregaDetailPage({ params }: { params: { id: stri
                 <div className="flex justify-between">
                   <dt className="text-cn-ink-400">Vendedor</dt>
                   <dd>
-                    <Link
-                      href={`/vendedores/${delivery.vehicle.sellerLead?.id}`}
-                      className="text-cn-teal-900 hover:underline"
-                    >
-                      {delivery.vehicle.sellerLead?.name ?? '—'}
-                    </Link>
+                    {delivery.vehicle.sellerLead ? (
+                      <Link
+                        href={
+                          currentUser.role === 'TALLER'
+                            ? `/operaciones/documentos?type=sellerLead&id=${delivery.vehicle.sellerLead.id}`
+                            : `/vendedores/${delivery.vehicle.sellerLead.id}`
+                        }
+                        className="text-cn-teal-900 hover:underline"
+                      >
+                        {delivery.vehicle.sellerLead?.name ?? '—'}
+                      </Link>
+                    ) : (
+                      '—'
+                    )}
                   </dd>
                 </div>
               </dl>
@@ -233,36 +243,37 @@ export default async function EntregaDetailPage({ params }: { params: { id: stri
 
             <div className="space-y-4 rounded-xl border border-cn-line bg-white p-5">
               <h3 className="text-cn-ink-400 text-sm font-semibold uppercase tracking-wide">
-                Comprador
+                Destinatario · {DELIVERY_KIND_LABELS[delivery.kind]}
               </h3>
               <dl className="space-y-2 text-sm">
                 <div className="flex justify-between">
                   <dt className="text-cn-ink-400">Nombre</dt>
                   <dd className="font-medium">
-                    <Link
-                      href={`/compradores/${delivery.buyerLead.id}`}
-                      className="text-cn-teal-900 hover:underline"
-                    >
-                      {delivery.buyerLead.name}
-                    </Link>
+                    {recipientHref ? (
+                      <Link href={recipientHref} className="text-cn-teal-900 hover:underline">
+                        {recipient?.name ?? 'Sin nombre registrado'}
+                      </Link>
+                    ) : (
+                      'Sin destinatario registrado'
+                    )}
                   </dd>
                 </div>
                 <div className="flex justify-between">
                   <dt className="text-cn-ink-400">Email</dt>
                   <dd>
                     <a
-                      href={`mailto:${delivery.buyerLead.email}`}
+                      href={recipient?.email ? `mailto:${recipient.email}` : undefined}
                       className="text-cn-teal-900 hover:underline"
                     >
-                      {delivery.buyerLead.email}
+                      {recipient?.email ?? '—'}
                     </a>
                   </dd>
                 </div>
-                {delivery.buyerLead.phone && (
+                {recipient?.phone && (
                   <div className="flex justify-between">
                     <dt className="text-cn-ink-400">Teléfono</dt>
                     <dd>
-                      <a href={`tel:${delivery.buyerLead.phone}`}>{delivery.buyerLead.phone}</a>
+                      <a href={`tel:${recipient.phone}`}>{recipient.phone}</a>
                     </dd>
                   </div>
                 )}
@@ -293,7 +304,9 @@ export default async function EntregaDetailPage({ params }: { params: { id: stri
                 <div>
                   <dt className="text-cn-ink-400">Garantía</dt>
                   <dd className="font-medium">
-                    {delivery.warranty ? (
+                    {delivery.warranty && currentUser.role === 'TALLER' ? (
+                      'Activa'
+                    ) : delivery.warranty ? (
                       <Link
                         href={`/postventa/${delivery.warranty.id}`}
                         className="text-green-700 hover:underline"
@@ -318,32 +331,46 @@ export default async function EntregaDetailPage({ params }: { params: { id: stri
 
         {/* Checklist */}
         <TabPanel tab="checklist">
-          <ChecklistSection
-            items={delivery.checklist}
-            disabled={delivery.status === 'COMPLETADA' || delivery.status === 'CANCELADA'}
-          />
+          <ChecklistSection items={delivery.checklist} disabled={!canEdit || isTerminal} />
         </TabPanel>
 
         {/* Documentos */}
         <TabPanel tab="documentos">
-          <DocumentsSection
-            deliveryId={delivery.id}
-            documents={docsWithUrls}
-            isTerminal={isTerminal}
-            isAdmin={isAdmin}
-          />
+          {canUseOperationalDocuments(currentUser) && (
+            <Link
+              className="mb-4 block text-primary underline"
+              href={`/operaciones/documentos?type=vehicle&id=${delivery.vehicleId}`}
+            >
+              Presupuestos y documentos operativos del vehículo
+            </Link>
+          )}
+          {currentUser.role !== 'TALLER' && (
+            <DocumentsSection
+              deliveryId={delivery.id}
+              documents={docsWithUrls}
+              isTerminal={isTerminal || !legacyEditable}
+              isAdmin={isAdmin}
+            />
+          )}
         </TabPanel>
 
         {/* Firma */}
         <TabPanel tab="firma">
-          <SignForm
-            deliveryId={delivery.id}
-            isSigned={isSigned}
-            signedByName={delivery.signedByName}
-            signedByDni={delivery.signedByDni}
-            canComplete={canComplete}
-            status={delivery.status}
-          />
+          {legacyEditable && currentUser.role !== 'TALLER' ? (
+            <SignForm
+              deliveryId={delivery.id}
+              isSigned={isSigned}
+              signedByName={delivery.signedByName}
+              signedByDni={delivery.signedByDni}
+              canComplete={false}
+              status={delivery.status}
+            />
+          ) : (
+            <p className="text-sm text-muted-foreground">
+              La firma no es obligatoria. Puedes adjuntar un justificante desde Documentos
+              operativos.
+            </p>
+          )}
         </TabPanel>
       </DeliveryTabs>
     </div>

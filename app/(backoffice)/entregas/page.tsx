@@ -5,6 +5,8 @@ import { requireCanViewEntregas } from '@/lib/auth'
 import { Eyebrow, HexPill, ButtonLink, EmptyState } from '@/components/redesign'
 import { cn } from '@/lib/utils'
 import type { DeliveryStatus } from '@prisma/client'
+import { DELIVERY_KIND_LABELS, deliveryRecipientName } from '@/lib/delivery-kind'
+import { canManageOperationalDeliveries } from '@/lib/operations-policy'
 
 const STATUS_LABELS: Record<DeliveryStatus, string> = {
   PROGRAMADA: 'Programada',
@@ -47,7 +49,8 @@ export default async function EntregasPage({
 }: {
   searchParams: { status?: string }
 }) {
-  await requireCanViewEntregas()
+  const actor = await requireCanViewEntregas()
+  const canManage = canManageOperationalDeliveries(actor)
 
   const where: Record<string, unknown> = {}
   if (searchParams.status) where.status = searchParams.status
@@ -57,6 +60,7 @@ export default async function EntregasPage({
     include: {
       vehicle: { select: { id: true, brand: true, model: true, year: true } },
       buyerLead: { select: { id: true, name: true } },
+      recipientSellerLead: { select: { id: true, name: true } },
       responsable: { select: { id: true, name: true } },
       checklist: { select: { result: true } },
     },
@@ -98,10 +102,12 @@ export default async function EntregasPage({
             {deliveries.length} en total
           </p>
         </div>
-        <ButtonLink href="/entregas/nueva" variant="primary">
-          <Plus size={15} strokeWidth={2.2} className="mr-1.5" />
-          Nueva entrega
-        </ButtonLink>
+        {canManage && (
+          <ButtonLink href="/entregas/nueva" variant="primary">
+            <Plus size={15} strokeWidth={2.2} className="mr-1.5" />
+            Nueva entrega
+          </ButtonLink>
+        )}
       </div>
 
       {/* Filtro por estado */}
@@ -142,8 +148,8 @@ export default async function EntregasPage({
         <EmptyState
           icon={<Truck size={20} strokeWidth={1.9} />}
           title="Sin entregas programadas"
-          description="Aquí verás la agenda de entregas por día, con el progreso del checklist y el responsable. Al completar una entrega se activa la garantía."
-          cta={{ label: 'Nueva entrega', href: '/entregas/nueva' }}
+          description="Aquí verás la agenda de entregas por día, con el progreso del checklist y el responsable. Sólo las entregas por venta activan una garantía."
+          cta={canManage ? { label: 'Nueva entrega', href: '/entregas/nueva' } : undefined}
         />
       ) : (
         <div className="flex flex-col gap-6">
@@ -185,7 +191,7 @@ export default async function EntregasPage({
                             {d.vehicle.brand} {d.vehicle.model} {d.vehicle.year}
                           </div>
                           <div className="mt-0.5 truncate font-hanken text-[12px] font-medium text-ink2">
-                            Comprador: {d.buyerLead.name}
+                            {DELIVERY_KIND_LABELS[d.kind]} · {deliveryRecipientName(d)}
                             {d.responsable ? ` · resp. ${d.responsable.name}` : ''}
                           </div>
                           <div className="mt-2 flex items-center gap-2.5">

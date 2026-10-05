@@ -78,10 +78,16 @@ const NAV_SECTIONS: NavSection[] = [
       },
       { href: '/taller', label: 'Taller', icon: Wrench, roles: ['ADMIN', 'AGENTE', 'TALLER'] },
       {
+        href: '/operaciones/documentos',
+        label: 'Documentos operativos',
+        icon: Package,
+        roles: ['ADMIN', 'AGENTE', 'TALLER'],
+      },
+      {
         href: '/entregas',
         label: 'Entregas',
         icon: Truck,
-        roles: ['ADMIN', 'AGENTE', 'ENTREGAS'],
+        roles: ['ADMIN', 'AGENTE', 'ENTREGAS', 'TALLER'],
       },
       {
         href: '/postventa',

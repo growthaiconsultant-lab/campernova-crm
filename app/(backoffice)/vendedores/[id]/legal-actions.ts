@@ -141,6 +141,10 @@ export async function deleteVehicleDocument(documentId: string) {
     include: { vehicle: { select: { sellerLeadId: true } } },
   })
   if (!doc) return { ok: false as const, error: 'Documento no encontrado' }
+  // La acción comercial histórica no administra raíces de compradores/vendedores.
+  if (!doc.vehicle)
+    return { ok: false as const, error: 'Este documento pertenece al módulo operativo.' }
+  const documentSellerId = doc.vehicle.sellerLeadId
 
   // Recolecta los objetos de TODAS las versiones (sin dejar huérfanos históricos). Si la fila es
   // legacy (sin versiones), cae al `url` legacy con la resolución estricta de PR5A. Si nada
@@ -175,12 +179,12 @@ export async function deleteVehicleDocument(documentId: string) {
         type: 'DOCUMENTO_ELIMINADO',
         content: `Documento eliminado: ${doc.name} (${doc.category})`,
         agentId: actor.id,
-        sellerLeadId: doc.vehicle.sellerLeadId,
+        sellerLeadId: documentSellerId,
       },
     })
   })
 
-  revalidatePath(`/vendedores/${doc.vehicle.sellerLeadId}`)
+  revalidatePath(`/vendedores/${documentSellerId}`)
   return { ok: true as const }
 }
 

@@ -17,12 +17,33 @@ function makeDb(overrides: Record<string, unknown> = {}) {
 }
 
 const BASE_DELIVERY = {
+  kind: 'VENTA',
   vehicleId: 'vehicle-1',
   buyerLeadId: 'buyer-1',
   completedAt: new Date('2026-05-01T10:00:00Z'),
 }
 
 describe('createWarrantyForDelivery', () => {
+  it.each(['DEVOLUCION_VENDEDOR', 'ENTREGA_TALLER'])(
+    'no crea garantía ni seguimientos para %s',
+    async (kind) => {
+      const db = makeDb()
+      db.delivery.findUnique.mockResolvedValue({ ...BASE_DELIVERY, kind })
+      await expect(createWarrantyForDelivery('delivery-1', db as never)).rejects.toThrow(
+        'Warranty requires a sale'
+      )
+      expect(db.warranty.create).not.toHaveBeenCalled()
+      expect(db.postventaFollowup.createMany).not.toHaveBeenCalled()
+    }
+  )
+  it('rechaza una venta incoherente sin comprador antes de crear garantía', async () => {
+    const db = makeDb()
+    db.delivery.findUnique.mockResolvedValue({ ...BASE_DELIVERY, buyerLeadId: null })
+    await expect(createWarrantyForDelivery('delivery-1', db as never)).rejects.toThrow(
+      'Warranty requires a sale'
+    )
+    expect(db.warranty.create).not.toHaveBeenCalled()
+  })
   it('crea warranty con endDate = startDate + 12 meses', async () => {
     const db = makeDb()
     db.delivery.findUnique.mockResolvedValue(BASE_DELIVERY)

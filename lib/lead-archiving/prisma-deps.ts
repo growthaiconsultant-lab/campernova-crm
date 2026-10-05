@@ -63,9 +63,12 @@ export async function loadSellerArchiveDependencies(
             where: { vehicleId, status: 'ACEPTADA', depositAmount: { gt: 0 } },
           })
         : Promise.resolve(0),
-      vehicleId
-        ? db.delivery.count({ where: { vehicleId, status: { in: ACTIVE_DELIVERY_STATUSES } } })
-        : Promise.resolve(0),
+      db.delivery.count({
+        where: {
+          status: { in: ACTIVE_DELIVERY_STATUSES },
+          OR: [{ recipientSellerLeadId: leadId }, ...(vehicleId ? [{ vehicleId }] : [])],
+        },
+      }),
       db.calendarEvent.count({
         where: {
           ...futureEventWhere(now),
