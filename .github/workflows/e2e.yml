@@ -15,4 +15,4 @@ jobs:
           PGOPTIONS: '-c default_transaction_read_only=on -c statement_timeout=15000'
         run: |
           test -n "$PGDATABASE"
-          psql -X -w -A -t -v ON_ERROR_STOP=1 -c "SELECT json_build_object('history', coalesce(json_agg(json_build_object('name',migration_name,'checksum',checksum,'finished',finished_at IS NOT NULL,'rolledBack',rolled_back_at IS NOT NULL) ORDER BY migration_name), '[]'::json)) FROM public._prisma_migrations;"
+          psql --dbname="$PGDATABASE" -X -w -A -t -v ON_ERROR_STOP=1 -c "SELECT json_build_object('history', coalesce(json_agg(json_build_object('name',migration_name,'checksum',checksum,'finished',finished_at IS NOT NULL,'rolledBack',rolled_back_at IS NOT NULL) ORDER BY migration_name), '[]'::json)) FROM public._prisma_migrations;"
