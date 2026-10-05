@@ -1,36 +1,28 @@
-name: OPS-1 encrypted staging backup
+name: OPS-1 synthetic backup recovery rehearsal
 on:
-  workflow_dispatch:
-    inputs:
-      phase:
-        type: choice
-        options: [backup, migrate]
-        default: backup
-        required: true
-      backup_sha:
-        type: string
-        required: false
+  workflow_dispatch: {}
 permissions: {}
 jobs:
   backup:
-    if: github.repository == 'growthaiconsultant-lab/campernova-crm' && github.ref == 'refs/heads/codex/ops-1-staging-connectivity-check' && inputs.phase == 'backup'
+    if: github.repository == 'growthaiconsultant-lab/campernova-crm' && github.ref
+      == 'refs/heads/codex/ops-1-staging-connectivity-check'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
       - name: Export public schema and data read-only and encrypt
         env:
-          PGDATABASE: ${{ secrets.OPS1_TEMP_STAGING_CONNECTION }}
-          PGCONNECT_TIMEOUT: '15'
-          OPS_BACKUP_PUBLIC_KEY: 'LS0tLS1CRUdJTiBQVUJMSUMgS0VZLS0tLS0KTUlJQm9qQU5CZ2txaGtpRzl3MEJBUUVGQUFPQ0FZOEFNSUlCaWdLQ0FZRUExWDlQRVFuenA4NFJKRncyNWljLwpUeFFXVDhMZHJYampIU1hhaEdsTWVOLzBBcHpkcVVFbFpReTZDTnhaUFdyVS9hZTllNUxqdTgra2JjcitNbUxnClYwKzVxQWJnTWtySUJmUUFxZ1pQaDNkRytxRUpNMmg3YUhYUlhxRzcyL01PZnNaVm1qYTVENVJtM1o3WlVJYWwKZFdDY0NkTWFVbkhiZkFWd0VGVnBndER3eHFuSzUva0NnY1VEUFZpWmpqTk1tQmE3MGNHMEUwREtaUmhPKzh3dgp1bEJKUlpZeVcwQ2VoVHRnWUlodlRvYlhYSnk1aHM1VHlCbHZPWXZDSGZ1UGxuWkhLdzlKTEFsa29PRW0xNEJkClk5MFZ0aExPUEw3alBNOUlGQjZ1R0pGUktabklRb0RKNTh4MzhEMVdIUUcyNXJoWTBLM25ZSmd5YUxPd2pZRWEKU0V1OXg2V3hCVzg5d2YwcE5ib0ZxVHpUUmx3azJhK2wzYUpvRnQra2RQQ3hCK3pRNFN5VGxPZG9sRlc0enpQYwo3RkttL3NkLzZ4NUVjcU5TZ2FDdks4RXM5VjhNaG9pL2xjQmRoNzVMbnFUb0t6VmV1aCt3ZHEyWEMwNnVNeTRsCmtISERyQXFXYW5jNFRTbTRESERNS21QV2tQZVlrcUtMdTQzRE4yWDJDMmx6QWdNQkFBRT0KLS0tLS1FTkQgUFVCTElDIEtFWS0tLS0tCg=='
+          PGDATABASE: postgresql://qa:synthetic_qa_only@127.0.0.1:5432/ops1_qa
+          PGCONNECT_TIMEOUT: "15"
+          OPS_BACKUP_PUBLIC_KEY: LS0tLS1CRUdJTiBQVUJMSUMgS0VZLS0tLS0KTUlJQm9qQU5CZ2txaGtpRzl3MEJBUUVGQUFPQ0FZOEFNSUlCaWdLQ0FZRUExWDlQRVFuenA4NFJKRncyNWljLwpUeFFXVDhMZHJYampIU1hhaEdsTWVOLzBBcHpkcVVFbFpReTZDTnhaUFdyVS9hZTllNUxqdTgra2JjcitNbUxnClYwKzVxQWJnTWtySUJmUUFxZ1pQaDNkRytxRUpNMmg3YUhYUlhxRzcyL01PZnNaVm1qYTVENVJtM1o3WlVJYWwKZFdDY0NkTWFVbkhiZkFWd0VGVnBndER3eHFuSzUva0NnY1VEUFZpWmpqTk1tQmE3MGNHMEUwREtaUmhPKzh3dgp1bEJKUlpZeVcwQ2VoVHRnWUlodlRvYlhYSnk1aHM1VHlCbHZPWXZDSGZ1UGxuWkhLdzlKTEFsa29PRW0xNEJkClk5MFZ0aExPUEw3alBNOUlGQjZ1R0pGUktabklRb0RKNTh4MzhEMVdIUUcyNXJoWTBLM25ZSmd5YUxPd2pZRWEKU0V1OXg2V3hCVzg5d2YwcE5ib0ZxVHpUUmx3azJhK2wzYUpvRnQra2RQQ3hCK3pRNFN5VGxPZG9sRlc0enpQYwo3RkttL3NkLzZ4NUVjcU5TZ2FDdks4RXM5VjhNaG9pL2xjQmRoNzVMbnFUb0t6VmV1aCt3ZHEyWEMwNnVNeTRsCmtISERyQXFXYW5jNFRTbTRESERNS21QV2tQZVlrcUtMdTQzRE4yWDJDMmx6QWdNQkFBRT0KLS0tLS1FTkQgUFVCTElDIEtFWS0tLS0tCg==
         shell: bash
         run: |
           set -euo pipefail
           umask 077
-          node -e 'const u=new URL(process.env.PGDATABASE);if(u.hostname!=="aws-1-eu-central-1.pooler.supabase.com"||u.username!=="postgres.iatuhydsfwoeprpbklod"||u.port!=="5432")process.exit(1)'
-          test -x /usr/lib/postgresql/17/bin/pg_dump
+          docker run --rm --network host -e PGDATABASE postgres:17 psql --dbname="$PGDATABASE" -v ON_ERROR_STOP=1 -c "CREATE TABLE deliveries (id integer PRIMARY KEY, label text NOT NULL); CREATE TABLE vehicle_documents (id integer PRIMARY KEY, label text NOT NULL); INSERT INTO deliveries VALUES (1,'QA delivery'); INSERT INTO vehicle_documents VALUES (1,'QA document');"
+          docker run --rm postgres:17 pg_dump --version
           trap 'rm -f "$RUNNER_TEMP/ops1-staging-public.dump"' EXIT
-          /usr/lib/postgresql/17/bin/pg_dump --dbname="$PGDATABASE" --schema=public --format=custom --no-owner --no-privileges --lock-wait-timeout=15s --file="$RUNNER_TEMP/ops1-staging-public.dump"
-          /usr/lib/postgresql/17/bin/pg_restore --list "$RUNNER_TEMP/ops1-staging-public.dump" >/dev/null
+          docker run --rm --network host -e PGDATABASE -e PGCONNECT_TIMEOUT postgres:17 pg_dump --dbname="$PGDATABASE" --schema=public --format=custom --no-owner --no-privileges --lock-wait-timeout=15s > "$RUNNER_TEMP/ops1-staging-public.dump"
+          docker run --rm -i postgres:17 pg_restore --list < "$RUNNER_TEMP/ops1-staging-public.dump" >/dev/null
           node - "$RUNNER_TEMP/ops1-staging-public.dump" <<'NODE'
           const fs=require('node:fs'),c=require('node:crypto');
           const input=process.argv[2]; const pub=Buffer.from(process.env.OPS_BACKUP_PUBLIC_KEY,'base64');
@@ -50,96 +42,14 @@ jobs:
           path: encrypted-backup/
           retention-days: 1
           if-no-files-found: error
-  migrate:
-    if: github.repository == 'growthaiconsultant-lab/campernova-crm' && github.ref == 'refs/heads/codex/ops-1-staging-connectivity-check' && inputs.phase == 'migrate'
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-    permissions:
-      contents: read
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
-        with:
-          ref: f135d96f649c64c561fb1043070e1508135da99b
-          fetch-depth: 0
-          persist-credentials: false
-      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413
-        with:
-          version: 10.33.2
-      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
-        with:
-          node-version: 20
-      - name: Install pinned dependencies without remote credentials
+    services:
+      postgres:
+        image: postgres:17
         env:
-          DATABASE_URL: postgresql://qa:qa@127.0.0.1:5432/qa
-          DIRECT_URL: postgresql://qa:qa@127.0.0.1:5432/qa
-        run: pnpm install --frozen-lockfile
-      - name: Preflight then exact OPS-1 migrations then postflight
-        env:
-          DATABASE_URL: ${{ secrets.OPS1_TEMP_STAGING_CONNECTION }}
-          DIRECT_URL: ${{ secrets.OPS1_TEMP_STAGING_CONNECTION }}
-          OPS_BACKUP_VERIFIED_SHA: ${{ inputs.backup_sha }}
-          PGCONNECT_TIMEOUT: '15'
-        shell: bash
-        run: |
-          node <<'NODE'
-          // Run only on the isolated OPS-1 GitHub workflow, against the explicitly guarded staging URI.
-          const { spawnSync } = require('node:child_process')
-          const fs = require('node:fs')
-          const crypto = require('node:crypto')
-          const expected = ['20260929120000_expand_typed_manual_deliveries','20260929130000_add_delivery_operation_keys','20260929140000_expand_operational_document_targets']
-          function run(command,args,env=process.env) {
-            const result=spawnSync(command,args,{env,encoding:'utf8',timeout:180000,maxBuffer:8*1024*1024})
-            if(result.status!==0)throw new Error('COMMAND_FAILED_'+command.replace(/[^a-z]/gi,''))
-            return result.stdout
-          }
-          function query(sql) {
-            return JSON.parse(run('psql',['--dbname='+process.env.DIRECT_URL,'-X','-w','-A','-t','-v','ON_ERROR_STOP=1','-c',sql],{...process.env,PGOPTIONS:'-c default_transaction_read_only=on -c statement_timeout=15000'}))
-          }
-          function historyCheck(local,rows,wantPending) {
-            if(rows.some(r=>!r.finished&&!r.rolledBack))throw new Error('FAILED_MIGRATION_PRESENT')
-            const pending=[]
-            for(const item of local) {
-              const done=rows.filter(r=>r.name===item.name&&r.finished&&!r.rolledBack)
-              if(!done.length)pending.push(item.name)
-              else if(done.some(r=>r.checksum!==item.hash))throw new Error('CHECKSUM_DRIFT')
-            }
-            if(JSON.stringify(pending)!==JSON.stringify(wantPending))throw new Error('UNEXPECTED_PENDING_MIGRATIONS')
-          }
-          if(process.argv.includes('--self-test')) {
-            const local=[{name:'a',hash:'x'}]
-            historyCheck(local,[{name:'a',checksum:'x',finished:true}],[])
-            historyCheck(local,[],['a'])
-            for(const rows of [[{name:'a',checksum:'bad',finished:true}],[{name:'a',finished:false}]]) {
-              let failed=false;try{historyCheck(local,rows,[])}catch{failed=true}if(!failed)throw new Error('GUARD_TEST_FAILED')
-            }
-            console.log('MIGRATION_GUARD_SELF_TEST_PASS')
-          } else {
-            try {
-              const uri=new URL(process.env.DIRECT_URL)
-              if(uri.hostname!=='aws-1-eu-central-1.pooler.supabase.com'||uri.username!=='postgres.iatuhydsfwoeprpbklod'||uri.port!=='5432'||uri.pathname!=='/postgres')throw new Error('WRONG_ENVIRONMENT')
-              if(!/^[a-f0-9]{64}$/.test(process.env.OPS_BACKUP_VERIFIED_SHA||''))throw new Error('BACKUP_NOT_VERIFIED')
-              const local=fs.readdirSync('prisma/migrations').filter(n=>/^\d/.test(n)).sort().map(name=>({name,hash:crypto.createHash('sha256').update(fs.readFileSync('prisma/migrations/'+name+'/migration.sql')).digest('hex')}))
-              const historySql=`SELECT coalesce(json_agg(json_build_object('name',migration_name,'checksum',checksum,'finished',finished_at IS NOT NULL,'rolledBack',rolled_back_at IS NOT NULL)), '[]'::json) FROM public._prisma_migrations`
-              historyCheck(local,query(historySql),expected)
-              const countsSql=`SELECT json_build_object('deliveries',(SELECT count(*) FROM public.deliveries),'documents',(SELECT count(*) FROM public.vehicle_documents),'versions',(SELECT count(*) FROM public.document_versions))`
-              const before=query(countsSql)
-              const invalid=query(`SELECT json_build_object('deliveries',(SELECT count(*) FROM public.deliveries WHERE buyer_lead_id IS NULL),'documents',(SELECT count(*) FROM public.vehicle_documents WHERE vehicle_id IS NULL))`)
-              if(invalid.deliveries||invalid.documents)throw new Error('LEGACY_DATA_INCOMPATIBLE')
-              const baseSchema=run('git',['show','72dbc47af1f337e58e62475e79d5e991a769b032:prisma/schema.prisma'])
-              fs.writeFileSync(process.env.RUNNER_TEMP+'/ops1-baseline.prisma',baseSchema)
-              run('pnpm',['exec','prisma','migrate','diff','--from-url',process.env.DIRECT_URL,'--to-schema-datamodel',process.env.RUNNER_TEMP+'/ops1-baseline.prisma','--exit-code'])
-              console.log('PREFLIGHT_PASS: staging identity, backup attestation, checksums, pending set, baseline parity, legacy rows')
-              console.log('MIGRATION_STARTED: only the three OPS-1 migrations')
-              run('pnpm',['exec','prisma','migrate','deploy'])
-              historyCheck(local,query(historySql),[])
-              run('pnpm',['exec','prisma','migrate','diff','--from-url',process.env.DIRECT_URL,'--to-schema-datamodel','prisma/schema.prisma','--exit-code'])
-              const constraints=query(`SELECT json_build_object('count',count(*)) FROM pg_constraint WHERE conname IN ('deliveries_kind_recipient_check','deliveries_operation_key_check','vehicle_documents_target_check','vehicle_documents_operation_key_check') AND convalidated`)
-              if(Number(constraints.count)!==4)throw new Error('POSTFLIGHT_CONSTRAINTS_FAILED')
-              if(JSON.stringify(before)!==JSON.stringify(query(countsSql)))throw new Error('POSTFLIGHT_COUNTS_CHANGED')
-              console.log('POSTFLIGHT_PASS: no pending migrations, schema parity, four validated constraints, row counts unchanged')
-            } catch(error) {
-              console.log(/^[A-Z_a-z]+$/.test(error.message)?error.message:'MIGRATION_OPERATION_FAILED')
-              process.exitCode=1
-            }
-          }
-          NODE
+          POSTGRES_USER: qa
+          POSTGRES_PASSWORD: synthetic_qa_only
+          POSTGRES_DB: ops1_qa
+        ports:
+          - 5432:5432
+        options: --health-cmd pg_isready --health-interval 5s --health-timeout 5s
+          --health-retries 10
