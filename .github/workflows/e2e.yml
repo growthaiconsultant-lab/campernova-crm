@@ -86,6 +86,10 @@ jobs:
           const { spawnSync } = require('node:child_process')
           const fs = require('node:fs')
           const crypto = require('node:crypto')
+          const catalogContract = {"sql":"SELECT json_build_object(\n 'tables',(SELECT json_agg(x ORDER BY x.name) FROM (SELECT c.relname AS name,c.relrowsecurity AS rls,c.relforcerowsecurity AS force_rls FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace WHERE n.nspname='public' AND c.relkind='r' AND c.relname<>'_prisma_migrations') x),\n 'columns',(SELECT json_agg(x ORDER BY x.table_name,x.column_name) FROM (SELECT c.relname AS table_name,a.attname AS column_name,format_type(a.atttypid,a.atttypmod) AS type,a.attnotnull AS not_null,pg_get_expr(d.adbin,d.adrelid) AS default_value FROM pg_attribute a JOIN pg_class c ON c.oid=a.attrelid JOIN pg_namespace n ON n.oid=c.relnamespace LEFT JOIN pg_attrdef d ON d.adrelid=c.oid AND d.adnum=a.attnum WHERE n.nspname='public' AND c.relkind='r' AND c.relname<>'_prisma_migrations' AND a.attnum>0 AND NOT a.attisdropped) x),\n 'constraints',(SELECT json_agg(x ORDER BY x.table_name,x.name) FROM (SELECT c.relname AS table_name,k.conname AS name,pg_get_constraintdef(k.oid) AS definition,k.convalidated AS validated FROM pg_constraint k JOIN pg_class c ON c.oid=k.conrelid JOIN pg_namespace n ON n.oid=c.relnamespace WHERE n.nspname='public' AND c.relname<>'_prisma_migrations') x),\n 'indexes',(SELECT json_agg(x ORDER BY x.tablename,x.indexname) FROM (SELECT tablename,indexname,indexdef FROM pg_indexes WHERE schemaname='public' AND tablename<>'_prisma_migrations') x),\n 'enums',(SELECT json_agg(x ORDER BY x.name,x.position) FROM (SELECT t.typname AS name,e.enumsortorder AS position,e.enumlabel AS label FROM pg_type t JOIN pg_enum e ON e.enumtypid=t.oid JOIN pg_namespace n ON n.oid=t.typnamespace WHERE n.nspname='public') x),\n 'policies',(SELECT json_agg(x ORDER BY x.tablename,x.policyname) FROM (SELECT tablename,policyname,permissive,roles,cmd,qual,with_check FROM pg_policies WHERE schemaname='public') x)\n)","before":"59f6928eeea01e5f8c98f43e3722b96ac8810da14b6e0bebf090a4dcd6dba088","after":"cd57f0f4d97be679844e1f1de40c725f3f51ffcd62bb7e3092aaf06b6652299a","extras":[{"name":"20260807170000_add_vehicle_reception_questionnaire","sha256":"8cd16ba2ee5daf787e15ea016320cb18c5e044ea03bfbd8c9db166a6eb2f0ddf"},{"name":"20260808120000_add_manual_buyer_vehicle_links","sha256":"3744f4b6c326fa6e07413b9bddcf80ba8c6a2bb64bb6532cb8b3fdab600d5473"}]}
+          function verifyCatalog(actual,expectedHash) {
+            if(crypto.createHash('sha256').update(JSON.stringify(actual)).digest('hex')!==expectedHash)throw new Error('CATALOG_DRIFT')
+          }
           const expected = ['20260929120000_expand_typed_manual_deliveries','20260929130000_add_delivery_operation_keys','20260929140000_expand_operational_document_targets']
           function run(command,args,env=process.env) {
             const result=spawnSync(command,args,{env,encoding:'utf8',timeout:180000,maxBuffer:8*1024*1024})
@@ -113,6 +117,11 @@ jobs:
               let failed=false;try{historyCheck(local,rows,[])}catch{failed=true}if(!failed)throw new Error('GUARD_TEST_FAILED')
             }
             console.log('MIGRATION_GUARD_SELF_TEST_PASS')
+            const fixture={tables:[],enums:[]}
+            verifyCatalog(fixture,crypto.createHash('sha256').update(JSON.stringify(fixture)).digest('hex'))
+            let rejected=false;try{verifyCatalog({tables:['unexpected']},crypto.createHash('sha256').update(JSON.stringify(fixture)).digest('hex'))}catch{rejected=true}
+            if(!rejected)throw Error('CATALOG_GUARD_TEST_FAILED')
+            console.log('CATALOG_GUARD_SELF_TEST_PASS')
           } else {
             try {
               const uri=new URL(process.env.DIRECT_URL)
@@ -120,19 +129,20 @@ jobs:
               if(!/^[a-f0-9]{64}$/.test(process.env.OPS_BACKUP_VERIFIED_SHA||''))throw new Error('BACKUP_NOT_VERIFIED')
               const local=fs.readdirSync('prisma/migrations').filter(n=>/^\d/.test(n)).sort().map(name=>({name,hash:crypto.createHash('sha256').update(fs.readFileSync('prisma/migrations/'+name+'/migration.sql')).digest('hex')}))
               const historySql=`SELECT coalesce(json_agg(json_build_object('name',migration_name,'checksum',checksum,'finished',finished_at IS NOT NULL,'rolledBack',rolled_back_at IS NOT NULL)), '[]'::json) FROM public._prisma_migrations`
-              historyCheck(local,query(historySql),expected)
+              if(!catalogContract)throw Error('CATALOG_CONTRACT_MISSING')
+              const history=query(historySql)
+              historyCheck(local,history,expected)
+              for(const extra of catalogContract.extras)if(!history.some(r=>r.name===extra.name&&r.checksum===extra.sha256&&r.finished&&!r.rolledBack))throw Error('HISTORICAL_MIGRATION_MISMATCH')
               const countsSql=`SELECT json_build_object('deliveries',(SELECT count(*) FROM public.deliveries),'documents',(SELECT count(*) FROM public.vehicle_documents),'versions',(SELECT count(*) FROM public.document_versions))`
               const before=query(countsSql)
               const invalid=query(`SELECT json_build_object('deliveries',(SELECT count(*) FROM public.deliveries WHERE buyer_lead_id IS NULL),'documents',(SELECT count(*) FROM public.vehicle_documents WHERE vehicle_id IS NULL))`)
               if(invalid.deliveries||invalid.documents)throw new Error('LEGACY_DATA_INCOMPATIBLE')
-              const baseSchema=run('git',['show','72dbc47af1f337e58e62475e79d5e991a769b032:prisma/schema.prisma'])
-              fs.writeFileSync(process.env.RUNNER_TEMP+'/ops1-baseline.prisma',baseSchema)
-              run('pnpm',['exec','prisma','migrate','diff','--from-url',process.env.DIRECT_URL,'--to-schema-datamodel',process.env.RUNNER_TEMP+'/ops1-baseline.prisma','--exit-code'])
+              verifyCatalog(query(catalogContract.sql),catalogContract.before)
               console.log('PREFLIGHT_PASS: staging identity, backup attestation, checksums, pending set, baseline parity, legacy rows')
               console.log('MIGRATION_STARTED: only the three OPS-1 migrations')
               run('pnpm',['exec','prisma','migrate','deploy'])
               historyCheck(local,query(historySql),[])
-              run('pnpm',['exec','prisma','migrate','diff','--from-url',process.env.DIRECT_URL,'--to-schema-datamodel','prisma/schema.prisma','--exit-code'])
+              verifyCatalog(query(catalogContract.sql),catalogContract.after)
               const constraints=query(`SELECT json_build_object('count',count(*)) FROM pg_constraint WHERE conname IN ('deliveries_kind_recipient_check','deliveries_operation_key_check','vehicle_documents_target_check','vehicle_documents_operation_key_check') AND convalidated`)
               if(Number(constraints.count)!==4)throw new Error('POSTFLIGHT_CONSTRAINTS_FAILED')
               if(JSON.stringify(before)!==JSON.stringify(query(countsSql)))throw new Error('POSTFLIGHT_COUNTS_CHANGED')
