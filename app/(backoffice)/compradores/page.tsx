@@ -3,7 +3,7 @@ import { Plus, Clock } from 'lucide-react'
 import { db } from '@/lib/db'
 import { requireAgente } from '@/lib/auth'
 import { BuyerListFilters } from './buyer-list-filters'
-import { buyerSourceFilter } from '@/lib/buyer-source'
+import { buyerSourceFilter, buyerSourceLabel } from '@/lib/buyer-source'
 import { TEMPERATURE_LABELS } from '@/lib/lead-temperature'
 import { NEXT_ACTION_LABELS, isNextActionOverdue, formatNextActionDue } from '@/lib/next-action'
 import {
@@ -246,6 +246,11 @@ export default async function CompradoresPage({ searchParams }: { searchParams: 
       ),
     },
     {
+      key: 'source',
+      header: 'Origen',
+      cell: (l) => <span className="font-medium text-ink2">{buyerSourceLabel(l.source)}</span>,
+    },
+    {
       key: 'temp',
       header: 'Temp.',
       cell: (l) =>
@@ -393,6 +398,9 @@ export default async function CompradoresPage({ searchParams }: { searchParams: 
               </div>
               <div className="mt-0.5 font-hanken text-[11.5px] font-medium text-ink3">
                 {prefs(l)} · {STATUS_LABELS[l.status]}
+              </div>
+              <div className="mt-1 font-hanken text-[11.5px] font-medium text-ink2">
+                Origen: {buyerSourceLabel(l.source)}
               </div>
               <div className="mt-2 flex items-center justify-between gap-2">
                 {l.nextActionType && l.nextActionDueAt ? (
