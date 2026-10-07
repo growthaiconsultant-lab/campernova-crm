@@ -4,6 +4,8 @@ import Link from 'next/link'
 import { DocumentsPanel } from '@/components/operations/documents-panel'
 import { db } from '@/lib/db'
 import { requireAgente } from '@/lib/auth'
+import { completedSalesQuery } from '@/lib/completed-sales'
+import { CompletedSaleCard } from '@/components/completed-sale-card'
 import { BuyerLeadEditForm } from './buyer-lead-edit-form'
 import { buyerSourceLabel, isBuyerSource } from '@/lib/buyer-source'
 import { TradeInCard } from './trade-in-card'
@@ -82,8 +84,8 @@ export default async function FichaCompradorPage({
 }) {
   const activeTab = searchParams.tab ?? 'ficha'
 
-  const [currentUser, lead, agents, activities] = await Promise.all([
-    requireAgente(),
+  const currentUser = await requireAgente()
+  const [lead, agents, activities] = await Promise.all([
     db.buyerLead.findUnique({
       where: { id: params.id },
       include: {
@@ -107,22 +109,7 @@ export default async function FichaCompradorPage({
             },
           },
         },
-        deliveries: {
-          orderBy: { createdAt: 'desc' },
-          take: 1,
-          include: {
-            vehicle: {
-              select: {
-                id: true,
-                brand: true,
-                model: true,
-                year: true,
-                salePrice: true,
-                sellerLead: { select: { id: true } },
-              },
-            },
-          },
-        },
+        deliveries: completedSalesQuery,
         matches: {
           include: {
             vehicle: {
@@ -234,7 +221,6 @@ export default async function FichaCompradorPage({
     .map(([k]) => EQUIPMENT_LABELS[k] ?? k)
 
   const daysInPipeline = daysSince(lead.createdAt)
-  const delivery = lead.deliveries[0] ?? null
   const warranty = lead.warranty
   const openTickets = warranty?.tickets ?? []
   const hasAlert = openTickets.length > 0
@@ -912,60 +898,7 @@ export default async function FichaCompradorPage({
               </div>
             )}
 
-            {/* Operación */}
-            {delivery && delivery.vehicle && (
-              <div className="rounded-xl border border-border bg-card p-5">
-                <p className="mb-3 font-mono text-[10px] uppercase tracking-[0.12em] text-muted-foreground">
-                  Operación
-                </p>
-                <div className="space-y-2.5">
-                  <div className="flex items-start justify-between gap-2">
-                    <span className="text-[11px] text-muted-foreground">Vehículo</span>
-                    <span className="text-right text-[12px] font-medium text-foreground">
-                      {delivery.vehicle.brand} {delivery.vehicle.model}
-                      {delivery.vehicle.year ? ` (${delivery.vehicle.year})` : ''}
-                    </span>
-                  </div>
-                  {delivery.vehicle.salePrice && (
-                    <div className="flex items-center justify-between">
-                      <span className="text-[11px] text-muted-foreground">Precio final</span>
-                      <span className="text-[13px] font-semibold text-green-600">
-                        {EUR(Number(delivery.vehicle.salePrice))}
-                      </span>
-                    </div>
-                  )}
-                  {delivery.vehicle.salePrice && lead.maxBudget && (
-                    <div className="flex items-center justify-between">
-                      <span className="text-[11px] text-muted-foreground">vs presupuesto</span>
-                      <span
-                        className={`text-[12px] font-medium ${
-                          Number(delivery.vehicle.salePrice) <= Number(lead.maxBudget)
-                            ? 'text-green-600'
-                            : 'text-amber-600'
-                        }`}
-                      >
-                        {Math.round(
-                          (Number(delivery.vehicle.salePrice) / Number(lead.maxBudget)) * 100
-                        )}
-                        %
-                      </span>
-                    </div>
-                  )}
-                  <div className="flex items-center justify-between">
-                    <span className="text-[11px] text-muted-foreground">Días en pipeline</span>
-                    <span className="text-[12px] text-foreground">{daysInPipeline} días</span>
-                  </div>
-                  {delivery.vehicle.sellerLead?.id && (
-                    <Link
-                      href={`/vendedores/${delivery.vehicle.sellerLead.id}`}
-                      className="mt-1 block text-[12px] font-medium text-sidebar-primary hover:underline"
-                    >
-                      Ver ficha del vehículo / vendedor →
-                    </Link>
-                  )}
-                </div>
-              </div>
-            )}
+            <CompletedSaleCard side="buyer" sales={lead.deliveries} />
 
             {/* Garantía */}
             {warranty && (

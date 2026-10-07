@@ -4,6 +4,8 @@ import Link from 'next/link'
 import { DocumentsPanel } from '@/components/operations/documents-panel'
 import { db } from '@/lib/db'
 import { requireAgente } from '@/lib/auth'
+import { completedSalesQuery } from '@/lib/completed-sales'
+import { CompletedSaleCard } from '@/components/completed-sale-card'
 import { initialOf, personLabel, vehicleLabel } from '@/lib/display'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
@@ -97,13 +99,14 @@ export default async function FichaVendedorPage({
   params: { id: string }
   searchParams: { tab?: string }
 }) {
-  const [currentUser, lead, agents, activities] = await Promise.all([
-    requireAgente(),
+  const currentUser = await requireAgente()
+  const [lead, agents, activities] = await Promise.all([
     db.sellerLead.findUnique({
       where: { id: params.id },
       include: {
         vehicle: {
           include: {
+            deliveries: completedSalesQuery,
             photos: { orderBy: { order: 'asc' } },
             valuations: {
               include: { createdBy: { select: { name: true } } },
@@ -277,9 +280,6 @@ export default async function FichaVendedorPage({
     }),
     counterpartHref: `/compradores/${o.buyerLead.id}`,
   }))
-
-  // Comprador de la operación (match cerrado) — para el cruce vehículo↔comprador
-  const closedMatch = vehicleMatches.find((m) => m.status === 'CERRADO') ?? null
 
   // Legal / expediente
   const legalInput: VehicleLegalInput | null = v
@@ -1478,31 +1478,9 @@ export default async function FichaVendedorPage({
               />
             </div>
 
-            {/* Comprador / operación (match cerrado) — cruce vehículo↔comprador */}
-            {closedMatch && (
-              <div className="p-5">
-                <p className="mb-3 font-mono text-[10px] uppercase tracking-[0.12em] text-muted-foreground">
-                  Comprador
-                </p>
-                <Link
-                  href={`/compradores/${closedMatch.buyerLead.id}`}
-                  className="flex items-center gap-3 rounded-lg border border-border p-3 transition-colors hover:bg-muted"
-                >
-                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-green-100 text-sm font-bold text-green-700">
-                    {initialOf(closedMatch.buyerLead.name)}
-                  </div>
-                  <div className="min-w-0">
-                    <p className="truncate text-sm font-semibold text-foreground">
-                      {personLabel(closedMatch.buyerLead.name, {
-                        role: 'Comprador sin identificar',
-                        id: closedMatch.buyerLead.id,
-                      })}
-                    </p>
-                    <p className="text-xs text-muted-foreground">Operación cerrada · ver ficha →</p>
-                  </div>
-                </Link>
-              </div>
-            )}
+            <div className="p-5">
+              <CompletedSaleCard side="seller" sales={v?.deliveries ?? []} />
+            </div>
 
             {/* Demanda activa (Block 19) — el argumento de captación */}
             {v && activeDemandCount > 0 && (
