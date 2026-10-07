@@ -212,8 +212,9 @@ existe y no se inventa aquí.
 
 ### Callers productivos (verificado en código)
 
-Exactamente **11** puntos de llamada productivos de `withLockedRoots` (`grep` sobre `app/`+`lib/`, sin
-tests):
+El inventario de la adopción en `ae88e31` registró **11** puntos de llamada productivos de
+`withLockedRoots`. Es una referencia histórica; las ampliaciones posteriores se documentan con
+sus cambios, no se interpreta ese número como el total actual:
 
 1. `createOffer` — `app/(backoffice)/ofertas/actions.ts` (I2B).
 2. `updateOfferStatus` — `app/(backoffice)/ofertas/actions.ts` (I2C).
@@ -259,6 +260,13 @@ compleción por los mismos row locks y relean el estado terminal bajo el lock an
 > retire un caller debe actualizar esta lista.
 
 ### Patrón completo que siguen los callers
+
+**Ampliación COM-4:** `associateManualMatch` en `lib/manual-matches.ts`, invocado por
+`app/(backoffice)/matches/manual-actions.ts`, toma `Vehicle → SellerLead → BuyerLead`. Resuelve el
+vendedor antes del lock y relee elegibilidad dentro, conserva el estado del Match y usa el unique del
+par/upsert con auditoría atómica. Dos envíos concurrentes son idempotentes; archivado concurrente
+ganador se observa tras esperar el lock y rechaza el interés. No cambia oferta, venta o garantía.
+Cobertura: `tests/integration/manual-matches.test.ts`; alcance y rollout: [COM-4](../specs/COM-4-asociacion-manual-comprador-vehiculo.md).
 
 1. **lectura preliminar** solo para resolver los ids de las raíces (no decide negocio);
 2. adquisición de **row locks** en el orden global (`Vehicle → SellerLead → BuyerLead`);

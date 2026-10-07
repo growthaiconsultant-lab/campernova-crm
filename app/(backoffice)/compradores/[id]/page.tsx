@@ -6,6 +6,8 @@ import { db } from '@/lib/db'
 import { requireAgente } from '@/lib/auth'
 import { completedSalesQuery } from '@/lib/completed-sales'
 import { CompletedSaleCard } from '@/components/completed-sale-card'
+import { ManualAssociationsCard } from '@/components/manual-associations-card'
+import { vehicleLabel } from '@/lib/display'
 import { BuyerLeadEditForm } from './buyer-lead-edit-form'
 import { buyerSourceLabel, isBuyerSource } from '@/lib/buyer-source'
 import { TradeInCard } from './trade-in-card'
@@ -118,6 +120,7 @@ export default async function FichaCompradorPage({
                 brand: true,
                 model: true,
                 year: true,
+                plate: true,
                 km: true,
                 status: true,
                 entryValidatedAt: true,
@@ -130,7 +133,6 @@ export default async function FichaCompradorPage({
             },
           },
           orderBy: { score: 'desc' },
-          take: 10,
         },
         calendarEvents: {
           where: { status: { notIn: ['CANCELADO', 'COMPLETADO', 'NO_SHOW'] } },
@@ -289,12 +291,14 @@ export default async function FichaCompradorPage({
       id: m.id,
       score: m.score,
       status: m.status,
+      generatedBy: m.generatedBy,
       explanation: matchExplanations.get(m.id) ?? null,
       vehicle: {
         id: m.vehicle.id,
         brand: m.vehicle.brand,
         model: m.vehicle.model,
         year: m.vehicle.year,
+        plate: m.vehicle.plate,
         km: m.vehicle.km,
         price: rawPrice ? Number(rawPrice) : null,
         photoUrl: m.vehicle.photos[0]?.url ?? null,
@@ -371,7 +375,7 @@ export default async function FichaCompradorPage({
   const tabs: LeadTab[] = [
     { key: 'ficha', label: 'Ficha' },
     { key: 'actividad', label: 'Actividad', badge: activities.length },
-    { key: 'matches', label: 'Vehículos sugeridos', badge: visibleMatches.length },
+    { key: 'matches', label: 'Vehículos de interés', badge: visibleMatches.length },
     { key: 'ofertas', label: 'Ofertas', badge: offerRows.length || undefined },
     ...(hasChat
       ? [{ key: 'conversacion', label: 'Conversación', badge: chatUserMsgCount } as LeadTab]
@@ -637,9 +641,12 @@ export default async function FichaCompradorPage({
                 <MatchesSection side="buyer" matches={buyerMatches} defaultOpen />
               ) : (
                 <div className="flex flex-col items-center justify-center rounded-xl border border-border bg-card py-16">
-                  <p className="text-[15px] font-medium text-foreground">Sin vehículos sugeridos</p>
+                  <p className="text-[15px] font-medium text-foreground">
+                    Sin vehículos de interés todavía
+                  </p>
                   <p className="mt-1 text-[13px] text-muted-foreground">
-                    Los matches se calculan automáticamente cuando hay vehículos compatibles
+                    Usa «Asociar vehículo» para elegir una furgo. También aparecerán sugerencias
+                    automáticas de vehículos compatibles.
                   </p>
                 </div>
               )}
@@ -821,6 +828,25 @@ export default async function FichaCompradorPage({
         {/* ── Right sidebar ── */}
         <aside className="border-t border-border lg:border-l lg:border-t-0">
           <div className="space-y-4 p-4 md:p-5 lg:sticky lg:top-[118px]">
+            <ManualAssociationsCard
+              side="buyer"
+              fixedId={lead.id}
+              entries={buyerMatches
+                .filter((m) => m.generatedBy === 'manual')
+                .map((m) => ({
+                  id: m.id,
+                  label: vehicleLabel(m.vehicle),
+                  href: `/vendedores/${m.vehicle.sellerLeadId}`,
+                  detail: `${m.vehicle.plate || 'Sin matrícula'} · Manual${m.status === 'RECHAZADO' ? ' · Rechazado' : ''}`,
+                }))}
+              listHref={`/compradores/${lead.id}?tab=matches`}
+              disabledReason={
+                subjectBuyerEligible
+                  ? undefined
+                  : 'Esta ficha está cerrada, perdida o archivada. No admite nuevos intereses.'
+              }
+            />
+
             {/* Próxima acción — dark gradient card (client, logs WhatsApp) */}
             <ProximaAccionCard
               phone={lead.phone}

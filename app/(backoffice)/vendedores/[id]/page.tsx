@@ -6,6 +6,7 @@ import { db } from '@/lib/db'
 import { requireAgente } from '@/lib/auth'
 import { completedSalesQuery } from '@/lib/completed-sales'
 import { CompletedSaleCard } from '@/components/completed-sale-card'
+import { ManualAssociationsCard } from '@/components/manual-associations-card'
 import { initialOf, personLabel, vehicleLabel } from '@/lib/display'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
@@ -134,7 +135,6 @@ export default async function FichaVendedorPage({
                 },
               },
               orderBy: { score: 'desc' },
-              take: 10,
             },
             offers: {
               orderBy: { createdAt: 'desc' },
@@ -251,6 +251,7 @@ export default async function FichaVendedorPage({
     id: m.id,
     score: m.score,
     status: m.status,
+    generatedBy: m.generatedBy,
     explanation: matchExplanations.get(m.id) ?? null,
     buyerLead: {
       id: m.buyerLead.id,
@@ -1465,6 +1466,32 @@ export default async function FichaVendedorPage({
         {/* ── Rail derecho persistente (320px) — orientación a la tarea ── */}
         <aside className="border-t border-border lg:border-l lg:border-t-0">
           <div className="divide-y divide-border lg:sticky lg:top-[118px]">
+            <div className="p-5">
+              {v && (
+                <ManualAssociationsCard
+                  side="vehicle"
+                  fixedId={v.id}
+                  entries={vehicleMatches
+                    .filter((m) => m.generatedBy === 'manual')
+                    .map((m) => ({
+                      id: m.id,
+                      label: personLabel(m.buyerLead.name, {
+                        role: 'Comprador sin identificar',
+                        id: m.buyerLead.id,
+                      }),
+                      href: `/compradores/${m.buyerLead.id}`,
+                      detail: `Manual${m.status === 'RECHAZADO' ? ' · Rechazado' : ''}`,
+                    }))}
+                  listHref={`/vendedores/${lead.id}?tab=compradores`}
+                  disabledReason={
+                    subjectVehicleEligible
+                      ? undefined
+                      : 'Disponible para vehículos tasados o publicados, con entrada validada y vendedor activo.'
+                  }
+                />
+              )}
+            </div>
+
             {/* Próxima acción — persistente en todas las pestañas */}
             <div className="p-5">
               <ProximaAccionCard

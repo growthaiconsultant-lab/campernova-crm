@@ -1,4 +1,4 @@
-import type { PrismaClient } from '@prisma/client'
+import type { PrismaClient, Prisma } from '@prisma/client'
 import type { EquipmentFlags } from '../valuation/types'
 import { eligibleBuyerWhere, eligibleVehicleWhere } from './eligibility'
 import type { MatchingBuyerInput, MatchingDeps, MatchingVehicleInput } from './types'
@@ -141,7 +141,7 @@ function buyerRowToInput(row: BuyerRow): MatchingBuyerInput {
 }
 
 /// Implementación real de las deps del matching, usando Prisma.
-export function prismaMatchingDeps(db: PrismaClient): MatchingDeps {
+export function prismaMatchingDeps(db: PrismaClient | Prisma.TransactionClient): MatchingDeps {
   return {
     async getVehicle(vehicleId) {
       const row = await db.vehicle.findUnique({
