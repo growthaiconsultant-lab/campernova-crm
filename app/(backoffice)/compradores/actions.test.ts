@@ -4,6 +4,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 
 vi.mock('@/lib/auth', () => ({ requireAgente: vi.fn() }))
 vi.mock('@/lib/matching', () => ({ recalculateMatchesForBuyer: vi.fn() }))
+vi.mock('next/cache', () => ({ revalidatePath: vi.fn() }))
 
 const { mockDb } = vi.hoisted(() => {
   const mockDb = {
@@ -17,6 +18,7 @@ vi.mock('@/lib/db', () => ({ db: mockDb }))
 import { recalculateMatchesForBuyer } from '@/lib/matching'
 import { requireAgente } from '@/lib/auth'
 import { createBuyerLead } from './actions'
+import { revalidatePath } from 'next/cache'
 
 const validInput = {
   name: 'Ana Compradora',
@@ -36,6 +38,20 @@ beforeEach(() => {
 })
 
 describe('createBuyerLead', () => {
+  it.each(['INSTAGRAM', 'PRESENCIAL', null])(
+    'guarda source %s y refresca el listado',
+    async (source) => {
+      expect(await createBuyerLead({ ...validInput, source })).toEqual({ leadId: 'buyer-1' })
+      expect(mockDb.buyerLead.create.mock.calls[0][0].data.source).toBe(source)
+      expect(revalidatePath).toHaveBeenCalledWith('/compradores')
+      expect(mockDb.kpiEvent.create.mock.calls[0][0].data.source).toBe('ui')
+    }
+  )
+  it('rechaza origen inválido antes de buscar duplicados', async () => {
+    expect(await createBuyerLead({ ...validInput, source: 'INVENTADO' })).toHaveProperty('error')
+    expect(mockDb.buyerLead.findMany).not.toHaveBeenCalled()
+    expect(mockDb.buyerLead.create).not.toHaveBeenCalled()
+  })
   it('rechaza datos inválidos (email mal formado)', async () => {
     const res = await createBuyerLead({ ...validInput, email: 'no-es-email' })
     expect('error' in res).toBe(true)

@@ -30,6 +30,7 @@ import {
   type BuyerLeadFormValues,
 } from '@/lib/validators/buyer-lead'
 import { createBuyerLead } from '../actions'
+import { BuyerSourceSelect } from '@/components/buyer-source-select'
 import { BUYER_LEAD_STATUS_LABELS as BUYER_STATUS_LABELS } from '@/lib/state-machine'
 
 const EQUIPMENT_ITEMS = [
@@ -55,6 +56,7 @@ export function BuyerLeadForm() {
       name: '',
       email: '',
       phone: '',
+      source: null,
       vehicleType: null,
       minSeats: null,
       maxBudget: null,
@@ -136,6 +138,19 @@ export function BuyerLeadForm() {
                   <FormLabel>Teléfono *</FormLabel>
                   <FormControl>
                     <Input type="tel" placeholder="+34 600 000 000" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="source"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Origen de captación</FormLabel>
+                  <FormControl>
+                    <BuyerSourceSelect {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>

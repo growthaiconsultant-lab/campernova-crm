@@ -157,6 +157,7 @@ describe('OPS-1 entregas independientes — PostgreSQL real', () => {
         name: `QA entrega ${suffix}`,
         email: `${suffix}@example.test`,
         phone: `6${randomInt(10000000, 99999999)}`,
+        source: 'WALLAPOP',
       },
     }
   }
@@ -168,14 +169,25 @@ describe('OPS-1 entregas independientes — PostgreSQL real', () => {
     const delivery = await db.delivery.findUniqueOrThrow({ where: { id: first.id } })
     const buyer = await db.buyerLead.findUniqueOrThrow({ where: { id: delivery.buyerLeadId! } })
     expect(buyer.status).toBe('NUEVO')
+    expect(buyer.source).toBe('WALLAPOP')
     expect(await db.buyerLead.count({ where: { email: buyer.email } })).toBe(1)
     expect(
       await db.kpiEvent.count({ where: { eventName: 'buyer_created', entityId: buyer.id } })
     ).toBe(1)
     expect((await db.vehicle.findUniqueOrThrow({ where: { id: f.vehicle.id } })).soldAt).toBeNull()
     await expect(create(f, { ...request, notes: 'otros datos' })).rejects.toThrow('otros datos')
+    if (request.recipient.type !== 'newBuyer') throw new Error('fixture')
+    await expect(
+      create(f, {
+        ...request,
+        recipient: { ...request.recipient, source: 'INSTAGRAM' },
+      })
+    ).rejects.toThrow('otros datos')
     await change(f, first.id, 'CANCELADA')
     expect(await db.buyerLead.findUnique({ where: { id: buyer.id } })).not.toBeNull()
+    expect((await db.buyerLead.findUniqueOrThrow({ where: { id: buyer.id } })).source).toBe(
+      'WALLAPOP'
+    )
     await create(f, { ...input(f), recipient: { type: 'buyerLead', id: buyer.id } })
   })
   it('una venta bloqueada revierte también el comprador nuevo y su KPI', async () => {

@@ -5,6 +5,7 @@ import { DocumentsPanel } from '@/components/operations/documents-panel'
 import { db } from '@/lib/db'
 import { requireAgente } from '@/lib/auth'
 import { BuyerLeadEditForm } from './buyer-lead-edit-form'
+import { buyerSourceLabel, isBuyerSource } from '@/lib/buyer-source'
 import { TradeInCard } from './trade-in-card'
 import { BuyerTopbarActions } from './buyer-topbar-actions'
 import { ProximaAccionCard } from './proxima-accion-card'
@@ -254,6 +255,7 @@ export default async function FichaCompradorPage({
     name: lead.name,
     email: lead.email,
     phone: lead.phone,
+    source: isBuyerSource(lead.source) ? lead.source : lead.source ? undefined : null,
     status: lead.status,
     agentId: lead.agentId,
     vehicleType: lead.vehicleType ?? null,
@@ -464,7 +466,7 @@ export default async function FichaCompradorPage({
               )}
               {lead.source && (
                 <span className="rounded bg-muted px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-[0.08em] text-muted-foreground">
-                  {lead.source}
+                  {buyerSourceLabel(lead.source)}
                 </span>
               )}
             </div>
@@ -591,7 +593,12 @@ export default async function FichaCompradorPage({
           {/* ── TAB: FICHA ── */}
           {activeTab === 'ficha' && (
             <div className="space-y-4">
-              <BuyerLeadEditForm leadId={lead.id} defaultValues={defaultValues} agents={agents} />
+              <BuyerLeadEditForm
+                leadId={lead.id}
+                defaultValues={defaultValues}
+                agents={agents}
+                legacySource={lead.source && !isBuyerSource(lead.source) ? lead.source : null}
+              />
               <TradeInCard
                 leadId={lead.id}
                 hasTradeIn={lead.hasTradeIn}
@@ -1123,7 +1130,7 @@ export default async function FichaCompradorPage({
                             : 'No',
                         }
                       : null,
-                    lead.source ? { label: 'Canal origen', value: lead.source } : null,
+                    { label: 'Origen de captación', value: buyerSourceLabel(lead.source) },
                     lead.vehicleType
                       ? {
                           label: 'Tipo buscado',

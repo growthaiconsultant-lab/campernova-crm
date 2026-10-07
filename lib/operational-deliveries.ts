@@ -46,6 +46,7 @@ async function createDeliveryBuyer(
       name: buyer.name,
       email: buyer.email,
       phone: buyer.phone,
+      source: buyer.source ?? null,
       status: 'NUEVO',
       temperature: suggestTemperatureFromTimeline(null),
       ...defaultNextActionData(),

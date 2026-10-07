@@ -44,6 +44,35 @@ beforeEach(() => {
 })
 
 describe('updateBuyerLead', () => {
+  it.each(['INSTAGRAM', null])(
+    'guarda el origen explícito %s sin cambiar el estado',
+    async (source) => {
+      mockDb.buyerLead.findUnique.mockResolvedValue({
+        status: 'CONTACTADO',
+        agentId: null,
+        agent: null,
+      })
+      expect(await updateBuyerLead('b1', { ...baseInput, source })).toEqual({ ok: true })
+      expect(mockDb.buyerLead.update.mock.calls[0][0].data.source).toBe(source)
+      expect(mockDb.activity.create).not.toHaveBeenCalled()
+    }
+  )
+  it('no toca el origen histórico cuando el cliente omite source', async () => {
+    mockDb.buyerLead.findUnique.mockResolvedValue({
+      status: 'CONTACTADO',
+      agentId: null,
+      agent: null,
+    })
+    await updateBuyerLead('b1', baseInput)
+    expect(mockDb.buyerLead.update.mock.calls[0][0].data).not.toHaveProperty('source')
+  })
+  it('rechaza un origen arbitrario antes de consultar o escribir', async () => {
+    expect(await updateBuyerLead('b1', { ...baseInput, source: 'INVENTADO' })).toHaveProperty(
+      'error'
+    )
+    expect(mockDb.buyerLead.findUnique).not.toHaveBeenCalled()
+    expect(mockDb.buyerLead.update).not.toHaveBeenCalled()
+  })
   it('permite una transición no secuencial (NUEVO → EN_NEGOCIACION) y deja Activity', async () => {
     mockDb.buyerLead.findUnique.mockResolvedValue({ status: 'NUEVO', agentId: null, agent: null })
     const res = await updateBuyerLead('b1', { ...baseInput, status: 'EN_NEGOCIACION' })

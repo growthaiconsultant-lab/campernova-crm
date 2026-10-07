@@ -3,6 +3,7 @@ import { Plus, Clock } from 'lucide-react'
 import { db } from '@/lib/db'
 import { requireAgente } from '@/lib/auth'
 import { BuyerListFilters } from './buyer-list-filters'
+import { buyerSourceFilter } from '@/lib/buyer-source'
 import { TEMPERATURE_LABELS } from '@/lib/lead-temperature'
 import { NEXT_ACTION_LABELS, isNextActionOverdue, formatNextActionDue } from '@/lib/next-action'
 import {
@@ -98,9 +99,7 @@ function buildWhere(
   }
 
   if (sp.source) {
-    if (sp.source === '__none__') conditions.push({ source: null })
-    else if (sp.source === 'CHAT') conditions.push({ source: { in: ['CHAT', 'CHAT_WEB'] } })
-    else conditions.push({ source: sp.source })
+    conditions.push(buyerSourceFilter(sp.source))
   }
 
   if (sp.temp && (sp.temp === 'HOT' || sp.temp === 'WARM' || sp.temp === 'COLD')) {
