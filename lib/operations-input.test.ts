@@ -4,12 +4,73 @@ import {
   manualDeliverySchema,
   operationalTargetSchema,
   documentTargetWhere,
+  manualDeliveryValidationMessage,
 } from './operations-input'
 import { canManageOperationalDeliveries, canUseOperationalDocuments } from './operations-policy'
 import { validateOperationalFile } from './operational-documents'
 import type { UserRole } from '@prisma/client'
 
 describe('OPS-1 permisos y validación', () => {
+  const validDelivery = () => ({
+    operationId: randomUUID(),
+    vehicleId: 'qa',
+    kind: 'VENTA',
+    recipient: { type: 'buyerLead', id: 'qa' },
+    scheduledAt: '2026-10-07T10:00:00Z',
+  })
+  const newBuyer = {
+    type: 'newBuyer',
+    name: 'QA comprador',
+    email: 'qa@example.test',
+    phone: '600111222',
+  }
+  it.each(['VENTA', 'ENTREGA_TALLER'])(
+    'permite nuevo comprador en %s y normaliza contacto',
+    (kind) => {
+      const result = manualDeliverySchema.parse({
+        ...validDelivery(),
+        kind,
+        recipient: { ...newBuyer, name: ' QA comprador ', email: ' QA@EXAMPLE.TEST ' },
+      })
+      expect(result.recipient).toEqual(newBuyer)
+    }
+  )
+  it('no admite comprador nuevo como devolución al vendedor', () => {
+    expect(
+      manualDeliverySchema.safeParse({
+        ...validDelivery(),
+        kind: 'DEVOLUCION_VENDEDOR',
+        recipient: newBuyer,
+      }).success
+    ).toBe(false)
+  })
+  it.each([
+    ['name', '   ', 'nombre completo'],
+    ['name', 'a'.repeat(151), 'nombre completo'],
+    ['email', 'no-es-email', 'email válido'],
+    ['email', '', 'email válido'],
+    ['phone', 'abcdefghi', 'teléfono válido'],
+    ['phone', '+()- .', 'teléfono válido'],
+    ['phone', '12345', 'teléfono válido'],
+    ['phone', '6'.repeat(41), 'teléfono válido'],
+  ])('nuevo comprador: %s inválido obtiene explicación específica', (field, value, message) => {
+    const result = manualDeliverySchema.safeParse({
+      ...validDelivery(),
+      recipient: { ...newBuyer, [field]: value },
+    })
+    expect(result.success).toBe(false)
+    if (!result.success) expect(manualDeliveryValidationMessage(result.error)).toContain(message)
+  })
+  it.each([
+    [{ vehicleId: '' }, 'Selecciona un vehículo'],
+    [{ kind: '' }, 'tipo de entrega'],
+    [{ recipient: { type: 'buyerLead', id: '' } }, 'Nuevo comprador'],
+    [{ scheduledAt: '' }, 'fecha y hora'],
+  ])('explica el dato pendiente y no repite los campos ya completos', (patch, message) => {
+    const result = manualDeliverySchema.safeParse({ ...validDelivery(), ...patch })
+    expect(result.success).toBe(false)
+    if (!result.success) expect(manualDeliveryValidationMessage(result.error)).toContain(message)
+  })
   it.each([
     ['ADMIN', true, true],
     ['AGENTE', false, true],

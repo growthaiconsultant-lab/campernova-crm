@@ -1,4 +1,4 @@
-import { randomUUID } from 'node:crypto'
+import { randomUUID, randomInt } from 'node:crypto'
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest'
 import type { DeliveryKind, PrismaClient, UserRole } from '@prisma/client'
 import { createGuardedTestPrisma, uniqueSuffix, withRollbackTransaction } from './db'
@@ -10,6 +10,7 @@ import {
 } from '@/lib/operational-deliveries'
 import { createOperationalDocumentTx } from '@/lib/operational-documents'
 import type { ManualDeliveryInput, OperationalTarget } from '@/lib/operations-input'
+import { buildDeliveryCreationRoots } from '@/lib/delivery-creation'
 
 let db: PrismaClient, other: PrismaClient, observer: PrismaClient
 const cleanup: Array<() => Promise<void>> = []
@@ -42,6 +43,13 @@ async function fixture(role: UserRole = 'TALLER') {
   })
   const vehicle = await db.vehicle.create({ data: { sellerLeadId: seller.id } })
   cleanup.push(async () => {
+    const linked = await db.delivery.findMany({
+      where: { vehicleId: vehicle.id },
+      select: { buyerLeadId: true },
+    })
+    const buyerIds = Array.from(
+      new Set([buyer.id, ...linked.flatMap((d) => (d.buyerLeadId ? [d.buyerLeadId] : []))])
+    )
     await db.vehicleDocument.deleteMany({
       where: {
         OR: [{ vehicleId: vehicle.id }, { buyerLeadId: buyer.id }, { sellerLeadId: seller.id }],
@@ -50,7 +58,8 @@ async function fixture(role: UserRole = 'TALLER') {
     await db.activity.deleteMany({ where: { agentId: actor.id } })
     await db.warranty.deleteMany({ where: { vehicleId: vehicle.id } })
     await db.vehicle.delete({ where: { id: vehicle.id } })
-    await db.buyerLead.delete({ where: { id: buyer.id } })
+    await db.kpiEvent.deleteMany({ where: { entityType: 'buyer', entityId: { in: buyerIds } } })
+    await db.buyerLead.deleteMany({ where: { id: { in: buyerIds } } })
     await db.sellerLead.delete({ where: { id: seller.id } })
     await db.user.delete({ where: { id: actor.id } })
   })
@@ -78,7 +87,12 @@ function input(f: Fixture, kind: DeliveryKind = 'VENTA'): ManualDeliveryInput {
 }
 function create(f: Fixture, data: ManualDeliveryInput, client = db) {
   return withLockedRoots(
-    f.roots,
+    buildDeliveryCreationRoots({
+      vehicleId: data.vehicleId,
+      sellerLeadId: f.seller.id,
+      buyerLeadId: data.recipient.type === 'buyerLead' ? data.recipient.id : null,
+      recipientSellerLeadId: data.recipient.type === 'sellerLead' ? data.recipient.id : null,
+    }),
     (tx) => createOperationalDeliveryTx(tx, data, f.actor.id, f.seller.id),
     { client }
   )
@@ -101,7 +115,7 @@ async function change(
 ) {
   const s = await snapshot(id)
   return withLockedRoots(
-    f.roots,
+    buildDeliveryCreationRoots({ ...s, sellerLeadId: f.seller.id }),
     (tx) =>
       changeOperationalDeliveryTx(
         tx,
@@ -134,6 +148,130 @@ async function blocked() {
 }
 
 describe('OPS-1 entregas independientes — PostgreSQL real', () => {
+  function newBuyerInput(f: Fixture): ManualDeliveryInput {
+    const suffix = uniqueSuffix()
+    return {
+      ...input(f),
+      recipient: {
+        type: 'newBuyer',
+        name: `QA entrega ${suffix}`,
+        email: `${suffix}@example.test`,
+        phone: `6${randomInt(10000000, 99999999)}`,
+      },
+    }
+  }
+  it('nuevo comprador y entrega se guardan juntos; replay conserva una sola ficha y KPI', async () => {
+    const f = await fixture(),
+      request = newBuyerInput(f)
+    const [first, replay] = await Promise.all([create(f, request), create(f, request, other)])
+    expect(first.id).toBe(replay.id)
+    const delivery = await db.delivery.findUniqueOrThrow({ where: { id: first.id } })
+    const buyer = await db.buyerLead.findUniqueOrThrow({ where: { id: delivery.buyerLeadId! } })
+    expect(buyer.status).toBe('NUEVO')
+    expect(await db.buyerLead.count({ where: { email: buyer.email } })).toBe(1)
+    expect(
+      await db.kpiEvent.count({ where: { eventName: 'buyer_created', entityId: buyer.id } })
+    ).toBe(1)
+    expect((await db.vehicle.findUniqueOrThrow({ where: { id: f.vehicle.id } })).soldAt).toBeNull()
+    await expect(create(f, { ...request, notes: 'otros datos' })).rejects.toThrow('otros datos')
+    await change(f, first.id, 'CANCELADA')
+    expect(await db.buyerLead.findUnique({ where: { id: buyer.id } })).not.toBeNull()
+    await create(f, { ...input(f), recipient: { type: 'buyerLead', id: buyer.id } })
+  })
+  it('una venta bloqueada revierte también el comprador nuevo y su KPI', async () => {
+    const f = await fixture(),
+      request = newBuyerInput(f)
+    await db.vehicle.update({
+      where: { id: f.vehicle.id },
+      data: { status: 'VENDIDO', soldAt: new Date() },
+    })
+    const buyersBefore = await db.buyerLead.count(),
+      kpisBefore = await db.kpiEvent.count()
+    await expect(create(f, request)).rejects.toThrow('venta registrada')
+    expect(await db.buyerLead.count()).toBe(buyersBefore)
+    expect(await db.kpiEvent.count()).toBe(kpisBefore)
+    expect(await db.delivery.count({ where: { vehicleId: f.vehicle.id } })).toBe(0)
+  })
+  it.each(['email', 'phone'] as const)(
+    'dos vehículos con el mismo %s no crean compradores duplicados',
+    async (field) => {
+      const f = await fixture(),
+        g = await fixture(),
+        request = newBuyerInput(f),
+        rival = newBuyerInput(g)
+      if (request.recipient.type !== 'newBuyer' || rival.recipient.type !== 'newBuyer')
+        throw new Error('fixture')
+      rival.recipient[field] = request.recipient[field]
+      if (field === 'phone') rival.recipient.phone = `+34 ${request.recipient.phone}`
+      const inserted = barrier(),
+        release = barrier()
+      const winner = withLockedRoots(
+        buildDeliveryCreationRoots({
+          vehicleId: f.vehicle.id,
+          sellerLeadId: f.seller.id,
+          buyerLeadId: null,
+        }),
+        (tx) =>
+          createOperationalDeliveryTx(tx, request, f.actor.id, f.seller.id, {
+            afterNewBuyerCreated: async () => {
+              inserted.open()
+              await release.wait
+            },
+          }),
+        { client: db }
+      )
+      await inserted.wait
+      const loser = create(g, rival, other)
+      const resultsPromise = Promise.allSettled([winner, loser])
+      try {
+        await blocked()
+      } finally {
+        release.open()
+      }
+      const results = await resultsPromise
+      expect(results.filter((r) => r.status === 'fulfilled')).toHaveLength(1)
+      const failed = results.find((r) => r.status === 'rejected') as PromiseRejectedResult
+      expect(failed.reason.message).toContain('Ya existe una ficha')
+    }
+  )
+  it('detecta email existente sin distinguir mayúsculas y no duplica ni vincula a otra persona', async () => {
+    const f = await fixture(),
+      request = newBuyerInput(f)
+    if (request.recipient.type !== 'newBuyer') throw new Error('fixture')
+    request.recipient.email = f.buyer.email.toUpperCase()
+    await expect(create(f, request)).rejects.toThrow('Ya existe una ficha')
+    expect(await db.delivery.count({ where: { vehicleId: f.vehicle.id } })).toBe(0)
+  })
+  it('completar con un comprador nuevo registra la venta y vincula su garantía', async () => {
+    const f = await fixture(),
+      result = await create(f, newBuyerInput(f))
+    await change(f, result.id, 'COMPLETADA')
+    const delivery = await db.delivery.findUniqueOrThrow({ where: { id: result.id } })
+    expect(
+      (await db.buyerLead.findUniqueOrThrow({ where: { id: delivery.buyerLeadId! } })).status
+    ).toBe('CERRADO')
+    expect(
+      await db.warranty.count({
+        where: { deliveryId: result.id, buyerLeadId: delivery.buyerLeadId! },
+      })
+    ).toBe(1)
+  })
+  it('un usuario revocado no crea una ficha de comprador desde la entrega', async () => {
+    const f = await fixture(),
+      buyersBefore = await db.buyerLead.count()
+    await db.user.update({ where: { id: f.actor.id }, data: { active: false } })
+    await expect(create(f, newBuyerInput(f))).rejects.toThrow('permiso')
+    expect(await db.buyerLead.count()).toBe(buyersBefore)
+  })
+  it.each(['AGENTE', 'MARKETING'] as const)(
+    'nuevo comprador no concede permisos de alta a %s',
+    async (role) => {
+      const f = await fixture(role),
+        buyersBefore = await db.buyerLead.count()
+      await expect(create(f, newBuyerInput(f))).rejects.toThrow('permiso')
+      expect(await db.buyerLead.count()).toBe(buyersBefore)
+    }
+  )
   it.each(['VENTA', 'DEVOLUCION_VENDEDOR', 'ENTREGA_TALLER'] as const)(
     '%s completa sin oferta, match, firma ni checklist obligatorio',
     async (kind) => {

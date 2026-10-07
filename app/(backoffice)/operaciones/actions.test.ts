@@ -27,6 +27,7 @@ import {
   searchOperationalTargets,
 } from './actions'
 import { OPERATIONAL_DELIVERY_ROLES } from '@/lib/operations-policy'
+import { randomUUID } from 'node:crypto'
 beforeEach(() => {
   vi.resetAllMocks()
   mock.role.mockResolvedValue({ id: 'qa', role: 'TALLER', active: true })
@@ -38,6 +39,46 @@ const calls = [
   () => updateOperationalChecklist('qa', { result: 'OK' }),
 ]
 describe('OPS-1 acciones operativas', () => {
+  const newBuyerRequest = () => ({
+    operationId: randomUUID(),
+    vehicleId: 'qa',
+    kind: 'VENTA',
+    recipient: {
+      type: 'newBuyer',
+      name: 'QA comprador',
+      email: 'qa@example.test',
+      phone: '600111222',
+    },
+    scheduledAt: '2026-10-07T10:00:00Z',
+  })
+  it('rechaza contacto inválido con mensaje útil antes de leer DB', async () => {
+    const request = newBuyerRequest()
+    request.recipient.email = 'incorrecto'
+    expect(await createManualDelivery(request)).toEqual({
+      ok: false,
+      error: 'Introduce un email válido para el nuevo comprador.',
+    })
+    expect(mock.vehicle.findUnique).not.toHaveBeenCalled()
+    expect(mock.lock).not.toHaveBeenCalled()
+  })
+  it('alta nueva bloquea raíces existentes sin buscar una ficha de comprador que aún no existe', async () => {
+    mock.vehicle.findUnique.mockResolvedValue({ sellerLeadId: 'seller' })
+    mock.lock.mockResolvedValue({ id: 'delivery' })
+    expect(await createManualDelivery(newBuyerRequest())).toEqual({ ok: true, id: 'delivery' })
+    expect(mock.lock).toHaveBeenCalledWith(
+      [
+        { type: 'vehicle', id: 'qa' },
+        { type: 'sellerLead', id: 'seller' },
+      ],
+      expect.any(Function)
+    )
+  })
+  it('nuevo comprador respeta el guard de entregas', async () => {
+    mock.role.mockRejectedValue(new Error('forbidden'))
+    await expect(createManualDelivery(newBuyerRequest())).rejects.toThrow('forbidden')
+    expect(mock.vehicle.findUnique).not.toHaveBeenCalled()
+    expect(mock.lock).not.toHaveBeenCalled()
+  })
   it.each([0, 1, 2])('guard precede a toda lectura/escritura en acción %s', async (index) => {
     mock.role.mockRejectedValue(new Error('forbidden'))
     await expect(calls[index]()).rejects.toThrow('forbidden')

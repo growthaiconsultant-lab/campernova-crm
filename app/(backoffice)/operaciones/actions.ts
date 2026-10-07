@@ -5,7 +5,11 @@ import { db } from '@/lib/db'
 import { requireRole } from '@/lib/auth'
 import { operationalWritesPaused, OPS1_PAUSED_MESSAGE } from '@/lib/operations-control'
 import { OPERATIONAL_DELIVERY_ROLES } from '@/lib/operations-policy'
-import { manualDeliverySchema, operationalSearchSchema } from '@/lib/operations-input'
+import {
+  manualDeliverySchema,
+  manualDeliveryValidationMessage,
+  operationalSearchSchema,
+} from '@/lib/operations-input'
 import { buildDeliveryCreationRoots } from '@/lib/delivery-creation'
 import { withLockedRoots, isLockError } from '@/lib/locking'
 import {
@@ -30,6 +34,7 @@ function invalidateDelivery(id: string) {
     `/entregas/${id}`,
     '/calendario',
     '/vehiculos',
+    '/compradores',
     '/comprar',
     '/comprar/vehiculos',
     '/dashboard',
@@ -100,7 +105,7 @@ export async function createManualDelivery(raw: unknown) {
   if (!parsed.success)
     return {
       ok: false as const,
-      error: 'Selecciona vehículo, tipo, destinatario y una fecha válida.',
+      error: manualDeliveryValidationMessage(parsed.error),
     }
   const input = parsed.data
   try {
