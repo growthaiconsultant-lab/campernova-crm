@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { buyerSourceSchema } from '@/lib/buyer-source'
 import { VEHICLE_CATEGORY_VALUES, BED_LAYOUT_VALUES, LICENSE_TYPE_VALUES } from '@/lib/rv-taxonomy'
 // CAP-1 deja FUERA de alcance a BuyerLead: el contacto del comprador sigue siendo obligatorio.
 
@@ -19,6 +20,7 @@ export const PURCHASE_TIMELINE_OPTIONS = [
 ] as const
 
 export const createBuyerLeadSchema = z.object({
+  source: buyerSourceSchema,
   // Contacto
   name: z.string().min(1, 'El nombre es obligatorio'),
   email: z.string().email('Email no válido'),
@@ -51,6 +53,7 @@ export type CreateBuyerLeadInput = z.infer<typeof createBuyerLeadSchema>
 export type BuyerLeadFormValues = z.input<typeof createBuyerLeadSchema>
 
 export const updateBuyerLeadSchema = z.object({
+  source: buyerSourceSchema,
   name: z.string().min(1, 'El nombre es obligatorio'),
   email: z.string().email('Email no válido'),
   phone: z.string().min(6, 'Teléfono demasiado corto'),

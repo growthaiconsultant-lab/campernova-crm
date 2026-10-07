@@ -3,7 +3,15 @@
 import { useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
-import { Form, FormControl, FormField, FormItem, FormMessage } from '@/components/ui/form'
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from '@/components/ui/form'
+import { BuyerSourceSelect } from '@/components/buyer-source-select'
 import { Button } from '@/components/ui/button'
 import {
   Select,
@@ -56,6 +64,7 @@ type Props = {
   leadId: string
   defaultValues: UpdateBuyerLeadValues
   agents: Agent[]
+  legacySource?: string | null
 }
 
 // ── Styled primitives ─────────────────────────────────────────────────────────
@@ -73,7 +82,7 @@ const inputCls =
 
 // ── Component ─────────────────────────────────────────────────────────────────
 
-export function BuyerLeadEditForm({ leadId, defaultValues, agents }: Props) {
+export function BuyerLeadEditForm({ leadId, defaultValues, agents, legacySource }: Props) {
   const [saved, setSaved] = useState(false)
   const [serverError, setServerError] = useState<string | null>(null)
 
@@ -154,6 +163,26 @@ export function BuyerLeadEditForm({ leadId, defaultValues, agents }: Props) {
                     <FieldLabel>Teléfono</FieldLabel>
                     <FormControl>
                       <input type="tel" {...field} className={inputCls} />
+                    </FormControl>
+                    <FormMessage className="text-[11px]" />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="source"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="font-mono text-[10px] uppercase tracking-[0.12em] text-[#8b94a3]">
+                      Origen de captación
+                    </FormLabel>
+                    <FormControl>
+                      <BuyerSourceSelect
+                        {...field}
+                        legacySource={legacySource}
+                        className={inputCls}
+                      />
                     </FormControl>
                     <FormMessage className="text-[11px]" />
                   </FormItem>

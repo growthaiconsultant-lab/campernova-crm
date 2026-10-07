@@ -25,6 +25,7 @@ export async function updateBuyerLead(leadId: string, data: unknown) {
     name,
     email,
     phone,
+    source,
     status,
     agentId,
     vehicleType,
@@ -123,6 +124,8 @@ export async function updateBuyerLead(leadId: string, data: unknown) {
         name,
         email,
         phone,
+        // Un cliente anterior o un origen legacy no debe borrar la atribución existente.
+        ...(source !== undefined ? { source } : {}),
         status,
         agentId: agentId ?? null,
         vehicleType: vehicleType ?? null,

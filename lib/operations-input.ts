@@ -14,7 +14,7 @@ export const operationalTargetSchema = z.object({
 })
 export type OperationalTarget = z.infer<typeof operationalTargetSchema>
 export const newDeliveryBuyerSchema = createBuyerLeadSchema
-  .pick({ name: true, email: true, phone: true })
+  .pick({ name: true, email: true, phone: true, source: true })
   .extend({
     name: z.string().trim().min(1).max(150),
     email: z
@@ -76,6 +76,8 @@ export function manualDeliveryValidationMessage(error: z.ZodError): string {
           return 'Introduce un email válido para el nuevo comprador.'
         case 'phone':
           return 'Introduce un teléfono válido para el nuevo comprador.'
+        case 'source':
+          return 'Selecciona un origen de captación válido para el nuevo comprador.'
         case 'id':
           return 'Selecciona al destinatario en los resultados. Si es un comprador sin ficha, elige «Nuevo comprador».'
         default:

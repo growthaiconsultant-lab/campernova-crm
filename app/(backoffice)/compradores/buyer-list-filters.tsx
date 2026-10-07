@@ -2,6 +2,7 @@
 
 import { useCallback, useRef } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
+import { BUYER_SOURCE_OPTIONS } from '@/lib/buyer-source'
 
 const STATUS_OPTIONS = [
   { value: 'NUEVO', label: 'Nuevo' },
@@ -18,10 +19,8 @@ const TYPE_OPTIONS = [
 ]
 
 const SOURCE_OPTIONS = [
-  { value: 'CHAT', label: 'Chat web' },
-  { value: 'PRO', label: 'Formulario web' },
-  { value: 'LLAMADA', label: 'Llamada' },
-  { value: '__none__', label: 'Backoffice' },
+  ...BUYER_SOURCE_OPTIONS,
+  { value: '__none__', label: 'Sin especificar / Backoffice' },
 ]
 
 // CAM-62: temperatura del lead

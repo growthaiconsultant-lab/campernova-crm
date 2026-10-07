@@ -1,6 +1,7 @@
 'use server'
 
 import { db } from '@/lib/db'
+import { revalidatePath } from 'next/cache'
 import { requireAgente } from '@/lib/auth'
 import { createBuyerLeadSchema } from '@/lib/validators/buyer-lead'
 import { recalculateMatchesForBuyer } from '@/lib/matching'
@@ -22,6 +23,7 @@ export async function createBuyerLead(data: unknown, allowDuplicate = false) {
     name,
     email,
     phone,
+    source,
     vehicleType,
     minSeats,
     maxBudget,
@@ -43,6 +45,7 @@ export async function createBuyerLead(data: unknown, allowDuplicate = false) {
       name,
       email,
       phone,
+      source: source ?? null,
       status: 'NUEVO',
       vehicleType: vehicleType ?? null,
       minSeats: minSeats ?? null,
@@ -68,5 +71,6 @@ export async function createBuyerLead(data: unknown, allowDuplicate = false) {
     source: 'ui',
   })
 
+  revalidatePath('/compradores')
   return { leadId: lead.id }
 }

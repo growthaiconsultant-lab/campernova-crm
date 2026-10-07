@@ -7,6 +7,8 @@ import { createManualDelivery } from '../../operaciones/actions'
 import { TargetPicker } from '@/components/operations/target-picker'
 import { DELIVERY_KIND_LABELS } from '@/lib/delivery-kind'
 import { manualDeliverySchema, manualDeliveryValidationMessage } from '@/lib/operations-input'
+import { BuyerSourceSelect } from '@/components/buyer-source-select'
+import type { BuyerSource } from '@/lib/buyer-source'
 export function NewDeliveryForm({ users }: { users: { id: string; name: string }[] }) {
   const router = useRouter(),
     operationId = useRef<string>('')
@@ -17,7 +19,12 @@ export function NewDeliveryForm({ users }: { users: { id: string; name: string }
   const [recipientType, setRecipientType] = useState<'buyerLead' | 'sellerLead'>('sellerLead'),
     [recipientId, setRecipientId] = useState('')
   const [buyerMode, setBuyerMode] = useState<'existing' | 'new'>('existing')
-  const [newBuyer, setNewBuyer] = useState({ name: '', email: '', phone: '' })
+  const [newBuyer, setNewBuyer] = useState<{
+    name: string
+    email: string
+    phone: string
+    source: BuyerSource | null
+  }>({ name: '', email: '', phone: '', source: null })
   async function submit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()
     if (pending) return
@@ -180,6 +187,15 @@ export function NewDeliveryForm({ users }: { users: { id: string; name: string }
                 className="mt-1 w-full rounded border p-2"
                 value={newBuyer.phone}
                 onChange={(e) => setNewBuyer({ ...newBuyer, phone: e.target.value })}
+              />
+            </label>
+            <label className="block">
+              Origen de captación
+              <BuyerSourceSelect
+                name="newBuyerSource"
+                value={newBuyer.source}
+                onChange={(source) => setNewBuyer({ ...newBuyer, source: source ?? null })}
+                className="mt-1 w-full rounded border p-2"
               />
             </label>
           </fieldset>
