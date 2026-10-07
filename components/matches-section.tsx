@@ -18,6 +18,7 @@ export type VehicleMatchData = {
   id: string
   score: number
   status: string
+  generatedBy?: string
   explanation?: MatchExplanationData
   buyerLead: {
     id: string
@@ -33,12 +34,14 @@ export type BuyerMatchData = {
   id: string
   score: number
   status: string
+  generatedBy?: string
   explanation?: MatchExplanationData
   vehicle: {
     id: string
     brand: string | null
     model: string | null
     year: number | null
+    plate?: string | null
     km: number | null
     price: number | null
     photoUrl: string | null
@@ -131,6 +134,7 @@ function MatchExplanation({ explanation }: { explanation?: MatchExplanationData 
 
 function StatusButtons({ matchId, currentStatus }: { matchId: string; currentStatus: string }) {
   const [isPending, startTransition] = useTransition()
+  const [error, setError] = useState('')
   const transitions =
     currentStatus in MATCH_STATUS_LABELS
       ? MATCH_STATUS_ACTIONS.filter(({ status }) => status !== currentStatus)
@@ -139,23 +143,36 @@ function StatusButtons({ matchId, currentStatus }: { matchId: string; currentSta
   if (transitions.length === 0) return null
 
   return (
-    <div className="flex flex-wrap gap-1.5">
-      {transitions.map(({ status, label, destructive }) => (
-        <Button
-          key={status}
-          size="sm"
-          variant={destructive ? 'outline' : 'secondary'}
-          className={destructive ? 'text-destructive hover:text-destructive' : ''}
-          disabled={isPending}
-          onClick={() =>
-            startTransition(async () => {
-              await updateMatchStatus(matchId, status)
-            })
-          }
-        >
-          {label}
-        </Button>
-      ))}
+    <div className="space-y-2">
+      <div className="flex flex-wrap gap-1.5">
+        {transitions.map(({ status, label, destructive }) => (
+          <Button
+            key={status}
+            size="sm"
+            variant={destructive ? 'outline' : 'secondary'}
+            className={destructive ? 'text-destructive hover:text-destructive' : ''}
+            disabled={isPending}
+            onClick={() =>
+              startTransition(async () => {
+                setError('')
+                try {
+                  const result = await updateMatchStatus(matchId, status)
+                  if (result.error) setError(result.error)
+                } catch {
+                  setError('No se pudo guardar el estado. Inténtalo de nuevo.')
+                }
+              })
+            }
+          >
+            {label}
+          </Button>
+        ))}
+      </div>
+      {error && (
+        <p role="alert" className="text-xs text-red-700">
+          {error}
+        </p>
+      )}
     </div>
   )
 }
@@ -191,7 +208,12 @@ function BuyerMatchCard({ match }: { match: VehicleMatchData }) {
           </div>
         </div>
         {/* Badges */}
-        <div className="flex shrink-0 items-center gap-1.5">
+        <div className="flex shrink-0 flex-wrap items-center justify-end gap-1.5">
+          {match.generatedBy === 'manual' && (
+            <span className="rounded-full bg-sidebar-primary/10 px-2 py-0.5 text-[11px] font-medium text-sidebar-primary">
+              Manual
+            </span>
+          )}
           <span
             className={`rounded-full px-2 py-0.5 text-xs font-medium ${scoreBadgeClass(match.score)}`}
           >
@@ -200,7 +222,9 @@ function BuyerMatchCard({ match }: { match: VehicleMatchData }) {
           <span
             className={`rounded-full px-2 py-0.5 text-xs font-medium ${MATCH_STATUS_COLORS[match.status] ?? ''}`}
           >
-            {MATCH_STATUS_LABELS[match.status] ?? match.status}
+            {match.generatedBy === 'manual' && match.status === 'SUGERIDO'
+              ? 'Interesado'
+              : (MATCH_STATUS_LABELS[match.status] ?? match.status)}
           </span>
         </div>
       </div>
@@ -225,7 +249,7 @@ function BuyerMatchCard({ match }: { match: VehicleMatchData }) {
       <MatchExplanation explanation={match.explanation} />
 
       {/* Acciones */}
-      <div className="flex items-center justify-between gap-2 pt-0.5">
+      <div className="flex flex-wrap items-center justify-between gap-2 pt-0.5">
         <StatusButtons matchId={match.id} currentStatus={match.status} />
         <Button asChild variant="ghost" size="sm" className="shrink-0 text-xs">
           <Link href={`/compradores/${buyerLead.id}`}>Ver ficha →</Link>
@@ -258,16 +282,22 @@ function VehicleMatchCard({ match }: { match: BuyerMatchData }) {
         </div>
 
         {/* Info vehículo */}
-        <div className="flex min-w-0 flex-1 items-start justify-between gap-2">
+        <div className="flex min-w-0 flex-1 flex-col items-start justify-between gap-2 sm:flex-row">
           <div className="min-w-0">
             <p className="truncate text-sm font-medium">{vehicleLabel(vehicle)}</p>
             <p className="text-xs text-muted-foreground">
               {vehicle.km != null ? `${vehicle.km.toLocaleString('es-ES')} km` : 'Km s/d'}
+              {vehicle.plate ? ` · ${vehicle.plate}` : ''}
               {vehicle.price ? ` · ${formatEur(vehicle.price)}` : ''}
             </p>
           </div>
           {/* Badges */}
-          <div className="flex shrink-0 items-center gap-1.5">
+          <div className="flex shrink-0 flex-wrap items-center justify-end gap-1.5">
+            {match.generatedBy === 'manual' && (
+              <span className="rounded-full bg-sidebar-primary/10 px-2 py-0.5 text-[11px] font-medium text-sidebar-primary">
+                Manual
+              </span>
+            )}
             <span
               className={`rounded-full px-2 py-0.5 text-xs font-medium ${scoreBadgeClass(match.score)}`}
             >
@@ -276,7 +306,9 @@ function VehicleMatchCard({ match }: { match: BuyerMatchData }) {
             <span
               className={`rounded-full px-2 py-0.5 text-xs font-medium ${MATCH_STATUS_COLORS[match.status] ?? ''}`}
             >
-              {MATCH_STATUS_LABELS[match.status] ?? match.status}
+              {match.generatedBy === 'manual' && match.status === 'SUGERIDO'
+                ? 'Interesado'
+                : (MATCH_STATUS_LABELS[match.status] ?? match.status)}
             </span>
           </div>
         </div>
@@ -285,7 +317,7 @@ function VehicleMatchCard({ match }: { match: BuyerMatchData }) {
       <MatchExplanation explanation={match.explanation} />
 
       {/* Acciones */}
-      <div className="flex items-center justify-between gap-2">
+      <div className="flex flex-wrap items-center justify-between gap-2">
         <StatusButtons matchId={match.id} currentStatus={match.status} />
         <Button asChild variant="ghost" size="sm" className="shrink-0 text-xs">
           <Link href={`/vendedores/${vehicle.sellerLeadId}`}>Ver ficha →</Link>
@@ -304,7 +336,8 @@ type MatchesSectionProps =
 export function MatchesSection(props: MatchesSectionProps) {
   const [open, setOpen] = useState(props.defaultOpen ?? false)
   const count = props.matches.length
-  const title = props.side === 'vehicle' ? 'Compradores interesados' : 'Vehículos sugeridos'
+  const title =
+    props.side === 'vehicle' ? 'Compradores interesados' : 'Vehículos de interés y sugeridos'
 
   return (
     <Card>
@@ -330,7 +363,8 @@ export function MatchesSection(props: MatchesSectionProps) {
         <CardContent className="pt-0">
           {count === 0 ? (
             <p className="text-sm text-muted-foreground">
-              Sin matches aún. Se calculan automáticamente al guardar el vehículo o el comprador.
+              Sin intereses todavía. Usa el botón de asociación para elegir una ficha; las
+              sugerencias compatibles también se calculan automáticamente.
             </p>
           ) : (
             <div className="space-y-2">

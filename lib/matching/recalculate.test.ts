@@ -2,6 +2,25 @@ import { describe, expect, it } from 'vitest'
 import { computeRecalcDiff } from './recalculate'
 
 describe('computeRecalcDiff', () => {
+  it('conserva manuales SUGERIDO dentro y fuera del top, sin cambiar su score', () => {
+    const diff = computeRecalcDiff(
+      [
+        { otherId: 'manual-in', score: 99 },
+        { otherId: 'auto-in', score: 85 },
+      ],
+      [
+        { otherId: 'manual-in', status: 'SUGERIDO', generatedBy: 'manual' },
+        { otherId: 'manual-out', status: 'SUGERIDO', generatedBy: 'manual' },
+        { otherId: 'auto-in', status: 'SUGERIDO', generatedBy: 'auto' },
+        { otherId: 'auto-out', status: 'SUGERIDO', generatedBy: 'auto' },
+      ]
+    )
+    expect(diff).toEqual({
+      toCreate: [],
+      toUpdateScore: [{ otherId: 'auto-in', score: 85 }],
+      toDeleteSuggested: ['auto-out'],
+    })
+  })
   it('inserta matches nuevos cuando no existen previos', () => {
     const diff = computeRecalcDiff(
       [

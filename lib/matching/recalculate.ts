@@ -7,6 +7,7 @@ import { notifyHighScoreMatches } from './notify'
 export type ExistingMatch = {
   otherId: string
   status: MatchStatus
+  generatedBy?: string
 }
 
 export type RecalcDiff = {
@@ -19,6 +20,7 @@ export type RecalcDiff = {
 /// decide qué crear, qué actualizar y qué borrar.
 ///
 /// Reglas:
+/// - Match manual → conservar, aunque SUGERIDO o fuera del top
 /// - Match en el top + no existe → crear con SUGERIDO
 /// - Match en el top + existe SUGERIDO → actualizar score
 /// - Match en el top + existe en estado posterior → no tocar (decisión del agente manda)
@@ -28,23 +30,25 @@ export function computeRecalcDiff(
   newTop: { otherId: string; score: number }[],
   existing: ExistingMatch[]
 ): RecalcDiff {
-  const existingMap = new Map(existing.map((m) => [m.otherId, m.status]))
+  const existingMap = new Map(existing.map((m) => [m.otherId, m]))
   const newTopIds = new Set(newTop.map((m) => m.otherId))
 
   const toCreate: { otherId: string; score: number }[] = []
   const toUpdateScore: { otherId: string; score: number }[] = []
 
   for (const match of newTop) {
-    const status = existingMap.get(match.otherId)
-    if (status === undefined) {
+    const current = existingMap.get(match.otherId)
+    if (current === undefined) {
       toCreate.push(match)
-    } else if (status === 'SUGERIDO') {
+    } else if (current.status === 'SUGERIDO' && current.generatedBy !== 'manual') {
       toUpdateScore.push(match)
     }
   }
 
   const toDeleteSuggested = existing
-    .filter((m) => m.status === 'SUGERIDO' && !newTopIds.has(m.otherId))
+    .filter(
+      (m) => m.generatedBy !== 'manual' && m.status === 'SUGERIDO' && !newTopIds.has(m.otherId)
+    )
     .map((m) => m.otherId)
 
   return { toCreate, toUpdateScore, toDeleteSuggested }
@@ -71,12 +75,16 @@ export async function recalculateMatchesForVehicle(
 
     const existing = await db.match.findMany({
       where: { vehicleId },
-      select: { buyerLeadId: true, status: true },
+      select: { buyerLeadId: true, status: true, generatedBy: true },
     })
 
     const diff = computeRecalcDiff(
       topToRecalcInput(top, 'buyer'),
-      existing.map((m) => ({ otherId: m.buyerLeadId, status: m.status }))
+      existing.map((m) => ({
+        otherId: m.buyerLeadId,
+        status: m.status,
+        generatedBy: m.generatedBy,
+      }))
     )
 
     for (const m of diff.toCreate) {
@@ -92,8 +100,8 @@ export async function recalculateMatchesForVehicle(
     }
 
     for (const m of diff.toUpdateScore) {
-      await db.match.update({
-        where: { vehicleId_buyerLeadId: { vehicleId, buyerLeadId: m.otherId } },
+      await db.match.updateMany({
+        where: { vehicleId, buyerLeadId: m.otherId, generatedBy: 'auto', status: 'SUGERIDO' },
         data: { score: m.score },
       })
     }
@@ -104,6 +112,7 @@ export async function recalculateMatchesForVehicle(
           vehicleId,
           buyerLeadId: { in: diff.toDeleteSuggested },
           status: 'SUGERIDO',
+          generatedBy: 'auto',
         },
       })
     }
@@ -128,12 +137,12 @@ export async function recalculateMatchesForBuyer(
 
     const existing = await db.match.findMany({
       where: { buyerLeadId },
-      select: { vehicleId: true, status: true },
+      select: { vehicleId: true, status: true, generatedBy: true },
     })
 
     const diff = computeRecalcDiff(
       topToRecalcInput(top, 'vehicle'),
-      existing.map((m) => ({ otherId: m.vehicleId, status: m.status }))
+      existing.map((m) => ({ otherId: m.vehicleId, status: m.status, generatedBy: m.generatedBy }))
     )
 
     for (const m of diff.toCreate) {
@@ -149,8 +158,8 @@ export async function recalculateMatchesForBuyer(
     }
 
     for (const m of diff.toUpdateScore) {
-      await db.match.update({
-        where: { vehicleId_buyerLeadId: { vehicleId: m.otherId, buyerLeadId } },
+      await db.match.updateMany({
+        where: { vehicleId: m.otherId, buyerLeadId, generatedBy: 'auto', status: 'SUGERIDO' },
         data: { score: m.score },
       })
     }
@@ -161,6 +170,7 @@ export async function recalculateMatchesForBuyer(
           buyerLeadId,
           vehicleId: { in: diff.toDeleteSuggested },
           status: 'SUGERIDO',
+          generatedBy: 'auto',
         },
       })
     }
