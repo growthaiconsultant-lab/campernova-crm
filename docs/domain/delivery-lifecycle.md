@@ -16,6 +16,11 @@
 
 ## 1. Entidades y campos clave
 
+> **ENT-1 preparado localmente, no publicado:** [alta de comprador desde una entrega](../specs/ENT-1-comprador-nuevo-y-validacion.md).
+> El formulario permite elegir ficha existente o introducir nombre, email y teléfono de un comprador
+> nuevo. Ficha, KPI y entrega se guardan juntos y el replay no duplica el alta. Cancelar conserva
+> la ficha y no modifica su estado comercial. Las reglas de venta, reserva y garantía se mantienen.
+
 > **OPS-1 en desarrollo local (no desplegado):** el contrato nuevo está definido en
 > [OPS-1](../specs/OPS-1-taller-documentos-entregas-manuales.md), con núcleos
 > `lib/operational-deliveries.ts` y acciones `/operaciones/actions.ts`. TALLER/ENTREGAS/ADMIN pueden

@@ -6,6 +6,7 @@ import type { DeliveryKind } from '@prisma/client'
 import { createManualDelivery } from '../../operaciones/actions'
 import { TargetPicker } from '@/components/operations/target-picker'
 import { DELIVERY_KIND_LABELS } from '@/lib/delivery-kind'
+import { manualDeliverySchema, manualDeliveryValidationMessage } from '@/lib/operations-input'
 export function NewDeliveryForm({ users }: { users: { id: string; name: string }[] }) {
   const router = useRouter(),
     operationId = useRef<string>('')
@@ -15,29 +16,35 @@ export function NewDeliveryForm({ users }: { users: { id: string; name: string }
     [vehicleId, setVehicleId] = useState('')
   const [recipientType, setRecipientType] = useState<'buyerLead' | 'sellerLead'>('sellerLead'),
     [recipientId, setRecipientId] = useState('')
+  const [buyerMode, setBuyerMode] = useState<'existing' | 'new'>('existing')
+  const [newBuyer, setNewBuyer] = useState({ name: '', email: '', phone: '' })
   async function submit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()
     if (pending) return
     setError('')
     const fd = new FormData(e.currentTarget),
       date = new Date(String(fd.get('scheduledAt')))
-    if (!vehicleId || !kind || !recipientId || !Number.isFinite(date.getTime())) {
-      setError('Selecciona vehículo, tipo, destinatario y fecha.')
-      return
-    }
-    if (!operationId.current) operationId.current = crypto.randomUUID()
     const payload = {
-      operationId: operationId.current,
+      operationId: operationId.current || crypto.randomUUID(),
       vehicleId,
       kind,
-      recipient: { type: recipientType, id: recipientId },
-      scheduledAt: date.toISOString(),
+      recipient:
+        recipientType === 'buyerLead' && buyerMode === 'new'
+          ? { type: 'newBuyer', ...newBuyer }
+          : { type: recipientType, id: recipientId },
+      scheduledAt: Number.isFinite(date.getTime()) ? date.toISOString() : '',
       responsableId: fd.get('responsableId') || null,
       notes: fd.get('notes') || null,
     }
+    const parsed = manualDeliverySchema.safeParse(payload)
+    if (!parsed.success) {
+      setError(manualDeliveryValidationMessage(parsed.error))
+      return
+    }
+    operationId.current = parsed.data.operationId
     setPending(true)
     try {
-      const result = await createManualDelivery(payload)
+      const result = await createManualDelivery(parsed.data)
       if (!result.ok) setError(result.error)
       else router.push(`/entregas/${result.id}`)
     } catch {
@@ -49,7 +56,7 @@ export function NewDeliveryForm({ users }: { users: { id: string; name: string }
     }
   }
   return (
-    <form onSubmit={submit} className="space-y-5 rounded-xl border bg-white p-6">
+    <form noValidate onSubmit={submit} className="space-y-5 rounded-xl border bg-white p-6">
       {error && (
         <p role="alert" className="rounded bg-red-50 p-3 text-red-700">
           {error}
@@ -68,6 +75,8 @@ export function NewDeliveryForm({ users }: { users: { id: string; name: string }
               setKind(k)
               setRecipientType(k === 'VENTA' ? 'buyerLead' : 'sellerLead')
               setRecipientId('')
+              setBuyerMode('existing')
+              setError('')
             }}
           >
             <option value="">Selecciona el tipo</option>
@@ -87,6 +96,8 @@ export function NewDeliveryForm({ users }: { users: { id: string; name: string }
               onChange={(e) => {
                 setRecipientType(e.target.value as typeof recipientType)
                 setRecipientId('')
+                setBuyerMode('existing')
+                setError('')
               }}
             >
               <option value="sellerLead">Vendedor</option>
@@ -94,15 +105,102 @@ export function NewDeliveryForm({ users }: { users: { id: string; name: string }
             </select>
           </label>
         )}
-        {kind && (
-          <TargetPicker
-            key={recipientType}
-            type={recipientType}
-            label={recipientType === 'buyerLead' ? 'Comprador' : 'Vendedor'}
-            value={recipientId}
-            onChange={setRecipientId}
-          />
+        {kind && recipientType === 'buyerLead' && (
+          <fieldset className="space-y-2">
+            <legend className="text-sm font-medium">Comprador</legend>
+            <div className="flex flex-wrap gap-4">
+              <label className="flex items-center gap-2">
+                <input
+                  type="radio"
+                  name="buyerMode"
+                  value="existing"
+                  checked={buyerMode === 'existing'}
+                  onChange={() => {
+                    setBuyerMode('existing')
+                    setError('')
+                  }}
+                />
+                Comprador existente
+              </label>
+              <label className="flex items-center gap-2">
+                <input
+                  type="radio"
+                  name="buyerMode"
+                  value="new"
+                  checked={buyerMode === 'new'}
+                  onChange={() => {
+                    setBuyerMode('new')
+                    setError('')
+                  }}
+                />
+                Nuevo comprador
+              </label>
+            </div>
+          </fieldset>
         )}
+        {kind && recipientType === 'buyerLead' && buyerMode === 'new' ? (
+          <fieldset className="space-y-3 rounded-lg border p-3">
+            <legend className="px-1 text-sm font-medium">Datos del nuevo comprador</legend>
+            <p className="text-sm text-muted-foreground">
+              Al crear la entrega se guardará su ficha de comprador con estos datos.
+            </p>
+            <label className="block">
+              Nombre completo
+              <input
+                name="newBuyerName"
+                required
+                maxLength={150}
+                autoComplete="name"
+                className="mt-1 w-full rounded border p-2"
+                value={newBuyer.name}
+                onChange={(e) => setNewBuyer({ ...newBuyer, name: e.target.value })}
+              />
+            </label>
+            <label className="block">
+              Email
+              <input
+                name="newBuyerEmail"
+                type="email"
+                required
+                maxLength={254}
+                autoComplete="email"
+                className="mt-1 w-full rounded border p-2"
+                value={newBuyer.email}
+                onChange={(e) => setNewBuyer({ ...newBuyer, email: e.target.value })}
+              />
+            </label>
+            <label className="block">
+              Teléfono
+              <input
+                name="newBuyerPhone"
+                type="tel"
+                required
+                maxLength={40}
+                autoComplete="tel"
+                className="mt-1 w-full rounded border p-2"
+                value={newBuyer.phone}
+                onChange={(e) => setNewBuyer({ ...newBuyer, phone: e.target.value })}
+              />
+            </label>
+          </fieldset>
+        ) : kind ? (
+          <div className="space-y-2">
+            <TargetPicker
+              key={recipientType}
+              type={recipientType}
+              label={recipientType === 'buyerLead' ? 'Comprador' : 'Vendedor'}
+              value={recipientId}
+              onChange={(id) => {
+                setRecipientId(id)
+                setError('')
+              }}
+            />
+            <p className="text-sm text-muted-foreground">
+              Busca por nombre y selecciona un resultado. Escribir en el buscador no crea una ficha.
+              {recipientType === 'buyerLead' && ' Si aún no tiene ficha, elige «Nuevo comprador».'}
+            </p>
+          </div>
+        ) : null}
         <p className="text-sm text-muted-foreground">
           {kind === 'VENTA'
             ? 'Al completar: se registra la venta y se activa su garantía. No se permite duplicar una venta existente.'
@@ -139,7 +237,7 @@ export function NewDeliveryForm({ users }: { users: { id: string; name: string }
           </button>
         </div>
       </fieldset>
-      {error && (
+      {error && operationId.current && (
         <button
           type="button"
           disabled={pending}

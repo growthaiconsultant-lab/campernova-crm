@@ -3,6 +3,10 @@ import type { Prisma } from '@prisma/client'
 import { createWarrantyForDelivery } from './postventa'
 import { canManageOperationalDeliveries } from './operations-policy'
 import type { ManualDeliveryInput } from './operations-input'
+import { normalizePhone, phonesMatch } from './phone'
+import { defaultNextActionData } from './next-action'
+import { suggestTemperatureFromTimeline } from './lead-temperature'
+import { KPI_EVENTS } from './kpi/events'
 
 export class OperationalError extends Error {}
 export function operationFingerprint(value: unknown) {
@@ -10,6 +14,55 @@ export function operationFingerprint(value: unknown) {
 }
 export function creationIdentity(actorId: string, input: ManualDeliveryInput) {
   return { key: `${actorId}:${input.operationId}`, fingerprint: operationFingerprint(input) }
+}
+async function createDeliveryBuyer(
+  tx: Prisma.TransactionClient,
+  buyer: Extract<ManualDeliveryInput['recipient'], { type: 'newBuyer' }>,
+  actorId: string
+) {
+  // Hashes evitan exponer contactos en consultas/locks. Orden fijo evita ciclos entre altas.
+  const contacts = [`email:${buyer.email.toLowerCase()}`, `phone:${normalizePhone(buyer.phone)}`]
+    .map((contact) => `delivery-buyer:${operationFingerprint(contact)}`)
+    .sort()
+  for (const contact of contacts) {
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${contact}, 0))`
+  }
+  const existing = await tx.buyerLead.findMany({
+    select: { email: true, phone: true },
+  })
+  if (
+    existing.some(
+      (row) =>
+        row.email.trim().toLowerCase() === buyer.email.toLowerCase() ||
+        phonesMatch(row.phone, buyer.phone)
+    )
+  ) {
+    throw new OperationalError(
+      'Ya existe una ficha con ese email o teléfono. Elige «Comprador existente» y búscala por su nombre.'
+    )
+  }
+  const created = await tx.buyerLead.create({
+    data: {
+      name: buyer.name,
+      email: buyer.email,
+      phone: buyer.phone,
+      status: 'NUEVO',
+      temperature: suggestTemperatureFromTimeline(null),
+      ...defaultNextActionData(),
+    },
+    select: { id: true },
+  })
+  await tx.kpiEvent.create({
+    data: {
+      eventName: KPI_EVENTS.BUYER_CREATED,
+      entityType: 'buyer',
+      entityId: created.id,
+      actorUserId: actorId,
+      source: 'ui',
+      metadata: {},
+    },
+  })
+  return created
 }
 async function assertActor(tx: Prisma.TransactionClient, actorId: string) {
   const actor = await tx.user.findUnique({
@@ -57,7 +110,8 @@ export async function createOperationalDeliveryTx(
   tx: Prisma.TransactionClient,
   input: ManualDeliveryInput,
   actorId: string,
-  sellerLeadId: string | null
+  sellerLeadId: string | null,
+  hooks: { afterNewBuyerCreated?: () => Promise<void> } = {}
 ) {
   await assertActor(tx, actorId)
   const { key, fingerprint } = creationIdentity(actorId, input)
@@ -78,11 +132,6 @@ export async function createOperationalDeliveryTx(
   })
   if (!vehicle || vehicle.sellerLeadId !== sellerLeadId)
     throw new OperationalError('El vehículo ha cambiado. Recarga antes de continuar.')
-  const recipient =
-    input.recipient.type === 'buyerLead'
-      ? await tx.buyerLead.findUnique({ where: { id: input.recipient.id }, select: { id: true } })
-      : await tx.sellerLead.findUnique({ where: { id: input.recipient.id }, select: { id: true } })
-  if (!recipient) throw new OperationalError('Destinatario no encontrado.')
   if (input.responsableId) {
     const responsible = await tx.user.findUnique({
       where: { id: input.responsableId },
@@ -100,15 +149,28 @@ export async function createOperationalDeliveryTx(
       'El vehículo ya tiene una entrega activa. Abre esa entrega para continuar.'
     )
   }
-  if (input.kind === 'VENTA') await assertSaleAvailable(tx, input.vehicleId, input.recipient.id)
+  const recipient =
+    input.recipient.type === 'newBuyer'
+      ? await createDeliveryBuyer(tx, input.recipient, actorId)
+      : input.recipient.type === 'buyerLead'
+        ? await tx.buyerLead.findUnique({ where: { id: input.recipient.id }, select: { id: true } })
+        : await tx.sellerLead.findUnique({
+            where: { id: input.recipient.id },
+            select: { id: true },
+          })
+  if (!recipient) throw new OperationalError('Destinatario no encontrado.')
+  if (input.recipient.type === 'newBuyer') await hooks.afterNewBuyerCreated?.()
+  const buyerLeadId = input.recipient.type !== 'sellerLead' ? recipient.id : null
+  const recipientSellerLeadId = input.recipient.type === 'sellerLead' ? recipient.id : null
+  if (input.kind === 'VENTA') await assertSaleAvailable(tx, input.vehicleId, recipient.id)
   const delivery = await tx.delivery.create({
     data: {
       creationKey: key,
       creationFingerprint: fingerprint,
       kind: input.kind,
       vehicleId: input.vehicleId,
-      buyerLeadId: input.recipient.type === 'buyerLead' ? input.recipient.id : null,
-      recipientSellerLeadId: input.recipient.type === 'sellerLead' ? input.recipient.id : null,
+      buyerLeadId,
+      recipientSellerLeadId,
       scheduledAt: new Date(input.scheduledAt),
       responsableId: input.responsableId,
       notes: input.notes,
@@ -134,8 +196,8 @@ export async function createOperationalDeliveryTx(
       type: 'ENTREGA_PROGRAMADA',
       content: `Entrega manual: ${input.kind}.`,
       agentId: actorId,
-      sellerLeadId: input.recipient.type === 'sellerLead' ? input.recipient.id : sellerLeadId,
-      buyerLeadId: input.recipient.type === 'buyerLead' ? input.recipient.id : null,
+      sellerLeadId: recipientSellerLeadId ?? sellerLeadId,
+      buyerLeadId,
     },
   })
   return { id: delivery.id, replayed: false }
