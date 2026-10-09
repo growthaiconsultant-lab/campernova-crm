@@ -3,6 +3,7 @@ import { z } from 'zod'
 import type { PrismaClient } from '@prisma/client'
 import { defaultNextActionData } from '@/lib/next-action'
 import { KPI_EVENTS } from '@/lib/kpi/events'
+import { landingAttributionSchema, landingAttributionLine } from './attribution'
 
 export const LANDING_SOURCE = 'Landing vende-tu-camper'
 
@@ -48,6 +49,7 @@ export const landingSellerSchema = z
         telefono: phone,
         zona: text(160).optional(),
         origen: text(1500),
+        atribucion: landingAttributionSchema.optional(),
         pagina: z.literal('/vende-tu-camper.html'),
       })
       .strict(),
@@ -119,10 +121,9 @@ export async function saveLandingSeller(
             create: {
               type: 'NOTA',
               content: [
-                'Formulario de campaña: /vende-tu-camper.html',
+                landingAttributionLine(answers.pagina, answers.atribucion, answers.origen),
                 `Prioridad indicada: ${answers.prioridad}`,
                 answers.busca_otra ? `Busca otro vehículo: ${answers.busca_otra}` : null,
-                `Atribución del formulario: ${answers.origen}`,
               ]
                 .filter(Boolean)
                 .join('\n'),

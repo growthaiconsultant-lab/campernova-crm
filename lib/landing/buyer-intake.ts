@@ -4,6 +4,12 @@ import type { PrismaClient } from '@prisma/client'
 import { defaultNextActionData } from '@/lib/next-action'
 import { KPI_EVENTS } from '@/lib/kpi/events'
 import { LandingRateLimitError } from './seller-intake'
+import {
+  landingAttributionSchema,
+  landingAttributionLine,
+  landingBuyerSource,
+  legacyLandingParameters,
+} from './attribution'
 
 const text = (max: number) => z.string().trim().min(1).max(max)
 const phone = text(32)
@@ -36,6 +42,7 @@ export const landingBuyerSchema = z
         entrega: z.enum(['Sí, quiero entregarla a cuenta', 'No']).optional(),
         detalle: text(2000).optional(),
         origen: text(1500),
+        atribucion: landingAttributionSchema.optional(),
         pagina: z.literal('/encuentra-tu-camper.html'),
       })
       .strict(),
@@ -67,7 +74,7 @@ export async function saveLandingBuyer(
         await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${quotaKey}, 0))`
         const recent = await tx.buyerLead.count({
           where: {
-            source: 'PRO',
+            source: { in: ['PRO', 'INSTAGRAM', 'META'] },
             gdprConsentIp: ip,
             createdAt: { gte: new Date(now.getTime() - 3600000) },
           },
@@ -75,6 +82,7 @@ export async function saveLandingBuyer(
         if (recent >= 10) throw new LandingRateLimitError()
       }
       const a = input.respuestas
+      const source = landingBuyerSource(a.atribucion ?? legacyLandingParameters(a.origen))
       const maxBudget =
         a.presupuesto === 'Menos de 50.000 €'
           ? 50000
@@ -90,7 +98,7 @@ export async function saveLandingBuyer(
           phone: input.contacto,
           email: null,
           agentId: null,
-          source: 'PRO',
+          source,
           status: 'NUEVO',
           gdprConsentAt: now,
           gdprConsentIp: ip,
@@ -123,7 +131,7 @@ export async function saveLandingBuyer(
             create: {
               type: 'NOTA',
               content: [
-                'Formulario de campaña: /encuentra-tu-camper.html',
+                landingAttributionLine(a.pagina, a.atribucion, a.origen),
                 `Rango de plazas para dormir indicado: ${a.plazas}`,
                 `Rango de presupuesto indicado: ${a.presupuesto}`,
                 a.cuando === 'Más adelante' ? 'Plazo indicado: Más adelante' : null,
@@ -132,7 +140,6 @@ export async function saveLandingBuyer(
                   ? 'Solicita información sobre financiación'
                   : null,
                 a.detalle ? `Descripción de la búsqueda: ${a.detalle}` : null,
-                `Atribución del formulario: ${a.origen}`,
               ]
                 .filter(Boolean)
                 .join('\n'),
@@ -146,7 +153,7 @@ export async function saveLandingBuyer(
           entityType: 'buyer',
           entityId: id,
           source: 'system',
-          metadata: { campaign: 'encuentra-tu-camper', buyerSource: 'PRO' },
+          metadata: { campaign: 'encuentra-tu-camper', buyerSource: source },
         },
       })
     },

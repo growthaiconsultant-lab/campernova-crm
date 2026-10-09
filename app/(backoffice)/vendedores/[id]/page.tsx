@@ -1,6 +1,7 @@
 import { notFound } from 'next/navigation'
 import { Suspense } from 'react'
 import Link from 'next/link'
+import { LandingAttribution } from '@/components/landing-attribution'
 import { DocumentsPanel } from '@/components/operations/documents-panel'
 import { db } from '@/lib/db'
 import { requireAgente } from '@/lib/auth'
@@ -605,6 +606,7 @@ export default async function FichaVendedorPage({
               </p>
             )}
             {/* Vendedor + contacto */}
+            <LandingAttribution activities={activities} />
             <div className="mt-2.5 flex flex-wrap items-center gap-2 text-sm">
               <span className="text-muted-foreground">
                 Vendedor ·{' '}

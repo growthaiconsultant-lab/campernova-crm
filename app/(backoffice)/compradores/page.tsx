@@ -4,6 +4,8 @@ import { db } from '@/lib/db'
 import { requireAgente } from '@/lib/auth'
 import { BuyerListFilters } from './buyer-list-filters'
 import { buyerSourceFilter, buyerSourceLabel } from '@/lib/buyer-source'
+import { landingCaptureSelection } from '@/lib/landing/attribution'
+import { LandingAttribution } from '@/components/landing-attribution'
 import { TEMPERATURE_LABELS } from '@/lib/lead-temperature'
 import { NEXT_ACTION_LABELS, isNextActionOverdue, formatNextActionDue } from '@/lib/next-action'
 import {
@@ -184,6 +186,7 @@ export default async function CompradoresPage({ searchParams }: { searchParams: 
         skip: (page - 1) * PAGE_SIZE,
         take: PAGE_SIZE,
         include: {
+          activities: landingCaptureSelection,
           agent: { select: { id: true, name: true } },
           _count: { select: { matches: true } },
         },
@@ -248,7 +251,12 @@ export default async function CompradoresPage({ searchParams }: { searchParams: 
     {
       key: 'source',
       header: 'Origen',
-      cell: (l) => <span className="font-medium text-ink2">{buyerSourceLabel(l.source)}</span>,
+      cell: (l) => (
+        <div>
+          <span className="font-medium text-ink2">{buyerSourceLabel(l.source)}</span>
+          <LandingAttribution activities={l.activities} compact />
+        </div>
+      ),
     },
     {
       key: 'temp',
@@ -402,6 +410,7 @@ export default async function CompradoresPage({ searchParams }: { searchParams: 
               <div className="mt-1 font-hanken text-[11.5px] font-medium text-ink2">
                 Origen: {buyerSourceLabel(l.source)}
               </div>
+              <LandingAttribution activities={l.activities} compact />
               <div className="mt-2 flex items-center justify-between gap-2">
                 {l.nextActionType && l.nextActionDueAt ? (
                   <span

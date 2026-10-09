@@ -3,6 +3,7 @@ import { z } from 'zod'
 /** Origen comercial; distinto del source técnico de los eventos KPI. */
 export const BUYER_SOURCE_VALUES = [
   'INSTAGRAM',
+  'META',
   'COCHES_NET',
   'WALLAPOP',
   'WEB',
@@ -23,6 +24,7 @@ export const buyerSourceSchema = z
 
 export const BUYER_SOURCE_OPTIONS: { value: BuyerSource; label: string }[] = [
   { value: 'INSTAGRAM', label: 'Instagram' },
+  { value: 'META', label: 'Meta / Facebook' },
   { value: 'COCHES_NET', label: 'Coches.net' },
   { value: 'WALLAPOP', label: 'Wallapop' },
   { value: 'WEB', label: 'Web' },

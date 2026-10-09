@@ -10,6 +10,7 @@ import { ManualAssociationsCard } from '@/components/manual-associations-card'
 import { vehicleLabel } from '@/lib/display'
 import { BuyerLeadEditForm } from './buyer-lead-edit-form'
 import { buyerSourceLabel, isBuyerSource } from '@/lib/buyer-source'
+import { LandingAttribution } from '@/components/landing-attribution'
 import { TradeInCard } from './trade-in-card'
 import { BuyerTopbarActions } from './buyer-topbar-actions'
 import { ProximaAccionCard } from './proxima-accion-card'
@@ -498,6 +499,7 @@ export default async function FichaCompradorPage({
         </div>
 
         {/* KPI tiles — mismo lenguaje que la ficha de vendedor */}
+        <LandingAttribution activities={activities} />
         <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-5">
           {/* Mejor match (ancla) */}
           <div className="rounded-xl border border-border bg-card px-4 py-3">

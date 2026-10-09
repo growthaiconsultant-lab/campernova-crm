@@ -3,6 +3,7 @@ import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest'
 import type { PrismaClient } from '@prisma/client'
 import { createGuardedTestPrisma } from './db'
 import { landingPayload } from '../fixtures/landing-seller'
+import { attributionFromActivities, landingCaptureSelection } from '@/lib/landing/attribution'
 import {
   landingSellerSchema,
   landingLeadId,
@@ -60,7 +61,7 @@ describe('landing seller · PostgreSQL real', () => {
       location: 'Sabadell',
     })
     expect(lead.activities).toHaveLength(1)
-    expect(lead.activities[0].content).toContain('utm_campaign=landing')
+    expect(attributionFromActivities(lead.activities)?.params.utm_campaign).toBe('landing')
     expect(await db.kpiEvent.count({ where: { entityId: lead.id } })).toBe(1)
   })
   it('serializes the same request from two clients/IPs without duplicates', async () => {
@@ -75,6 +76,30 @@ describe('landing seller · PostgreSQL real', () => {
     expect(await db.vehicle.count({ where: { sellerLeadId: id } })).toBe(1)
     expect(await db.activity.count({ where: { sellerLeadId: id } })).toBe(1)
     expect(await db.kpiEvent.count({ where: { entityId: id } })).toBe(1)
+  })
+  it('persists the structured campaign and retrieves only the system capture for lists', async () => {
+    const data = input()
+    data.respuestas.atribucion = {
+      utm_source: 'instagram',
+      utm_campaign: 'qa_seller',
+      ad_id: 'qa_ad',
+    }
+    const id = landingLeadId(data)
+    ids.push(id)
+    await saveLandingSeller(db, data, null)
+    await db.activity.create({
+      data: { type: 'NOTA', sellerLeadId: id, content: 'Nota comercial posterior' },
+    })
+    const lead = await db.sellerLead.findUniqueOrThrow({
+      where: { id },
+      include: { activities: landingCaptureSelection },
+    })
+    expect(lead.source).toBe(LANDING_SOURCE)
+    expect(lead.activities).toHaveLength(1)
+    expect(attributionFromActivities(lead.activities)).toMatchObject({
+      landing: '/vende-tu-camper.html',
+      params: data.respuestas.atribucion,
+    })
   })
   it('enforces quota under race, allows confirmed retries and leaves no partial lead', async () => {
     const ip = `test-${randomUUID()}`,

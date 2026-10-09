@@ -5,6 +5,7 @@ import { createGuardedTestPrisma } from './db'
 import { landingBuyerPayload } from '../fixtures/landing-buyer'
 import { landingBuyerSchema, landingBuyerId, saveLandingBuyer } from '@/lib/landing/buyer-intake'
 import { LandingRateLimitError } from '@/lib/landing/seller-intake'
+import { attributionFromActivities, landingCaptureSelection } from '@/lib/landing/attribution'
 
 let db: PrismaClient, other: PrismaClient
 const ids: string[] = []
@@ -81,10 +82,48 @@ describe('buyer landing · PostgreSQL real', () => {
     expect(await db.activity.count({ where: { buyerLeadId: id } })).toBe(1)
     expect(await db.kpiEvent.count({ where: { entityId: id } })).toBe(1)
   })
+  it.each([
+    ['instagram', 'INSTAGRAM'],
+    ['facebook', 'META'],
+  ])(
+    'persists %s source and the complete campaign once under concurrent retries',
+    async (utm_source, source) => {
+      const p = input()
+      p.respuestas.atribucion = {
+        utm_source,
+        utm_campaign: 'qa_buyer',
+        utm_content: 'qa_creative',
+        campaign_id: 'qa_campaign',
+        adset_id: 'qa_set',
+        ad_id: 'qa_ad',
+      }
+      const id = landingBuyerId(p)
+      ids.push(id)
+      await Promise.all([saveLandingBuyer(db, p, null), saveLandingBuyer(other, p, null)])
+      const lead = await db.buyerLead.findUniqueOrThrow({
+        where: { id },
+        include: { activities: landingCaptureSelection },
+      })
+      expect(lead.source).toBe(source)
+      expect(lead.activities).toHaveLength(1)
+      expect(attributionFromActivities(lead.activities)).toMatchObject({
+        landing: '/encuentra-tu-camper.html',
+        params: p.respuestas.atribucion,
+      })
+      const events = await db.kpiEvent.findMany({ where: { entityId: id } })
+      expect(events).toHaveLength(1)
+      expect(events[0].metadata).toEqual({ campaign: 'encuentra-tu-camper', buyerSource: source })
+    }
+  )
   it('enforces per-IP quota under race and permits confirmed retries without partial writes', async () => {
     const ip = `test-${randomUUID()}`,
       now = new Date()
-    for (let i = 0; i < 9; i++) await saveLandingBuyer(db, input(), ip, now)
+    for (let i = 0; i < 9; i++) {
+      const p = input()
+      p.respuestas.atribucion = { utm_source: ['instagram', 'facebook', 'other'][i % 3] }
+      ids.push(landingBuyerId(p))
+      await saveLandingBuyer(db, p, ip, now)
+    }
     const a = input(),
       b = input()
     const r = await Promise.allSettled([

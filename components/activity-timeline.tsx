@@ -19,6 +19,7 @@ import {
 } from 'lucide-react'
 import type { ActivityType } from '@prisma/client'
 import { DeleteNoteButton } from './delete-note-button'
+import { formatLandingActivity } from '@/lib/landing/attribution'
 
 const ACTIVITY_LABELS: Record<ActivityType, string> = {
   CAMBIO_ESTADO: 'Cambio de estado',
@@ -241,7 +242,7 @@ export function ActivityTimeline({ activities, currentUserId }: Props) {
           <div className="min-w-0 flex-1 pb-4 pt-0.5">
             <div className="flex items-start justify-between gap-2">
               <p className="whitespace-pre-wrap text-sm leading-snug">
-                {act.content ?? ACTIVITY_LABELS[act.type]}
+                {act.content ? formatLandingActivity(act.content) : ACTIVITY_LABELS[act.type]}
               </p>
               {act.type === 'NOTA' && currentUserId && act.agentId === currentUserId && (
                 <DeleteNoteButton activityId={act.id} />
