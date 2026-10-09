@@ -9,7 +9,7 @@ window.cnOK = true;
    - whatsapp: número al que se abre WhatsApp después de enviar (o si el envío falla). */
 var CN_CONFIG = window.CN_CONFIG || {
   endpoint: 'https://docs.niraagency.com/api/formulario/',
-  crmEndpoint: '/api/landing/vende-tu-camper',
+  crmEndpoint: '',
   pixel: '',
   whatsapp: '34645639185'
 };
@@ -293,7 +293,7 @@ var CN_CONFIG = window.CN_CONFIG || {
     var retry = document.getElementById('cn-retry');
     btn.disabled = true; retry.disabled = true; retry.textContent = 'Enviando…';
     var jobs = [
-      { name: 'crm', url: CN_CONFIG.crmEndpoint || '/api/landing/vende-tu-camper' },
+      { name: 'crm', url: CN_CONFIG.crmEndpoint || (slug === 'campersnova-encuentra' ? '/api/landing/encuentra-tu-camper' : '/api/landing/vende-tu-camper') },
       { name: 'nira', url: CN_CONFIG.endpoint + slug }
     ].filter(function (job) { return !submission.sent[job.name]; });
     Promise.all(jobs.map(function (job) {

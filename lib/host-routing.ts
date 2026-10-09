@@ -31,6 +31,7 @@ const PUBLIC_MARKETING_PREFIXES = [
   '/comprar',
   '/vender',
   '/vende-tu-camper.html',
+  '/encuentra-tu-camper.html',
   '/cn-landing',
   '/sobre',
   '/como-funciona',

@@ -147,7 +147,12 @@ export function BuyerLeadEditForm({ leadId, defaultValues, agents, legacySource 
                   <FormItem>
                     <FieldLabel>Email</FieldLabel>
                     <FormControl>
-                      <input type="email" {...field} className={inputCls} />
+                      <input
+                        type="email"
+                        {...field}
+                        value={field.value ?? ''}
+                        className={inputCls}
+                      />
                     </FormControl>
                     <FormMessage className="text-[11px]" />
                   </FormItem>

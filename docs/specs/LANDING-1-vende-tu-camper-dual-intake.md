@@ -2,7 +2,7 @@
 
 | Campo               | Valor                                      |
 | ------------------- | ------------------------------------------ |
-| **Estado**          | IMPLEMENTED                                |
+| **Estado**          | DEPLOYED                                   |
 | **Owner**           | Engineering                                |
 | **Ticket**          | LANDING-1 (solicitud en este chat)         |
 | **Rama / PR**       | `codex/vende-tu-camper-dual-intake` / #191 |
@@ -76,24 +76,24 @@ el envío pendiente requiere intervención. WhatsApp mantiene los datos preparad
 
 ## Criterios de aceptación
 
-- [ ] HTML y todos los recursos responden sin sesión; rutas privadas siguen protegidas.
-- [ ] Formulario desktop y móvil valida pasos, consentimiento y datos numéricos.
-- [ ] Envía a ambos destinos con atribución/event_id; éxito solo tras ambas confirmaciones.
-- [ ] Fallo total/parcial conserva WhatsApp y permite reintentar solo lo pendiente.
-- [ ] Persistencia atómica, datos ausentes null, solicitud pendiente, KPI/nota sin duplicados.
-- [ ] La API rechaza origen distinto, consentimiento ausente, JSON inválido/grande y honeypot.
-- [ ] CI y deployment identificables; distinguir pruebas simuladas de entrega real a Nira.
+- [x] HTML y todos los recursos responden sin sesión; rutas privadas siguen protegidas.
+- [x] Formulario desktop y móvil valida pasos, consentimiento y datos numéricos.
+- [x] Envía a ambos destinos con atribución/event_id; éxito solo tras ambas confirmaciones.
+- [x] Fallo total/parcial conserva WhatsApp y permite reintentar solo lo pendiente.
+- [x] Persistencia atómica, datos ausentes null, solicitud pendiente, KPI/nota sin duplicados.
+- [x] La API rechaza origen distinto, consentimiento ausente, JSON inválido/grande y honeypot.
+- [x] CI y deployment identificables; distinguir pruebas simuladas de entrega real a Nira.
 
 ## Verificación
 
-| Criterio                    | Evidencia prevista                                             | Resultado                                                                        |
-| --------------------------- | -------------------------------------------------------------- | -------------------------------------------------------------------------------- |
-| Routing y API               | Vitest con sesión/Prisma mockeados                             | 41 tests dirigidos pasan                                                         |
-| Persistencia/carreras/cuota | PostgreSQL efímero en GitHub CI                                | CI integration PASS (run 37938538581), PostgreSQL 17 real                        |
-| Formulario y recursos       | Playwright local, desktop/móvil, respuestas interceptadas      | 12 tests desktop/móvil pasan                                                     |
-| Calidad                     | typecheck, lint, unit, check:sdd                               | Tipos y lint correctos; 1661 unitarios pasan; SDD correcto                       |
-| Producción                  | GET recursos, rechazos API sin mutación, deployment            | Pendiente                                                                        |
-| Nira real                   | OPTIONS/CORS y, con autorización específica, solicitud técnica | OPTIONS 200, CORS abierto y POST/Content-Type permitidos; entrega real pendiente |
+| Criterio                    | Evidencia prevista                                             | Resultado                                                                         |
+| --------------------------- | -------------------------------------------------------------- | --------------------------------------------------------------------------------- |
+| Routing y API               | Vitest con sesión/Prisma mockeados                             | 41 tests dirigidos pasan                                                          |
+| Persistencia/carreras/cuota | PostgreSQL efímero en GitHub CI                                | CI integration PASS (run 37938538581), PostgreSQL 17 real                         |
+| Formulario y recursos       | Playwright local, desktop/móvil, respuestas interceptadas      | 12 tests desktop/móvil pasan                                                      |
+| Calidad                     | typecheck, lint, unit, check:sdd                               | Tipos y lint correctos; 1661 unitarios pasan; SDD correcto                        |
+| Producción                  | GET recursos, rechazos API sin mutación, deployment            | Smoke público OK; deployment Ready                                                |
+| Nira real                   | OPTIONS/CORS y, con autorización específica, solicitud técnica | Una prueba autorizada: POST HTTP 200 / ok:true; avisos posteriores no verificados |
 
 ## Rollout, rollback y stop conditions
 
@@ -117,9 +117,9 @@ el envío pendiente requiere intervención. WhatsApp mantiene los datos preparad
 
 ## Cierre
 
-- **Commit:** implementación `26e7b85`.
+- **Commit:** implementación `26e7b85`; squash en main `541a7e8ce2f0350d254564d43d94878f8dfb4ad4`.
 - **PR:** [#191](https://github.com/growthaiconsultant-lab/campernova-crm/pull/191).
-- **CI:** quality, integration y migration-replay PASS en run `37938538581`.
-- **Deployment:** pendiente al registrar esta revisión; la PR enlaza los deployments reales.
-- **Validación:** pendiente; no hay envíos de prueba a producción en esta fase.
+- **CI:** PR final `37938918873` y main `37939851912`: quality, integration, migration-replay y supabase-storage PASS.
+- **Deployment:** `dpl_BQsfSgVP4fvh7DTSLsLAGqX5JxM9` Ready; https://campersnova.com/vende-tu-camper.html.
+- **Validación:** HTML, JS, CSS, fuentes e imágenes 200; MP4 range 206; API inválida 400. Una prueba técnica NO CONTACTAR, autorizada expresamente, aceptada HTTP 200 / ok:true por CRM y Nira. No se verificó la entrega posterior de avisos del proveedor.
 - **Deuda restante:** recepción operativa Nira y tratamiento de timeouts ambiguos del proveedor.

@@ -33,7 +33,7 @@ async function createDeliveryBuyer(
   if (
     existing.some(
       (row) =>
-        row.email.trim().toLowerCase() === buyer.email.toLowerCase() ||
+        row.email?.trim().toLowerCase() === buyer.email.toLowerCase() ||
         phonesMatch(row.phone, buyer.phone)
     )
   ) {

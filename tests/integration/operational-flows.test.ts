@@ -250,7 +250,7 @@ describe('OPS-1 entregas independientes — PostgreSQL real', () => {
     const f = await fixture(),
       request = newBuyerInput(f)
     if (request.recipient.type !== 'newBuyer') throw new Error('fixture')
-    request.recipient.email = f.buyer.email.toUpperCase()
+    request.recipient.email = f.buyer.email!.toUpperCase()
     await expect(create(f, request)).rejects.toThrow('Ya existe una ficha')
     expect(await db.delivery.count({ where: { vehicleId: f.vehicle.id } })).toBe(0)
   })
@@ -267,6 +267,17 @@ describe('OPS-1 entregas independientes — PostgreSQL real', () => {
         where: { deliveryId: result.id, buyerLeadId: delivery.buyerLeadId! },
       })
     ).toBe(1)
+  })
+  it('la entrega tolera compradores existentes sin email y mantiene deduplicación por teléfono', async () => {
+    const f = await fixture(),
+      request = newBuyerInput(f)
+    await db.buyerLead.update({ where: { id: f.buyer.id }, data: { email: null } })
+    if (request.recipient.type !== 'newBuyer') throw new Error('fixture')
+    request.recipient.phone = f.buyer.phone
+    await expect(create(f, request)).rejects.toThrow('Ya existe una ficha')
+    request.recipient.phone = '+34 688 123 789'
+    const result = await create(f, request)
+    expect(result.id).toBeTruthy()
   })
   it('un usuario revocado no crea una ficha de comprador desde la entrega', async () => {
     const f = await fixture(),
