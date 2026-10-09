@@ -296,7 +296,7 @@ jobs:
           assert tables "$tables" 33
           # LANDING-2 adds two nullable consent fields; buyer email becomes nullable without DML.
           assert buyer_email_nullable "$(psql "$PSQL_URL" -tAc "SELECT is_nullable FROM information_schema.columns WHERE table_schema='public' AND table_name='buyer_leads' AND column_name='email'")" YES
-          assert buyer_consent_columns "$(psql "$PSQL_URL" -tAc "SELECT count(*) FROM information_schema.columns WHERE table_schema='public' AND table_name='buyer_leads' AND column_name IN ('gdpr_consent_at','gdpr_consent_ip') AND is_nullable='YES')")" 2
+          assert buyer_consent_columns "$(psql "$PSQL_URL" -tAc "SELECT count(*) FROM information_schema.columns WHERE table_schema='public' AND table_name='buyer_leads' AND column_name IN ('gdpr_consent_at','gdpr_consent_ip') AND is_nullable='YES'")" 2
           assert columns "$columns" 495
           assert enums "$enums" 58
           assert enum_values "$enum_values" 308

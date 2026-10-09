@@ -106,3 +106,12 @@ La prueba real autorizada de vendedores ya se ejecutó; no repetir avisos extern
 - **Deployment:** Pendiente de CI y migración remota. Vercel marca DIRECT_URL como sensitive y no devuelve su valor por CLI; no descargar otros secretos.
 - **Validación:** Playwright Chrome desktop/móvil 22 OK, todos los destinos simulados. No nuevos contactos reales enviados.
 - **Deuda restante:** Sin cola de reenvíos.
+
+### Operación alternativa preparada
+
+El comando scripts/deploy-buyer-landing-migration.ts es de solo lectura por defecto.
+Comprueba identidad, checksums, única migración pendiente y schema antes de cualquier aplicación.
+Una configuración temporal de despliegue Vercel permitiría usar las credenciales existentes
+sin descargarlas. Aplicar en ese build requiere autorización específica como excepción al runbook.
+Production usa --skip-domain para mantener los dominios en la versión anterior hasta el merge.
+El build ordinario y su guard de solo lectura permanecen intactos.
