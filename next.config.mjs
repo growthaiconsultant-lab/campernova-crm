@@ -2,6 +2,12 @@ import { withSentryConfig } from '@sentry/nextjs'
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  async rewrites() {
+    return [
+      { source: '/encuentra-tu-camper', destination: '/encuentra-tu-camper.html' },
+      { source: '/vende-tu-camper', destination: '/vende-tu-camper.html' },
+    ]
+  },
   // Adjuntos operativos de hasta 3 MiB más multipart, bajo el límite de Vercel (4,5 MB).
   experimental: { serverActions: { bodySizeLimit: '4mb' } },
   images: {

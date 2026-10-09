@@ -25,6 +25,7 @@ export default defineConfig({
     env: {
       DATABASE_URL: 'postgresql://test:test@127.0.0.1:5432/landing_test',
       DIRECT_URL: 'postgresql://test:test@127.0.0.1:5432/landing_test',
+      NEXT_PUBLIC_GTM_ID: 'GTM-NK5ZBX8P',
     },
     timeout: 120000,
   },
