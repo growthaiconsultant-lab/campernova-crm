@@ -55,12 +55,18 @@ async function fill(page: Page, slug: string) {
 }
 for (const slug of ['vende-tu-camper', 'encuentra-tu-camper']) {
   for (const extension of ['', '.html']) {
-    test(`public ${slug}${extension} preserves UTM and gates tracking`, async ({ page }) => {
+    test(`public ${slug}${extension} preserves UTM and gates tracking`, async ({
+      page,
+    }, testInfo) => {
       const requests = await intercept(page)
       const response = await page.goto(`/${slug}${extension}?utm_source=instagram&utm_campaign=qa`)
       expect(response!.status()).toBe(200)
       expect(page.url()).toContain(`/${slug}${extension}?utm_source=instagram`)
       await expect(page.locator('#cn-cookies')).toBeVisible()
+      expect((await page.locator('#cn-cookies').boundingBox())!.height).toBeLessThan(
+        page.viewportSize()!.height / 3
+      )
+      await page.screenshot({ path: testInfo.outputPath('cookie-banner.png') })
       expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(
         true
       )

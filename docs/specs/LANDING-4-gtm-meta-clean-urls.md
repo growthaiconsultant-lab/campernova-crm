@@ -95,6 +95,10 @@ Conversion API, anuncios, facturación, nuevos eventos de GTM Lead/Contact, camb
 
 ## Cierre
 
+- Rollout inicial: PR #194, main f643594cbefc98b80f10b02ad4092dc2c0755733, CI 37958483059 y 37959279002 PASS; deployment dpl_e5sLv8msdN3ygsBXR5GhJU59U2w7 READY en campersnova.com. GTM versión 3 publicada, solo etiqueta Meta añadida; recuperación: versión 2.
+- Verificación pública: cuatro URLs 200, 35 assets por página 200, payload vacío rechazado 400; 18 tests desktop/mobile con GTM real y colectores/formularios simulados PASS.
+- Revisión visual posterior: el banner móvil conserva el texto en una columna estrecha junto a los botones y ocupa demasiado alto. Ajuste aprobado dentro del mismo alcance: apilar texto y acciones bajo 600px, subrayar el enlace de información, versionar CSS y comprobar captura/tamaño del aviso. No cambia lógica de consentimiento ni tracking.
+
 - Implementación y pruebas locales completas; etiqueta Meta preparada en GTM como único cambio del workspace, sin publicar todavía. Typecheck y lint PASS.
 - CI / Deployment / versión GTM: pendientes hasta entrega y rollout.
 - Evidencia final posterior a la implementación en la descripción mutable del PR.
