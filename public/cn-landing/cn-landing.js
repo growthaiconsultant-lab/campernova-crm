@@ -225,13 +225,28 @@ var CN_CONFIG = window.CN_CONFIG || {
 
   /* de qué anuncio viene el contacto */
   var origen = {};
+  var attributionKeys = ['utm_source', 'utm_medium', 'utm_campaign', 'utm_content', 'utm_term', 'utm_id', 'campaign_id', 'adset_id', 'ad_id', 'placement'];
+  var originKeys = attributionKeys.concat(['fbclid']);
+  function cleanOrigin(values) {
+    var clean = {};
+    originKeys.forEach(function (k) {
+      var v = values && values[k];
+      if (typeof v !== 'string') return;
+      v = v.replace(/[\u0000-\u001f\u007f]/g, '').trim().slice(0, 200);
+      if (v && v.indexOf('{{') === -1 && v.indexOf('}}') === -1) clean[k] = v;
+    });
+    return clean;
+  }
   try {
     var qs = new URLSearchParams(location.search);
-    ['utm_source', 'utm_medium', 'utm_campaign', 'utm_content', 'utm_term', 'fbclid'].forEach(function (k) {
-      var v = qs.get(k); if (v) v = v.slice(0, 200);
-      if (v) { origen[k] = v; try { sessionStorage.setItem('cn_' + k, v); } catch (e) {} }
-      else { try { var s = sessionStorage.getItem('cn_' + k); if (s) origen[k] = s.slice(0, 200); } catch (e) {} }
-    });
+    var incoming = {}, tagged = false;
+    originKeys.forEach(function (k) { if (qs.has(k)) { tagged = true; incoming[k] = qs.get(k); } });
+    if (tagged) {
+      origen = cleanOrigin(incoming);
+      try { sessionStorage.setItem('cn_attribution_v1', JSON.stringify(origen)); } catch (e) {}
+    } else {
+      try { origen = cleanOrigin(JSON.parse(sessionStorage.getItem('cn_attribution_v1') || '{}')); } catch (e) {}
+    }
   } catch (e) {}
 
   function aviso(msg) { var e = steps[actual].querySelector('.err'); e.textContent = msg; e.classList.remove('on'); void e.offsetWidth; e.classList.add('on'); }
@@ -283,7 +298,7 @@ var CN_CONFIG = window.CN_CONFIG || {
     });
     var o = [];
     Object.keys(origen).forEach(function (k) { o.push(k + '=' + origen[k]); });
-    respuestas.origen = o.length ? o.join(' · ') : 'directo';
+    respuestas.origen = o.length ? o.join(' · ').slice(0, 1500) : 'directo';
     respuestas.pagina = location.pathname;
     return { respuestas: respuestas, resumen: resumen };
   }
@@ -300,7 +315,10 @@ var CN_CONFIG = window.CN_CONFIG || {
       var controller = new AbortController();
       var timeout = setTimeout(function () { controller.abort(); }, 15000);
       var body = Object.assign({}, submission.payload);
-      if (job.name === 'crm') body.gdpr_consent = true;
+      if (job.name === 'crm') {
+        body.gdpr_consent = true;
+        body.respuestas = Object.assign({}, submission.payload.respuestas, { atribucion: submission.attribution });
+      }
       return fetch(job.url, {
         method: 'POST', headers: { 'Content-Type': 'application/json' }, signal: controller.signal,
         body: JSON.stringify(body)
@@ -349,7 +367,9 @@ var CN_CONFIG = window.CN_CONFIG || {
     var eventId = 'cn' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
     d.respuestas.event_id = eventId;
 
-    submission = { payload: { nombre: nombre, contacto: tel, respuestas: d.respuestas, web_url: (form.querySelector('[name=web_url]') || {}).value || '' },
+    var attribution = {};
+    attributionKeys.forEach(function (k) { if (origen[k]) attribution[k] = origen[k]; });
+    submission = { payload: { nombre: nombre, contacto: tel, respuestas: d.respuestas, web_url: (form.querySelector('[name=web_url]') || {}).value || '' }, attribution: attribution,
       eventId: eventId, wa: wa, sent: { crm: false, nira: false }, tracked: false,
       successText: document.getElementById('cn-done').querySelector('p').textContent };
     sendPending();

@@ -17,6 +17,7 @@ vi.mock('@/lib/auth', () => ({ requireAgente: mocks.auth }))
 vi.mock('./leads-filters', () => ({ LeadsFilters: () => null }))
 
 import VendedoresPage from './page'
+import { landingAttributionLine, landingCaptureSelection } from '@/lib/landing/attribution'
 
 function lead(id: string) {
   return {
@@ -30,6 +31,16 @@ function lead(id: string) {
     dealType: null,
     nextActionType: null,
     nextActionDueAt: null,
+    activities: [
+      {
+        agentId: null,
+        content: landingAttributionLine(
+          '/vende-tu-camper.html',
+          { utm_source: 'instagram', utm_campaign: 'qa_seller_campaign' },
+          'directo'
+        ),
+      },
+    ],
   }
 }
 
@@ -49,11 +60,16 @@ describe('seller list', () => {
     }
     expect(html).toContain('Paginación de vendedores superior')
     expect(html).toContain('Paginación de vendedores inferior')
+    expect(html).toContain('Vende tu camper')
+    expect(html).toContain('Instagram')
+    expect(html).toContain('Campaña: qa_seller_campaign')
+    expect(html).not.toContain('__CN_ATTRIBUTION')
     expect(mocks.findMany).toHaveBeenCalledWith(
       expect.objectContaining({
         take: 25,
         skip: 0,
         orderBy: [{ createdAt: 'desc' }, { id: 'asc' }],
+        include: expect.objectContaining({ activities: landingCaptureSelection }),
       })
     )
   })

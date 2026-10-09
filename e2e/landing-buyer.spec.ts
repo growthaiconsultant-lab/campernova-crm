@@ -77,8 +77,86 @@ test('sends original buyer contract without email to both correct destinations',
   expect(answers[0].pagina).toBe('/encuentra-tu-camper.html')
   expect(answers[0].origen).toContain('utm_campaign=compra')
   expect(answers[0].email).toBeUndefined()
+  expect(
+    (received.find((p) => p.gdpr_consent === true)?.respuestas as Record<string, unknown>)
+      .atribucion
+  ).toEqual({ utm_source: 'meta', utm_campaign: 'compra' })
+  expect(
+    (received.find((p) => p.gdpr_consent !== true)?.respuestas as Record<string, unknown>)
+      .atribucion
+  ).toBeUndefined()
   await expect(page.locator('#cn-retry')).toBeHidden()
 })
+for (const visit of [
+  'untagged',
+  'new-campaign',
+  'blank-tags',
+  'unresolved-template',
+  'blocked-storage',
+]) {
+  test(`buyer preserves a coherent campaign snapshot: ${visit}`, async ({ page }) => {
+    let crm: Record<string, unknown> | undefined
+    let nira: Record<string, unknown> | undefined
+    await page.route(CRM, async (r) => {
+      crm = r.request().postDataJSON()
+      await r.fulfill({ json: { ok: true } })
+    })
+    await page.route(NIRA, async (r) => {
+      nira = r.request().postDataJSON()
+      await r.fulfill({ json: { ok: true } })
+    })
+    if (visit === 'blocked-storage')
+      await page.addInitScript(() => {
+        Object.defineProperty(window, 'sessionStorage', {
+          get() {
+            throw new Error('blocked')
+          },
+        })
+      })
+    await page.goto(
+      '/encuentra-tu-camper.html?utm_source=instagram&utm_campaign=qa_old&utm_content=qa_old_ad&ad_id=qa_old_id'
+    )
+    const next =
+      visit === 'new-campaign'
+        ? '?utm_source=facebook&utm_campaign=qa_new&campaign_id=qa_campaign&adset_id=qa_set&ad_id=qa_new_id&placement=feed'
+        : visit === 'blank-tags'
+          ? '?utm_source='
+          : visit === 'unresolved-template'
+            ? '?utm_source=%7B%7Bsite_source_name%7D%7D&ad_id=%7B%7Bad.id%7D%7D'
+            : visit === 'blocked-storage'
+              ? '?utm_source=meta&utm_campaign=qa_storage'
+              : ''
+    await page.goto('/encuentra-tu-camper.html' + next)
+    await fill(page)
+    await page.locator('button[type=submit]').click()
+    await expect(page.locator('#cn-done h3')).toHaveText('¡Recibido!')
+    const answers = crm?.respuestas as Record<string, unknown>
+    const expected =
+      visit === 'new-campaign'
+        ? {
+            utm_source: 'facebook',
+            utm_campaign: 'qa_new',
+            campaign_id: 'qa_campaign',
+            adset_id: 'qa_set',
+            ad_id: 'qa_new_id',
+            placement: 'feed',
+          }
+        : visit === 'untagged'
+          ? {
+              utm_source: 'instagram',
+              utm_campaign: 'qa_old',
+              utm_content: 'qa_old_ad',
+              ad_id: 'qa_old_id',
+            }
+          : visit === 'blocked-storage'
+            ? { utm_source: 'meta', utm_campaign: 'qa_storage' }
+            : {}
+    expect(answers.atribucion).toEqual(expected)
+    const niraAnswers = nira?.respuestas as Record<string, unknown>
+    expect(niraAnswers.atribucion).toBeUndefined()
+    expect(Object.values(niraAnswers).every((v) => typeof v === 'string')).toBe(true)
+  })
+}
 for (const failed of ['crm', 'nira'])
   test(`retries only unconfirmed buyer ${failed}`, async ({ page }) => {
     const calls = { crm: 0, nira: 0 }

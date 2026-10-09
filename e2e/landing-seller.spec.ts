@@ -92,6 +92,14 @@ test('sends both contracts and attribution and waits for both confirmations', as
   const answers = received.map((p) => p.respuestas as Record<string, string>)
   expect(answers[0].event_id).toBe(answers[1].event_id)
   expect(answers[0].origen).toContain('utm_campaign=test')
+  expect(
+    (received.find((p) => p.gdpr_consent === true)?.respuestas as Record<string, unknown>)
+      .atribucion
+  ).toEqual({ utm_source: 'meta', utm_campaign: 'test' })
+  expect(
+    (received.find((p) => p.gdpr_consent !== true)?.respuestas as Record<string, unknown>)
+      .atribucion
+  ).toBeUndefined()
   await expect(page.locator('#cn-retry')).toBeHidden()
   await expect(page.locator('#cn-wa')).toHaveAttribute('href', /wa\.me\/34645639185\?text=/)
 })
@@ -100,17 +108,19 @@ for (const failed of ['crm', 'nira']) {
   test(`retries only ${failed} after partial failure`, async ({ page }) => {
     const count = { crm: 0, nira: 0 }
     const keys: string[] = []
+    const crmBodies: unknown[] = []
     for (const name of ['crm', 'nira'] as const) {
       await page.route(name === 'crm' ? CRM : NIRA, async (route) => {
         count[name]++
         keys.push(route.request().postDataJSON().respuestas.event_id)
+        if (name === 'crm') crmBodies.push(route.request().postDataJSON())
         await route.fulfill({
           status: name === failed && count[name] === 1 ? 503 : 200,
           json: { ok: !(name === failed && count[name] === 1) },
         })
       })
     }
-    await page.goto('/vende-tu-camper.html')
+    await page.goto('/vende-tu-camper.html?utm_source=instagram&utm_campaign=qa_retry&ad_id=qa_ad')
     await fill(page)
     await page.locator('button[type=submit]').click()
     await expect(page.locator('#cn-done h3')).toHaveText('Falta completar el envío')
@@ -118,6 +128,7 @@ for (const failed of ['crm', 'nira']) {
     await expect(page.locator('#cn-done h3')).toHaveText('¡Recibido!')
     expect(count).toEqual(failed === 'crm' ? { crm: 2, nira: 1 } : { crm: 1, nira: 2 })
     expect(new Set(keys).size).toBe(1)
+    if (failed === 'crm') expect(crmBodies[0]).toEqual(crmBodies[1])
   })
 }
 

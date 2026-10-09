@@ -1,6 +1,8 @@
 import Link from 'next/link'
 import { Plus, Clock } from 'lucide-react'
 import { db } from '@/lib/db'
+import { landingCaptureSelection } from '@/lib/landing/attribution'
+import { LandingAttribution } from '@/components/landing-attribution'
 import { requireAgente } from '@/lib/auth'
 import { LeadsFilters } from './leads-filters'
 import { SELLER_DEAL_TYPE_LABELS } from '@/lib/deal-terms'
@@ -179,6 +181,7 @@ export default async function VendedoresPage({ searchParams }: { searchParams: S
     skip: pagination.skip,
     take: SELLERS_PAGE_SIZE,
     include: {
+      activities: landingCaptureSelection,
       agent: { select: { id: true, name: true } },
       vehicle: {
         select: {
@@ -217,6 +220,7 @@ export default async function VendedoresPage({ searchParams }: { searchParams: S
           <div className="mt-0.5 text-[11px] font-medium text-ink3">
             {CANAL_LABELS[l.canal]} · {relativeDays(l.createdAt)}
           </div>
+          <LandingAttribution activities={l.activities} compact />
         </div>
       ),
     },
@@ -362,6 +366,7 @@ export default async function VendedoresPage({ searchParams }: { searchParams: S
                   : 'Sin vehículo'}{' '}
                 · {CANAL_LABELS[l.canal]}
               </div>
+              <LandingAttribution activities={l.activities} compact />
               <div className="mt-2 flex items-center justify-between gap-2">
                 {l.nextActionType && l.nextActionDueAt ? (
                   <span
