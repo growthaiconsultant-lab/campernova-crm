@@ -1,15 +1,15 @@
 # LANDING-1 — Publicar la campaña con entrada en CRM y Nira
 
-| Campo               | Valor                               |
-| ------------------- | ----------------------------------- |
-| **Estado**          | APPROVED                            |
-| **Owner**           | Engineering                         |
-| **Ticket**          | LANDING-1 (solicitud en este chat)  |
-| **Rama / PR**       | `codex/vende-tu-camper-dual-intake` |
-| **Categorías**      | C0, C1, C3, C5, C6, C8              |
-| **Riesgo**          | Alto                                |
-| **Ruta SDD**        | Reforzada                           |
-| **Última revisión** | 2026-10-09                          |
+| Campo               | Valor                                      |
+| ------------------- | ------------------------------------------ |
+| **Estado**          | IMPLEMENTED                                |
+| **Owner**           | Engineering                                |
+| **Ticket**          | LANDING-1 (solicitud en este chat)         |
+| **Rama / PR**       | `codex/vende-tu-camper-dual-intake` / #191 |
+| **Categorías**      | C0, C1, C3, C5, C6, C8                     |
+| **Riesgo**          | Alto                                       |
+| **Ruta SDD**        | Reforzada                                  |
+| **Última revisión** | 2026-10-09                                 |
 
 ## Problema y evidencia
 
@@ -89,7 +89,7 @@ el envío pendiente requiere intervención. WhatsApp mantiene los datos preparad
 | Criterio                    | Evidencia prevista                                             | Resultado                                                                        |
 | --------------------------- | -------------------------------------------------------------- | -------------------------------------------------------------------------------- |
 | Routing y API               | Vitest con sesión/Prisma mockeados                             | 41 tests dirigidos pasan                                                         |
-| Persistencia/carreras/cuota | PostgreSQL efímero en GitHub CI                                | Pendiente                                                                        |
+| Persistencia/carreras/cuota | PostgreSQL efímero en GitHub CI                                | CI integration PASS (run 37938538581), PostgreSQL 17 real                        |
 | Formulario y recursos       | Playwright local, desktop/móvil, respuestas interceptadas      | 12 tests desktop/móvil pasan                                                     |
 | Calidad                     | typecheck, lint, unit, check:sdd                               | Tipos y lint correctos; 1661 unitarios pasan; SDD correcto                       |
 | Producción                  | GET recursos, rechazos API sin mutación, deployment            | Pendiente                                                                        |
@@ -117,6 +117,9 @@ el envío pendiente requiere intervención. WhatsApp mantiene los datos preparad
 
 ## Cierre
 
-- **Commit/PR/CI/Deployment:** pendientes.
+- **Commit:** implementación `26e7b85`.
+- **PR:** [#191](https://github.com/growthaiconsultant-lab/campernova-crm/pull/191).
+- **CI:** quality, integration y migration-replay PASS en run `37938538581`.
+- **Deployment:** pendiente al registrar esta revisión; la PR enlaza los deployments reales.
 - **Validación:** pendiente; no hay envíos de prueba a producción en esta fase.
 - **Deuda restante:** recepción operativa Nira y tratamiento de timeouts ambiguos del proveedor.
