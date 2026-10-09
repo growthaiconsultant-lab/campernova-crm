@@ -40,6 +40,8 @@ export const landingSellerSchema = z
           ),
         km: kilometers,
         prioridad: z.enum([
+          'Venderla pronto',
+          'Sacar el mejor precio',
           'Que se la compren ya',
           'Venderla en depósito por el mejor precio',
           'Solo saber cuánto vale',
