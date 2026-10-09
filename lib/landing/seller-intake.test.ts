@@ -3,6 +3,22 @@ import { landingSellerSchema, landingLeadId } from './seller-intake'
 import { landingPayload } from '@/tests/fixtures/landing-seller'
 
 describe('landing seller input', () => {
+  it.each([
+    'Venderla pronto',
+    'Sacar el mejor precio',
+    'Solo saber cuánto vale',
+    'Que se la compren ya',
+    'Venderla en depósito por el mejor precio',
+  ])('accepts current and cached-page priority %s without changing it', (prioridad) => {
+    const data = landingPayload()
+    data.respuestas.prioridad = prioridad
+    expect(landingSellerSchema.parse(data).respuestas.prioridad).toBe(prioridad)
+  })
+  it('rejects a priority outside the public form contract', () => {
+    const data = landingPayload()
+    data.respuestas.prioridad = 'other'
+    expect(landingSellerSchema.safeParse(data).success).toBe(false)
+  })
   it('normalizes km and keeps the whole make/model without guessing', () => {
     const data = landingSellerSchema.parse(landingPayload())
     expect(data.respuestas.km).toBe(85000)

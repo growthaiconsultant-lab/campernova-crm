@@ -5,7 +5,7 @@ const NIRA = 'https://docs.niraagency.com/api/formulario/campersnova-vende'
 test.beforeEach(async ({ page }) => {
   await page.addInitScript(() => localStorage.setItem('cn_cookie_consent', 'essential'))
 })
-async function fill(page: Page) {
+async function fill(page: Page, priority = 'Solo saber cuánto vale') {
   await page
     .locator('.opts label')
     .filter({ has: page.locator('[name=tipo]') })
@@ -17,8 +17,7 @@ async function fill(page: Page) {
   await page.locator('[data-ir="1"]').click()
   await page
     .locator('.opts label')
-    .filter({ has: page.locator('[name=prioridad]') })
-    .last()
+    .filter({ has: page.locator(`[name=prioridad][value="${priority}"]`) })
     .click()
   await page.locator('[name=nombre]').fill('Prueba técnica')
   await page.locator('[name=telefono]').fill('600000000')
@@ -76,36 +75,39 @@ test('validates vehicle fields and consent before either submission', async ({ p
   expect(calls).toBe(0)
 })
 
-test('sends both contracts and attribution and waits for both confirmations', async ({ page }) => {
-  const received: Record<string, unknown>[] = []
-  await page.route(CRM, async (route) => {
-    received.push(route.request().postDataJSON())
-    await route.fulfill({ json: { ok: true } })
+for (const priority of ['Venderla pronto', 'Sacar el mejor precio']) {
+  test(`sends priority ${priority} to both destinations with attribution`, async ({ page }) => {
+    const received: Record<string, unknown>[] = []
+    await page.route(CRM, async (route) => {
+      received.push(route.request().postDataJSON())
+      await route.fulfill({ json: { ok: true } })
+    })
+    await page.route(NIRA, async (route) => {
+      received.push(route.request().postDataJSON())
+      await route.fulfill({ json: { ok: true } })
+    })
+    await page.goto('/vende-tu-camper.html?utm_source=meta&utm_campaign=test')
+    await fill(page, priority)
+    await page.locator('button[type=submit]').click()
+    await expect(page.locator('#cn-done h3')).toHaveText('¡Recibido!')
+    expect(received).toHaveLength(2)
+    expect(received.filter((p) => p.gdpr_consent === true)).toHaveLength(1)
+    const answers = received.map((p) => p.respuestas as Record<string, string>)
+    expect(answers.map((a) => a.prioridad)).toEqual([priority, priority])
+    expect(answers[0].event_id).toBe(answers[1].event_id)
+    expect(answers[0].origen).toContain('utm_campaign=test')
+    expect(
+      (received.find((p) => p.gdpr_consent === true)?.respuestas as Record<string, unknown>)
+        .atribucion
+    ).toEqual({ utm_source: 'meta', utm_campaign: 'test' })
+    expect(
+      (received.find((p) => p.gdpr_consent !== true)?.respuestas as Record<string, unknown>)
+        .atribucion
+    ).toBeUndefined()
+    await expect(page.locator('#cn-retry')).toBeHidden()
+    await expect(page.locator('#cn-wa')).toHaveAttribute('href', /wa\.me\/34645639185\?text=/)
   })
-  await page.route(NIRA, async (route) => {
-    received.push(route.request().postDataJSON())
-    await route.fulfill({ json: { ok: true } })
-  })
-  await page.goto('/vende-tu-camper.html?utm_source=meta&utm_campaign=test')
-  await fill(page)
-  await page.locator('button[type=submit]').click()
-  await expect(page.locator('#cn-done h3')).toHaveText('¡Recibido!')
-  expect(received).toHaveLength(2)
-  expect(received.filter((p) => p.gdpr_consent === true)).toHaveLength(1)
-  const answers = received.map((p) => p.respuestas as Record<string, string>)
-  expect(answers[0].event_id).toBe(answers[1].event_id)
-  expect(answers[0].origen).toContain('utm_campaign=test')
-  expect(
-    (received.find((p) => p.gdpr_consent === true)?.respuestas as Record<string, unknown>)
-      .atribucion
-  ).toEqual({ utm_source: 'meta', utm_campaign: 'test' })
-  expect(
-    (received.find((p) => p.gdpr_consent !== true)?.respuestas as Record<string, unknown>)
-      .atribucion
-  ).toBeUndefined()
-  await expect(page.locator('#cn-retry')).toBeHidden()
-  await expect(page.locator('#cn-wa')).toHaveAttribute('href', /wa\.me\/34645639185\?text=/)
-})
+}
 
 for (const failed of ['crm', 'nira']) {
   test(`retries only ${failed} after partial failure`, async ({ page }) => {
