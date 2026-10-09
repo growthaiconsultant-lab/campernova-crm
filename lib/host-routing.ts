@@ -30,6 +30,8 @@ const BACKOFFICE_PREFIXES = [
 const PUBLIC_MARKETING_PREFIXES = [
   '/comprar',
   '/vender',
+  '/vende-tu-camper.html',
+  '/cn-landing',
   '/sobre',
   '/como-funciona',
   '/contacto',
