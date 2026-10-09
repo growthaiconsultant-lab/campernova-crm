@@ -12,11 +12,13 @@ describe('campaign public routes', () => {
   })
   it.each([
     '/vende-tu-camper.html',
+    '/encuentra-tu-camper.html',
     '/cn-landing/cn-landing.js',
     '/cn-landing/cn-landing.css',
     '/cn-landing/fonts/Inter-latin.woff2',
     '/cn-landing/media/v-sprinter.mp4',
     '/api/landing/vende-tu-camper',
+    '/api/landing/encuentra-tu-camper',
   ])('serves %s without an auth lookup', async (path) => {
     const response = await middleware(new NextRequest(`https://campersnova.com${path}`))
     expect(response.headers.get('x-middleware-next')).toBe('1')

@@ -122,9 +122,14 @@ export function BuyerLeadForm() {
               name="email"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Email *</FormLabel>
+                  <FormLabel>Email (opcional)</FormLabel>
                   <FormControl>
-                    <Input type="email" placeholder="correo@ejemplo.com" {...field} />
+                    <Input
+                      type="email"
+                      placeholder="correo@ejemplo.com"
+                      {...field}
+                      value={field.value ?? ''}
+                    />
                   </FormControl>
                   <FormMessage />
                 </FormItem>

@@ -182,8 +182,8 @@ jobs:
           count=$(psql "$PSQL_URL" -tAc "SELECT count(*) FROM _prisma_migrations WHERE finished_at IS NOT NULL")
           names=$(psql "$PSQL_URL" -tAc "SELECT string_agg(migration_name, ',' ORDER BY migration_name) FROM _prisma_migrations WHERE finished_at IS NOT NULL")
           echo "migraciones aplicadas: $count · nombres: $names"
-          test "$count" = "17" || { echo "esperado 17 migraciones aplicadas, incluidas las tres expansiones OPS-1"; exit 1; }
-          test "$names" = "000000000000_squashed_migrations,20260712000000_add_versioned_document_model,20260719120000_add_lead_archiving_model,20260720000000_add_calendar_event_commitment,20260721100000_add_delivery_offer_link_expand,20260721200000_make_delivery_offer_link_required,20260726000000_add_vehicle_entry_foundations,20260726120000_add_official_entry_activity_and_inspection_index,20260727000000_add_valuation_purpose_and_attempts,20260728130000_cap1_business_fields_nullable,20260729130000_add_photo_category_and_unpublish,20260805160000_perm3_status_corrections,20260907150000_add_seller_intake_admission,20260907184500_preserve_operational_web_intakes,20260929120000_expand_typed_manual_deliveries,20260929130000_add_delivery_operation_keys,20260929140000_expand_operational_document_targets" || { echo "conjunto u orden de migraciones inesperado"; exit 1; }
+          test "$count" = "18" || { echo "esperado 18 migraciones aplicadas, incluida la expansión de compradores LANDING-2"; exit 1; }
+          test "$names" = "000000000000_squashed_migrations,20260712000000_add_versioned_document_model,20260719120000_add_lead_archiving_model,20260720000000_add_calendar_event_commitment,20260721100000_add_delivery_offer_link_expand,20260721200000_make_delivery_offer_link_required,20260726000000_add_vehicle_entry_foundations,20260726120000_add_official_entry_activity_and_inspection_index,20260727000000_add_valuation_purpose_and_attempts,20260728130000_cap1_business_fields_nullable,20260729130000_add_photo_category_and_unpublish,20260805160000_perm3_status_corrections,20260907150000_add_seller_intake_admission,20260907184500_preserve_operational_web_intakes,20260929120000_expand_typed_manual_deliveries,20260929130000_add_delivery_operation_keys,20260929140000_expand_operational_document_targets,20261009090000_expand_buyer_landing_contact" || { echo "conjunto u orden de migraciones inesperado"; exit 1; }
 
       - name: Prisma migrate status (must be up to date)
         run: pnpm prisma migrate status
@@ -294,7 +294,10 @@ jobs:
           assert offer_id_nullable "$(psql "$PSQL_URL" -tAc "SELECT is_nullable FROM information_schema.columns WHERE table_schema='public' AND table_name='deliveries' AND column_name='offer_id'")" YES
           assert delivery_recipient_check "$(psql "$PSQL_URL" -tAc "SELECT count(*) FROM pg_constraint WHERE conname='deliveries_kind_recipient_check' AND convalidated")" 1
           assert tables "$tables" 33
-          assert columns "$columns" 493
+          # LANDING-2 adds two nullable consent fields; buyer email becomes nullable without DML.
+          assert buyer_email_nullable "$(psql "$PSQL_URL" -tAc "SELECT is_nullable FROM information_schema.columns WHERE table_schema='public' AND table_name='buyer_leads' AND column_name='email'")" YES
+          assert buyer_consent_columns "$(psql "$PSQL_URL" -tAc "SELECT count(*) FROM information_schema.columns WHERE table_schema='public' AND table_name='buyer_leads' AND column_name IN ('gdpr_consent_at','gdpr_consent_ip') AND is_nullable='YES')")" 2
+          assert columns "$columns" 495
           assert enums "$enums" 58
           assert enum_values "$enum_values" 308
           assert foreign_keys "$fks" 82

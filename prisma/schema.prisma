@@ -882,7 +882,9 @@ model VehicleValuationAttempt {
 model BuyerLead {
   id                     String              @id @default(cuid())
   name                   String
-  email                  String
+  email                  String?
+  gdprConsentAt          DateTime?           @map("gdpr_consent_at")
+  gdprConsentIp          String?             @map("gdpr_consent_ip")
   phone                  String
   agentId                String?             @map("agent_id")
   vehicleType            VehicleType?        @map("vehicle_type")
