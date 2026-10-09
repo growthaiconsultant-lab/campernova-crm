@@ -2,6 +2,9 @@ import { test, expect, type Page } from '@playwright/test'
 
 const CRM = '**/api/landing/vende-tu-camper'
 const NIRA = 'https://docs.niraagency.com/api/formulario/campersnova-vende'
+test.beforeEach(async ({ page }) => {
+  await page.addInitScript(() => localStorage.setItem('cn_cookie_consent', 'essential'))
+})
 async function fill(page: Page) {
   await page
     .locator('.opts label')

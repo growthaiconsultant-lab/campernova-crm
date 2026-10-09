@@ -1,4 +1,5 @@
 import type { Metadata } from 'next'
+import Script from 'next/script'
 import {
   Inter,
   Fraunces,
@@ -86,6 +87,9 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="es">
+      <head>
+        <Script src="/cn-landing/cn-consent.js?v=69" strategy="beforeInteractive" />
+      </head>
       <body
         className={`${inter.variable} ${fraunces.variable} ${jetbrainsMono.variable} ${cormorant.variable} ${crmFont.variable} min-h-screen font-sans antialiased`}
       >

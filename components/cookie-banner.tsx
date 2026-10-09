@@ -12,15 +12,28 @@ export function CookieBanner() {
   const [visible, setVisible] = useState(false)
 
   useEffect(() => {
-    try {
-      const stored = localStorage.getItem(CONSENT_KEY)
-      if (!stored) setVisible(true)
-    } catch {
-      // localStorage no disponible (SSR guard, modo privado, etc.)
+    const sync = () => {
+      if (window.CNConsent) {
+        setVisible(window.CNConsent.get() === null)
+        return
+      }
+      try {
+        setVisible(!localStorage.getItem(CONSENT_KEY))
+      } catch {
+        setVisible(true)
+      }
     }
+    sync()
+    window.addEventListener('cn:consent-ui', sync)
+    return () => window.removeEventListener('cn:consent-ui', sync)
   }, [])
 
   const accept = (value: ConsentValue) => {
+    if (window.CNConsent) {
+      window.CNConsent.set(value)
+      setVisible(false)
+      return
+    }
     try {
       localStorage.setItem(CONSENT_KEY, value)
       window.dispatchEvent(new CustomEvent(CONSENT_EVENT, { detail: value }))
@@ -44,8 +57,9 @@ export function CookieBanner() {
             <p>
               Usamos cookies propias <strong className="text-white">técnicas</strong> (necesarias
               para el funcionamiento del sitio) y <strong className="text-white">analíticas</strong>{' '}
-              (PostHog y Google Analytics, para mejorar el servicio). Puedes aceptar todas o solo
-              las esenciales.{' '}
+              (PostHog y Google Analytics, para mejorar el servicio) y{' '}
+              <strong className="text-white">publicitarias</strong> (Meta, para medir nuestros
+              anuncios). Puedes aceptar todas o solo las esenciales.{' '}
               <Link
                 href="/cookies"
                 className="text-[#b59e7d] underline underline-offset-2 hover:text-[#b59e7d]/80"

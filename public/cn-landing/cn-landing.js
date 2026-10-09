@@ -5,7 +5,7 @@ window.cnOK = true;
    CONFIGURACIÓN (lo único que hay que tocar):
    - endpoint: servidor de formularios de Nira.
    - crmEndpoint: entrada pública del CRM. Ambos destinos deben confirmar el envío.
-   - pixel: ID del píxel de Meta de Campers Nova. Vacío = no se carga nada y no sale aviso de cookies.
+   - pixel: mantener vacío. GTM es el único cargador del píxel de Meta.
    - whatsapp: número al que se abre WhatsApp después de enviar (o si el envío falla). */
 var CN_CONFIG = window.CN_CONFIG || {
   endpoint: 'https://docs.niraagency.com/api/formulario/',
@@ -91,7 +91,7 @@ var CN_CONFIG = window.CN_CONFIG || {
   /* WhatsApp y teléfono también son contactos: se miden como Contact en Meta */
   document.addEventListener('click', function (e) {
     var a = e.target.closest('a[href*="wa.me"],a[href^="tel:"]');
-    if (a && window.fbq) window.fbq('track', 'Contact', { content_name: (document.getElementById('cn-form') || {}).getAttribute ? document.getElementById('cn-form').getAttribute('data-slug') : '' });
+    if (a && window.CNConsent) window.CNConsent.trackMeta('track', 'Contact', { content_name: (document.getElementById('cn-form') || {}).getAttribute ? document.getElementById('cn-form').getAttribute('data-slug') : '' });
   });
 
   /* filtros de la rejilla de vehículos (como las pestañas de la plantilla) */
@@ -124,7 +124,7 @@ var CN_CONFIG = window.CN_CONFIG || {
         notas.forEach(function (o) { if (o !== n && o._au && !o._au.paused) { o._au.pause(); o.classList.remove('sonando'); } });
         var pr = au.play(); if (pr && pr.catch) pr.catch(function () {});
         n.classList.add('sonando');
-        if (window.fbq) window.fbq('trackCustom', 'EscucharNota', { quien: n.querySelector('b').textContent });
+        if (window.CNConsent) window.CNConsent.trackMeta('trackCustom', 'EscucharNota', { quien: n.querySelector('b').textContent });
       } else { au.pause(); n.classList.remove('sonando'); }
     });
   });
@@ -299,7 +299,8 @@ var CN_CONFIG = window.CN_CONFIG || {
     var o = [];
     Object.keys(origen).forEach(function (k) { o.push(k + '=' + origen[k]); });
     respuestas.origen = o.length ? o.join(' · ').slice(0, 1500) : 'directo';
-    respuestas.pagina = location.pathname;
+    respuestas.pagina = location.pathname === '/encuentra-tu-camper' ? '/encuentra-tu-camper.html'
+      : location.pathname === '/vende-tu-camper' ? '/vende-tu-camper.html' : location.pathname;
     return { respuestas: respuestas, resumen: resumen };
   }
 
@@ -339,9 +340,8 @@ var CN_CONFIG = window.CN_CONFIG || {
       retry.hidden = ok; retry.disabled = false; retry.textContent = 'Reintentar envío';
       document.getElementById('cn-wa').href = submission.wa;
       hecho.classList.add('on');
-      if ((submission.sent.crm || submission.sent.nira) && !submission.tracked) {
-        submission.tracked = true;
-        if (window.fbq) window.fbq('track', 'Lead', { content_name: slug }, { eventID: submission.eventId });
+      if ((submission.sent.crm || submission.sent.nira) && !submission.tracked && window.CNConsent) {
+        submission.tracked = window.CNConsent.trackMeta('track', 'Lead', { content_name: slug }, { eventID: submission.eventId });
       }
       var fj = document.querySelector('.fijo'); if (fj) fj.remove();
       if (form.getBoundingClientRect().top < 70) form.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -383,29 +383,17 @@ var CN_CONFIG = window.CN_CONFIG || {
     window.addEventListener('scroll', function () { fijo.classList.toggle('on', !visto && window.scrollY > 400); }, { passive: true });
   }
 
-  /* píxel de Meta: solo con ID y solo si aceptan cookies */
-  if (CN_CONFIG.pixel) {
-    var KEY = 'cn_consent';
-    var cargar = function () {
-      !function (f, b, e, v, n, t, s) { if (f.fbq) return; n = f.fbq = function () { n.callMethod ? n.callMethod.apply(n, arguments) : n.queue.push(arguments); }; if (!f._fbq) f._fbq = n; n.push = n; n.loaded = !0; n.version = '2.0'; n.queue = []; t = b.createElement(e); t.async = !0; t.src = v; s = b.getElementsByTagName(e)[0]; s.parentNode.insertBefore(t, s); }(window, document, 'script', 'https://connect.facebook.net/en_US/fbevents.js');
-      window.fbq('init', CN_CONFIG.pixel);
-      window.fbq('track', 'PageView');
-    };
-    var c = null; try { c = localStorage.getItem(KEY); } catch (e) {}
-    if (c === 'si') cargar();
-    else if (c !== 'no') {
-      var banner = document.getElementById('cn-cookies');
-      if (banner) {
-        banner.classList.add('on');
-        banner.addEventListener('click', function (e) {
-          var b = e.target.closest('[data-consent]'); if (!b) return;
-          var v = b.getAttribute('data-consent');
-          try { localStorage.setItem(KEY, v); } catch (er) {}
-          banner.classList.remove('on');
-          if (v === 'si') cargar();
-        });
-      }
-    }
+  /* El mismo consentimiento que la web, aunque el píxel local esté vacío. */
+  var banner = document.getElementById('cn-cookies');
+  if (banner && window.CNConsent) {
+    function syncBanner() { banner.classList.toggle('on', window.CNConsent.get() === null); }
+    syncBanner();
+    window.addEventListener('cn:consent-ui', syncBanner);
+    banner.addEventListener('click', function (e) {
+      var b = e.target.closest('[data-consent]'); if (!b) return;
+      window.CNConsent.set(b.getAttribute('data-consent') === 'si' ? 'all' : 'essential');
+      syncBanner();
+    });
   }
 })();
 

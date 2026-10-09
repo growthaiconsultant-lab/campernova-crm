@@ -1,0 +1,20 @@
+<!-- GTM-NK5ZBX8P · Custom HTML · All Pages · Once per page. No Lead/Contact tags. -->
+<script>
+(function (w, d) {
+  if (!w.CNConsent || !w.CNConsent.isAllowed() || w.__cnMetaPixelInitialized) return;
+  w.__cnMetaPixelInitialized = true;
+  !function (f, b, e, v, n, t, s) {
+    if (f.fbq) return;
+    n = f.fbq = function () { n.callMethod ? n.callMethod.apply(n, arguments) : n.queue.push(arguments); };
+    if (!f._fbq) f._fbq = n;
+    n.push = n; n.loaded = true; n.version = '2.0'; n.queue = [];
+    t = b.createElement(e); t.async = true; t.src = v;
+    s = b.getElementsByTagName(e)[0]; s.parentNode.insertBefore(t, s);
+  }(w, d, 'script', 'https://connect.facebook.net/en_US/fbevents.js');
+  w.fbq('consent', 'grant');
+  w.fbq('set', 'autoConfig', false, '1409201494758945');
+  w.fbq('init', '1409201494758945');
+  w.fbq('track', 'PageView');
+  w.CNConsent.flushMeta();
+})(window, document);
+</script>

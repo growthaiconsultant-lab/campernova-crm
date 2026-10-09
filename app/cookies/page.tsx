@@ -11,7 +11,7 @@ export const metadata: Metadata = pageMetadata({
 
 export default function CookiesPage() {
   return (
-    <LegalLayout title="Política de Cookies" lastUpdated="Mayo 2026">
+    <LegalLayout title="Política de Cookies" lastUpdated="Octubre 2026">
       <section>
         <h2 className="mb-3 text-xl font-semibold text-foreground">1. ¿Qué son las cookies?</h2>
         <p className="text-muted-foreground">
@@ -35,14 +35,25 @@ export default function CookiesPage() {
             </thead>
             <tbody className="divide-y divide-border">
               <tr>
+                <td className="px-4 py-3 font-mono text-xs text-muted-foreground">_fbp (Meta)</td>
+                <td className="px-4 py-3 text-muted-foreground">Publicitaria</td>
+                <td className="px-4 py-3 text-muted-foreground">
+                  Medición de visitas y conversiones de anuncios mediante el píxel de Meta, cargado
+                  desde Google Tag Manager después de aceptar todas.
+                </td>
+                <td className="px-4 py-3 text-muted-foreground">Según la configuración de Meta</td>
+              </tr>
+              <tr>
                 <td className="px-4 py-3 font-mono text-xs text-muted-foreground">
                   cn_cookie_consent
                 </td>
                 <td className="px-4 py-3 text-muted-foreground">Técnica</td>
                 <td className="px-4 py-3 text-muted-foreground">
-                  Guarda tu preferencia sobre cookies analíticas
+                  Guarda tu preferencia sobre cookies analíticas y publicitarias
                 </td>
-                <td className="px-4 py-3 text-muted-foreground">1 año</td>
+                <td className="px-4 py-3 text-muted-foreground">
+                  Hasta restablecer tus preferencias
+                </td>
               </tr>
               <tr className="bg-muted/20">
                 <td className="px-4 py-3 font-mono text-xs text-muted-foreground">
@@ -90,7 +101,7 @@ export default function CookiesPage() {
         </div>
         <p className="mt-3 text-xs text-muted-foreground">
           Las cookies técnicas son necesarias para el funcionamiento del sitio y no requieren
-          consentimiento. Las cookies analíticas solo se activan si aceptas su uso.
+          consentimiento. Las cookies analíticas y publicitarias solo se activan si aceptas todas.
         </p>
       </section>
 

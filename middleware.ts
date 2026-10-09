@@ -70,7 +70,10 @@ export async function middleware(request: NextRequest) {
     return NextResponse.next({ request })
   }
 
-  const isPublic = PUBLIC_PATHS.some((p) => pathname === p || pathname.startsWith(`${p}/`))
+  const isPublic =
+    pathname === '/vende-tu-camper' ||
+    pathname === '/encuentra-tu-camper' ||
+    PUBLIC_PATHS.some((p) => pathname === p || pathname.startsWith(`${p}/`))
 
   // Las rutas públicas (landing, /comprar, /vender, robots, sitemap…) no necesitan
   // consultar Supabase Auth. Saltar esa llamada de red evita el cold-start del

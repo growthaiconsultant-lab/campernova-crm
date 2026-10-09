@@ -11,6 +11,8 @@ describe('campaign public routes', () => {
     mocks.updateSession.mockResolvedValue({ supabaseResponse: NextResponse.next(), user: null })
   })
   it.each([
+    '/vende-tu-camper',
+    '/encuentra-tu-camper',
     '/vende-tu-camper.html',
     '/encuentra-tu-camper.html',
     '/cn-landing/cn-landing.js',
@@ -24,22 +26,29 @@ describe('campaign public routes', () => {
     expect(response.headers.get('x-middleware-next')).toBe('1')
     expect(mocks.updateSession).not.toHaveBeenCalled()
   })
-  it.each(['/vendedores', '/api/landing/other', '/cn-landing-private/file.js', '/private.html'])(
-    'keeps %s protected',
-    async (path) => {
-      expect((await middleware(new NextRequest(`https://campersnova.com${path}`))).status).toBe(307)
-      expect(mocks.updateSession).toHaveBeenCalledOnce()
-    }
-  )
-  it('redirects CRM campaign pages to the public host preserving attribution', async () => {
+  it.each([
+    '/vendedores',
+    '/api/landing/other',
+    '/cn-landing-private/file.js',
+    '/private.html',
+    '/vende-tu-camper-private',
+    '/encuentra-tu-camper/private',
+  ])('keeps %s protected', async (path) => {
+    expect((await middleware(new NextRequest(`https://campersnova.com${path}`))).status).toBe(307)
+    expect(mocks.updateSession).toHaveBeenCalledOnce()
+  })
+  it.each([
+    '/vende-tu-camper.html',
+    '/encuentra-tu-camper.html',
+    '/vende-tu-camper',
+    '/encuentra-tu-camper',
+  ])('redirects CRM %s to the public host preserving attribution', async (path) => {
     vi.stubEnv('CRM_HOST', 'crm.campersnova.com')
     const response = await middleware(
-      new NextRequest('https://crm.campersnova.com/vende-tu-camper.html?utm_source=ad', {
+      new NextRequest(`https://crm.campersnova.com${path}?utm_source=ad`, {
         headers: { host: 'crm.campersnova.com' },
       })
     )
-    expect(response.headers.get('location')).toBe(
-      'https://campersnova.com/vende-tu-camper.html?utm_source=ad'
-    )
+    expect(response.headers.get('location')).toBe(`https://campersnova.com${path}?utm_source=ad`)
   })
 })
