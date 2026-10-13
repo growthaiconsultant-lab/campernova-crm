@@ -3,9 +3,15 @@ import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest'
 import type { PrismaClient } from '@prisma/client'
 import { createGuardedTestPrisma } from './db'
 import { landingBuyerPayload } from '../fixtures/landing-buyer'
-import { landingBuyerSchema, landingBuyerId, saveLandingBuyer } from '@/lib/landing/buyer-intake'
+import {
+  landingBuyerSchema,
+  landingBuyerId,
+  saveLandingBuyer,
+  META_BUYER_HOURLY_LIMIT,
+} from '@/lib/landing/buyer-intake'
 import { LandingRateLimitError } from '@/lib/landing/seller-intake'
 import { attributionFromActivities, landingCaptureSelection } from '@/lib/landing/attribution'
+import { KPI_EVENTS } from '@/lib/kpi/events'
 
 let db: PrismaClient, other: PrismaClient
 const ids: string[] = []
@@ -27,6 +33,68 @@ function input() {
   return p
 }
 describe('buyer landing · PostgreSQL real', () => {
+  function metaInput() {
+    const p = input()
+    p.respuestas.atribucion = {
+      utm_source: 'facebook',
+      utm_medium: 'lead_ads',
+      utm_campaign: 'CN · Encuentra tu camper · oct 2026',
+    }
+    ids.push(landingBuyerId(p))
+    return p
+  }
+  it('stores authenticated Lead Ads as META once under simultaneous retries, without relay consent IP', async () => {
+    const p = metaInput()
+    await Promise.all([
+      saveLandingBuyer(db, p, '192.0.2.90', new Date(), { leadAds: true }),
+      saveLandingBuyer(other, p, '192.0.2.90', new Date(), { leadAds: true }),
+    ])
+    const id = landingBuyerId(p)
+    const lead = await db.buyerLead.findUniqueOrThrow({
+      where: { id },
+      include: { activities: true },
+    })
+    expect(lead).toMatchObject({ source: 'META', status: 'NUEVO', gdprConsentIp: null })
+    expect(lead.activities).toHaveLength(1)
+    expect(attributionFromActivities(lead.activities)?.params).toEqual(p.respuestas.atribucion)
+    const events = await db.kpiEvent.findMany({ where: { entityId: id } })
+    expect(events).toHaveLength(1)
+    expect(events[0].metadata).toMatchObject({ intake: 'meta_lead_ads', buyerSource: 'META' })
+  })
+  it('serializes the separate relay quota and lets confirmed retries succeed when full', async () => {
+    const now = new Date()
+    const seeds = Array.from({ length: META_BUYER_HOURLY_LIMIT - 1 }, () => {
+      const entityId = `relay-quota-${randomUUID()}`
+      ids.push(entityId)
+      return {
+        eventName: KPI_EVENTS.BUYER_CREATED,
+        entityType: 'buyer',
+        entityId,
+        metadata: { intake: 'meta_lead_ads' },
+        createdAt: now,
+      }
+    })
+    await db.kpiEvent.createMany({ data: seeds })
+    const a = metaInput(),
+      b = metaInput()
+    const outcomes = await Promise.allSettled([
+      saveLandingBuyer(db, a, null, now, { leadAds: true }),
+      saveLandingBuyer(other, b, null, now, { leadAds: true }),
+    ])
+    expect(outcomes.filter((r) => r.status === 'fulfilled')).toHaveLength(1)
+    expect(
+      (outcomes.find((r) => r.status === 'rejected') as PromiseRejectedResult).reason
+    ).toBeInstanceOf(LandingRateLimitError)
+    const accepted = outcomes[0].status === 'fulfilled' ? a : b
+    const rejected = outcomes[0].status === 'fulfilled' ? b : a
+    await expect(
+      saveLandingBuyer(db, accepted, null, now, { leadAds: true })
+    ).resolves.toBeUndefined()
+    expect(await db.buyerLead.count({ where: { id: landingBuyerId(rejected) } })).toBe(0)
+    expect(await db.kpiEvent.count({ where: { entityId: landingBuyerId(rejected) } })).toBe(0)
+    // Browser quota is independent even while the relay quota is full.
+    await expect(saveLandingBuyer(db, input(), '192.0.2.91', now)).resolves.toBeUndefined()
+  })
   it('stores missing email and imprecise preferences as null with consent and one KPI', async () => {
     const p = input(),
       now = new Date()

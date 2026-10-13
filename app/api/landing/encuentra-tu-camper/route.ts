@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 import { landingBuyerSchema, saveLandingBuyer } from '@/lib/landing/buyer-intake'
 import { LandingRateLimitError } from '@/lib/landing/seller-intake'
+import { authenticateBuyerLeadAds } from '@/lib/landing/lead-ads-auth'
 
 export const runtime = 'nodejs'
 
@@ -13,7 +14,12 @@ const json = (body: object, status = 200) =>
   })
 
 export async function POST(request: NextRequest) {
-  if (request.headers.get('origin') !== new URL(request.url).origin) {
+  const authorization = request.headers.get('authorization')
+  const leadAds = authorization !== null
+  if (leadAds && !authenticateBuyerLeadAds(authorization)) {
+    return json({ ok: false, error: 'unauthorized' }, 401)
+  }
+  if (!leadAds && request.headers.get('origin') !== new URL(request.url).origin) {
     return json({ ok: false, error: 'origin' }, 403)
   }
   if (!request.headers.get('content-type')?.toLowerCase().startsWith('application/json')) {
@@ -41,12 +47,24 @@ export async function POST(request: NextRequest) {
   }
   const parsed = landingBuyerSchema.safeParse(body)
   if (!parsed.success) return json({ ok: false, error: 'invalid_data' }, 400)
+  if (
+    leadAds &&
+    (parsed.data.respuestas.atribucion?.utm_source !== 'facebook' ||
+      parsed.data.respuestas.atribucion?.utm_medium !== 'lead_ads')
+  ) {
+    return json({ ok: false, error: 'invalid_data' }, 400)
+  }
   const ip =
     request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ??
     request.headers.get('x-real-ip') ??
     null
   try {
-    await saveLandingBuyer(db, parsed.data, ip)
+    if (leadAds) {
+      // A relay's IP is not the contact's consent IP. Its quota is independent of browser traffic.
+      await saveLandingBuyer(db, parsed.data, null, new Date(), { leadAds: true })
+    } else {
+      await saveLandingBuyer(db, parsed.data, ip)
+    }
     return json({ ok: true })
   } catch (error) {
     if (error instanceof LandingRateLimitError) return json({ ok: false, error: 'rate_limit' }, 429)
