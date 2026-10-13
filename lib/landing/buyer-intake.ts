@@ -51,6 +51,7 @@ export const landingBuyerSchema = z
   .refine((v) => v.nombre === v.respuestas.nombre && v.contacto === v.respuestas.telefono)
 
 export type LandingBuyerInput = z.infer<typeof landingBuyerSchema>
+export const META_BUYER_HOURLY_LIMIT = 300
 export function landingBuyerId(input: LandingBuyerInput): string {
   return (
     'landing_buyer_' + createHash('sha256').update(JSON.stringify(input)).digest('hex').slice(0, 40)
@@ -61,7 +62,8 @@ export async function saveLandingBuyer(
   client: PrismaClient,
   input: LandingBuyerInput,
   ip: string | null,
-  now = new Date()
+  now = new Date(),
+  options: { leadAds?: boolean } = {}
 ): Promise<void> {
   const id = landingBuyerId(input)
   await client.$transaction(
@@ -69,7 +71,19 @@ export async function saveLandingBuyer(
       const lockKey = `landing:${id}`
       await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${lockKey}, 0))`
       if (await tx.buyerLead.findUnique({ where: { id }, select: { id: true } })) return
-      if (ip) {
+      if (options.leadAds) {
+        const quotaKey = 'landing:buyer:meta-lead-ads'
+        await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${quotaKey}, 0))`
+        const recent = await tx.kpiEvent.count({
+          where: {
+            eventName: KPI_EVENTS.BUYER_CREATED,
+            metadata: { path: ['intake'], equals: 'meta_lead_ads' },
+            createdAt: { gte: new Date(now.getTime() - 3600000) },
+          },
+        })
+        if (recent >= META_BUYER_HOURLY_LIMIT) throw new LandingRateLimitError()
+      }
+      if (ip && !options.leadAds) {
         const quotaKey = `landing:buyer:ip:${ip}`
         await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${quotaKey}, 0))`
         const recent = await tx.buyerLead.count({
@@ -101,7 +115,7 @@ export async function saveLandingBuyer(
           source,
           status: 'NUEVO',
           gdprConsentAt: now,
-          gdprConsentIp: ip,
+          gdprConsentIp: options.leadAds ? null : ip,
           vehicleType:
             a.tipo === 'Autocaravana'
               ? 'AUTOCARAVANA'
@@ -153,7 +167,11 @@ export async function saveLandingBuyer(
           entityType: 'buyer',
           entityId: id,
           source: 'system',
-          metadata: { campaign: 'encuentra-tu-camper', buyerSource: source },
+          metadata: {
+            campaign: 'encuentra-tu-camper',
+            buyerSource: source,
+            ...(options.leadAds ? { intake: 'meta_lead_ads' } : {}),
+          },
         },
       })
     },
