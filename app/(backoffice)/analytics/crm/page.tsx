@@ -90,6 +90,13 @@ export default async function CrmDashboardPage({
           <p className="mb-3 font-mono text-[10px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
             Salud del CRM
           </p>
+          <p className="mb-3 text-[13px] text-muted-foreground">
+            {isAgente
+              ? '«Leads nuevos» muestra tus contactos asignados. Los contactos sin asignar no se incluyen en tu contador.'
+              : filter.agentId
+                ? '«Leads nuevos» muestra los contactos del comercial seleccionado. El filtro deja fuera los contactos sin asignar.'
+                : '«Leads nuevos» incluye los contactos sin asignar.'}
+          </p>
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
             <KpiCard
               label={`Leads nuevos (${flow.range.label.toLowerCase()})`}
