@@ -1,15 +1,15 @@
 # COM-5 — Cambiar el estado del comprador desde ficha y listado
 
-| Campo               | Valor                                                   |
-| ------------------- | ------------------------------------------------------- |
-| **Estado**          | IMPLEMENTED                                             |
-| **Owner**           | Engineering                                             |
-| **Ticket**          | COM-5; petición del usuario del 2026-10-14 en este chat |
-| **Rama / PR**       | codex/compradores-estado-rapido; PR pendiente           |
-| **Categorías**      | C0, C1, C2, C3, C6                                      |
-| **Riesgo**          | Medio                                                   |
-| **Ruta SDD**        | Reforzada por la escritura concurrente de estado        |
-| **Última revisión** | 2026-10-14                                              |
+| Campo               | Valor                                                                                   |
+| ------------------- | --------------------------------------------------------------------------------------- |
+| **Estado**          | DEPLOYED                                                                                |
+| **Owner**           | Engineering                                                                             |
+| **Ticket**          | COM-5; petición del usuario del 2026-10-14 en este chat                                 |
+| **Rama / PR**       | [PR #199](https://github.com/growthaiconsultant-lab/campernova-crm/pull/199), fusionada |
+| **Categorías**      | C0, C1, C2, C3, C6                                                                      |
+| **Riesgo**          | Medio                                                                                   |
+| **Ruta SDD**        | Reforzada por la escritura concurrente de estado                                        |
+| **Última revisión** | 2026-10-14                                                                              |
 
 ## Problema y evidencia
 
@@ -23,9 +23,9 @@ Hecho verificado: la clasificación es corregible (`lib/state-machine.ts`) y CER
 requiere una entrega VENTA COMPLETADA en la acción de edición. El matching excluye
 CERRADO/PERDIDO y los archivados. Writers existentes: edición, marcar perdido y
 coordinación de entregas; readers: ficha, listado/filtros, pipeline y matching.
-No se dispone de una base PostgreSQL de pruebas configurada (`TEST_DATABASE_URL`
-ausente). La UI se comprueba con componentes reales y boundary de servidor simulado,
-sin utilizar una sesión del CRM ni datos remotos.
+La comprobación local inicial no disponía de `TEST_DATABASE_URL` y usó componentes
+reales con boundary simulado. La integración PostgreSQL se ejecutó después en CI;
+el listado publicado se comprobó con una sesión autenticada (evidencia en Cierre).
 
 ## Resultado esperado
 
@@ -50,7 +50,8 @@ traza en actividades y refresca la vista conservando filtros y paginación.
 ## Fuera de alcance
 
 Migraciones, nuevos permisos, backfill de notas históricas, cambios a otros writers,
-automatización de contacto, métricas nuevas, commit, PR y producción.
+automatización de contacto y métricas nuevas. Publicación autorizada posteriormente;
+el nuevo estado y su migración se documentan en COM-7.
 
 ## Decisiones
 
@@ -84,12 +85,15 @@ automatización de contacto, métricas nuevas, commit, PR y producción.
 
 - [x] Cambiar NUEVO a CONTACTADO desde cabecera y lista, escritorio y móvil (UI con boundary simulado).
 - [x] Selector visible con colores, teclado, guardado y error, sin abrir ficha al usarlo.
-- [ ] Sólo cambia status/updatedAt, con una Activity y refresco de consumidores.
+- [x] Sólo cambia status/updatedAt, con una Activity y refresco de consumidores (integración CI).
 - [x] Estados inválidos, falta de autorización y CERRADO sin entrega no escriben (unitarios).
-- [ ] Doble envío no duplica Activity; conflicto no pisa estado; rollback atómico.
+- [x] Doble envío no duplica Activity; conflicto no pisa estado; rollback atómico (integración CI).
 - [x] Filtros por estado existentes conservados en código y navegación a ficha comprobada en navegador.
 
-## Verificación
+## Verificación local inicial
+
+Los resultados iniciales se conservan como historial; la integración pendiente se
+resolvió en CI y el despliegue se comprobó según la sección Cierre.
 
 | Criterio                      | Evidencia prevista                                                                                  | Resultado                                                                                                                                                                   |
 | ----------------------------- | --------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -102,8 +106,7 @@ automatización de contacto, métricas nuevas, commit, PR y producción.
 
 ## Rollout, rollback y stop conditions
 
-- **Rollout:** implementación local autorizada por esta petición; publicación requiere
-  alcance posterior. Sin migraciones ni mutaciones remotas de datos durante pruebas.
+- **Rollout:** publicado tras la autorización explícita y checks verdes; véase Cierre.
 - **Rollback/mitigación:** revertir este cambio de código; los estados guardados
   continúan siendo compatibles y corregibles con el formulario existente.
 - **Detener si:** discrepancia con estados/roles existentes, cierre sin entrega,
@@ -126,11 +129,20 @@ automatización de contacto, métricas nuevas, commit, PR y producción.
 
 Publicación autorizada explícitamente por el usuario el 2026-10-14: commit, push,
 PR, merge, despliegue y migración de NO_CONTESTA tras superar las comprobaciones.
-Este permiso sustituye la exclusión inicial de operaciones remotas; ejecución pendiente.
+Este permiso sustituye la exclusión inicial de operaciones remotas.
 
-- **Commit/PR/CI/Deployment:** pendientes de ejecución, ya autorizados.
-- **Validación:** implementación local comprobada con unitarios, tipos, lint,
-  compilación y UI aislada. IMPLEMENTED no implica persistencia real validada ni deployment.
-- **Deuda restante:** ejecutar los cuatro tests de integración contra PostgreSQL
-  efímero y el flujo autenticado del CRM antes de publicación. El harness UI y sus
-  capturas permanecen como artefactos locales ignorados en `.artifacts/com-5-ui/`.
+- **Entrega:** PR #199 fusionada el 2026-10-14; commit de main
+  `df5fc05a04c693ff75342757f8312fcdf78f2410`.
+- **CI:** [run 38586793511](https://github.com/growthaiconsultant-lab/campernova-crm/actions/runs/38586793511)
+  superado: 1.810 unitarios, 430 tests de integración PostgreSQL y 19 tests Supabase,
+  además de replay, parity, RLS e idempotencia. El
+  [run de main 38589249944](https://github.com/growthaiconsultant-lab/campernova-crm/actions/runs/38589249944)
+  también terminó en verde.
+- **Producción:** deployment `dpl_DwoGUVKUnuVns3U6v6QJCuLDkoRK` READY, asociado al
+  commit de main por el check Vercel; panel en <https://campersnova.com/compradores>.
+- **Smoke autenticado:** 50 filas con controles habilitados y siete estados,
+  incluido No contesta; filtro NO_CONTESTA devuelve resultado sin error. No se
+  modificaron compradores durante esta comprobación.
+- **Límite:** guardado, auditoría y concurrencia comprobados en PostgreSQL de CI;
+  escritorio/móvil en UI aislada. No se realizó una escritura de prueba en producción
+  ni una ventana prolongada de observación. Estado DEPLOYED, no VALIDATED.

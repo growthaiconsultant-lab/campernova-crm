@@ -1,28 +1,28 @@
 # COM-6 — Gestionar compradores sin salir del listado
 
-| Campo               | Valor                                                                         |
-| ------------------- | ----------------------------------------------------------------------------- |
-| **Estado**          | IMPLEMENTED                                                                   |
-| **Owner**           | Engineering                                                                   |
-| **Ticket**          | Petición del usuario del 2026-10-14: editar opciones desde el listado adjunto |
-| **Rama / PR**       | codex/compradores-estado-rapido; continuación de COM-5, sin PR                |
-| **Categorías**      | C0, C1, C3, C6                                                                |
-| **Riesgo**          | Medio                                                                         |
-| **Ruta SDD**        | Reforzada por concurrencia                                                    |
-| **Última revisión** | 2026-10-14                                                                    |
+| Campo               | Valor                                                                                   |
+| ------------------- | --------------------------------------------------------------------------------------- |
+| **Estado**          | DEPLOYED                                                                                |
+| **Owner**           | Engineering                                                                             |
+| **Ticket**          | Petición del usuario del 2026-10-14: editar opciones desde el listado adjunto           |
+| **Rama / PR**       | [PR #199](https://github.com/growthaiconsultant-lab/campernova-crm/pull/199), fusionada |
+| **Categorías**      | C0, C1, C3, C6                                                                          |
+| **Riesgo**          | Medio                                                                                   |
+| **Ruta SDD**        | Reforzada por concurrencia                                                              |
+| **Última revisión** | 2026-10-14                                                                              |
 
 ## Problema y evidencia
 
-main/origin/main siguen en 2f141ec. COM-5 está preparado localmente en esta rama:
+Baseline inicial: main/origin/main en 2f141ec. COM-5 estaba preparado localmente:
 el estado ya es editable desde listado/ficha. La captura adjunta muestra el listado
 anterior en el que todas las columnas son texto de lectura. Temperatura, responsable,
 próxima acción todavía requieren abrir la ficha. El usuario confirmó expresamente
 el alcance: estado, temperatura, responsable y próxima acción; posteriormente pidió
-añadir también origen. Esta ampliación está autorizada para implementación local.
+añadir también origen. La publicación se autorizó posteriormente (véase Cierre).
 
 Reglas verificadas: requireAgente para ADMIN/AGENTE; PERM-4 permite asignar a cualquier
-comercial activo o desasignar. Los campos y Activities ya existen. No hay PostgreSQL
-de pruebas configurado ni validación autenticada local realizada.
+comercial activo o desasignar. Los campos y Activities ya existen. La integración
+PostgreSQL se ejecutó en CI y el panel autenticado se comprobó tras publicar.
 
 ## Resultado esperado
 
@@ -50,7 +50,7 @@ Ofrecer los mismos controles fuera del enlace de las tarjetas móviles.
 ## Fuera de alcance
 
 Edición masiva, nuevos roles, migraciones, backfill, automatizaciones, refactor de
-writers previos, edición de otros campos, commit, PR, despliegue o mutaciones remotas durante pruebas.
+writers previos, edición de otros campos o mutaciones de compradores remotos durante pruebas.
 
 ## Decisiones
 
@@ -82,9 +82,12 @@ writers previos, edición de otros campos, commit, PR, despliegue o mutaciones r
 - [x] Programar, cambiar y quitar próxima acción sin navegar a ficha (navegador aislado).
 - [x] Loading/error accesibles; selector y diálogo no activan enlace de fila.
 - [x] Entradas inválidas y responsable no comercial/activo no escriben (unitarios).
-- [ ] Campos ajenos conservados, no-op sin duplicación, conflicto y rollback atómico.
+- [x] Campos ajenos conservados, no-op sin duplicación, conflicto y rollback atómico (integración CI).
 
-## Verificación
+## Verificación local inicial
+
+Los resultados iniciales se conservan como historial; la integración pendiente se
+resolvió en CI y el despliegue se comprobó según la sección Cierre.
 
 | Evidencia                          | Resultado                                                                                                                                                                                                                                 |
 | ---------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -101,11 +104,11 @@ Ampliación «y origen»: 63 tests focalizados de quick-edit-actions/buyer-sourc
 typecheck, lint, check:sdd, formato y compilación Next en modo compile superados.
 El navegador aislado comprueba cambio de origen escritorio/móvil, conservación de
 REFERIDO_ANTIGUO, CHAT_WEB actual y borrado explícito. Los siete casos de integración
-preparados siguen sin ejecutarse: el guard rechaza TEST_DATABASE_URL ausente antes
-de conectar. La batería de 1.776 tests arriba corresponde al alcance anterior;
+preparados no pudieron ejecutarse localmente: el guard rechazó TEST_DATABASE_URL
+ausente antes de conectar; posteriormente pasaron en CI. La batería de 1.776 tests arriba corresponde al alcance anterior;
 para la ampliación se ejecutó la batería focalizada proporcional.
 
-- **Rollout:** preparación local autorizada por petición; publicación fuera de alcance.
+- **Rollout:** publicado tras autorización explícita y checks verdes; véase Cierre.
 - **Rollback:** revertir el cambio de código; campos y estados siguen compatibles.
 - **Detener si:** destino no autorizado, datos ajenos sobrescritos o pruebas remotas.
 - **Post-deploy:** probar ficha/lista móvil/escritorio, filtros y Activities con lead
@@ -126,8 +129,15 @@ para la ampliación se ejecutó la batería focalizada proporcional.
 El 2026-10-14 el usuario autorizó publicar todos los cambios, incluidos commit, push,
 PR, merge y verificación del despliegue; autorización condicionada a checks verdes.
 
-- **Commit/PR/CI/deploy:** pendientes de ejecución, autorizados.
-- **Validación:** implementación local, sin publicar, comprobada con unitarios,
-  tipos, lint, compilación y navegador aislado. No implica validación PostgreSQL ni
-  flujo autenticado. Artefactos UI locales ignorados en `.artifacts/com-6-ui/`.
-- **Deuda:** PostgreSQL real y flujo autenticado antes de publicar.
+- **Entrega y CI:** PR #199 fusionada; main
+  `df5fc05a04c693ff75342757f8312fcdf78f2410`. Evidencia y enlaces de CI en
+  [COM-5](COM-5-estado-rapido-compradores.md#cierre): 1.810 unitarios, 430 tests de
+  integración PostgreSQL, 19 Supabase y replay/parity/RLS/idempotencia superados.
+- **Producción:** deployment `dpl_DwoGUVKUnuVns3U6v6QJCuLDkoRK` READY;
+  <https://campersnova.com/compradores> comprobado con sesión autenticada.
+- **Smoke:** origen, temperatura, estado y responsable son selectores habilitados
+  en las filas. El botón de próxima acción abre el diálogo y Cancelar lo cierra sin
+  abandonar /compradores. Sin errores de consola en esta comprobación.
+- **Límite:** no se guardaron cambios de compradores en producción. Persistencia,
+  carreras y rollback comprobados en CI; escritorio/móvil en navegador aislado.
+  Sin ventana prolongada de observación; estado DEPLOYED, no VALIDATED.
