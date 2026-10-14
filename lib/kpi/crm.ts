@@ -1,4 +1,5 @@
-import type { PrismaClient, BuyerLeadStatus, SellerLeadStatus } from '@prisma/client'
+import type { PrismaClient, SellerLeadStatus } from '@prisma/client'
+import { BUYER_LEAD_ACTIVE_STATUSES as ACTIVE_BUYER } from '@/lib/state-machine'
 import type { DashboardFilter } from '@/lib/dashboard/queries'
 import { personLabel } from '@/lib/display'
 import { LOST_REASON_LABELS } from '@/lib/lost-reason'
@@ -11,7 +12,6 @@ import { BUYER_STATUSES_TERMINAL, SELLER_STATUSES_TERMINAL } from './stage-map'
  * motivos de pérdida. Se lee de tablas. Respeta el filtro de agente.
  */
 
-const ACTIVE_BUYER: BuyerLeadStatus[] = ['NUEVO', 'CONTACTADO', 'CUALIFICADO', 'EN_NEGOCIACION']
 const ACTIVE_SELLER: SellerLeadStatus[] = ['NUEVO', 'CONTACTADO', 'CUALIFICADO', 'EN_NEGOCIACION']
 
 export type LostReasonRow = { label: string; count: number }

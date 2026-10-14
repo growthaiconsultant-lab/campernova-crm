@@ -2,6 +2,7 @@ import Link from 'next/link'
 import { db } from '@/lib/db'
 import { requireAgente } from '@/lib/auth'
 import { TEMPERATURE_LABELS } from '@/lib/lead-temperature'
+import { BUYER_LEAD_ACTIVE_STATUSES } from '@/lib/state-machine'
 import { Eyebrow, EmptyState } from '@/components/redesign'
 import { cn } from '@/lib/utils'
 import type { LeadTemperature } from '@prisma/client'
@@ -41,7 +42,7 @@ export default async function PipelinePage() {
 
   const buyers = await db.buyerLead.findMany({
     where: {
-      status: { in: ['NUEVO', 'CONTACTADO', 'CUALIFICADO', 'EN_NEGOCIACION'] },
+      status: { in: BUYER_LEAD_ACTIVE_STATUSES },
       ...(isAgente ? { agentId: currentUser.id } : {}),
     },
     orderBy: { updatedAt: 'desc' },

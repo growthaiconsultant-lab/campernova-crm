@@ -1,4 +1,5 @@
-import type { PrismaClient, BuyerLeadStatus, SellerLeadStatus } from '@prisma/client'
+import type { PrismaClient, SellerLeadStatus } from '@prisma/client'
+import { BUYER_LEAD_ACTIVE_STATUSES as ACTIVE_BUYER } from '@/lib/state-machine'
 import { personLabel, vehicleLabel } from '@/lib/display'
 import { NEXT_ACTION_LABELS } from '@/lib/next-action'
 import { admittedSellerWhere } from '@/lib/seller-intake'
@@ -9,7 +10,6 @@ import { admittedSellerWhere } from '@/lib/seller-intake'
  * riesgo, con una lista priorizada. Lectura. Se filtra por el agente indicado.
  */
 
-const ACTIVE_BUYER: BuyerLeadStatus[] = ['NUEVO', 'CONTACTADO', 'CUALIFICADO', 'EN_NEGOCIACION']
 const ACTIVE_SELLER: SellerLeadStatus[] = ['NUEVO', 'CONTACTADO', 'CUALIFICADO', 'EN_NEGOCIACION']
 
 export type ActionRow = {

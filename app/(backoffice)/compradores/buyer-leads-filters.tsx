@@ -11,15 +11,12 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Button } from '@/components/ui/button'
+import { BUYER_LEAD_STATUS_LABELS } from '@/lib/state-machine'
 
-const STATUS_OPTIONS = [
-  { value: 'NUEVO', label: 'Nuevo' },
-  { value: 'CONTACTADO', label: 'Contactado' },
-  { value: 'CUALIFICADO', label: 'Cualificado' },
-  { value: 'EN_NEGOCIACION', label: 'En negociación' },
-  { value: 'CERRADO', label: 'Cerrado' },
-  { value: 'PERDIDO', label: 'Perdido' },
-]
+const STATUS_OPTIONS = Object.entries(BUYER_LEAD_STATUS_LABELS).map(([value, label]) => ({
+  value,
+  label,
+}))
 
 const SORT_OPTIONS = [
   { value: 'createdAt', label: 'Fecha entrada' },

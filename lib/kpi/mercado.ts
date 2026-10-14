@@ -1,4 +1,5 @@
-import type { PrismaClient, BuyerLeadStatus, VehicleStatus } from '@prisma/client'
+import type { PrismaClient, VehicleStatus } from '@prisma/client'
+import { BUYER_LEAD_ACTIVE_STATUSES as ACTIVE_BUYER } from '@/lib/state-machine'
 import type { DashboardFilter } from '@/lib/dashboard/queries'
 
 /**
@@ -7,7 +8,6 @@ import type { DashboardFilter } from '@/lib/dashboard/queries'
  * demanda, rotación por modelo y precio de cierre. Lectura sobre tablas.
  */
 
-const ACTIVE_BUYER: BuyerLeadStatus[] = ['NUEVO', 'CONTACTADO', 'CUALIFICADO', 'EN_NEGOCIACION']
 const STOCK: VehicleStatus[] = ['TASADO', 'PUBLICADO']
 
 const PRICE_BUCKETS = [

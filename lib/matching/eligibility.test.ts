@@ -67,7 +67,13 @@ describe('isVehicleEligible', () => {
 
 describe('isBuyerEligible', () => {
   it('NUEVO / CONTACTADO / CUALIFICADO / EN_NEGOCIACION → elegibles', () => {
-    for (const status of ['NUEVO', 'CONTACTADO', 'CUALIFICADO', 'EN_NEGOCIACION'] as const) {
+    for (const status of [
+      'NUEVO',
+      'NO_CONTESTA',
+      'CONTACTADO',
+      'CUALIFICADO',
+      'EN_NEGOCIACION',
+    ] as const) {
       expect(isBuyerEligible({ status, archivedAt: null })).toBe(true)
     }
   })

@@ -1,4 +1,5 @@
-import type { PrismaClient, BuyerLeadStatus, VehicleStatus } from '@prisma/client'
+import type { PrismaClient, VehicleStatus } from '@prisma/client'
+import { BUYER_LEAD_ACTIVE_STATUSES as ACTIVE_BUYER } from '@/lib/state-machine'
 import type { DashboardFilter } from '@/lib/dashboard/queries'
 import { buyerCompleteness, vehicleCompleteness } from '@/lib/scoring/completeness'
 
@@ -8,7 +9,6 @@ import { buyerCompleteness, vehicleCompleteness } from '@/lib/scoring/completene
  * trazabilidad de eventos. Lectura. Respeta el filtro de agente.
  */
 
-const ACTIVE_BUYER: BuyerLeadStatus[] = ['NUEVO', 'CONTACTADO', 'CUALIFICADO', 'EN_NEGOCIACION']
 const STOCK: VehicleStatus[] = ['NUEVO', 'TASADO', 'PUBLICADO', 'RESERVADO']
 
 export type CalidadRow = { id: string; href: string; name: string; detail: string }
