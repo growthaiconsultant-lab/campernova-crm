@@ -6,6 +6,7 @@ import { db } from '@/lib/db'
 import { requireCanViewVehiculos } from '@/lib/auth'
 import { buildAdmittedVehicleWhere, VEHICLE_ORIGIN_LABELS } from '@/lib/seller-intake'
 import { vehicleLabel } from '@/lib/display'
+import { vehiclePlateSearchConditions } from '@/lib/vehicle-plate-search'
 import { eligibleBuyerCounterpartMatchWhere, isVehicleEligible } from '@/lib/matching'
 import { VEHICLE_STATUS_LABELS } from '@/lib/state-machine'
 import { VehicleFilters } from './vehicle-filters'
@@ -55,6 +56,7 @@ function buildWhere(sp: SearchParams): Prisma.VehicleWhereInput {
       OR: [
         { brand: { contains: q, mode: 'insensitive' } },
         { model: { contains: q, mode: 'insensitive' } },
+        ...vehiclePlateSearchConditions(q),
       ],
     })
   }
