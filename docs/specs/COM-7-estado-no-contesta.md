@@ -118,6 +118,15 @@ NO_CONTESTA, aplicar su migración en producción y subir/abrir/fusionar la PR t
 pasar las comprobaciones pendientes. Se mantiene el preflight de identidad e historial
 antes de cualquier escritura remota. Esta autorización amplía el alcance local inicial.
 
+La PR #199 supera CI en el commit 4e9aff3: quality, integración PostgreSQL,
+migration-replay con parity/RLS/idempotencia, Supabase local y Preview Vercel.
+Vercel no exporta las variables sensibles al operador local; se añade un comando
+explícito `scripts/deploy-buyer-status-migration.ts` que reutiliza sus credenciales
+dentro del build. Predeterminado sólo lectura, identidad comprobada, sólo una
+migración pendiente permitida, schema antes/después y errores sanitizados. Sus
+guards puros tienen tests. Despliegues de operador con `--skip-domain` mantienen
+el panel publicado hasta la verificación y promoción del código final.
+
 - **Commit/PR/CI/deployment/migración remota:** pendientes de ejecución, autorizados.
 - **Validación:** implementación local verificada con unitarios, UI simulada, tipos,
   lint, generación/validación Prisma, historial y compilación. No equivale a validación
