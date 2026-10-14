@@ -33,6 +33,7 @@ export type SellerFunnelStage = (typeof SELLER_FUNNEL_STAGES)[number]
 export function buyerLeadStage(status: BuyerLeadStatus): BuyerFunnelStage {
   switch (status) {
     case 'NUEVO':
+    case 'NO_CONTESTA':
       return 'lead'
     case 'CONTACTADO':
       return 'contactado'

@@ -9,8 +9,9 @@ const SELLER_LEAD_STATUSES: SellerLeadStatus[] = [
   'DESCARTADO',
 ]
 
-const BUYER_LEAD_STATUSES: BuyerLeadStatus[] = [
+export const BUYER_LEAD_STATUSES: BuyerLeadStatus[] = [
   'NUEVO',
+  'NO_CONTESTA',
   'CONTACTADO',
   'CUALIFICADO',
   'EN_NEGOCIACION',
@@ -21,6 +22,10 @@ const BUYER_LEAD_STATUSES: BuyerLeadStatus[] = [
 function allOtherStatuses<T extends string>(statuses: T[], current: T): T[] {
   return statuses.filter((status) => status !== current)
 }
+
+export const BUYER_LEAD_ACTIVE_STATUSES = BUYER_LEAD_STATUSES.filter(
+  (status) => status !== 'CERRADO' && status !== 'PERDIDO'
+)
 
 /**
  * El estado del lead es una clasificación operativa corregible, no un gate del funnel. Cualquier
@@ -106,6 +111,7 @@ export const VEHICLE_STATUS_LABELS: Record<VehicleStatus, string> = {
 
 export const BUYER_LEAD_STATUS_LABELS: Record<BuyerLeadStatus, string> = {
   NUEVO: 'Nuevo',
+  NO_CONTESTA: 'No contesta',
   CONTACTADO: 'Contactado',
   CUALIFICADO: 'Cualificado',
   EN_NEGOCIACION: 'En negociación',
@@ -133,6 +139,7 @@ export const VEHICLE_STATUS_CLASSES: Record<VehicleStatus, string> = {
 
 export const BUYER_LEAD_STATUS_CLASSES: Record<BuyerLeadStatus, string> = {
   NUEVO: 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300',
+  NO_CONTESTA: 'bg-orange-100 text-orange-700 dark:bg-orange-900/40 dark:text-orange-300',
   CONTACTADO: 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300',
   CUALIFICADO: 'bg-violet-100 text-violet-700 dark:bg-violet-900/40 dark:text-violet-300',
   EN_NEGOCIACION: 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300',

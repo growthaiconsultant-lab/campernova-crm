@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { BuyerLeadStatus } from '@prisma/client'
 import { buyerSourceSchema } from '@/lib/buyer-source'
 import { VEHICLE_CATEGORY_VALUES, BED_LAYOUT_VALUES, LICENSE_TYPE_VALUES } from '@/lib/rv-taxonomy'
 // LANDING-2: name and phone remain required; an uncaptured email stays null.
@@ -62,7 +63,7 @@ export const updateBuyerLeadSchema = z.object({
   name: z.string().min(1, 'El nombre es obligatorio'),
   email: buyerEmailSchema,
   phone: z.string().min(6, 'Teléfono demasiado corto'),
-  status: z.enum(['NUEVO', 'CONTACTADO', 'CUALIFICADO', 'EN_NEGOCIACION', 'CERRADO', 'PERDIDO']),
+  status: z.enum(BuyerLeadStatus),
   agentId: z.string().nullable(),
   vehicleType: z.enum(['CAMPER', 'AUTOCARAVANA']).optional().nullable(),
   minSeats: z

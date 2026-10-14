@@ -32,6 +32,8 @@ export interface ActionableTableProps<T> {
   /** Móvil (ESPEC §6): si se pasa, en <lg la tabla se convierte en una lista
    *  de tarjetas con los campos críticos; la tabla solo se muestra en ≥lg. */
   mobileCard?: (row: T) => React.ReactNode
+  /** Controles móviles fuera del enlace de navegación de la tarjeta. */
+  mobileCardActions?: (row: T) => React.ReactNode
 }
 
 const ALIGN = {
@@ -49,6 +51,7 @@ export function ActionableTable<T>({
   empty,
   className,
   mobileCard,
+  mobileCardActions,
 }: ActionableTableProps<T>) {
   if (rows.length === 0) {
     return (
@@ -66,6 +69,23 @@ export function ActionableTable<T>({
     <div className="flex flex-col gap-2.5 p-3 lg:hidden">
       {rows.map((row) => {
         const href = rowHref?.(row)
+        if (mobileCardActions) {
+          return (
+            <div
+              key={rowKey(row)}
+              className="rounded-[11px] border border-line bg-card p-3 shadow-[0_1px_2px_rgba(20,25,34,0.04)]"
+            >
+              {href ? (
+                <Link href={href} className="block">
+                  {mobileCard(row)}
+                </Link>
+              ) : (
+                mobileCard(row)
+              )}
+              <div className="mt-2">{mobileCardActions(row)}</div>
+            </div>
+          )
+        }
         const card = (
           <div className="rounded-[11px] border border-line bg-card p-3 shadow-[0_1px_2px_rgba(20,25,34,0.04)]">
             {mobileCard(row)}

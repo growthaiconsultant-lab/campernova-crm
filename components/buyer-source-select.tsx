@@ -3,7 +3,10 @@
 import { forwardRef } from 'react'
 import { BUYER_SOURCE_OPTIONS, buyerSourceLabel, type BuyerSource } from '@/lib/buyer-source'
 
-type Props = {
+type Props = Pick<
+  React.SelectHTMLAttributes<HTMLSelectElement>,
+  'aria-label' | 'aria-describedby' | 'aria-busy' | 'title'
+> & {
   value?: BuyerSource | null
   onChange: (value: BuyerSource | null | undefined) => void
   onBlur?: () => void
@@ -22,7 +25,7 @@ export const BuyerSourceSelect = forwardRef<HTMLSelectElement, Props>(function B
     <select
       {...props}
       ref={ref}
-      aria-label="Origen de captación"
+      aria-label={props['aria-label'] ?? 'Origen de captación'}
       className={className ?? 'h-10 w-full rounded-md border bg-background px-3 text-sm'}
       value={value === undefined && legacySource ? '__keep__' : (value ?? '__none__')}
       onChange={(event) =>

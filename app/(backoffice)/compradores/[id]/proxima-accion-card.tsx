@@ -8,6 +8,7 @@ import type { NextActionType } from '@prisma/client'
 
 const NEXT_ACTION_TEXT: Record<string, string> = {
   NUEVO: 'Contactar al comprador',
+  NO_CONTESTA: 'Intentar contactar de nuevo',
   CONTACTADO: 'Cualificar sus necesidades',
   CUALIFICADO: 'Presentar vehículos match',
   EN_NEGOCIACION: 'Cerrar la operación',

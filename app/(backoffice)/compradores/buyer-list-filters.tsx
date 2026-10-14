@@ -3,15 +3,12 @@
 import { useCallback, useRef } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { BUYER_SOURCE_OPTIONS } from '@/lib/buyer-source'
+import { BUYER_LEAD_STATUS_LABELS } from '@/lib/state-machine'
 
-const STATUS_OPTIONS = [
-  { value: 'NUEVO', label: 'Nuevo' },
-  { value: 'CONTACTADO', label: 'Contactado' },
-  { value: 'CUALIFICADO', label: 'Cualificado' },
-  { value: 'EN_NEGOCIACION', label: 'En negociación' },
-  { value: 'CERRADO', label: 'Cerrado' },
-  { value: 'PERDIDO', label: 'Perdido' },
-]
+const STATUS_OPTIONS = Object.entries(BUYER_LEAD_STATUS_LABELS).map(([value, label]) => ({
+  value,
+  label,
+}))
 
 const TYPE_OPTIONS = [
   { value: 'CAMPER', label: 'Camper' },
@@ -36,6 +33,7 @@ type Props = { agents: Agent[] }
 // Status dot colors for chip indicator
 const STATUS_COLORS: Record<string, string> = {
   NUEVO: '#3a6fd4',
+  NO_CONTESTA: '#c2410c',
   CONTACTADO: '#7c3aed',
   CUALIFICADO: '#0891b2',
   EN_NEGOCIACION: '#c9820a',

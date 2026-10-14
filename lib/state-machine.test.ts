@@ -2,12 +2,21 @@ import { describe, expect, it } from 'vitest'
 import type { BuyerLeadStatus, SellerLeadStatus } from '@prisma/client'
 import {
   BUYER_LEAD_TRANSITIONS,
+  BUYER_LEAD_ACTIVE_STATUSES,
+  BUYER_LEAD_STATUS_LABELS,
   SELLER_LEAD_TRANSITIONS,
   VEHICLE_TRANSITIONS,
   isValidTransition,
 } from './state-machine'
 
 describe('transiciones permisivas de leads', () => {
+  it('No contesta permanece activo y se puede corregir a Contactado', () => {
+    expect(BUYER_LEAD_STATUS_LABELS.NO_CONTESTA).toBe('No contesta')
+    expect(BUYER_LEAD_ACTIVE_STATUSES).toContain('NO_CONTESTA')
+    expect(isValidTransition(BUYER_LEAD_TRANSITIONS, 'NUEVO', 'NO_CONTESTA')).toBe(true)
+    expect(isValidTransition(BUYER_LEAD_TRANSITIONS, 'NO_CONTESTA', 'CONTACTADO')).toBe(true)
+    expect(isValidTransition(BUYER_LEAD_TRANSITIONS, 'NO_CONTESTA', 'NUEVO')).toBe(true)
+  })
   it('permite un salto no secuencial y la vuelta atrás en vendedores', () => {
     expect(isValidTransition(SELLER_LEAD_TRANSITIONS, 'NUEVO', 'EN_NEGOCIACION')).toBe(true)
     expect(isValidTransition(SELLER_LEAD_TRANSITIONS, 'CERRADO', 'CONTACTADO')).toBe(true)

@@ -109,9 +109,10 @@ enum SellerLeadStatus {
   DESCARTADO
 }
 
-// nuevo → contactado → cualificado → en_negociacion → cerrado / perdido
+// Estados operativos corregibles; no contesta mantiene el seguimiento activo.
 enum BuyerLeadStatus {
   NUEVO
+  NO_CONTESTA
   CONTACTADO
   CUALIFICADO
   EN_NEGOCIACION

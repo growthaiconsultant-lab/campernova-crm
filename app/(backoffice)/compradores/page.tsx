@@ -1,46 +1,30 @@
 import Link from 'next/link'
-import { Plus, Clock } from 'lucide-react'
+import { Plus } from 'lucide-react'
 import { db } from '@/lib/db'
 import { requireAgente } from '@/lib/auth'
 import { BuyerListFilters } from './buyer-list-filters'
-import { buyerSourceFilter, buyerSourceLabel } from '@/lib/buyer-source'
+import { BuyerStatusSelect } from './buyer-status-select'
+import { BuyerNextActionControl, BuyerQuickSelect } from './buyer-quick-controls'
+import { buyerSourceFilter } from '@/lib/buyer-source'
+import { BUYER_LEAD_STATUS_LABELS } from '@/lib/state-machine'
 import { landingCaptureSelection } from '@/lib/landing/attribution'
 import { LandingAttribution } from '@/components/landing-attribution'
-import { TEMPERATURE_LABELS } from '@/lib/lead-temperature'
-import { NEXT_ACTION_LABELS, isNextActionOverdue, formatNextActionDue } from '@/lib/next-action'
 import {
   Eyebrow,
   Card,
   ActionableTable,
-  Pill,
   ButtonLink,
   EmptyState,
   type Column,
-  type PillTone,
 } from '@/components/redesign'
 import { cn } from '@/lib/utils'
-import type { Prisma, LeadTemperature } from '@prisma/client'
+import type { Prisma } from '@prisma/client'
 
 const PAGE_SIZE = 50
-
-const STATUS_LABELS: Record<string, string> = {
-  NUEVO: 'Nuevo',
-  CONTACTADO: 'Contactado',
-  CUALIFICADO: 'Cualificado',
-  EN_NEGOCIACION: 'En negociación',
-  CERRADO: 'Cerrado',
-  PERDIDO: 'Perdido',
-}
 
 const VEHICLE_TYPE_LABELS: Record<string, string> = {
   CAMPER: 'Camper',
   AUTOCARAVANA: 'Autocaravana',
-}
-
-const TEMP_TONE: Record<LeadTemperature, PillTone> = {
-  HOT: 'bad',
-  WARM: 'warn',
-  COLD: 'neutral',
 }
 
 const EUR = (n: number) =>
@@ -83,8 +67,7 @@ function buildWhere(
   }
 
   if (sp.status) {
-    const valid = ['NUEVO', 'CONTACTADO', 'CUALIFICADO', 'EN_NEGOCIACION', 'CERRADO', 'PERDIDO']
-    if (valid.includes(sp.status)) {
+    if (Object.hasOwn(BUYER_LEAD_STATUS_LABELS, sp.status)) {
       conditions.push({ status: sp.status as Prisma.EnumBuyerLeadStatusFilter['equals'] })
     }
   }
@@ -177,25 +160,37 @@ export default async function CompradoresPage({ searchParams }: { searchParams: 
   const sevenDaysAgo = new Date()
   sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7)
 
-  const [total, leads, agents, sinAsignarCount, conMatchesCount, estaSemanaCount] =
-    await Promise.all([
-      db.buyerLead.count({ where }),
-      db.buyerLead.findMany({
-        where,
-        orderBy,
-        skip: (page - 1) * PAGE_SIZE,
-        take: PAGE_SIZE,
-        include: {
-          activities: landingCaptureSelection,
-          agent: { select: { id: true, name: true } },
-          _count: { select: { matches: true } },
-        },
-      }),
-      db.user.findMany({ select: { id: true, name: true }, orderBy: { name: 'asc' } }),
-      db.buyerLead.count({ where: { agentId: null } }),
-      db.buyerLead.count({ where: { matches: { some: {} } } }),
-      db.buyerLead.count({ where: { createdAt: { gte: sevenDaysAgo } } }),
-    ])
+  const [
+    total,
+    leads,
+    agents,
+    sinAsignarCount,
+    conMatchesCount,
+    estaSemanaCount,
+    assignableAgents,
+  ] = await Promise.all([
+    db.buyerLead.count({ where }),
+    db.buyerLead.findMany({
+      where,
+      orderBy,
+      skip: (page - 1) * PAGE_SIZE,
+      take: PAGE_SIZE,
+      include: {
+        activities: landingCaptureSelection,
+        agent: { select: { id: true, name: true } },
+        _count: { select: { matches: true } },
+      },
+    }),
+    db.user.findMany({ select: { id: true, name: true }, orderBy: { name: 'asc' } }),
+    db.buyerLead.count({ where: { agentId: null } }),
+    db.buyerLead.count({ where: { matches: { some: {} } } }),
+    db.buyerLead.count({ where: { createdAt: { gte: sevenDaysAgo } } }),
+    db.user.findMany({
+      where: { active: true, role: { in: ['ADMIN', 'AGENTE'] } },
+      select: { id: true, name: true },
+      orderBy: { name: 'asc' },
+    }),
+  ])
 
   const totalPages = Math.ceil(total / PAGE_SIZE)
   const from = total === 0 ? 0 : (page - 1) * PAGE_SIZE + 1
@@ -228,6 +223,12 @@ export default async function CompradoresPage({ searchParams }: { searchParams: 
 
   type Lead = (typeof leads)[number]
 
+  const leadRef = (lead: Lead) => ({
+    leadId: lead.id,
+    buyerName: lead.name,
+    updatedAt: lead.updatedAt.toISOString(),
+  })
+
   const prefs = (l: Lead) => {
     const parts: string[] = []
     parts.push(
@@ -251,9 +252,10 @@ export default async function CompradoresPage({ searchParams }: { searchParams: 
     {
       key: 'source',
       header: 'Origen',
+      className: 'relative z-[1]',
       cell: (l) => (
         <div>
-          <span className="font-medium text-ink2">{buyerSourceLabel(l.source)}</span>
+          <BuyerQuickSelect {...leadRef(l)} field="source" value={l.source} />
           <LandingAttribution activities={l.activities} compact />
         </div>
       ),
@@ -261,38 +263,26 @@ export default async function CompradoresPage({ searchParams }: { searchParams: 
     {
       key: 'temp',
       header: 'Temp.',
-      cell: (l) =>
-        l.temperature ? (
-          <Pill tone={TEMP_TONE[l.temperature]} dot>
-            {TEMPERATURE_LABELS[l.temperature]}
-          </Pill>
-        ) : (
-          <span className="text-ink3">—</span>
-        ),
+      className: 'relative z-[1]',
+      cell: (l) => <BuyerQuickSelect {...leadRef(l)} field="temperature" value={l.temperature} />,
     },
     {
       key: 'stage',
-      header: 'Etapa',
-      cell: (l) => <span className="font-medium text-ink2">{STATUS_LABELS[l.status]}</span>,
+      header: 'Estado',
+      className: 'relative z-[1]',
+      cell: (l) => <BuyerStatusSelect leadId={l.id} status={l.status} buyerName={l.name} />,
     },
     {
       key: 'next',
       header: 'Próxima acción',
-      cell: (l) => {
-        if (!l.nextActionType || !l.nextActionDueAt) return <span className="text-ink3">—</span>
-        const overdue = isNextActionOverdue(l.nextActionDueAt)
-        return (
-          <span
-            className={cn(
-              'inline-flex items-center gap-1.5 font-medium',
-              overdue ? 'text-bad' : 'text-ink2'
-            )}
-          >
-            <Clock size={13} strokeWidth={2} className="shrink-0" />
-            {NEXT_ACTION_LABELS[l.nextActionType]} · {formatNextActionDue(l.nextActionDueAt)}
-          </span>
-        )
-      },
+      className: 'relative z-[1]',
+      cell: (l) => (
+        <BuyerNextActionControl
+          {...leadRef(l)}
+          nextActionType={l.nextActionType}
+          nextActionDueAt={l.nextActionDueAt?.toISOString() ?? null}
+        />
+      ),
     },
     {
       key: 'budget',
@@ -316,7 +306,16 @@ export default async function CompradoresPage({ searchParams }: { searchParams: 
     {
       key: 'agent',
       header: 'Resp.',
-      cell: (l) => <span className="font-medium text-ink2">{l.agent?.name ?? 'Sin asignar'}</span>,
+      className: 'relative z-[1]',
+      cell: (l) => (
+        <BuyerQuickSelect
+          {...leadRef(l)}
+          field="agentId"
+          value={l.agentId}
+          agentName={l.agent?.name ?? null}
+          agents={assignableAgents}
+        />
+      ),
     },
   ]
 
@@ -398,39 +397,38 @@ export default async function CompradoresPage({ searchParams }: { searchParams: 
                 <span className="truncate font-hanken text-[13.5px] font-semibold text-ink">
                   {l.name}
                 </span>
-                {l.temperature && (
-                  <Pill tone={TEMP_TONE[l.temperature]} dot className="shrink-0">
-                    {TEMPERATURE_LABELS[l.temperature]}
-                  </Pill>
-                )}
               </div>
               <div className="mt-0.5 font-hanken text-[11.5px] font-medium text-ink3">
-                {prefs(l)} · {STATUS_LABELS[l.status]}
-              </div>
-              <div className="mt-1 font-hanken text-[11.5px] font-medium text-ink2">
-                Origen: {buyerSourceLabel(l.source)}
+                {prefs(l)}
               </div>
               <LandingAttribution activities={l.activities} compact />
               <div className="mt-2 flex items-center justify-between gap-2">
-                {l.nextActionType && l.nextActionDueAt ? (
-                  <span
-                    className={cn(
-                      'inline-flex items-center gap-1.5 font-hanken text-[12px] font-medium',
-                      isNextActionOverdue(l.nextActionDueAt) ? 'text-bad' : 'text-ink2'
-                    )}
-                  >
-                    <Clock size={12} strokeWidth={2} className="shrink-0" />
-                    {NEXT_ACTION_LABELS[l.nextActionType]} ·{' '}
-                    {formatNextActionDue(l.nextActionDueAt)}
-                  </span>
-                ) : (
-                  <span className="font-hanken text-[12px] text-ink3">Sin próxima acción</span>
-                )}
                 <span className="shrink-0 font-mono text-[12px] font-semibold text-ink">
                   {l.maxBudget ? EUR(Number(l.maxBudget)) : '—'}
                 </span>
               </div>
             </>
+          )}
+          mobileCardActions={(l) => (
+            <div className="space-y-2">
+              <div className="flex flex-wrap items-start gap-2">
+                <BuyerStatusSelect leadId={l.id} status={l.status} buyerName={l.name} />
+                <BuyerQuickSelect {...leadRef(l)} field="source" value={l.source} />
+                <BuyerQuickSelect {...leadRef(l)} field="temperature" value={l.temperature} />
+                <BuyerQuickSelect
+                  {...leadRef(l)}
+                  field="agentId"
+                  value={l.agentId}
+                  agentName={l.agent?.name ?? null}
+                  agents={assignableAgents}
+                />
+              </div>
+              <BuyerNextActionControl
+                {...leadRef(l)}
+                nextActionType={l.nextActionType}
+                nextActionDueAt={l.nextActionDueAt?.toISOString() ?? null}
+              />
+            </div>
           )}
           empty={
             <EmptyState

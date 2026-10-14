@@ -44,6 +44,16 @@ beforeEach(() => {
 })
 
 describe('updateBuyerLead', () => {
+  it('el formulario admite No contesta y conserva su auditoría', async () => {
+    mockDb.buyerLead.findUnique.mockResolvedValue({ status: 'NUEVO', agentId: null, agent: null })
+    expect(await updateBuyerLead('b1', { ...baseInput, status: 'NO_CONTESTA' })).toEqual({
+      ok: true,
+    })
+    expect(mockDb.buyerLead.update.mock.calls[0][0].data.status).toBe('NO_CONTESTA')
+    expect(mockDb.activity.create.mock.calls[0][0].data.content).toBe(
+      'Estado cambiado: Nuevo → No contesta'
+    )
+  })
   it.each(['INSTAGRAM', null])(
     'guarda el origen explícito %s sin cambiar el estado',
     async (source) => {

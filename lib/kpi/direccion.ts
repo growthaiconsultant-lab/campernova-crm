@@ -1,4 +1,5 @@
 import type { PrismaClient } from '@prisma/client'
+import { BUYER_LEAD_ACTIVE_STATUSES as ACTIVE_BUYER } from '@/lib/state-machine'
 import type { DashboardFilter } from '@/lib/dashboard/queries'
 import { ACTIVE_DEMAND_MATCH_THRESHOLD } from '@/lib/scoring'
 
@@ -8,7 +9,6 @@ import { ACTIVE_DEMAND_MATCH_THRESHOLD } from '@/lib/scoring'
  * el día 1. Respeta el filtro de agente.
  */
 
-const ACTIVE_BUYER = ['NUEVO', 'CONTACTADO', 'CUALIFICADO', 'EN_NEGOCIACION'] as const
 const USEFUL_MATCH_SCORE = 70
 
 export type DireccionKpis = {
@@ -96,7 +96,7 @@ export async function getDireccionKpis(
   const buyerFunnel = [
     {
       label: 'Lead',
-      count: buyerBy(['NUEVO', 'CONTACTADO', 'CUALIFICADO', 'EN_NEGOCIACION', 'CERRADO']),
+      count: buyerBy([...ACTIVE_BUYER, 'CERRADO']),
       href: '/compradores',
     },
     {

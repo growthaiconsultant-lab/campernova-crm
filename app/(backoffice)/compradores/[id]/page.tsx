@@ -38,7 +38,7 @@ import { buyerWhatsAppMessage } from '@/lib/whatsapp'
 import { MobileFichaActions } from '@/components/mobile-ficha-actions'
 import { LeadTabNav } from '@/app/(backoffice)/vendedores/[id]/lead-tab-nav'
 import type { LeadTab } from '@/app/(backoffice)/vendedores/[id]/lead-tab-nav'
-import { StatusPill } from '@/components/status-pill'
+import { BuyerStatusSelect } from '../buyer-status-select'
 import { TemperatureChip } from './temperature-chip'
 import { InfoTooltip } from '@/components/info-tooltip'
 import { BUYER_LEAD_STATUS_LABELS, BUYER_LEAD_TRANSITIONS } from '@/lib/state-machine'
@@ -355,6 +355,7 @@ export default async function FichaCompradorPage({
   const scoreMatches = Math.min(100, bestMatchScore)
   const statusEngagementMap: Record<string, number> = {
     NUEVO: 15,
+    NO_CONTESTA: 15,
     CONTACTADO: 35,
     CUALIFICADO: 60,
     EN_NEGOCIACION: 80,
@@ -429,7 +430,7 @@ export default async function FichaCompradorPage({
               <h1 className="text-[22px] font-bold leading-tight tracking-[-0.02em] text-foreground">
                 {needSummary}
               </h1>
-              <StatusPill status={lead.status} entity="buyer" />
+              <BuyerStatusSelect leadId={lead.id} status={lead.status} buyerName={lead.name} />
               <TemperatureChip leadId={lead.id} temperature={lead.temperature} />
               {isTerminal && (
                 <span className="text-[11px] text-muted-foreground">Estado final</span>
