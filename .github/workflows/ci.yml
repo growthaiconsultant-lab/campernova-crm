@@ -53,6 +53,12 @@ jobs:
       - name: Unit tests
         run: pnpm test
 
+      - name: Install table navigation browsers
+        run: pnpm exec playwright install --with-deps chromium webkit
+
+      - name: Table navigation (Chromium and WebKit, no backend)
+        run: pnpm test:table-navigation
+
   integration:
     name: integration
     runs-on: ubuntu-latest

@@ -13,6 +13,8 @@ export interface Column<T> {
   header: React.ReactNode
   /** Contenido de la celda. */
   cell: (row: T) => React.ReactNode
+  /** false para celdas con controles o enlaces propios; __cta siempre queda fuera. */
+  rowLink?: boolean
   align?: 'left' | 'right' | 'center'
   /** Cifras/códigos → JetBrains Mono. */
   mono?: boolean
@@ -24,7 +26,7 @@ export interface ActionableTableProps<T> {
   columns: Column<T>[]
   rows: T[]
   rowKey: (row: T) => string
-  /** Enlace de fila (drill-down) — toda la fila navega a la ficha. */
+  /** Enlace de fila: las celdas informativas navegan a la ficha. */
   rowHref?: (row: T) => string
   onRowClick?: (row: T) => void
   empty?: React.ReactNode
@@ -102,6 +104,8 @@ export function ActionableTable<T>({
     </div>
   )
 
+  const firstLinkedColumn = columns.findIndex((c) => c.rowLink !== false && c.key !== '__cta')
+
   return (
     <>
       {mobileList}
@@ -133,36 +137,37 @@ export function ActionableTable<T>({
                   onClick={onRowClick ? () => onRowClick(row) : undefined}
                   className={cn(
                     'group border-b border-line2 transition-colors last:border-0',
-                    interactive && 'cursor-pointer hover:bg-line2',
-                    href && 'relative'
+                    interactive && 'cursor-pointer hover:bg-line2'
                   )}
                 >
-                  {columns.map((c, ci) => (
-                    <td
-                      key={c.key}
-                      className={cn(
-                        'px-[18px] py-3 align-middle font-hanken text-[13px] font-semibold text-ink',
-                        c.mono && 'font-mono',
-                        ALIGN[c.align ?? 'left'],
-                        // La columna CTA queda por encima del overlay de fila.
-                        c.key === '__cta' && 'relative z-[1]',
-                        c.className
-                      )}
-                    >
-                      {/* Drill-down: la 1ª celda lleva el enlace estirado que hace
-                        clicable toda la fila (stretched-link) sin anidar <a> en <tr>. */}
-                      {href && ci === 0 ? (
-                        <Link
-                          href={href}
-                          className="after:absolute after:inset-0 after:content-['']"
-                        >
-                          {c.cell(row)}
-                        </Link>
-                      ) : (
-                        c.cell(row)
-                      )}
-                    </td>
-                  ))}
+                  {columns.map((c, ci) => {
+                    const cellHref = c.rowLink !== false && c.key !== '__cta' ? href : undefined
+                    return (
+                      <td
+                        key={c.key}
+                        className={cn(
+                          'px-[18px] py-3 align-middle font-hanken text-[13px] font-semibold text-ink',
+                          c.mono && 'font-mono',
+                          ALIGN[c.align ?? 'left'],
+                          // WebKit sí contiene el enlace absoluto dentro de td, no de tr.
+                          cellHref && 'relative',
+                          c.className
+                        )}
+                      >
+                        {cellHref ? (
+                          <Link
+                            href={cellHref}
+                            tabIndex={ci === firstLinkedColumn ? undefined : -1}
+                            className="after:absolute after:inset-0 after:content-['']"
+                          >
+                            {c.cell(row)}
+                          </Link>
+                        ) : (
+                          c.cell(row)
+                        )}
+                      </td>
+                    )
+                  })}
                 </tr>
               )
             })}
