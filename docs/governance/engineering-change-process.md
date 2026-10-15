@@ -281,9 +281,10 @@ de auditoría ni base de métricas de negocio.
 > `app/global-error.tsx` (`Sentry.captureException`). **Session Replay** en cliente con
 > `maskAllText: true` + `blockAllMedia: true`. DSN vía `NEXT_PUBLIC_SENTRY_DSN`; source maps vía
 > `SENTRY_AUTH_TOKEN`. Muestreo de trazas 10% prod / 100% dev-staging; replay 1% sesión / 100% error.
-> **No existen** hoy `beforeSend`, `setUser`, `setContext`, `setTag`, `addBreadcrumb`, `withScope`
-> ni `ignoreErrors` → la instrumentación contextual y el scrubbing server-side son **recomendaciones**,
-> no hechos.
+> `beforeSend` cliente tiene un filtro acotado para el error del puente de Instagram/iOS,
+> documentado en [OBS-1](../specs/OBS-1-instagram-bridge-error.md); no cambia el envío del formulario.
+> No existen `setUser`, `setContext`, `setTag`, `addBreadcrumb`, `withScope` ni `ignoreErrors`:
+> la instrumentación contextual y el scrubbing server-side siguen siendo recomendaciones.
 
 **Qué capturar:** excepciones inesperadas; fallos técnicos no recuperables; errores de integraciones;
 fallos de Server Actions que **no** sean errores de dominio esperados; degradaciones de rendimiento
