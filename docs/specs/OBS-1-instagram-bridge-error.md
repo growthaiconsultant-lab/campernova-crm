@@ -1,15 +1,15 @@
 # OBS-1 — Distinguir el error del puente de Instagram de los errores del formulario
 
-| Campo               | Valor                                                                    |
-| ------------------- | ------------------------------------------------------------------------ |
-| **Estado**          | IMPLEMENTED                                                              |
-| **Owner**           | Engineering                                                              |
-| **Ticket**          | Alerta CAMPERNOVA-CRM-1K enviada por el usuario el 2026-10-15            |
-| **Rama / PR**       | codex/sentry-instagram-bridge; sin PR                                    |
-| **Categorías**      | C0, C9                                                                   |
-| **Riesgo**          | Medio: evitar ocultar errores propios en observabilidad                  |
-| **Ruta SDD**        | Estándar: filtro cliente acotado, sin datos, permisos ni lógica de envío |
-| **Última revisión** | 2026-10-15                                                               |
+| Campo               | Valor                                                                                   |
+| ------------------- | --------------------------------------------------------------------------------------- |
+| **Estado**          | DEPLOYED                                                                                |
+| **Owner**           | Engineering                                                                             |
+| **Ticket**          | Alerta CAMPERNOVA-CRM-1K enviada por el usuario el 2026-10-15                           |
+| **Rama / PR**       | [PR #201](https://github.com/growthaiconsultant-lab/campernova-crm/pull/201), fusionada |
+| **Categorías**      | C0, C9                                                                                  |
+| **Riesgo**          | Medio: evitar ocultar errores propios en observabilidad                                 |
+| **Ruta SDD**        | Estándar: filtro cliente acotado, sin datos, permisos ni lógica de envío                |
+| **Última revisión** | 2026-10-15                                                                              |
 
 ## Problema y evidencia
 
@@ -113,11 +113,21 @@ ajuste, fusionar la PR y desplegarlo; no se requieren migraciones ni cambios en 
 
 ## Cierre
 
-- **Commit/PR/CI/Deployment:** publicación autorizada; evidencia final en la PR de esta rama.
+- **Commit/PR:** PR #201 fusionada el 2026-10-15; main
+  `d49405466cd83bb2cb35db879fde8c4f4793c57d`.
+- **CI:** [run 38747474542](https://github.com/growthaiconsultant-lab/campernova-crm/actions/runs/38747474542)
+  superado: quality (tipos, lint, SDD y 1.835 unitarios), integración PostgreSQL,
+  migration-replay y Supabase Storage. Preview Vercel READY
+  `dpl_4Sim8GcMZ6duvbzJxwVYGrUsdu2X`; formulario cargado sin errores de consola.
+- **Producción:** deployment `dpl_AGZ5JHUBQuqzc4wmfVqZBQESvPy9` READY y asociado
+  al commit de main por el check Vercel. Alias campersnova.com comprobado contra
+  ese deployment el 2026-10-15. Formulario /vender/empezar cargado, paso Vehículo
+  visible y botón Continuar habilitado; sin errores de consola en la comprobación.
 - **Validación:** implementación local, 25 tests focalizados y 1.835 unitarios
   completos, typecheck, lint, SDD y formato/diff superados. El primer ensayo del
   parser resolvía el entrypoint Node del SDK y no reconocía sintaxis Safari;
   corregido para cargar el parser de navegador instalado, con prueba verde.
-  Sin CI ni despliegue; integración DB/E2E de envío no aplican al filtro y no se ejecutaron.
-- **Deuda restante:** publicación y observación real posterior; el
+  Integración DB/replay/Storage sí ejecutados por CI; E2E de envío no aplica al filtro
+  y no se ejecutó. No se creó un lead durante las comprobaciones de navegador.
+- **Deuda restante:** observación con tráfico real posterior; el
   resultado de guardado del envío afectado no se ha determinado.
