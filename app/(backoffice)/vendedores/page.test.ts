@@ -55,9 +55,16 @@ describe('seller list', () => {
 
   it('keeps distinct destinations even for sellers with identical names, in table and cards', async () => {
     const html = renderToStaticMarkup(await VendedoresPage({ searchParams: {} }))
-    for (const id of ['seller-a', 'seller-b']) {
-      expect(html.match(new RegExp(`href="/vendedores/${id}"`, 'g'))).toHaveLength(2)
-    }
+    const tableRows = html.match(/<tbody>([\s\S]*?)<\/tbody>/)![1].match(/<tr\b[\s\S]*?<\/tr>/g)!
+    expect(tableRows).toHaveLength(2)
+    const cards = html.slice(0, html.indexOf('<table'))
+    ;['seller-a', 'seller-b'].forEach((id, index) => {
+      // Every informative cell may link, but all links in a row must target that seller.
+      const links = tableRows[index].match(/href="\/vendedores\/[^"?]+"/g)!
+      expect(links.length).toBeGreaterThan(0)
+      expect(new Set(links)).toEqual(new Set([`href="/vendedores/${id}"`]))
+      expect(cards.match(new RegExp(`href="/vendedores/${id}"`, 'g'))).toHaveLength(1)
+    })
     expect(html).toContain('Paginación de vendedores superior')
     expect(html).toContain('Paginación de vendedores inferior')
     expect(html).toContain('Vende tu camper')

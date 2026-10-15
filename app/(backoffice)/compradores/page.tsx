@@ -252,7 +252,7 @@ export default async function CompradoresPage({ searchParams }: { searchParams: 
     {
       key: 'source',
       header: 'Origen',
-      className: 'relative z-[1]',
+      rowLink: false,
       cell: (l) => (
         <div>
           <BuyerQuickSelect {...leadRef(l)} field="source" value={l.source} />
@@ -263,19 +263,19 @@ export default async function CompradoresPage({ searchParams }: { searchParams: 
     {
       key: 'temp',
       header: 'Temp.',
-      className: 'relative z-[1]',
+      rowLink: false,
       cell: (l) => <BuyerQuickSelect {...leadRef(l)} field="temperature" value={l.temperature} />,
     },
     {
       key: 'stage',
       header: 'Estado',
-      className: 'relative z-[1]',
+      rowLink: false,
       cell: (l) => <BuyerStatusSelect leadId={l.id} status={l.status} buyerName={l.name} />,
     },
     {
       key: 'next',
       header: 'Próxima acción',
-      className: 'relative z-[1]',
+      rowLink: false,
       cell: (l) => (
         <BuyerNextActionControl
           {...leadRef(l)}
@@ -306,7 +306,7 @@ export default async function CompradoresPage({ searchParams }: { searchParams: 
     {
       key: 'agent',
       header: 'Resp.',
-      className: 'relative z-[1]',
+      rowLink: false,
       cell: (l) => (
         <BuyerQuickSelect
           {...leadRef(l)}
