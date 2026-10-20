@@ -356,6 +356,7 @@ export default async function FichaCompradorPage({
   const statusEngagementMap: Record<string, number> = {
     NUEVO: 15,
     NO_CONTESTA: 15,
+    BAJO_PEDIDO: 15,
     CONTACTADO: 35,
     CUALIFICADO: 60,
     EN_NEGOCIACION: 80,

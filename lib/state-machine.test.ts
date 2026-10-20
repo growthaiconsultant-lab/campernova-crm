@@ -10,6 +10,12 @@ import {
 } from './state-machine'
 
 describe('transiciones permisivas de leads', () => {
+  it('Bajo pedido permanece activo y permite corregir su clasificación', () => {
+    expect(BUYER_LEAD_STATUS_LABELS.BAJO_PEDIDO).toBe('Bajo pedido')
+    expect(BUYER_LEAD_ACTIVE_STATUSES).toContain('BAJO_PEDIDO')
+    expect(isValidTransition(BUYER_LEAD_TRANSITIONS, 'NUEVO', 'BAJO_PEDIDO')).toBe(true)
+    expect(isValidTransition(BUYER_LEAD_TRANSITIONS, 'BAJO_PEDIDO', 'CONTACTADO')).toBe(true)
+  })
   it('No contesta permanece activo y se puede corregir a Contactado', () => {
     expect(BUYER_LEAD_STATUS_LABELS.NO_CONTESTA).toBe('No contesta')
     expect(BUYER_LEAD_ACTIVE_STATUSES).toContain('NO_CONTESTA')

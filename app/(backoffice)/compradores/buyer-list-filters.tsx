@@ -34,6 +34,7 @@ type Props = { agents: Agent[] }
 const STATUS_COLORS: Record<string, string> = {
   NUEVO: '#3a6fd4',
   NO_CONTESTA: '#c2410c',
+  BAJO_PEDIDO: '#0e7490',
   CONTACTADO: '#7c3aed',
   CUALIFICADO: '#0891b2',
   EN_NEGOCIACION: '#c9820a',

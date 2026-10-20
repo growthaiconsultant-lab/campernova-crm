@@ -34,6 +34,7 @@ export function buyerLeadStage(status: BuyerLeadStatus): BuyerFunnelStage {
   switch (status) {
     case 'NUEVO':
     case 'NO_CONTESTA':
+    case 'BAJO_PEDIDO': // Clasificación de búsqueda; no acredita contacto, oferta ni reserva.
       return 'lead'
     case 'CONTACTADO':
       return 'contactado'

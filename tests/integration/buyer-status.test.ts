@@ -54,6 +54,27 @@ async function fixture() {
 }
 
 describe('COM-5 estado del comprador — PostgreSQL real', () => {
+  it('COM-8 persiste y filtra Bajo pedido, permite corrección y audita sin cambiar la ficha', async () => {
+    const lead = await fixture()
+    const input = { leadId: lead.id, expectedStatus: 'NUEVO', status: 'BAJO_PEDIDO' }
+    expect(await setBuyerStatus(input)).toEqual({ ok: true })
+    expect(await setBuyerStatus(input)).toEqual({ ok: true })
+    expect(await db.buyerLead.count({ where: { id: lead.id, status: 'BAJO_PEDIDO' } })).toBe(1)
+    expect(await db.buyerLead.findUniqueOrThrow({ where: { id: lead.id } })).toEqual({
+      ...lead,
+      status: 'BAJO_PEDIDO',
+      updatedAt: expect.any(Date),
+    })
+    const activities = await db.activity.findMany({ where: { buyerLeadId: lead.id } })
+    expect(activities).toHaveLength(1)
+    expect(activities[0]).toMatchObject({
+      type: 'CAMBIO_ESTADO',
+      content: 'Estado cambiado: Nuevo → Bajo pedido',
+    })
+    expect(
+      await setBuyerStatus({ leadId: lead.id, expectedStatus: 'BAJO_PEDIDO', status: 'CONTACTADO' })
+    ).toEqual({ ok: true })
+  })
   it('COM-7 enum migrado, filtrado y corrección de No contesta conservan la ficha', async () => {
     const lead = await fixture()
     expect(
