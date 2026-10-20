@@ -70,6 +70,7 @@ describe('isBuyerEligible', () => {
     for (const status of [
       'NUEVO',
       'NO_CONTESTA',
+      'BAJO_PEDIDO',
       'CONTACTADO',
       'CUALIFICADO',
       'EN_NEGOCIACION',

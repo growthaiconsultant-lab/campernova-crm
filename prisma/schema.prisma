@@ -118,6 +118,7 @@ enum BuyerLeadStatus {
   EN_NEGOCIACION
   CERRADO
   PERDIDO
+  BAJO_PEDIDO
 }
 
 // sugerido → propuesto_cliente → visita → oferta → cerrado / rechazado

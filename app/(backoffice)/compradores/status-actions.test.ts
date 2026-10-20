@@ -85,6 +85,7 @@ describe('COM-5 cambio rápido de estado', () => {
 
   it.each([
     'NO_CONTESTA',
+    'BAJO_PEDIDO',
     'CONTACTADO',
     'CUALIFICADO',
     'EN_NEGOCIACION',
