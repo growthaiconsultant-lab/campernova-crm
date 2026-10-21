@@ -5,6 +5,7 @@ import { TEMPERATURE_LABELS } from '@/lib/lead-temperature'
 import { BUYER_LEAD_ACTIVE_STATUSES } from '@/lib/state-machine'
 import { Eyebrow, EmptyState } from '@/components/redesign'
 import { cn } from '@/lib/utils'
+import { SearchRequestBadge } from '@/components/search-request-badge'
 import type { LeadTemperature } from '@prisma/client'
 
 /**
@@ -172,6 +173,7 @@ export default async function PipelinePage() {
                           <div className="mt-1 font-mono text-[10.5px] text-ink3">
                             {b.maxBudget ? `hasta ${EUR(Number(b.maxBudget))}` : 'sin presupuesto'}
                           </div>
+                          <SearchRequestBadge leadId={b.id} className="mt-1.5" />
                           {col.key === 'oferta' && offerAmount != null && (
                             <div className="mt-1 font-mono text-[11px] font-semibold text-warn">
                               oferta {EUR(offerAmount)}

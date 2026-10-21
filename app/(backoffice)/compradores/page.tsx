@@ -9,6 +9,7 @@ import { buyerSourceFilter } from '@/lib/buyer-source'
 import { BUYER_LEAD_STATUS_LABELS } from '@/lib/state-machine'
 import { landingCaptureSelection } from '@/lib/landing/attribution'
 import { LandingAttribution } from '@/components/landing-attribution'
+import { SearchRequestBadge } from '@/components/search-request-badge'
 import {
   Eyebrow,
   Card,
@@ -246,6 +247,7 @@ export default async function CompradoresPage({ searchParams }: { searchParams: 
         <div>
           <div className="text-ink">{l.name}</div>
           <div className="mt-0.5 text-[11px] font-medium text-ink3">{prefs(l)}</div>
+          <SearchRequestBadge leadId={l.id} className="mt-1.5" />
         </div>
       ),
     },
@@ -402,6 +404,7 @@ export default async function CompradoresPage({ searchParams }: { searchParams: 
                 {prefs(l)}
               </div>
               <LandingAttribution activities={l.activities} compact />
+              <SearchRequestBadge leadId={l.id} className="mt-1.5" />
               <div className="mt-2 flex items-center justify-between gap-2">
                 <span className="shrink-0 font-mono text-[12px] font-semibold text-ink">
                   {l.maxBudget ? EUR(Number(l.maxBudget)) : '—'}
