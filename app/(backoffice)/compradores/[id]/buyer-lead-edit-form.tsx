@@ -1,6 +1,8 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
+import { useRouter } from 'next/navigation'
+import { createAutosave, type AutosaveState } from '@/lib/autosave'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import {
@@ -71,9 +73,9 @@ type Props = {
 
 function FieldLabel({ children }: { children: React.ReactNode }) {
   return (
-    <p className="mb-1 font-mono text-[10px] uppercase tracking-[0.12em] text-[#8b94a3]">
+    <FormLabel className="mb-1 block font-mono text-[10px] uppercase tracking-[0.12em] text-[#8b94a3]">
       {children}
-    </p>
+    </FormLabel>
   )
 }
 
@@ -83,8 +85,8 @@ const inputCls =
 // ── Component ─────────────────────────────────────────────────────────────────
 
 export function BuyerLeadEditForm({ leadId, defaultValues, agents, legacySource }: Props) {
-  const [saved, setSaved] = useState(false)
-  const [serverError, setServerError] = useState<string | null>(null)
+  const router = useRouter()
+  const [saveState, setSaveState] = useState<AutosaveState>({ status: 'idle' })
 
   const currentStatus = defaultValues.status as BuyerLeadStatus
   const allowedStatuses: BuyerLeadStatus[] = [
@@ -98,29 +100,134 @@ export function BuyerLeadEditForm({ leadId, defaultValues, agents, legacySource 
     defaultValues,
   })
 
-  const isDirty = form.formState.isDirty
+  const [autosave] = useState(() =>
+    createAutosave({
+      initial: form.getValues(),
+      onState: setSaveState,
+      validate: (data) => {
+        const result = updateBuyerLeadSchema.safeParse(data)
+        // Populate the existing inline validation messages without changing the inputs.
+        void form.trigger()
+        return result.success ? null : 'Hay cambios sin guardar. Revisa los campos indicados.'
+      },
+      save: async (data, fields) => {
+        const result = await updateBuyerLead(leadId, data, fields)
+        if ('error' in result) {
+          const error = result.error as {
+            formErrors?: string[]
+            fieldErrors?: Record<string, string[]>
+          }
+          return (
+            error.formErrors?.[0] ??
+            Object.values(error.fieldErrors ?? {}).flat()[0] ??
+            'No se ha podido guardar. Reintenta.'
+          )
+        }
+        return null
+      },
+    })
+  )
 
-  async function onSubmit(data: UpdateBuyerLeadValues) {
-    setSaved(false)
-    setServerError(null)
-    const result = await updateBuyerLead(leadId, data)
-    if ('error' in result) {
-      const fe = (result.error as { formErrors?: string[] })?.formErrors
-      setServerError(fe?.[0] ?? 'Error al guardar. Revisa los datos.')
-      return
+  useEffect(() => {
+    autosave.start()
+    const subscription = form.watch(() => autosave.change(form.getValues()))
+    const beforeUnload = (event: BeforeUnloadEvent) => {
+      if (!autosave.hasPending()) return
+      event.preventDefault()
+      event.returnValue = ''
     }
-    setSaved(true)
-    form.reset(data)
-    setTimeout(() => setSaved(false), 3000)
-  }
+    let navigating = false
+    const beforeNavigate = (event: MouseEvent) => {
+      if (
+        !autosave.hasPending() ||
+        event.defaultPrevented ||
+        event.button !== 0 ||
+        event.metaKey ||
+        event.ctrlKey ||
+        event.shiftKey ||
+        event.altKey
+      )
+        return
+      const link = event.target instanceof Element ? event.target.closest('a[href]') : null
+      if (
+        !(link instanceof HTMLAnchorElement) ||
+        link.download ||
+        (link.target && link.target !== '_self')
+      )
+        return
+      const destination = new URL(link.href)
+      if (!['http:', 'https:'].includes(destination.protocol)) return
+      if (
+        destination.origin === location.origin &&
+        destination.pathname === location.pathname &&
+        destination.search === location.search &&
+        destination.hash
+      )
+        return
+      event.preventDefault()
+      event.stopImmediatePropagation()
+      if (navigating) return
+      navigating = true
+      void autosave.flush().then((saved) => {
+        navigating = false
+        if (!saved) return
+        if (destination.origin === location.origin)
+          router.push(destination.pathname + destination.search + destination.hash)
+        else location.assign(destination.href)
+      })
+    }
+    window.addEventListener('beforeunload', beforeUnload)
+    document.addEventListener('click', beforeNavigate, true)
+    return () => {
+      subscription.unsubscribe()
+      autosave.stop()
+      window.removeEventListener('beforeunload', beforeUnload)
+      document.removeEventListener('click', beforeNavigate, true)
+    }
+  }, [autosave, form, router])
+
+  const saveMessage =
+    saveState.status === 'saving'
+      ? 'Guardando…'
+      : saveState.status === 'pending'
+        ? 'Cambios pendientes de guardar…'
+        : saveState.status === 'saved'
+          ? 'Guardado'
+          : saveState.status === 'error'
+            ? saveState.message
+            : 'Los cambios se guardan automáticamente'
 
   return (
     <Form {...form}>
-      <form onSubmit={form.handleSubmit(onSubmit)}>
+      <form
+        onSubmit={(event) => {
+          event.preventDefault()
+          void autosave.flush()
+        }}
+      >
+        <div
+          className={`sticky top-2 z-10 mb-4 flex flex-wrap items-center gap-3 rounded-lg border px-4 py-3 shadow-sm ${saveState.status === 'error' ? 'border-amber-200 bg-amber-50' : 'border-[#e6e9ee] bg-white'}`}
+        >
+          <span
+            role={saveState.status === 'error' ? 'alert' : 'status'}
+            aria-live="polite"
+            className={`flex-1 text-[12px] ${saveState.status === 'error' ? 'text-red-700' : saveState.status === 'saved' ? 'text-[#0e7d6b]' : 'text-muted-foreground'}`}
+          >
+            {saveMessage}
+          </span>
+          {saveState.status === 'error' && (
+            <Button type="submit" size="sm">
+              Reintentar guardado
+            </Button>
+          )}
+        </div>
         {/* ── Card 1: Datos del comprador ── */}
         <div className="overflow-hidden rounded-xl border border-[#e6e9ee] bg-white">
           <div className="border-b border-[#e6e9ee] px-6 py-4">
             <h2 className="text-[14px] font-semibold text-[#141922]">Datos del comprador</h2>
+            <p className="mt-1 text-xs text-muted-foreground">
+              Guardado automático de datos y preferencias
+            </p>
           </div>
           <div className="p-6">
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
@@ -357,11 +464,11 @@ export function BuyerLeadEditForm({ leadId, defaultValues, agents, legacySource 
                 render={({ field }) => (
                   <FormItem>
                     <FieldLabel>Presupuesto máximo</FieldLabel>
-                    <FormControl>
-                      <div className="relative">
-                        <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[13px] text-[#8b94a3]">
-                          €
-                        </span>
+                    <div className="relative">
+                      <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[13px] text-[#8b94a3]">
+                        €
+                      </span>
+                      <FormControl>
                         <input
                           type="number"
                           min={0}
@@ -373,8 +480,8 @@ export function BuyerLeadEditForm({ leadId, defaultValues, agents, legacySource 
                           placeholder="Sin límite"
                           className={`${inputCls} pl-7`}
                         />
-                      </div>
-                    </FormControl>
+                      </FormControl>
+                    </div>
                     <FormMessage className="text-[11px]" />
                   </FormItem>
                 )}
@@ -414,11 +521,11 @@ export function BuyerLeadEditForm({ leadId, defaultValues, agents, legacySource 
                 render={({ field }) => (
                   <FormItem>
                     <FieldLabel>Cuota máxima mensual</FieldLabel>
-                    <FormControl>
-                      <div className="relative">
-                        <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[13px] text-[#8b94a3]">
-                          €
-                        </span>
+                    <div className="relative">
+                      <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[13px] text-[#8b94a3]">
+                        €
+                      </span>
+                      <FormControl>
                         <input
                           type="number"
                           min={0}
@@ -430,8 +537,8 @@ export function BuyerLeadEditForm({ leadId, defaultValues, agents, legacySource 
                           placeholder="Sin especificar"
                           className={`${inputCls} pl-7`}
                         />
-                      </div>
-                    </FormControl>
+                      </FormControl>
+                    </div>
                     <FormMessage className="text-[11px]" />
                   </FormItem>
                 )}
@@ -775,45 +882,6 @@ export function BuyerLeadEditForm({ leadId, defaultValues, agents, legacySource 
                 ))}
               </div>
             </div>
-          </div>
-
-          {/* Save bar */}
-          <div
-            className={`flex items-center gap-3 border-t px-6 py-3 transition-colors ${
-              isDirty ? 'border-amber-200 bg-amber-50' : 'border-[#eef1f5] bg-[#fafafa]'
-            }`}
-          >
-            {isDirty && (
-              <span className="flex items-center gap-1.5 text-[12px] text-amber-700">
-                <span className="h-1.5 w-1.5 rounded-full bg-amber-500" />
-                Cambios sin guardar
-              </span>
-            )}
-            {saved && !isDirty && (
-              <span className="flex items-center gap-1.5 text-[12px] text-[#1a9d5f]">
-                <span className="h-1.5 w-1.5 rounded-full bg-[#1a9d5f]" />
-                Guardado
-              </span>
-            )}
-            {serverError && <span className="text-[12px] text-red-600">{serverError}</span>}
-            <div className="flex-1" />
-            {isDirty && (
-              <button
-                type="button"
-                onClick={() => form.reset()}
-                className="px-3 py-1.5 text-[12.5px] font-medium text-[#586173] transition-colors hover:text-[#141922]"
-              >
-                Descartar
-              </button>
-            )}
-            <Button
-              type="submit"
-              size="sm"
-              disabled={form.formState.isSubmitting}
-              className="h-8 bg-primary px-4 text-[12.5px] text-white hover:bg-primary/90"
-            >
-              {form.formState.isSubmitting ? 'Guardando…' : 'Guardar cambios'}
-            </Button>
           </div>
         </div>
       </form>

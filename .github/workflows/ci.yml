@@ -59,7 +59,7 @@ jobs:
       - name: Table navigation (Chromium and WebKit, no backend)
         run: pnpm test:table-navigation
 
-      - name: Buyer notes and scheduled actions (Chromium and WebKit, no backend)
+      - name: Buyer notes, scheduled actions and autosave (Chromium and WebKit, no backend)
         run: pnpm test:buyer-followup
 
   integration:
