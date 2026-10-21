@@ -14,6 +14,10 @@ import { LandingAttribution } from '@/components/landing-attribution'
 import { TradeInCard } from './trade-in-card'
 import { BuyerTopbarActions } from './buyer-topbar-actions'
 import { ProximaAccionCard } from './proxima-accion-card'
+import { BuyerNotesPanel } from '@/components/buyer-notes-panel'
+import { BuyerActionsPanel } from '@/components/buyer-actions-panel'
+import { buyerCommercialNotesWhere, followupPage, FOLLOWUP_PAGE_SIZE } from '@/lib/buyer-followup'
+import { createCalendarEvent } from '@/app/(backoffice)/calendario/actions'
 import { MatchesSection } from '@/components/matches-section'
 import { OffersSection } from '@/components/offers-section'
 import { isActiveHold } from '@/lib/offers'
@@ -83,12 +87,14 @@ export default async function FichaCompradorPage({
   searchParams,
 }: {
   params: { id: string }
-  searchParams: { tab?: string }
+  searchParams: { tab?: string; notesPage?: string; actionsPage?: string }
 }) {
   const activeTab = searchParams.tab ?? 'ficha'
+  const notesPage = followupPage(searchParams.notesPage)
+  const actionsPage = followupPage(searchParams.actionsPage)
 
   const currentUser = await requireAgente()
-  const [lead, agents, activities] = await Promise.all([
+  const [lead, agents, activities, commercialNotes] = await Promise.all([
     db.buyerLead.findUnique({
       where: { id: params.id },
       include: {
@@ -137,9 +143,18 @@ export default async function FichaCompradorPage({
         },
         calendarEvents: {
           where: { status: { notIn: ['CANCELADO', 'COMPLETADO', 'NO_SHOW'] } },
-          orderBy: { startAt: 'asc' },
-          take: 5,
-          select: { id: true, type: true, title: true, startAt: true, status: true },
+          orderBy: [{ startAt: 'asc' }, { id: 'asc' }],
+          skip: (actionsPage - 1) * FOLLOWUP_PAGE_SIZE,
+          take: FOLLOWUP_PAGE_SIZE + 1,
+          select: {
+            id: true,
+            type: true,
+            title: true,
+            description: true,
+            startAt: true,
+            status: true,
+            assignedTo: { select: { name: true } },
+          },
         },
         offers: {
           orderBy: { createdAt: 'desc' },
@@ -160,9 +175,47 @@ export default async function FichaCompradorPage({
       orderBy: { createdAt: 'desc' },
       take: 50,
     }),
+    db.activity.findMany({
+      where: buyerCommercialNotesWhere(params.id),
+      select: { id: true, content: true, createdAt: true, agent: { select: { name: true } } },
+      orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+      skip: (notesPage - 1) * FOLLOWUP_PAGE_SIZE,
+      take: FOLLOWUP_PAGE_SIZE + 1,
+    }),
   ])
 
   if (!lead) notFound()
+
+  function pagination(kind: 'notesPage' | 'actionsPage', page: number, hasMore: boolean) {
+    if (page === 1 && !hasMore) return null
+    const href = (next: number) => {
+      const query = new URLSearchParams({
+        tab: 'ficha',
+        notesPage: String(notesPage),
+        actionsPage: String(actionsPage),
+      })
+      query.set(kind, String(next))
+      return `/compradores/${params.id}?${query}#seguimiento`
+    }
+    return (
+      <nav
+        aria-label={kind === 'notesPage' ? 'Páginas de notas' : 'Páginas de acciones'}
+        className="mt-3 flex items-center gap-4 text-sm"
+      >
+        {page > 1 && (
+          <Link className="underline" href={href(page - 1)}>
+            Anterior
+          </Link>
+        )}
+        <span className="text-muted-foreground">Página {page}</span>
+        {hasMore && (
+          <Link className="underline" href={href(page + 1)}>
+            Siguiente
+          </Link>
+        )}
+      </nav>
+    )
+  }
 
   const isTerminal = !BUYER_LEAD_TRANSITIONS[lead.status as BuyerLeadStatus]
   const statusLabel = BUYER_LEAD_STATUS_LABELS[lead.status as BuyerLeadStatus] ?? lead.status
@@ -465,6 +518,18 @@ export default async function FichaCompradorPage({
             </div>
 
             <div className="mt-2 flex flex-wrap items-center gap-2">
+              <Link
+                href={`/compradores/${lead.id}?tab=ficha#buyer-notes-title`}
+                className="rounded-full border border-border bg-card px-3 py-1 text-[12px] font-medium text-sidebar-primary"
+              >
+                Escribir nota
+              </Link>
+              <Link
+                href={`/compradores/${lead.id}?tab=ficha#buyer-actions-title`}
+                className="rounded-full border border-border bg-card px-3 py-1 text-[12px] font-medium text-sidebar-primary"
+              >
+                Próximas acciones
+              </Link>
               {lead.email && (
                 <a
                   href={`mailto:${lead.email}`}
@@ -579,6 +644,64 @@ export default async function FichaCompradorPage({
           </Suspense>
         </div>
       </section>
+
+      {activeTab === 'ficha' && (
+        <div
+          id="seguimiento"
+          className="grid scroll-mt-20 grid-cols-1 gap-4 border-b border-border p-4 md:p-8 xl:grid-cols-2"
+        >
+          <BuyerNotesPanel
+            notes={commercialNotes.slice(0, FOLLOWUP_PAGE_SIZE).map((note) => ({
+              id: note.id,
+              content: note.content,
+              createdAt: note.createdAt.toISOString(),
+              author: note.agent?.name ?? 'Comercial',
+            }))}
+            addNote={addBuyerLeadNote.bind(null, lead.id)}
+            afterSaveHref={
+              notesPage > 1
+                ? `/compradores/${lead.id}?tab=ficha&actionsPage=${actionsPage}#buyer-notes-title`
+                : undefined
+            }
+            pagination={pagination(
+              'notesPage',
+              notesPage,
+              commercialNotes.length > FOLLOWUP_PAGE_SIZE
+            )}
+          />
+          <BuyerActionsPanel
+            buyerLeadId={lead.id}
+            actorId={currentUser.id}
+            archived={lead.archivedAt !== null}
+            createAction={createCalendarEvent}
+            actions={lead.calendarEvents.slice(0, FOLLOWUP_PAGE_SIZE).map((event) => ({
+              id: event.id,
+              title: event.title,
+              description: event.description,
+              startAt: event.startAt.toISOString(),
+              assignee: event.assignedTo?.name ?? null,
+              overdue: event.startAt < new Date(),
+            }))}
+            pagination={pagination(
+              'actionsPage',
+              actionsPage,
+              lead.calendarEvents.length > FOLLOWUP_PAGE_SIZE
+            )}
+            legacyAction={
+              lead.nextActionType ? (
+                <ProximaAccionCard
+                  phone={null}
+                  leadId={lead.id}
+                  leadName={lead.name}
+                  status={lead.status}
+                  nextActionType={lead.nextActionType}
+                  nextActionDueAt={lead.nextActionDueAt?.toISOString() ?? null}
+                />
+              ) : undefined
+            }
+          />
+        </div>
+      )}
 
       {/* ── Body grid ── */}
       <div className="grid flex-1 grid-cols-1 lg:grid-cols-[1fr_320px]">
@@ -850,57 +973,6 @@ export default async function FichaCompradorPage({
                   : 'Esta ficha está cerrada, perdida o archivada. No admite nuevos intereses.'
               }
             />
-
-            {/* Próxima acción — dark gradient card (client, logs WhatsApp) */}
-            <ProximaAccionCard
-              phone={lead.phone}
-              leadId={lead.id}
-              leadName={lead.name}
-              status={lead.status}
-              nextActionType={lead.nextActionType}
-              nextActionDueAt={lead.nextActionDueAt ? lead.nextActionDueAt.toISOString() : null}
-            />
-
-            {/* Citas y eventos (F2 calendario) */}
-            <div className="rounded-xl border border-border bg-card p-5">
-              <div className="mb-3 flex items-center justify-between">
-                <p className="font-mono text-[10px] uppercase tracking-[0.12em] text-muted-foreground">
-                  Citas y eventos
-                </p>
-                <Link
-                  href={`/calendario/nuevo?type=CITA&buyer=${lead.id}`}
-                  className="text-[11px] font-medium text-sidebar-primary hover:underline"
-                >
-                  + Agendar
-                </Link>
-              </div>
-              {lead.calendarEvents.length === 0 ? (
-                <p className="text-[12px] text-muted-foreground">Sin citas próximas.</p>
-              ) : (
-                <div className="space-y-2">
-                  {lead.calendarEvents.map((ev) => (
-                    <Link
-                      key={ev.id}
-                      href={`/calendario/${ev.id}`}
-                      className="block rounded-lg border border-border px-3 py-2 transition-colors hover:bg-muted"
-                    >
-                      <p className="truncate text-[12.5px] font-medium text-foreground">
-                        {ev.title}
-                      </p>
-                      <p className="mt-0.5 font-mono text-[11px] text-muted-foreground">
-                        {new Date(ev.startAt).toLocaleString('es-ES', {
-                          day: 'numeric',
-                          month: 'short',
-                          hour: '2-digit',
-                          minute: '2-digit',
-                          timeZone: 'Europe/Madrid',
-                        })}
-                      </p>
-                    </Link>
-                  ))}
-                </div>
-              )}
-            </div>
 
             {/* Alert: open tickets */}
             {hasAlert && (

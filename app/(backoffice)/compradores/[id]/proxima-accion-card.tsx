@@ -58,7 +58,7 @@ export function ProximaAccionCard({
         className="relative font-mono text-[10px] uppercase tracking-[0.12em]"
         style={{ color: '#0e7d6b' }}
       >
-        Próxima acción
+        Acción destacada
       </p>
       <NextActionEditor
         leadType="buyer"
