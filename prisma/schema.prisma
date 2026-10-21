@@ -881,6 +881,16 @@ model VehicleValuationAttempt {
 
 /// Lead de comprador — persona que busca comprar un vehículo.
 /// criticalEquipment es JSONB con flags: solar, kitchen, bathroom, shower, heating.
+/// Server-managed rotation. Empty/disabled until an operator configures verified user IDs.
+model BuyerLeadAssignment {
+  id        Int      @id @default(1)
+  enabled   Boolean  @default(false)
+  agentIds  String[] @map("agent_ids")
+  nextIndex Int      @default(0) @map("next_index")
+
+  @@map("buyer_lead_assignment")
+}
+
 model BuyerLead {
   id                     String              @id @default(cuid())
   name                   String
