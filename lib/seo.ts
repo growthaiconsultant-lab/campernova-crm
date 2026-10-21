@@ -74,6 +74,7 @@ export const PRIVATE_PATH_PREFIXES = [
 /** Rutas públicas estáticas para el sitemap. */
 export const PUBLIC_ROUTES = [
   '/',
+  '/busqueda-bajo-pedido',
   '/comprar',
   '/vender',
   '/como-funciona',

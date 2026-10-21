@@ -7,6 +7,7 @@ import { usePathname } from 'next/navigation'
 const NAV_LINKS: { href: string; label: string; activePath?: string }[] = [
   { href: '/', label: 'Inicio' },
   { href: '/comprar', label: 'Comprar' },
+  { href: '/busqueda-bajo-pedido', label: 'Búsqueda a medida' },
   { href: '/vender', label: 'Vender' },
   { href: '/como-funciona', label: 'Cómo funciona' },
   { href: '/sobre', label: 'Sobre nosotros' },
@@ -45,7 +46,7 @@ export function PublicNav() {
         </Link>
 
         {/* Desktop nav links */}
-        <nav className="hidden items-center gap-7 lg:flex" aria-label="Navegación principal">
+        <nav className="hidden items-center gap-7 xl:flex" aria-label="Navegación principal">
           {NAV_LINKS.map(({ href, label, activePath }) => {
             const active = isActive(href, activePath)
             return (

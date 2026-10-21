@@ -125,6 +125,12 @@ jobs:
       - name: Integration tests
         run: pnpm test:integration
 
+      - name: Install search questionnaire browsers
+        run: pnpm exec playwright install --with-deps chromium webkit
+
+      - name: Public search form to CRM (desktop, Android and iPhone)
+        run: pnpm test:search-request
+
       # Guard de despliegue (solo lectura) end-to-end contra la base efímera migrada: debe
       # devolver PASS porque todas las migraciones locales están aplicadas. No usa secretos ni
       # se conecta a staging/producción; el marcador de entorno valida la guarda anti-confusión.
