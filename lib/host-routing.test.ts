@@ -6,6 +6,17 @@ const APEX = 'campersnova.com'
 const base = { crmHost: CRM, apexHost: APEX }
 
 describe('resolveHostRedirect', () => {
+  it('keeps the new search page public and sends CRM visitors to the apex', () => {
+    expect(
+      resolveHostRedirect({ ...base, host: APEX, pathname: '/busqueda-bajo-pedido' })
+    ).toBeNull()
+    expect(resolveHostRedirect({ ...base, host: CRM, pathname: '/busqueda-bajo-pedido' })).toBe(
+      `https://${APEX}/busqueda-bajo-pedido`
+    )
+    expect(
+      resolveHostRedirect({ ...base, host: APEX, pathname: '/api/landing/busqueda-bajo-pedido' })
+    ).toBeNull()
+  })
   it('apex + ruta de backoffice → CRM (preserva query)', () => {
     expect(resolveHostRedirect({ ...base, host: APEX, pathname: '/dashboard', search: '' })).toBe(
       `https://${CRM}/dashboard`

@@ -11,6 +11,7 @@ import { vehicleLabel } from '@/lib/display'
 import { BuyerLeadEditForm } from './buyer-lead-edit-form'
 import { buyerSourceLabel, isBuyerSource } from '@/lib/buyer-source'
 import { LandingAttribution } from '@/components/landing-attribution'
+import { searchSnapshotId } from '@/lib/search-request/intake'
 import { TradeInCard } from './trade-in-card'
 import { BuyerTopbarActions } from './buyer-topbar-actions'
 import { ProximaAccionCard } from './proxima-accion-card'
@@ -94,7 +95,7 @@ export default async function FichaCompradorPage({
   const actionsPage = followupPage(searchParams.actionsPage)
 
   const currentUser = await requireAgente()
-  const [lead, agents, activities, commercialNotes] = await Promise.all([
+  const [lead, agents, activities, commercialNotes, searchRequest] = await Promise.all([
     db.buyerLead.findUnique({
       where: { id: params.id },
       include: {
@@ -181,6 +182,10 @@ export default async function FichaCompradorPage({
       orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
       skip: (notesPage - 1) * FOLLOWUP_PAGE_SIZE,
       take: FOLLOWUP_PAGE_SIZE + 1,
+    }),
+    db.activity.findFirst({
+      where: { id: searchSnapshotId(params.id), buyerLeadId: params.id, agentId: null },
+      select: { content: true, createdAt: true },
     }),
   ])
 
@@ -567,6 +572,26 @@ export default async function FichaCompradorPage({
 
         {/* KPI tiles — mismo lenguaje que la ficha de vendedor */}
         <LandingAttribution activities={activities} />
+        {searchRequest && (
+          <section
+            className="mt-4 rounded-xl border border-border bg-card p-4"
+            aria-label="Ficha de búsqueda web"
+          >
+            <h2 className="text-sm font-semibold">Solicitud de búsqueda recibida desde la web</h2>
+            <p className="mt-1 text-xs text-muted-foreground">
+              Respuestas originales del cliente ·{' '}
+              {searchRequest.createdAt.toLocaleDateString('es-ES')}
+            </p>
+            <details className="mt-3">
+              <summary className="cursor-pointer text-sm font-medium text-primary">
+                Ver todas las respuestas de la ficha
+              </summary>
+              <p className="mt-4 whitespace-pre-wrap break-words text-sm leading-relaxed">
+                {searchRequest.content}
+              </p>
+            </details>
+          </section>
+        )}
         <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-5">
           {/* Mejor match (ancla) */}
           <div className="rounded-xl border border-border bg-card px-4 py-3">

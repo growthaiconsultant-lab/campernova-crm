@@ -3,18 +3,18 @@ import Link from 'next/link'
 const STEPS = [
   {
     num: '01',
-    title: 'Cuéntanos con tus palabras',
-    desc: '"Somos pareja, queremos algo manejable para escapadas en los Pirineos, presupuesto sobre 45.000 €". Sin formularios eternos.',
+    title: 'Cuéntanos qué buscas',
+    desc: 'Completa tu ficha con el presupuesto, las plazas y las características que necesitas. Si tienes dudas, puedes dejar preguntas en blanco.',
   },
   {
     num: '02',
-    title: 'Te orientamos con preguntas útiles',
-    desc: 'El asistente afina contigo el tipo de viaje, las plazas reales que necesitas y los plazos. Sin presión, sin venta forzada.',
+    title: 'Revisamos tus preferencias',
+    desc: 'El equipo revisa qué es imprescindible para ti y qué opciones podrías valorar. Así preparamos una conversación útil.',
   },
   {
     num: '03',
-    title: 'El equipo te llama con propuestas',
-    desc: 'Cuando tenemos lo importante, Esteban del equipo te pasa 2-3 vehículos reales que tenemos o podemos traer. Por WhatsApp o llamada, tú eliges.',
+    title: 'Tu asesor te llama',
+    desc: 'Un asesor de CampersNova contactará contigo para comentar tu búsqueda y acordar los siguientes pasos.',
   },
 ]
 
@@ -35,20 +35,20 @@ export function SearchMethod() {
               className="text-[2rem] font-bold leading-tight tracking-[-0.02em] lg:text-[2.4rem]"
               style={{ color: 'var(--cn-teal-900)', fontFamily: 'var(--font-fraunces)' }}
             >
-              No buscamos por filtros. Buscamos por conversación.
+              La camper que buscas empieza por lo que necesitas.
             </h2>
           </div>
           <div>
             <p className="mb-5 text-[15px] leading-relaxed" style={{ color: 'var(--cn-ink-500)' }}>
-              Olvídate de chequear casillas y comparar fichas que parecen iguales. Nos cuentas qué
-              buscas con tus palabras y proponemos vehículos reales que encajan contigo.
+              Cuéntanos cómo quieres tu camper o autocaravana. Recogemos tus preferencias y te
+              llamamos para ayudarte a definir tu búsqueda.
             </p>
             <Link
-              href="/comprar"
+              href="/busqueda-bajo-pedido"
               className="inline-flex items-center gap-2 rounded-full px-5 py-3 text-[13px] font-semibold text-white transition-opacity hover:opacity-90"
               style={{ background: 'var(--cn-terra-500)' }}
             >
-              Empezar conversación
+              Completar mi ficha de búsqueda
               <svg
                 width="14"
                 height="14"
