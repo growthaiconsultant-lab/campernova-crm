@@ -44,6 +44,44 @@ beforeEach(() => {
 })
 
 describe('updateBuyerLead', () => {
+  it('autoguardado no sobrescribe campos ajenos ni audita valores obsoletos', async () => {
+    mockDb.buyerLead.findUnique.mockResolvedValue({
+      status: 'PERDIDO',
+      agentId: 'other',
+      agent: { name: 'Otro' },
+    })
+    expect(await updateBuyerLead('b1', { ...baseInput, maxBudget: 60000 }, ['maxBudget'])).toEqual({
+      ok: true,
+    })
+    expect(mockDb.buyerLead.update).toHaveBeenCalledWith({
+      where: { id: 'b1' },
+      data: { maxBudget: 60000 },
+    })
+    expect(mockDb.activity.create).not.toHaveBeenCalled()
+    expect(mockDb.user.findUnique).not.toHaveBeenCalled()
+  })
+  it.each([
+    { fields: [] },
+    { fields: ['archivedAt'] },
+    { fields: ['__proto__'] },
+    { fields: 'maxBudget' },
+  ])('rechaza selección de campos arbitraria $fields', async ({ fields }) => {
+    expect(await updateBuyerLead('b1', baseInput, fields)).toHaveProperty('error')
+    expect(mockDb.buyerLead.findUnique).not.toHaveBeenCalled()
+    expect(mockDb.buyerLead.update).not.toHaveBeenCalled()
+  })
+  it('autoguardado conserva la restricción de cierre', async () => {
+    mockDb.buyerLead.findUnique.mockResolvedValue({
+      status: 'CONTACTADO',
+      agentId: null,
+      agent: null,
+    })
+    mockDb.delivery.findFirst.mockResolvedValue(null)
+    expect(
+      await updateBuyerLead('b1', { ...baseInput, status: 'CERRADO' }, ['status'])
+    ).toHaveProperty('error')
+    expect(mockDb.buyerLead.update).not.toHaveBeenCalled()
+  })
   it('el formulario admite Bajo pedido y conserva su auditoría', async () => {
     mockDb.buyerLead.findUnique.mockResolvedValue({ status: 'NUEVO', agentId: null, agent: null })
     expect(await updateBuyerLead('b1', { ...baseInput, status: 'BAJO_PEDIDO' })).toEqual({

@@ -711,6 +711,7 @@ export default async function FichaCompradorPage({
           {activeTab === 'ficha' && (
             <div className="space-y-4">
               <BuyerLeadEditForm
+                key={lead.id}
                 leadId={lead.id}
                 defaultValues={defaultValues}
                 agents={agents}

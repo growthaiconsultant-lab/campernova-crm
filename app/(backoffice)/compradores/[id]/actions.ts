@@ -13,7 +13,7 @@ import {
 import { isValidLostReason, LOST_REASON_LABELS } from '@/lib/lost-reason'
 import type { BuyerLeadStatus, LostReason } from '@prisma/client'
 
-export async function updateBuyerLead(leadId: string, data: unknown) {
+export async function updateBuyerLead(leadId: string, data: unknown, changedFields?: unknown) {
   const actor = await requireAgente()
 
   const parsed = updateBuyerLeadSchema.safeParse(data)
@@ -21,13 +21,19 @@ export async function updateBuyerLead(leadId: string, data: unknown) {
     return { error: parsed.error.flatten() }
   }
 
+  const fieldSelection = updateBuyerLeadSchema.keyof().array().min(1).safeParse(changedFields)
+  if (changedFields !== undefined && !fieldSelection.success) {
+    return { error: { formErrors: ['Campos de actualización no válidos'], fieldErrors: {} } }
+  }
+  const fields = changedFields === undefined ? null : new Set(fieldSelection.data)
+
   const {
     name,
     email,
     phone,
     source,
-    status,
-    agentId,
+    status: requestedStatus,
+    agentId: requestedAgentId,
     vehicleType,
     minSeats,
     maxBudget,
@@ -53,6 +59,9 @@ export async function updateBuyerLead(leadId: string, data: unknown) {
     select: { status: true, agentId: true, agent: { select: { name: true } } },
   })
   if (!currentLead) return { error: { formErrors: ['Lead no encontrado'], fieldErrors: {} } }
+
+  const status = !fields || fields.has('status') ? requestedStatus : currentLead.status
+  const agentId = !fields || fields.has('agentId') ? requestedAgentId : currentLead.agentId
 
   if (!isValidTransition(BUYER_LEAD_TRANSITIONS, currentLead.status, status)) {
     return {
@@ -120,33 +129,35 @@ export async function updateBuyerLead(leadId: string, data: unknown) {
   await db.$transaction(async (tx) => {
     await tx.buyerLead.update({
       where: { id: leadId },
-      data: {
-        name,
-        email,
-        phone,
-        // Un cliente anterior o un origen legacy no debe borrar la atribución existente.
-        ...(source !== undefined ? { source } : {}),
-        status,
-        agentId: agentId ?? null,
-        vehicleType: vehicleType ?? null,
-        minSeats: minSeats ?? null,
-        maxBudget: maxBudget ?? null,
-        financingNeeded: financingNeeded ?? null,
-        maxMonthlyPayment: maxMonthlyPayment ?? null,
-        criticalEquipment,
-        useZone: useZone ?? null,
-        purchaseTimeline: purchaseTimeline ?? null,
-        preferredCategory: preferredCategory ?? null,
-        preferredBedLayout: preferredBedLayout ?? null,
-        sleepingPlacesRequired: sleepingPlacesRequired ?? null,
-        bathroomRequired: bathroomRequired ?? null,
-        licenseType: licenseType ?? null,
-        needsWinter: needsWinter ?? null,
-        needsGarage: needsGarage ?? null,
-        maxLengthM: maxLengthM ?? null,
-        maxHeightM: maxHeightM ?? null,
-        hasKids: hasKids ?? null,
-      },
+      data: Object.fromEntries(
+        Object.entries({
+          name,
+          email,
+          phone,
+          // Un cliente anterior o un origen legacy no debe borrar la atribución existente.
+          ...(source !== undefined ? { source } : {}),
+          status,
+          agentId: agentId ?? null,
+          vehicleType: vehicleType ?? null,
+          minSeats: minSeats ?? null,
+          maxBudget: maxBudget ?? null,
+          financingNeeded: financingNeeded ?? null,
+          maxMonthlyPayment: maxMonthlyPayment ?? null,
+          criticalEquipment,
+          useZone: useZone ?? null,
+          purchaseTimeline: purchaseTimeline ?? null,
+          preferredCategory: preferredCategory ?? null,
+          preferredBedLayout: preferredBedLayout ?? null,
+          sleepingPlacesRequired: sleepingPlacesRequired ?? null,
+          bathroomRequired: bathroomRequired ?? null,
+          licenseType: licenseType ?? null,
+          needsWinter: needsWinter ?? null,
+          needsGarage: needsGarage ?? null,
+          maxLengthM: maxLengthM ?? null,
+          maxHeightM: maxHeightM ?? null,
+          hasKids: hasKids ?? null,
+        }).filter(([key]) => !fields || fields.has(key as keyof typeof parsed.data))
+      ),
     })
     if (agentChanging && agentActivityContent) {
       await tx.activity.create({
