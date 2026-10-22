@@ -35,6 +35,9 @@ por teléfono o correo conocido se anexan al cliente existente sin consumir turn
   canónica y se conservan sus datos originales. Notas conservan ID, autor y timestamp.
 - Las fichas con contratos, entregas, garantías, documentos privados o conflictos de matching se
   bloquean para revisión especializada; no hay fusión financiera implícita.
+- Si ambas asociaciones al mismo vehículo son sugerencias automáticas sin agenda ni ofertas,
+  se conserva la canónica y la otra permanece íntegra en el original archivado. Las asociaciones
+  sin coincidencia se trasladan. Estados avanzados o asociaciones manuales siguen bloqueados.
 - Las cinco altas, el cambio de contacto y la fusión coordinan identidad en transacción.
 - Si teléfono y correo identifican canónicas distintas, se rechaza el alta sin crear otra ficha.
 - No se envían datos de un cliente existente a formularios públicos.
