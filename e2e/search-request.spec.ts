@@ -40,7 +40,11 @@ test.afterAll(async () => {
 test.beforeEach(async ({ page }) => {
   await page.goto('/busqueda-bajo-pedido')
   const cookies = page.getByRole('button', { name: 'Solo esenciales', exact: true })
-  if (await cookies.isVisible()) await cookies.click()
+  // Fresh contexts have no consent. Wait for hydration so a late banner cannot cover the form.
+  await expect(cookies).toBeVisible({ timeout: 15000 })
+  await cookies.click()
+  await expect(page.getByRole('dialog', { name: 'Aviso de cookies' })).toBeHidden()
+  await expect(page).toHaveURL(/\/busqueda-bajo-pedido$/)
   page.on('request', (req) => {
     if (req.url().endsWith('/api/landing/busqueda-bajo-pedido') && req.method() === 'POST')
       leadIds.add(searchRequestId(req.postDataJSON().requestId))

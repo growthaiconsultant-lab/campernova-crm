@@ -2,6 +2,11 @@ import { describe, it, expect } from 'vitest'
 import { resolveLegacyRedirect, isLegacyGone } from './legacy-redirects'
 
 describe('resolveLegacyRedirect', () => {
+  it('canonicalizes questionnaire .html links before the login guard', () => {
+    expect(resolveLegacyRedirect('/busqueda-bajo-pedido.html')).toBe('/busqueda-bajo-pedido')
+    expect(resolveLegacyRedirect('/busqueda-bajo-pedido.html/')).toBe('/busqueda-bajo-pedido')
+    expect(resolveLegacyRedirect('/busqueda-bajo-pedido-private')).toBeNull()
+  })
   it('mapea las páginas con valor SEO que cambian de slug', () => {
     expect(resolveLegacyRedirect('/tasacion')).toBe('/vender')
     expect(resolveLegacyRedirect('/gestion-de-venta')).toBe('/vender')

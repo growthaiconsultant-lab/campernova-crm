@@ -12,6 +12,7 @@
 
 /** Mapeo exacto de páginas que cambian de slug. */
 const EXACT: Record<string, string> = {
+  '/busqueda-bajo-pedido.html': '/busqueda-bajo-pedido',
   '/tasacion': '/vender',
   '/gestion-de-venta': '/vender',
   '/cars': '/comprar',
