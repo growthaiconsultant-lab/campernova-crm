@@ -1,4 +1,5 @@
 import { test, expect, type Page } from '@playwright/test'
+import { randomInt } from 'node:crypto'
 import { searchPayload } from '../tests/fixtures/search-request'
 import { FORM_STEPS, QUESTION_SECTIONS } from '../lib/search-request/questions'
 import {
@@ -67,6 +68,8 @@ test('complete revised questionnaire reaches real CRM with assignment and follow
   page,
 }, info) => {
   const input = searchPayload(true)
+  input.answers.phone = `6${randomInt(10000000, 99999999)}`
+  input.answers.email = `${prefix}-${uniqueSuffix()}@example.invalid`
   await expect(page.getByRole('img', { name: 'CampersNova', exact: true })).toBeVisible()
   await expect(page.getByText('Permisos de conducir disponibles')).toHaveCount(0)
   await expect(page.getByText('Autonomía y lo que llevarás contigo')).toHaveCount(0)
@@ -118,7 +121,7 @@ test('validation, back navigation and lost confirmation retry preserve answers a
   await page.getByRole('button', { name: 'Continuar' }).click()
   await expect(page.locator('#field-name')).toBeFocused()
   await page.locator('#field-name').fill('Prueba de reintento')
-  await page.locator('#field-phone').fill('600000000')
+  await page.locator('#field-phone').fill(`6${randomInt(10000000, 99999999)}`)
   await page.getByRole('button', { name: 'Continuar' }).click()
   await page.getByRole('button', { name: 'Anterior' }).click()
   await expect(page.locator('#field-name')).toHaveValue('Prueba de reintento')
