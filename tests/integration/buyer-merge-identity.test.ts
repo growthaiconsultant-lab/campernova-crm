@@ -2,6 +2,7 @@ import { randomInt } from 'node:crypto'
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
 import { createGuardedTestPrisma, uniqueSuffix } from './db'
 import { buyerMergePreview, mergeBuyerLeads } from '@/lib/buyer-merge'
+import { buyerSearchWhere } from '@/lib/buyer-search'
 import { BuyerIdentityConflict, findBuyerIdentity, lockBuyerIdentity } from '@/lib/buyer-identity'
 import { saveLandingBuyer, landingBuyerSchema } from '@/lib/landing/buyer-intake'
 import { saveSearchRequest } from '@/lib/search-request/intake'
@@ -135,6 +136,9 @@ describe('buyer merge and identity against PostgreSQL', () => {
     })
     expect(unified.agentId).toBe(agents[1])
     expect(unified.chatSessions).toHaveLength(2)
+    expect(
+      (await db.buyerLead.findMany({ where: buyerSearchWhere(source.name) })).map((row) => row.id)
+    ).toEqual([target.id])
     for (const original of notes)
       expect(unified.activities.find((a) => a.id === original.id)).toEqual({
         ...original,

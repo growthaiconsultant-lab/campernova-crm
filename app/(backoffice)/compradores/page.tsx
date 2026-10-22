@@ -3,6 +3,7 @@ import { Plus } from 'lucide-react'
 import { db } from '@/lib/db'
 import { requireAgente } from '@/lib/auth'
 import { leadListView } from '@/lib/lead-list-view'
+import { buyerSearchWhere } from '@/lib/buyer-search'
 import { BuyerListFilters } from './buyer-list-filters'
 import { BuyerStatusSelect } from './buyer-status-select'
 import { BuyerNextActionControl, BuyerQuickSelect } from './buyer-quick-controls'
@@ -59,13 +60,7 @@ function buildWhere(
 
   if (sp.q) {
     const q = sp.q.trim()
-    conditions.push({
-      OR: [
-        { name: { contains: q, mode: 'insensitive' } },
-        { email: { contains: q, mode: 'insensitive' } },
-        { phone: { contains: q, mode: 'insensitive' } },
-      ],
-    })
+    conditions.push(buyerSearchWhere(q))
   }
 
   if (sp.status) {

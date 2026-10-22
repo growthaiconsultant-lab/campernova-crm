@@ -243,7 +243,7 @@ export async function mergeBuyerLeads(
           type: 'NOTA',
           buyerLeadId: p.target.id,
           agentId: input.actorId,
-          content: `COM-13: fichas unificadas. Responsable: ${p.responsible.name}. Se conservan notas, autores, fechas y conversaciones.`,
+          content: `COM-13: ficha «${p.source.name}» unificada con «${p.target.name}». Responsable: ${p.responsible.name}. Se conservan notas, autores, fechas y conversaciones.`,
         },
       })
       await tx.kpiEvent.create({
