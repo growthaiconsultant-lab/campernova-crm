@@ -373,7 +373,7 @@ export function BuyerLeadForm() {
         {duplicate && (
           <div className="rounded-lg border border-amber-300 bg-amber-50 p-4">
             <p className="text-sm font-medium text-amber-800">
-              Ya existe un comprador con este teléfono
+              Ya existe un comprador con este teléfono o correo
             </p>
             <p className="mt-1 text-sm text-amber-700">
               <Link
@@ -385,21 +385,11 @@ export function BuyerLeadForm() {
               (
               {BUYER_STATUS_LABELS[duplicate.status as keyof typeof BUYER_STATUS_LABELS] ??
                 duplicate.status}
-              ). Revisa si es la misma persona antes de crear un duplicado.
+              ). Continúa el seguimiento en su ficha para conservar el responsable y el historial.
             </p>
             <div className="mt-3 flex flex-wrap gap-2">
               <Button asChild size="sm" variant="outline">
                 <Link href={`/compradores/${duplicate.id}`}>Abrir ficha existente</Link>
-              </Button>
-              <Button
-                type="button"
-                size="sm"
-                variant="ghost"
-                className="text-amber-700"
-                disabled={form.formState.isSubmitting}
-                onClick={() => submit(form.getValues(), true)}
-              >
-                Crear de todas formas
               </Button>
             </div>
           </div>

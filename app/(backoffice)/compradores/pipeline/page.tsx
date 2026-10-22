@@ -43,6 +43,7 @@ export default async function PipelinePage() {
 
   const buyers = await db.buyerLead.findMany({
     where: {
+      mergedIntoId: null,
       status: { in: BUYER_LEAD_ACTIVE_STATUSES },
       ...(isAgente ? { agentId: currentUser.id } : {}),
     },

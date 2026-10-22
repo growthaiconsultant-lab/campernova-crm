@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 import { landingBuyerSchema, saveLandingBuyer } from '@/lib/landing/buyer-intake'
 import { LandingRateLimitError } from '@/lib/landing/seller-intake'
+import { BuyerIdentityConflict } from '@/lib/buyer-identity'
 import { authenticateBuyerLeadAds } from '@/lib/landing/lead-ads-auth'
 
 export const runtime = 'nodejs'
@@ -67,6 +68,8 @@ export async function POST(request: NextRequest) {
     }
     return json({ ok: true })
   } catch (error) {
+    if (error instanceof BuyerIdentityConflict)
+      return json({ ok: false, error: 'contact_review' }, 409)
     if (error instanceof LandingRateLimitError) return json({ ok: false, error: 'rate_limit' }, 429)
     // No request, contact details or database error payload in logs.
     console.error('[landing/buyer] persistence failed')

@@ -104,7 +104,13 @@ describe('POST /api/chat/buyer/message — flujo correcto', () => {
     const txCreate = vi.fn().mockResolvedValue({ id: 'lead-1', name: 'Ana', email: 'a@b.com' })
     mockDb.$transaction.mockImplementation(async (cb: (tx: unknown) => Promise<unknown>) =>
       cb({
-        buyerLead: { create: txCreate },
+        buyerLead: { create: txCreate, findMany: vi.fn().mockResolvedValue([]) },
+        buyerContact: {
+          findMany: vi.fn().mockResolvedValue([]),
+          findUnique: vi.fn().mockResolvedValue(null),
+          create: vi.fn(),
+        },
+        $executeRaw: vi.fn(),
         buyerChatSession: { update: vi.fn() },
         activity: { create: vi.fn() },
       })

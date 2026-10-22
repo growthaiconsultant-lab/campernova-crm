@@ -102,7 +102,11 @@ describe('search request with real PostgreSQL and assignment trigger', () => {
     ).rejects.toBeInstanceOf(SearchRequestConflict)
   })
   it('serializes the IP quota under a race, including missing IP; a retry remains accepted at quota', async () => {
-    const inputs = Array.from({ length: 11 }, () => searchPayload())
+    const inputs = Array.from({ length: 11 }, (_, i) => {
+      const input = searchPayload()
+      input.answers.phone = `+34${600000100 + i}`
+      return input
+    })
     const results = await Promise.allSettled(
       inputs.map((input, i) => saveSearchRequest(i % 2 ? db : other, input, null))
     )
@@ -142,7 +146,7 @@ describe('search request with real PostgreSQL and assignment trigger', () => {
     }
     await saveSearchRequest(db, input, null)
   })
-  it('keeps requests when the pool is inactive and never updates an existing buyer by phone', async () => {
+  it('keeps repeated requests on one buyer when the pool is inactive, preserving the owner and preferences', async () => {
     await db.user.updateMany({ where: { id: { in: agents } }, data: { active: false } })
     const first = searchPayload()
     const second = searchPayload()
@@ -151,7 +155,8 @@ describe('search request with real PostgreSQL and assignment trigger', () => {
     const leads = await db.buyerLead.findMany({
       where: { id: { in: [searchRequestId(first.requestId), searchRequestId(second.requestId)] } },
     })
-    expect(leads).toHaveLength(2)
+    expect(leads).toHaveLength(1)
     expect(leads.every((l) => l.agentId === null && l.nextActionType === 'LLAMAR')).toBe(true)
+    expect(await db.activity.count({ where: { buyerLeadId: leads[0].id } })).toBe(2)
   })
 })

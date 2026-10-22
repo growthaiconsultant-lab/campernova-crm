@@ -1,4 +1,5 @@
 'use server'
+import { buyerSearchWhere } from '@/lib/buyer-search'
 
 import { db } from '@/lib/db'
 import { requireAuth } from '@/lib/auth'
@@ -38,7 +39,7 @@ export async function globalSearch(query: string): Promise<SearchResults> {
   const [buyers, sellers, vehicles, captures] = await Promise.all([
     canSearchCommercial
       ? db.buyerLead.findMany({
-          where: { OR: [{ name: contains }, { email: contains }, { phone: contains }] },
+          where: buyerSearchWhere(q),
           select: { id: true, name: true, phone: true, status: true },
           orderBy: { updatedAt: 'desc' },
           take: 5,

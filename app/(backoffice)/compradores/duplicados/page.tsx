@@ -18,7 +18,11 @@ export default async function LeadDuplicatesPage() {
     agent: { select: { name: true } },
   } as const
   const [buyers, sellers] = await Promise.all([
-    db.buyerLead.findMany({ select, orderBy: [{ createdAt: 'asc' }, { id: 'asc' }] }),
+    db.buyerLead.findMany({
+      where: { mergedIntoId: null },
+      select,
+      orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
+    }),
     db.sellerLead.findMany({ select, orderBy: [{ createdAt: 'asc' }, { id: 'asc' }] }),
   ])
   const sections = [
@@ -61,6 +65,18 @@ export default async function LeadDuplicatesPage() {
                     </li>
                   ))}
                 </ul>
+                {path === 'compradores' &&
+                  group.leads.length === 2 &&
+                  group.leads.every(
+                    (lead) => !lead.archivedAt && !['PERDIDO', 'CERRADO'].includes(lead.status)
+                  ) && (
+                    <Link
+                      className="mt-3 inline-block underline"
+                      href={`/compradores/duplicados/unificar?ids=${group.leads.map((lead) => lead.id).join(',')}`}
+                    >
+                      Revisar unificación
+                    </Link>
+                  )}
               </div>
             ))}
           </section>

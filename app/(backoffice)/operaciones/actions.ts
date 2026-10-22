@@ -80,7 +80,10 @@ export async function searchOperationalTargets(raw: unknown) {
           ? (
               await db.buyerLead.findMany({
                 ...paging,
-                where: query ? { name: { contains: query, mode: 'insensitive' } } : {},
+                where: {
+                  mergedIntoId: null,
+                  ...(query ? { name: { contains: query, mode: 'insensitive' } } : {}),
+                },
                 orderBy: [{ name: 'asc' }, { id: 'asc' }],
                 select: { id: true, name: true },
               })

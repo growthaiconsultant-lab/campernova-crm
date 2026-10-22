@@ -12,6 +12,12 @@ import {
 } from '@/lib/state-machine'
 import { isValidLostReason, LOST_REASON_LABELS } from '@/lib/lost-reason'
 import type { BuyerLeadStatus, LostReason } from '@prisma/client'
+import {
+  lockBuyerIdentity,
+  findBuyerIdentity,
+  rememberBuyerContact,
+  BuyerIdentityConflict,
+} from '@/lib/buyer-identity'
 
 export async function updateBuyerLead(leadId: string, data: unknown, changedFields?: unknown) {
   const actor = await requireAgente()
@@ -127,6 +133,20 @@ export async function updateBuyerLead(leadId: string, data: unknown, changedFiel
   }
 
   await db.$transaction(async (tx) => {
+    await lockBuyerIdentity(tx)
+    const saved = await tx.buyerLead.findUniqueOrThrow({ where: { id: leadId } })
+    if (saved.mergedIntoId)
+      throw new Error('Esta ficha se ha unificado. Vuelve a abrirla para continuar.')
+    if (!fields || fields.has('phone') || fields.has('email')) {
+      const contact = {
+        phone: !fields || fields.has('phone') ? phone : saved.phone,
+        email: !fields || fields.has('email') ? email : saved.email,
+      }
+      const duplicate = await findBuyerIdentity(tx, contact)
+      if (duplicate && duplicate.id !== leadId) throw new BuyerIdentityConflict()
+      await rememberBuyerContact(tx, leadId, saved)
+      await rememberBuyerContact(tx, leadId, contact)
+    }
     await tx.buyerLead.update({
       where: { id: leadId },
       data: Object.fromEntries(
@@ -247,15 +267,25 @@ export async function addBuyerLeadNote(leadId: string, content: string) {
   if (!trimmed) return { error: 'El contenido no puede estar vacío' }
   if (trimmed.length > 2000) return { error: 'Máximo 2000 caracteres' }
 
-  await db.activity.create({
-    data: {
-      type: 'NOTA',
-      content: trimmed,
-      agentId: actor.id,
-      buyerLeadId: leadId,
-    },
+  const canonicalId = await db.$transaction(async (tx) => {
+    await lockBuyerIdentity(tx)
+    const lead = await tx.buyerLead.findUniqueOrThrow({
+      where: { id: leadId },
+      select: { id: true, mergedIntoId: true },
+    })
+    const canonicalId = lead.mergedIntoId ?? lead.id
+    await tx.activity.create({
+      data: {
+        type: 'NOTA',
+        content: trimmed,
+        agentId: actor.id,
+        buyerLeadId: canonicalId,
+      },
+    })
+    return canonicalId
   })
 
   revalidatePath(`/compradores/${leadId}`)
+  revalidatePath(`/compradores/${canonicalId}`)
   return { ok: true }
 }

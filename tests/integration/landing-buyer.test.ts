@@ -1,4 +1,4 @@
-import { randomUUID } from 'node:crypto'
+import { randomUUID, randomInt } from 'node:crypto'
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest'
 import type { PrismaClient } from '@prisma/client'
 import { createGuardedTestPrisma } from './db'
@@ -29,6 +29,8 @@ afterAll(async () => {
 })
 function input() {
   const p = landingBuyerSchema.parse(landingBuyerPayload(randomUUID()))
+  p.contacto = `6${randomInt(10000000, 99999999)}`
+  p.respuestas.telefono = p.contacto
   ids.push(landingBuyerId(p))
   return p
 }

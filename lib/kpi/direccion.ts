@@ -29,7 +29,7 @@ export async function getDireccionKpis(
   db: PrismaClient,
   filter: DashboardFilter
 ): Promise<DireccionKpis> {
-  const buyerWhere = filter.agentId ? { agentId: filter.agentId } : {}
+  const buyerWhere = { mergedIntoId: null, ...(filter.agentId ? { agentId: filter.agentId } : {}) }
   const vehWhere = filter.agentId ? { sellerLead: { agentId: filter.agentId } } : {}
 
   const [

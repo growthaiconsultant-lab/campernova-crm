@@ -3,6 +3,7 @@ import { db } from '@/lib/db'
 import { searchRequestSchema } from '@/lib/search-request/schema'
 import { saveSearchRequest, SearchRequestConflict } from '@/lib/search-request/intake'
 import { LandingRateLimitError } from '@/lib/landing/seller-intake'
+import { BuyerIdentityConflict } from '@/lib/buyer-identity'
 
 export const runtime = 'nodejs'
 const json = (body: object, status = 200) =>
@@ -43,6 +44,8 @@ export async function POST(request: NextRequest) {
     await saveSearchRequest(db, parsed.data, ip)
     return json({ ok: true })
   } catch (error) {
+    if (error instanceof BuyerIdentityConflict)
+      return json({ ok: false, error: 'contact_review' }, 409)
     if (error instanceof LandingRateLimitError) return json({ ok: false, error: 'rate_limit' }, 429)
     if (error instanceof SearchRequestConflict) return json({ ok: false, error: 'conflict' }, 409)
     console.error('[search-request] persistence failed')
