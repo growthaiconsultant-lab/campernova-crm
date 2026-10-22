@@ -6,9 +6,9 @@
 | **Owner**           | Engineering / Comercial                  |
 | **Ticket**          | Petición del usuario en chat, 2026-10-22 |
 | **Rama / PR**       | codex/mis-leads-duplicados               |
-| **Categorías**      | C0, C1, C4                                   |
-| **Riesgo**          | Medio                                     |
-| **Ruta SDD**        | Reforzada                                 |
+| **Categorías**      | C0, C1, C4                               |
+| **Riesgo**          | Medio                                    |
+| **Ruta SDD**        | Reforzada                                |
 | **Última revisión** | 2026-10-22                               |
 
 ## Problema y evidencia
@@ -102,4 +102,3 @@ La consulta de producción no autoriza modificar clientes.
 ## Consulta administrativa y autorización
 
 El alcance solicitado incluye desplegar la vista personal y comprobar duplicados en producción. La consulta /compradores/duplicados exige requireAdmin antes de leer compradores y vendedores, compara teléfono normalizado y correo y muestra sólo fichas, responsables y estados. Las coincidencias pueden corresponder a familiares; no se fusionan ni reasignan registros. No se serializan contactos al HTML ni a logs. Pruebas de control de acceso y render sin contactos: 2; agrupación: 5. La sesión administrativa del usuario ya está disponible para validar tras desplegar. No hay migraciones ni escrituras de negocio. Rollback: revertir el commit; detener ante fallo de quality o exposición de contactos.
-
