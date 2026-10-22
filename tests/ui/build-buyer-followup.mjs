@@ -12,6 +12,7 @@ async function main() {
     entryPoints: {
       app: 'tests/ui/buyer-followup-fixture.tsx',
       autosave: 'tests/ui/buyer-autosave-fixture.tsx',
+      searchRequest: 'tests/ui/search-request-fixture.tsx',
     },
     bundle: true,
     outdir: '.artifacts/buyer-followup',

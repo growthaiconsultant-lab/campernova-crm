@@ -12,6 +12,8 @@ import { BuyerLeadEditForm } from './buyer-lead-edit-form'
 import { buyerSourceLabel, isBuyerSource } from '@/lib/buyer-source'
 import { LandingAttribution } from '@/components/landing-attribution'
 import { searchSnapshotId } from '@/lib/search-request/intake'
+import { SearchRequestBadge } from '@/components/search-request-badge'
+import { SearchRequestCard } from '@/components/search-request-card'
 import { TradeInCard } from './trade-in-card'
 import { BuyerTopbarActions } from './buyer-topbar-actions'
 import { ProximaAccionCard } from './proxima-accion-card'
@@ -490,6 +492,7 @@ export default async function FichaCompradorPage({
                 {needSummary}
               </h1>
               <BuyerStatusSelect leadId={lead.id} status={lead.status} buyerName={lead.name} />
+              <SearchRequestBadge leadId={lead.id} />
               <TemperatureChip leadId={lead.id} temperature={lead.temperature} />
               {isTerminal && (
                 <span className="text-[11px] text-muted-foreground">Estado final</span>
@@ -573,24 +576,10 @@ export default async function FichaCompradorPage({
         {/* KPI tiles — mismo lenguaje que la ficha de vendedor */}
         <LandingAttribution activities={activities} />
         {searchRequest && (
-          <section
-            className="mt-4 rounded-xl border border-border bg-card p-4"
-            aria-label="Ficha de búsqueda web"
-          >
-            <h2 className="text-sm font-semibold">Solicitud de búsqueda recibida desde la web</h2>
-            <p className="mt-1 text-xs text-muted-foreground">
-              Respuestas originales del cliente ·{' '}
-              {searchRequest.createdAt.toLocaleDateString('es-ES')}
-            </p>
-            <details className="mt-3">
-              <summary className="cursor-pointer text-sm font-medium text-primary">
-                Ver todas las respuestas de la ficha
-              </summary>
-              <p className="mt-4 whitespace-pre-wrap break-words text-sm leading-relaxed">
-                {searchRequest.content}
-              </p>
-            </details>
-          </section>
+          <SearchRequestCard
+            content={searchRequest.content}
+            receivedAt={searchRequest.createdAt.toLocaleDateString('es-ES')}
+          />
         )}
         <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-5">
           {/* Mejor match (ancla) */}

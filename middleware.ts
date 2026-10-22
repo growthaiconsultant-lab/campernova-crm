@@ -41,7 +41,8 @@ export async function middleware(request: NextRequest) {
   if (legacyDest) {
     const url = request.nextUrl.clone()
     url.pathname = legacyDest
-    url.search = ''
+    // Shared questionnaire links retain campaign parameters when using the .html alias.
+    if (legacyDest !== '/busqueda-bajo-pedido') url.search = ''
     return NextResponse.redirect(url, 308)
   }
 

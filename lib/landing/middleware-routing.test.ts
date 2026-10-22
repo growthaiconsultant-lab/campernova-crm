@@ -15,12 +15,15 @@ describe('campaign public routes', () => {
     '/encuentra-tu-camper',
     '/vende-tu-camper.html',
     '/encuentra-tu-camper.html',
+    '/busqueda-bajo-pedido',
+    '/busqueda-bajo-pedido?utm_source=whatsapp',
     '/cn-landing/cn-landing.js',
     '/cn-landing/cn-landing.css',
     '/cn-landing/fonts/Inter-latin.woff2',
     '/cn-landing/media/v-sprinter.mp4',
     '/api/landing/vende-tu-camper',
     '/api/landing/encuentra-tu-camper',
+    '/api/landing/busqueda-bajo-pedido',
   ])('serves %s without an auth lookup', async (path) => {
     const response = await middleware(new NextRequest(`https://campersnova.com${path}`))
     expect(response.headers.get('x-middleware-next')).toBe('1')
@@ -28,6 +31,8 @@ describe('campaign public routes', () => {
   })
   it.each([
     '/vendedores',
+    '/compradores',
+    '/busqueda-bajo-pedido-private',
     '/api/landing/other',
     '/cn-landing-private/file.js',
     '/private.html',
@@ -42,6 +47,7 @@ describe('campaign public routes', () => {
     '/encuentra-tu-camper.html',
     '/vende-tu-camper',
     '/encuentra-tu-camper',
+    '/busqueda-bajo-pedido',
   ])('redirects CRM %s to the public host preserving attribution', async (path) => {
     vi.stubEnv('CRM_HOST', 'crm.campersnova.com')
     const response = await middleware(
@@ -50,5 +56,15 @@ describe('campaign public routes', () => {
       })
     )
     expect(response.headers.get('location')).toBe(`https://campersnova.com${path}?utm_source=ad`)
+  })
+  it('redirects the .html questionnaire alias to the public form without checking auth', async () => {
+    const response = await middleware(
+      new NextRequest('https://campersnova.com/busqueda-bajo-pedido.html?utm_source=whatsapp')
+    )
+    expect(response.status).toBe(308)
+    expect(response.headers.get('location')).toBe(
+      'https://campersnova.com/busqueda-bajo-pedido?utm_source=whatsapp'
+    )
+    expect(mocks.updateSession).not.toHaveBeenCalled()
   })
 })
