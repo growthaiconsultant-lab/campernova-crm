@@ -50,7 +50,7 @@ function groupLost(
 export async function getCrmKpis(db: PrismaClient, filter: DashboardFilter): Promise<CrmKpis> {
   const since30 = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)
   const now = new Date()
-  const buyerWhere = filter.agentId ? { agentId: filter.agentId } : {}
+  const buyerWhere = { mergedIntoId: null, ...(filter.agentId ? { agentId: filter.agentId } : {}) }
   const sellerWhere = filter.agentId ? { agentId: filter.agentId } : {}
 
   const [

@@ -91,6 +91,7 @@ export function prismaCalendarDeps(db: PrismaClient): CalendarDeps {
         }),
         db.buyerLead.findMany({
           where: {
+            mergedIntoId: null,
             status: BUYER_ACTIVE,
             nextActionType: { not: null },
             nextActionDueAt: range,

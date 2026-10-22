@@ -149,7 +149,7 @@ export default async function NuevoEventoPage({
       orderBy: { name: 'asc' },
     }),
     db.buyerLead.findMany({
-      where: { status: { notIn: ['CERRADO', 'PERDIDO'] } },
+      where: { mergedIntoId: null, status: { notIn: ['CERRADO', 'PERDIDO'] } },
       select: { id: true, name: true },
       orderBy: { createdAt: 'desc' },
       take: 200,

@@ -3,10 +3,11 @@ import type { Prisma } from '@prisma/client'
 import { createWarrantyForDelivery } from './postventa'
 import { canManageOperationalDeliveries } from './operations-policy'
 import type { ManualDeliveryInput } from './operations-input'
-import { normalizePhone, phonesMatch } from './phone'
+import { normalizePhone } from './phone'
 import { defaultNextActionData } from './next-action'
 import { suggestTemperatureFromTimeline } from './lead-temperature'
 import { KPI_EVENTS } from './kpi/events'
+import { lockBuyerIdentity, findBuyerIdentity, rememberBuyerContact } from './buyer-identity'
 
 export class OperationalError extends Error {}
 export function operationFingerprint(value: unknown) {
@@ -20,6 +21,7 @@ async function createDeliveryBuyer(
   buyer: Extract<ManualDeliveryInput['recipient'], { type: 'newBuyer' }>,
   actorId: string
 ) {
+  await lockBuyerIdentity(tx)
   // Hashes evitan exponer contactos en consultas/locks. Orden fijo evita ciclos entre altas.
   const contacts = [`email:${buyer.email.toLowerCase()}`, `phone:${normalizePhone(buyer.phone)}`]
     .map((contact) => `delivery-buyer:${operationFingerprint(contact)}`)
@@ -27,16 +29,8 @@ async function createDeliveryBuyer(
   for (const contact of contacts) {
     await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${contact}, 0))`
   }
-  const existing = await tx.buyerLead.findMany({
-    select: { email: true, phone: true },
-  })
-  if (
-    existing.some(
-      (row) =>
-        row.email?.trim().toLowerCase() === buyer.email.toLowerCase() ||
-        phonesMatch(row.phone, buyer.phone)
-    )
-  ) {
+  const existing = await findBuyerIdentity(tx, buyer)
+  if (existing) {
     throw new OperationalError(
       'Ya existe una ficha con ese email o teléfono. Elige «Comprador existente» y búscala por su nombre.'
     )
@@ -53,6 +47,7 @@ async function createDeliveryBuyer(
     },
     select: { id: true },
   })
+  await rememberBuyerContact(tx, created.id, buyer)
   await tx.kpiEvent.create({
     data: {
       eventName: KPI_EVENTS.BUYER_CREATED,

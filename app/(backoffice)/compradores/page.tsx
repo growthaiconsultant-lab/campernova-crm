@@ -55,7 +55,7 @@ function buildWhere(
   sp: SearchParams,
   viewConditions: Prisma.BuyerLeadWhereInput
 ): Prisma.BuyerLeadWhereInput {
-  const conditions: Prisma.BuyerLeadWhereInput[] = []
+  const conditions: Prisma.BuyerLeadWhereInput[] = [{ mergedIntoId: null }]
 
   if (sp.q) {
     const q = sp.q.trim()
@@ -187,16 +187,16 @@ export default async function CompradoresPage({ searchParams }: { searchParams: 
       },
     }),
     db.user.findMany({ select: { id: true, name: true }, orderBy: { name: 'asc' } }),
-    db.buyerLead.count({ where: { agentId: null } }),
-    db.buyerLead.count({ where: { matches: { some: {} } } }),
-    db.buyerLead.count({ where: { createdAt: { gte: sevenDaysAgo } } }),
+    db.buyerLead.count({ where: { mergedIntoId: null, agentId: null } }),
+    db.buyerLead.count({ where: { mergedIntoId: null, matches: { some: {} } } }),
+    db.buyerLead.count({ where: { mergedIntoId: null, createdAt: { gte: sevenDaysAgo } } }),
     db.user.findMany({
       where: { active: true, role: { in: ['ADMIN', 'AGENTE'] } },
       select: { id: true, name: true },
       orderBy: { name: 'asc' },
     }),
-    db.buyerLead.count({ where: { agentId: currentUser.id } }),
-    db.buyerLead.count(),
+    db.buyerLead.count({ where: { mergedIntoId: null, agentId: currentUser.id } }),
+    db.buyerLead.count({ where: { mergedIntoId: null } }),
   ])
 
   const totalPages = Math.ceil(total / PAGE_SIZE)

@@ -45,7 +45,7 @@ export async function getMercadoKpis(
   db: PrismaClient,
   filter: DashboardFilter
 ): Promise<MercadoKpis> {
-  const buyerWhere = filter.agentId ? { agentId: filter.agentId } : {}
+  const buyerWhere = { mergedIntoId: null, ...(filter.agentId ? { agentId: filter.agentId } : {}) }
   const vehWhere = filter.agentId ? { sellerLead: { agentId: filter.agentId } } : {}
 
   const [buyers, stockVehicles, soldVehicles, closedOffers] = await Promise.all([

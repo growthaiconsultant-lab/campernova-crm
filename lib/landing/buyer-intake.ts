@@ -5,6 +5,13 @@ import { defaultNextActionData } from '@/lib/next-action'
 import { KPI_EVENTS } from '@/lib/kpi/events'
 import { LandingRateLimitError } from './seller-intake'
 import {
+  lockBuyerIdentity,
+  findBuyerIdentity,
+  rememberBuyerContact,
+  recordBuyerCapture,
+  BUYER_CAPTURE_EVENT,
+} from '@/lib/buyer-identity'
+import {
   landingAttributionSchema,
   landingAttributionLine,
   landingBuyerSource,
@@ -68,16 +75,30 @@ export async function saveLandingBuyer(
   const id = landingBuyerId(input)
   await client.$transaction(
     async (tx) => {
+      await lockBuyerIdentity(tx)
       const lockKey = `landing:${id}`
       await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${lockKey}, 0))`
       if (await tx.buyerLead.findUnique({ where: { id }, select: { id: true } })) return
+      if (await tx.kpiEvent.findUnique({ where: { id: `capture_${id}` }, select: { id: true } }))
+        return
+      const ipHash = createHash('sha256')
+        .update(ip ?? 'unknown')
+        .digest('hex')
       if (options.leadAds) {
         const quotaKey = 'landing:buyer:meta-lead-ads'
         await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${quotaKey}, 0))`
         const recent = await tx.kpiEvent.count({
           where: {
-            eventName: KPI_EVENTS.BUYER_CREATED,
-            metadata: { path: ['intake'], equals: 'meta_lead_ads' },
+            OR: [
+              {
+                eventName: KPI_EVENTS.BUYER_CREATED,
+                metadata: { path: ['intake'], equals: 'meta_lead_ads' },
+              },
+              {
+                eventName: BUYER_CAPTURE_EVENT,
+                metadata: { path: ['channel'], equals: 'meta_lead_ads' },
+              },
+            ],
             createdAt: { gte: new Date(now.getTime() - 3600000) },
           },
         })
@@ -86,16 +107,25 @@ export async function saveLandingBuyer(
       if (ip && !options.leadAds) {
         const quotaKey = `landing:buyer:ip:${ip}`
         await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${quotaKey}, 0))`
-        const recent = await tx.buyerLead.count({
-          where: {
-            source: { in: ['PRO', 'INSTAGRAM', 'META'] },
-            gdprConsentIp: ip,
-            createdAt: { gte: new Date(now.getTime() - 3600000) },
-          },
-        })
+        const recent =
+          (await tx.buyerLead.count({
+            where: {
+              source: { in: ['PRO', 'INSTAGRAM', 'META'] },
+              gdprConsentIp: ip,
+              createdAt: { gte: new Date(now.getTime() - 3600000) },
+            },
+          })) +
+          (await tx.kpiEvent.count({
+            where: {
+              eventName: BUYER_CAPTURE_EVENT,
+              metadata: { path: ['ipHash'], equals: ipHash },
+              createdAt: { gte: new Date(now.getTime() - 3600000) },
+            },
+          }))
         if (recent >= 10) throw new LandingRateLimitError()
       }
       const a = input.respuestas
+      const existingBuyer = await findBuyerIdentity(tx, { phone: input.contacto })
       const source = landingBuyerSource(a.atribucion ?? legacyLandingParameters(a.origen))
       const maxBudget =
         a.presupuesto === 'Menos de 50.000 €'
@@ -105,75 +135,108 @@ export async function saveLandingBuyer(
             : a.presupuesto === '65.000–80.000 €'
               ? 80000
               : null
-      await tx.buyerLead.create({
-        data: {
-          id,
-          name: input.nombre,
-          phone: input.contacto,
-          email: null,
-          agentId: null,
-          source,
-          status: 'NUEVO',
-          gdprConsentAt: now,
-          gdprConsentIp: options.leadAds ? null : ip,
-          vehicleType:
-            a.tipo === 'Autocaravana'
-              ? 'AUTOCARAVANA'
-              : a.tipo === 'Camper / furgoneta camperizada'
-                ? 'CAMPER'
-                : null,
-          maxBudget,
-          // Sleeping ranges do not establish exact sleeping or homologated travelling seats.
-          minSeats: null,
-          sleepingPlacesRequired: null,
-          useZone: null,
-          purchaseTimeline:
-            a.cuando === 'Lo antes posible'
-              ? 'menos_1_mes'
-              : a.cuando === 'En 1 a 3 meses'
-                ? '1_3_meses'
-                : null,
-          financingNeeded: a.financiacion === 'Sí' ? true : a.financiacion === 'No' ? false : null,
-          hasTradeIn:
-            a.entrega === 'Sí, quiero entregarla a cuenta'
-              ? true
-              : a.entrega === 'No'
-                ? false
-                : null,
-          ...defaultNextActionData(now),
-          activities: {
-            create: {
-              type: 'NOTA',
-              content: [
-                landingAttributionLine(a.pagina, a.atribucion, a.origen),
-                `Rango de plazas para dormir indicado: ${a.plazas}`,
-                `Rango de presupuesto indicado: ${a.presupuesto}`,
-                a.cuando === 'Más adelante' ? 'Plazo indicado: Más adelante' : null,
-                a.zona ? `Población de contacto (no zona de uso): ${a.zona}` : null,
-                a.financiacion === 'Quiero que me lo expliquéis'
-                  ? 'Solicita información sobre financiación'
+      const leadId = existingBuyer?.id ?? id
+      if (!existingBuyer)
+        await tx.buyerLead.create({
+          data: {
+            id,
+            name: input.nombre,
+            phone: input.contacto,
+            email: null,
+            agentId: null,
+            source,
+            status: 'NUEVO',
+            gdprConsentAt: now,
+            gdprConsentIp: options.leadAds ? null : ip,
+            vehicleType:
+              a.tipo === 'Autocaravana'
+                ? 'AUTOCARAVANA'
+                : a.tipo === 'Camper / furgoneta camperizada'
+                  ? 'CAMPER'
                   : null,
-                a.detalle ? `Descripción de la búsqueda: ${a.detalle}` : null,
-              ]
-                .filter(Boolean)
-                .join('\n'),
+            maxBudget,
+            // Sleeping ranges do not establish exact sleeping or homologated travelling seats.
+            minSeats: null,
+            sleepingPlacesRequired: null,
+            useZone: null,
+            purchaseTimeline:
+              a.cuando === 'Lo antes posible'
+                ? 'menos_1_mes'
+                : a.cuando === 'En 1 a 3 meses'
+                  ? '1_3_meses'
+                  : null,
+            financingNeeded:
+              a.financiacion === 'Sí' ? true : a.financiacion === 'No' ? false : null,
+            hasTradeIn:
+              a.entrega === 'Sí, quiero entregarla a cuenta'
+                ? true
+                : a.entrega === 'No'
+                  ? false
+                  : null,
+            ...defaultNextActionData(now),
+            activities: {
+              create: {
+                id: `capture_note_${id}`,
+                type: 'NOTA',
+                content: [
+                  landingAttributionLine(a.pagina, a.atribucion, a.origen),
+                  `Rango de plazas para dormir indicado: ${a.plazas}`,
+                  `Rango de presupuesto indicado: ${a.presupuesto}`,
+                  a.cuando === 'Más adelante' ? 'Plazo indicado: Más adelante' : null,
+                  a.zona ? `Población de contacto (no zona de uso): ${a.zona}` : null,
+                  a.financiacion === 'Quiero que me lo expliquéis'
+                    ? 'Solicita información sobre financiación'
+                    : null,
+                  a.detalle ? `Descripción de la búsqueda: ${a.detalle}` : null,
+                ]
+                  .filter(Boolean)
+                  .join('\n'),
+              },
             },
           },
-        },
-      })
-      await tx.kpiEvent.create({
-        data: {
-          eventName: KPI_EVENTS.BUYER_CREATED,
-          entityType: 'buyer',
-          entityId: id,
-          source: 'system',
-          metadata: {
-            campaign: 'encuentra-tu-camper',
-            buyerSource: source,
-            ...(options.leadAds ? { intake: 'meta_lead_ads' } : {}),
+        })
+      if (existingBuyer)
+        await tx.activity.create({
+          data: {
+            id: `capture_note_${id}`,
+            buyerLeadId: leadId,
+            type: 'NOTA',
+            content: [
+              landingAttributionLine(a.pagina, a.atribucion, a.origen),
+              'Nueva solicitud de un comprador existente. Se conserva su responsable y preferencias.',
+              `Tipo: ${a.tipo}. Plazas para dormir: ${a.plazas}. Presupuesto: ${a.presupuesto}. Plazo: ${a.cuando}.`,
+              a.detalle ? `Descripción: ${a.detalle}` : null,
+              a.zona ? `Población: ${a.zona}` : null,
+              a.financiacion ? `Financiación: ${a.financiacion}` : null,
+              a.entrega ? `Entrega a cuenta: ${a.entrega}` : null,
+            ]
+              .filter(Boolean)
+              .join('\n'),
           },
-        },
-      })
+        })
+      await rememberBuyerContact(tx, leadId, { phone: input.contacto })
+      if (existingBuyer)
+        await recordBuyerCapture(tx, {
+          id,
+          leadId,
+          channel: options.leadAds ? 'meta_lead_ads' : 'landing',
+          ipHash,
+          now,
+        })
+      if (!existingBuyer)
+        await tx.kpiEvent.create({
+          data: {
+            eventName: KPI_EVENTS.BUYER_CREATED,
+            entityType: 'buyer',
+            entityId: id,
+            source: 'system',
+            metadata: {
+              campaign: 'encuentra-tu-camper',
+              buyerSource: source,
+              ...(options.leadAds ? { intake: 'meta_lead_ads' } : {}),
+            },
+          },
+        })
     },
     { maxWait: 5000, timeout: 10000 }
   )

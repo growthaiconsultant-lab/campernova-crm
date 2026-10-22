@@ -1,4 +1,4 @@
-import { notFound } from 'next/navigation'
+import { notFound, redirect } from 'next/navigation'
 import { Suspense } from 'react'
 import Link from 'next/link'
 import { DocumentsPanel } from '@/components/operations/documents-panel'
@@ -11,7 +11,6 @@ import { vehicleLabel } from '@/lib/display'
 import { BuyerLeadEditForm } from './buyer-lead-edit-form'
 import { buyerSourceLabel, isBuyerSource } from '@/lib/buyer-source'
 import { LandingAttribution } from '@/components/landing-attribution'
-import { searchSnapshotId } from '@/lib/search-request/intake'
 import { SearchRequestBadge } from '@/components/search-request-badge'
 import { SearchRequestCard } from '@/components/search-request-card'
 import { TradeInCard } from './trade-in-card'
@@ -102,8 +101,10 @@ export default async function FichaCompradorPage({
       where: { id: params.id },
       include: {
         agent: true,
-        chatSession: {
+        chatSessions: {
+          orderBy: { startedAt: 'asc' },
           select: {
+            id: true,
             messages: true,
             status: true,
             startedAt: true,
@@ -186,12 +187,15 @@ export default async function FichaCompradorPage({
       take: FOLLOWUP_PAGE_SIZE + 1,
     }),
     db.activity.findFirst({
-      where: { id: searchSnapshotId(params.id), buyerLeadId: params.id, agentId: null },
+      where: { id: { startsWith: 'search_answers_' }, buyerLeadId: params.id, agentId: null },
+      orderBy: { createdAt: 'desc' },
       select: { content: true, createdAt: true },
     }),
   ])
 
   if (!lead) notFound()
+  if (lead.mergedIntoId)
+    redirect(`/compradores/${lead.mergedIntoId}?tab=${encodeURIComponent(activeTab)}`)
 
   function pagination(kind: 'notesPage' | 'actionsPage', page: number, hasMore: boolean) {
     if (page === 1 && !hasMore) return null
@@ -427,12 +431,11 @@ export default async function FichaCompradorPage({
   const scoreColor = (s: number) => (s >= 70 ? '#1a9d5f' : s >= 45 ? '#c9820a' : '#8b94a3')
 
   // Chat session (CAM-55) — leads originados en el chat /comprar
-  const chatSession = lead.chatSession
-  const chatMessages: ChatMessage[] = Array.isArray(chatSession?.messages)
-    ? (chatSession.messages as unknown as ChatMessage[])
-    : []
+  const chatMessages: ChatMessage[] = lead.chatSessions.flatMap((session) =>
+    Array.isArray(session.messages) ? (session.messages as unknown as ChatMessage[]) : []
+  )
   const chatUserMsgCount = chatMessages.filter((m) => m.role === 'user').length
-  const hasChat = !!chatSession
+  const hasChat = lead.chatSessions.length > 0
 
   // Tabs definition
   const tabs: LeadTab[] = [
@@ -808,15 +811,24 @@ export default async function FichaCompradorPage({
           {/* ── TAB: CONVERSACIÓN (CAM-55) ── */}
           {activeTab === 'conversacion' &&
             (hasChat ? (
-              <ChatTranscript
-                messages={chatMessages}
-                status={chatSession!.status}
-                startedAt={chatSession!.startedAt}
-                lastMessageAt={chatSession!.lastMessageAt}
-                completedAt={chatSession!.completedAt}
-                totalTokens={chatSession!.totalTokens}
-                llmModel={chatSession!.llmModel}
-              />
+              <div className="space-y-6">
+                {lead.chatSessions.map((session) => (
+                  <ChatTranscript
+                    key={session.id}
+                    messages={
+                      Array.isArray(session.messages)
+                        ? (session.messages as unknown as ChatMessage[])
+                        : []
+                    }
+                    status={session.status}
+                    startedAt={session.startedAt}
+                    lastMessageAt={session.lastMessageAt}
+                    completedAt={session.completedAt}
+                    totalTokens={session.totalTokens}
+                    llmModel={session.llmModel}
+                  />
+                ))}
+              </div>
             ) : (
               <div className="flex flex-col items-center justify-center rounded-xl border border-border bg-card py-16">
                 <MessagesSquare className="mb-3 h-8 w-8 text-muted-foreground/30" />

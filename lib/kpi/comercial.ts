@@ -49,7 +49,7 @@ export async function getComercialKpis(
   const now = new Date()
   const dayStart = startOfToday()
   const dayEnd = endOfToday()
-  const buyerWhere = agentId ? { agentId } : {}
+  const buyerWhere = { mergedIntoId: null, ...(agentId ? { agentId } : {}) }
   // Las solicitudes web pendientes/rechazadas viven en su bandeja de admisión y no deben
   // contaminar el trabajo diario (la web les crea una próxima acción por defecto).
   const sellerWhere = { ...admittedSellerWhere, ...(agentId ? { agentId } : {}) }

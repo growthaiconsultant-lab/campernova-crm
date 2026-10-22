@@ -38,7 +38,10 @@ export async function globalSearch(query: string): Promise<SearchResults> {
   const [buyers, sellers, vehicles, captures] = await Promise.all([
     canSearchCommercial
       ? db.buyerLead.findMany({
-          where: { OR: [{ name: contains }, { email: contains }, { phone: contains }] },
+          where: {
+            mergedIntoId: null,
+            OR: [{ name: contains }, { email: contains }, { phone: contains }],
+          },
           select: { id: true, name: true, phone: true, status: true },
           orderBy: { updatedAt: 'desc' },
           take: 5,

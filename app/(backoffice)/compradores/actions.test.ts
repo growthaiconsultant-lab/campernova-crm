@@ -8,7 +8,10 @@ vi.mock('next/cache', () => ({ revalidatePath: vi.fn() }))
 
 const { mockDb } = vi.hoisted(() => {
   const mockDb = {
-    buyerLead: { create: vi.fn(), findMany: vi.fn() },
+    buyerLead: { create: vi.fn(), findMany: vi.fn(), findUniqueOrThrow: vi.fn() },
+    buyerContact: { findMany: vi.fn(), findUnique: vi.fn(), create: vi.fn() },
+    $executeRaw: vi.fn(),
+    $transaction: vi.fn(),
     kpiEvent: { create: vi.fn() },
   }
   return { mockDb }
@@ -35,9 +38,28 @@ beforeEach(() => {
   vi.mocked(requireAgente).mockResolvedValue({ id: 'agent-1' } as never)
   mockDb.buyerLead.create.mockResolvedValue({ id: 'buyer-1' })
   mockDb.buyerLead.findMany.mockResolvedValue([]) // sin duplicados por defecto
+  mockDb.buyerLead.findUniqueOrThrow.mockResolvedValue({
+    id: 'existing',
+    name: 'Ana',
+    status: 'CONTACTADO',
+  })
+  mockDb.buyerContact.findMany.mockResolvedValue([])
+  mockDb.buyerContact.findUnique.mockResolvedValue(null)
+  mockDb.$transaction.mockImplementation(async (fn: (tx: typeof mockDb) => Promise<unknown>) =>
+    fn(mockDb)
+  )
 })
 
 describe('createBuyerLead', () => {
+  it('bloquea una identidad ambigua sin crear otra ficha', async () => {
+    mockDb.buyerLead.findMany.mockResolvedValue([
+      { id: 'a', phone: validInput.phone, email: 'other@example.com', mergedIntoId: null },
+      { id: 'b', phone: '612345678', email: validInput.email, mergedIntoId: null },
+    ])
+    const result = await createBuyerLead(validInput)
+    expect(result).toHaveProperty('error')
+    expect(mockDb.buyerLead.create).not.toHaveBeenCalled()
+  })
   it.each(['INSTAGRAM', 'PRESENCIAL', null])(
     'guarda source %s y refresca el listado',
     async (source) => {
@@ -106,12 +128,12 @@ describe('createBuyerLead', () => {
     expect(mockDb.buyerLead.create).not.toHaveBeenCalled()
   })
 
-  it('con allowDuplicate=true crea aunque exista', async () => {
+  it('un cliente antiguo no puede forzar otro responsable con allowDuplicate=true', async () => {
     mockDb.buyerLead.findMany.mockResolvedValue([
       { id: 'existing', name: 'Ana', phone: '600111222', status: 'NUEVO' },
     ])
     const res = await createBuyerLead(validInput, true)
-    expect(res).toEqual({ leadId: 'buyer-1' })
-    expect(mockDb.buyerLead.create).toHaveBeenCalled()
+    expect('duplicate' in res && res.duplicate?.id).toBe('existing')
+    expect(mockDb.buyerLead.create).not.toHaveBeenCalled()
   })
 })

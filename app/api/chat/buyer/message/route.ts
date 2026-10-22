@@ -7,7 +7,7 @@ import { registerBuyerLeadSchema } from '@/lib/chat/tools'
 import { sendBuyerChatLeadNotification } from '@/lib/email/send'
 import { defaultNextActionData } from '@/lib/next-action'
 import { suggestTemperatureFromTimeline } from '@/lib/lead-temperature'
-import { findDuplicateBuyerByPhone, prismaBuyerDedupDeps } from '@/lib/buyer-dedup'
+import { lockBuyerIdentity, findBuyerIdentity, rememberBuyerContact } from '@/lib/buyer-identity'
 import { emitKpiEvent } from '@/lib/kpi/emit'
 import { KPI_EVENTS } from '@/lib/kpi/events'
 
@@ -84,7 +84,6 @@ export async function POST(req: NextRequest) {
           execute: async (d) => {
             // CAM-66: si ya existe un comprador con este teléfono, se reutiliza
             // (no se crea un duplicado desde el chat).
-            const existing = await findDuplicateBuyerByPhone(d.telefono, prismaBuyerDedupDeps(db))
 
             const sessionData = {
               status: 'COMPLETED' as const,
@@ -104,6 +103,8 @@ export async function POST(req: NextRequest) {
             }
 
             const dbResult = await db.$transaction(async (tx) => {
+              await lockBuyerIdentity(tx)
+              const existing = await findBuyerIdentity(tx, { phone: d.telefono, email: d.email })
               const lead = existing
                 ? await tx.buyerLead.findUniqueOrThrow({ where: { id: existing.id } })
                 : await tx.buyerLead.create({
@@ -133,6 +134,7 @@ export async function POST(req: NextRequest) {
                       ...defaultNextActionData(),
                     },
                   })
+              await rememberBuyerContact(tx, lead.id, { phone: d.telefono, email: d.email })
 
               await tx.buyerChatSession.update({
                 where: { sessionToken: body.sessionToken! },
@@ -149,14 +151,14 @@ export async function POST(req: NextRequest) {
                 },
               })
 
-              return lead
+              return { lead, created: !existing }
             })
 
-            if (!existing) {
+            if (dbResult.created) {
               await emitKpiEvent({
                 event: KPI_EVENTS.BUYER_CREATED,
                 entityType: 'buyer',
-                entityId: dbResult.id,
+                entityId: dbResult.lead.id,
                 source: 'chat',
               })
             }
@@ -164,12 +166,17 @@ export async function POST(req: NextRequest) {
             // Non-blocking agent notification
             db.user
               .findMany({
-                where: { active: true, notifyOnNewLead: true, role: { in: ['ADMIN', 'AGENTE'] } },
+                where: {
+                  id: dbResult.lead.agentId ?? '__unassigned__',
+                  active: true,
+                  notifyOnNewLead: true,
+                  role: { in: ['ADMIN', 'AGENTE'] },
+                },
               })
               .then(async (agents) => {
                 if (agents.length > 0) {
                   await sendBuyerChatLeadNotification(
-                    dbResult,
+                    dbResult.lead,
                     d,
                     agents.map((a) => a.email)
                   )

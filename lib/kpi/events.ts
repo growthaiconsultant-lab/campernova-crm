@@ -12,6 +12,8 @@ export const KPI_EVENTS = {
   LEAD_LOST: 'lead_lost',
   // Compradores / vendedores
   BUYER_CREATED: 'buyer_created',
+  BUYER_CAPTURE_RECEIVED: 'buyer_capture_received',
+  BUYER_MERGED: 'buyer_merged',
   SELLER_CREATED: 'seller_created',
   // Vehículos
   VEHICLE_CAPTURED: 'vehicle_captured',

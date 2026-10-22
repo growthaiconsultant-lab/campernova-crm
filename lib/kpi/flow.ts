@@ -41,7 +41,7 @@ export async function getFlowKpis(
   filter: DashboardFilter,
   range: ResolvedRange
 ): Promise<FlowKpis> {
-  const buyerWhere = filter.agentId ? { agentId: filter.agentId } : {}
+  const buyerWhere = { mergedIntoId: null, ...(filter.agentId ? { agentId: filter.agentId } : {}) }
   const sellerWhere = filter.agentId ? { agentId: filter.agentId } : {}
   const vehWhere = filter.agentId ? { sellerLead: { agentId: filter.agentId } } : {}
 

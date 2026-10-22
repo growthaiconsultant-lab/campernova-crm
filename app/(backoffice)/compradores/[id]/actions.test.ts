@@ -8,7 +8,14 @@ vi.mock('@/lib/matching', () => ({ recalculateMatchesForBuyer: vi.fn() }))
 
 const { mockDb } = vi.hoisted(() => {
   const mockDb = {
-    buyerLead: { findUnique: vi.fn(), update: vi.fn() },
+    buyerLead: {
+      findUnique: vi.fn(),
+      findUniqueOrThrow: vi.fn(),
+      findMany: vi.fn(),
+      update: vi.fn(),
+    },
+    buyerContact: { findMany: vi.fn(), findUnique: vi.fn(), create: vi.fn() },
+    $executeRaw: vi.fn(),
     user: { findUnique: vi.fn() },
     delivery: { findFirst: vi.fn() },
     activity: { create: vi.fn() },
@@ -38,6 +45,15 @@ beforeEach(() => {
   vi.mocked(requireAgente).mockResolvedValue(agent)
   mockDb.activity.create.mockResolvedValue({})
   mockDb.buyerLead.update.mockResolvedValue({})
+  mockDb.buyerLead.findUniqueOrThrow.mockResolvedValue({
+    id: 'b1',
+    phone: '600111222',
+    email: 'ana@example.com',
+    mergedIntoId: null,
+  })
+  mockDb.buyerLead.findMany.mockResolvedValue([])
+  mockDb.buyerContact.findMany.mockResolvedValue([])
+  mockDb.buyerContact.findUnique.mockResolvedValue(null)
   mockDb.$transaction.mockImplementation(async (fn: (tx: typeof mockDb) => Promise<unknown>) =>
     fn(mockDb)
   )

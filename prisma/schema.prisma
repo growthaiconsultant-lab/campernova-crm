@@ -893,6 +893,8 @@ model BuyerLeadAssignment {
 
 model BuyerLead {
   id                     String              @id @default(cuid())
+  mergedIntoId           String?             @map("merged_into_id")
+  mergedAt               DateTime?           @map("merged_at")
   name                   String
   email                  String?
   gdprConsentAt          DateTime?           @map("gdpr_consent_at")
@@ -947,12 +949,15 @@ model BuyerLead {
   updatedAt              DateTime            @updatedAt @map("updated_at")
 
   agent                User?             @relation("AgentBuyerLeads", fields: [agentId], references: [id])
+  mergedInto           BuyerLead?        @relation("MergedBuyers", fields: [mergedIntoId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  mergedFrom           BuyerLead[]       @relation("MergedBuyers")
+  contacts             BuyerContact[]
   archivedBy           User?             @relation("ArchivedBuyerLeads", fields: [archivedById], references: [id], onDelete: SetNull)
   matches              Match[]
   activities           Activity[]
   documents            Document[]
   operationalDocuments VehicleDocument[] @relation("BuyerOperationalDocuments")
-  chatSession          BuyerChatSession?
+  chatSessions         BuyerChatSession[]
   deliveries           Delivery[]
   warranty             Warranty?
   tradeInSellerLead    SellerLead?       @relation("BuyerTradeIn", fields: [tradeInSellerLeadId], references: [id])
@@ -963,7 +968,19 @@ model BuyerLead {
   @@index([agentId])
   @@index([nextActionDueAt])
   @@index([archivedAt])
+  @@index([mergedIntoId])
   @@map("buyer_leads")
+}
+
+/// Hashed historical contact aliases; only server-side writers may read or register identities.
+model BuyerContact {
+  hash        String    @id
+  buyerLeadId String    @map("buyer_lead_id")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  buyerLead   BuyerLead @relation(fields: [buyerLeadId], references: [id], onDelete: Cascade)
+
+  @@index([buyerLeadId])
+  @@map("buyer_contacts")
 }
 
 /// Sesión de chat para captación de comprador vía /comprar.
@@ -988,7 +1005,7 @@ model BuyerChatSession {
   gdprConsentAt DateTime? @map("gdpr_consent_at")
   gdprConsentIp String?   @map("gdpr_consent_ip")
 
-  buyerLeadId String?    @unique @map("buyer_lead_id")
+  buyerLeadId String?    @map("buyer_lead_id")
   buyerLead   BuyerLead? @relation(fields: [buyerLeadId], references: [id])
 
   ipAddress      String? @map("ip_address")
@@ -1003,6 +1020,7 @@ model BuyerChatSession {
 
   @@index([status])
   @@index([startedAt])
+  @@index([buyerLeadId])
   @@map("buyer_chat_sessions")
 }
 

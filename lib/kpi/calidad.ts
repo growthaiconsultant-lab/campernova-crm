@@ -31,7 +31,7 @@ export async function getCalidadKpis(
   db: PrismaClient,
   filter: DashboardFilter
 ): Promise<CalidadKpis> {
-  const buyerWhere = filter.agentId ? { agentId: filter.agentId } : {}
+  const buyerWhere = { mergedIntoId: null, ...(filter.agentId ? { agentId: filter.agentId } : {}) }
   const vehWhere = filter.agentId ? { sellerLead: { agentId: filter.agentId } } : {}
 
   const [buyers, vehicles, eventsTotal, eventsTraced, salesNoMargin] = await Promise.all([
