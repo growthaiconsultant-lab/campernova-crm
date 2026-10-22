@@ -2,10 +2,10 @@
 
 | Campo               | Valor                       |
 | ------------------- | --------------------------- |
-| **Estado**          | APPROVED                    |
+| **Estado**          | VALIDATED                   |
 | **Owner**           | Engineering / Comercial     |
 | **Ticket**          | Petición en chat 2026-10-22 |
-| **Rama / PR**       | codex/unifica-compradores   |
+| **Rama / PR**       | PR #211 y #212              |
 | **Categorías**      | C1, C2, C3, C4, C6          |
 | **Riesgo**          | Alto                        |
 | **Ruta SDD**        | Reforzada                   |
@@ -77,22 +77,28 @@ Fusiones masivas, reabrir leads perdidos, reasignar otras carteras, alterar cont
 
 ## Criterios de aceptación
 
-- [ ] Las dos parejas autorizadas quedan en una ficha canónica con dueño verificado.
-- [ ] Todas las notas conservan contenido, ID, autor y fecha; conversaciones originales accesibles.
-- [ ] Altas repetidas de diferentes canales, incluso concurrentes, no crean otro cliente/responsable.
-- [ ] Idempotencia de payload/requestId y cuotas se mantienen.
-- [ ] Otra persona con identidad ambigua no se fusiona automáticamente.
-- [ ] Acceso no admin, versiones obsoletas y dependencias complejas no mutan datos.
+- [x] Las dos parejas autorizadas quedan en una ficha canónica con dueño verificado.
+- [x] Todas las notas conservan contenido, ID, autor y fecha; conversaciones originales accesibles.
+- [x] Altas repetidas de diferentes canales, incluso concurrentes, no crean otro cliente/responsable.
+- [x] Idempotencia de payload/requestId y cuotas se mantienen.
+- [x] Otra persona con identidad ambigua no se fusiona automáticamente.
+- [x] Acceso no admin, versiones obsoletas y dependencias complejas no mutan datos.
 
 ## Verificación
 
-| Criterio           | Evidencia prevista                                         | Resultado |
-| ------------------ | ---------------------------------------------------------- | --------- |
-| Fusión y rollback  | PostgreSQL real: notas/chats/CAS/idempotencia              | Pendiente |
-| Altas concurrentes | PostgreSQL real: web/cuestionario/manual y lock compartido | Pendiente |
-| Migración          | Replay completo, parity, RLS, constraints                  | Pendiente |
-| Código             | Typecheck, lint, unitarios y CI                            | Pendiente |
-| Producción         | Preflight, operación de parejas autorizadas y postflight   | Pendiente |
+| Criterio           | Evidencia prevista                                                                     | Resultado                            |
+| ------------------ | -------------------------------------------------------------------------------------- | ------------------------------------ |
+| Fusión y rollback  | PostgreSQL real: notas/chats/CAS/idempotencia y matches equivalentes                   | PASS en CI 39818819287 / 39821232855 |
+| Altas concurrentes | PostgreSQL real: web/cuestionario/manual y lock compartido                             | PASS en CI 39818819287               |
+| Migración          | Replay completo, parity, RLS, constraints                                              | PASS en ambos runs                   |
+| Código             | Typecheck, lint, unitarios y UI quality                                                | PASS en ambos runs                   |
+| Producción         | Preflight, operación de parejas autorizadas y comparación de IDs/hashes/autores/fechas | PASS, 2026-10-22 17:26 UTC           |
+
+El E2E público (desktop/Android/iPhone) pasó en 39818819287. En 39821232855 el paso
+PostgreSQL terminó correctamente y la instalación de navegadores seguía pendiente al registrar
+la operación. El job Storage no pudo iniciar las pruebas por GHCR 429 al descargar imágenes,
+también tras reintentos en el primer run; no se presenta como validado. No hubo cambios de Storage
+y la fusión bloquea documentos privados.
 
 ## Rollout, rollback y stop conditions
 
@@ -118,9 +124,22 @@ Fusiones masivas, reabrir leads perdidos, reasignar otras carteras, alterar cont
 
 ## Cierre
 
-- **Commit:** pendiente.
-- **PR:** pendiente.
-- **CI:** pendiente.
-- **Deployment:** pendiente.
-- **Validación:** pendiente.
+- **Commits:** `12bd32b1d83f5fc551e7e0ac8a0650d28097d9c7` (identidad/fusión) y
+  `35e54ef8eb7a026f9662d4b3e7f89c07bd27225a` (sugerencias equivalentes).
+- **PR:** [#211](https://github.com/growthaiconsultant-lab/campernova-crm/pull/211) y
+  [#212](https://github.com/growthaiconsultant-lab/campernova-crm/pull/212).
+- **CI:** [39818819287](https://github.com/growthaiconsultant-lab/campernova-crm/actions/runs/39818819287)
+  y [39821232855](https://github.com/growthaiconsultant-lab/campernova-crm/actions/runs/39821232855),
+  con los límites descritos arriba.
+- **Deployment:** `dpl_7CzqTNwDCakDq4SK17XRxbqttRhN` aplicó la migración mediante Prisma;
+  después se retiró el flag opt-in. `dpl_23eWUKQmV1BMPxF5JbgA5hfviu29` READY y alias
+  campersnova.com, desde checkout limpio de `35e54ef` con árbol idéntico al head probado `c772250`.
+  El despliegue CLI no aporta SHA Git remoto; la procedencia se verificó en el checkout local.
+- **Validación:** ambas parejas unificadas con responsables verificados; diez actividades originales
+  conservan ID, hash del contenido, autor y fecha; tres conversaciones conservan ID y hash.
+  Quince asociaciones de vehículos permanecen intactas, incluidas tres sugerencias redundantes
+  en el original archivado. Las fichas fuente están archivadas y enlazadas a sus canónicas.
+  El informe revisa 480 compradores y 155 vendedores: sólo permanece un grupo de teléfono
+  compartido con nombres diferentes, todos PERDIDO, expresamente excluido de fusión.
+  Evidencia privada y capturas fuera de Git; no se crearon leads sintéticos en producción.
 - **Deuda restante:** observación de nuevas captaciones reales tras desplegar.
