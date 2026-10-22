@@ -1,6 +1,26 @@
 import { describe, expect, it } from 'vitest'
 import { buyerContactHashes } from './buyer-identity'
-import { firstBuyerHandler } from './buyer-merge'
+import { firstBuyerHandler, isUnattendedAutomaticSuggestion } from './buyer-merge'
+
+describe('automatic suggestion merge policy', () => {
+  const suggestion = {
+    status: 'SUGERIDO',
+    generatedBy: 'auto',
+    _count: { calendarEvents: 0, offers: 0 },
+  }
+  it('allows only automatic suggestions without subsequent decisions', () => {
+    expect(isUnattendedAutomaticSuggestion(suggestion)).toBe(true)
+    for (const status of ['PROPUESTO_CLIENTE', 'VISITA', 'OFERTA', 'CERRADO', 'RECHAZADO'])
+      expect(isUnattendedAutomaticSuggestion({ ...suggestion, status })).toBe(false)
+    expect(isUnattendedAutomaticSuggestion({ ...suggestion, generatedBy: 'manual' })).toBe(false)
+    expect(
+      isUnattendedAutomaticSuggestion({ ...suggestion, _count: { calendarEvents: 1, offers: 0 } })
+    ).toBe(false)
+    expect(
+      isUnattendedAutomaticSuggestion({ ...suggestion, _count: { calendarEvents: 0, offers: 1 } })
+    ).toBe(false)
+  })
+})
 
 describe('buyer contact identity', () => {
   it('normalizes contact aliases without retaining plain contacts in index keys', () => {

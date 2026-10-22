@@ -57,6 +57,7 @@ afterEach(async () => {
     where: { name: { startsWith: prefix }, mergedIntoId: { not: null } },
   })
   await db.buyerLead.deleteMany({ where: { name: { startsWith: prefix } } })
+  await db.sellerLead.deleteMany({ where: { name: { startsWith: prefix } } })
 })
 afterAll(async () => {
   await db.user.deleteMany({ where: { id: { in: [...agents, adminId] } } })
@@ -188,6 +189,61 @@ describe('buyer merge and identity against PostgreSQL', () => {
     expect(
       (await db.buyerLead.findUniqueOrThrow({ where: { id: source.id } })).mergedIntoId
     ).toBeNull()
+  })
+  it('preserves overlapping automatic suggestions on the archived original and moves distinct vehicles', async () => {
+    const { target, source } = await pair()
+    const vehicles = await Promise.all(
+      [0, 1].map((i) =>
+        db.vehicle.create({
+          data: { sellerLead: { create: { name: `${prefix}-seller-${i}` } } },
+        })
+      )
+    )
+    const canonical = await db.match.create({
+      data: { buyerLeadId: target.id, vehicleId: vehicles[0].id, score: 80 },
+    })
+    const retained = await db.match.create({
+      data: { buyerLeadId: source.id, vehicleId: vehicles[0].id, score: 60 },
+    })
+    const moved = await db.match.create({
+      data: { buyerLeadId: source.id, vehicleId: vehicles[1].id, score: 70 },
+    })
+    await mergeBuyerLeads(db, await plan([target.id, source.id]))
+    expect(await db.match.findUniqueOrThrow({ where: { id: canonical.id } })).toEqual(canonical)
+    expect(await db.match.findUniqueOrThrow({ where: { id: retained.id } })).toEqual(retained)
+    expect(await db.match.findUniqueOrThrow({ where: { id: moved.id } })).toMatchObject({
+      buyerLeadId: target.id,
+      score: moved.score,
+      createdAt: moved.createdAt,
+    })
+    expect(await db.match.count({ where: { buyerLeadId: target.id } })).toBe(2)
+    const audit = await db.kpiEvent.findUniqueOrThrow({ where: { id: `buyer_merge_${source.id}` } })
+    expect(audit.metadata).toMatchObject({
+      movedMatchIds: [moved.id],
+      retainedSourceMatchIds: [retained.id],
+    })
+  })
+  it.each([
+    { status: 'PROPUESTO_CLIENTE' as const, generatedBy: 'auto' },
+    { status: 'SUGERIDO' as const, generatedBy: 'manual' },
+  ])('blocks overlapping suggestions with human decisions: %j', async (conflict) => {
+    const { target, source } = await pair()
+    const vehicle = await db.vehicle.create({
+      data: { sellerLead: { create: { name: `${prefix}-seller-conflict` } } },
+    })
+    await db.match.createMany({
+      data: [
+        { buyerLeadId: target.id, vehicleId: vehicle.id, score: 80, ...conflict },
+        { buyerLeadId: source.id, vehicleId: vehicle.id, score: 60 },
+      ],
+    })
+    await expect(mergeBuyerLeads(db, await plan([target.id, source.id]))).rejects.toThrow(
+      'vehículos'
+    )
+    expect(
+      (await db.buyerLead.findUniqueOrThrow({ where: { id: source.id } })).mergedIntoId
+    ).toBeNull()
+    expect(await db.match.count({ where: { buyerLeadId: source.id } })).toBe(1)
   })
   it('serializes web, questionnaire and manual intake into one buyer and one rotation turn', async () => {
     await db.$executeRaw`INSERT INTO buyer_lead_assignment(id,enabled,agent_ids,next_index) VALUES(1,true,${agents}::text[],0)`

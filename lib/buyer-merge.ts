@@ -5,6 +5,19 @@ import { KPI_EVENTS } from './kpi/events'
 
 export class BuyerMergeError extends Error {}
 
+export function isUnattendedAutomaticSuggestion(match: {
+  status: string
+  generatedBy: string
+  _count: { calendarEvents: number; offers: number }
+}) {
+  return (
+    match.status === 'SUGERIDO' &&
+    match.generatedBy === 'auto' &&
+    match._count.calendarEvents === 0 &&
+    match._count.offers === 0
+  )
+}
+
 export function firstBuyerHandler(
   activities: Pick<Activity, 'id' | 'type' | 'content' | 'agentId' | 'createdAt'>[]
 ) {
@@ -115,22 +128,32 @@ export async function mergeBuyerLeads(
             'Hay contratos, entregas, documentos o parte de pago. Se requiere revisión especializada.'
           )
       }
+      await tx.$queryRaw(
+        Prisma.sql`SELECT id FROM matches WHERE buyer_lead_id IN (${Prisma.join([...input.ids].sort())}) ORDER BY id FOR UPDATE`
+      )
       const sourceMatches = await tx.match.findMany({
         where: { buyerLeadId: p.source.id },
-        select: { id: true, vehicleId: true },
+        include: { _count: { select: { calendarEvents: true, offers: true } } },
       })
+      const targetMatches = await tx.match.findMany({
+        where: { buyerLeadId: p.target.id },
+        include: { _count: { select: { calendarEvents: true, offers: true } } },
+      })
+      const overlaps = sourceMatches.filter((m) =>
+        targetMatches.some((target) => target.vehicleId === m.vehicleId)
+      )
       if (
-        sourceMatches.length &&
-        (await tx.match.count({
-          where: {
-            buyerLeadId: p.target.id,
-            vehicleId: { in: sourceMatches.map((m) => m.vehicleId) },
-          },
-        }))
+        overlaps.some((source) => {
+          const target = targetMatches.find((m) => m.vehicleId === source.vehicleId)!
+          return ![source, target].every(isUnattendedAutomaticSuggestion)
+        })
       )
         throw new BuyerMergeError(
           'Ambas fichas tienen vehículos asociados coincidentes. Requiere revisión.'
         )
+      // Equivalent automatic suggestions remain on the archived original, preserving scores/IDs.
+      const retainedIds = new Set(overlaps.map((m) => m.id))
+      const movableMatches = sourceMatches.filter((m) => !retainedIds.has(m.id))
       const moved = await tx.activity.findMany({
         where: { buyerLeadId: p.source.id },
         select: { id: true },
@@ -185,7 +208,7 @@ export async function mergeBuyerLeads(
         data: { buyerLeadId: p.target.id },
       })
       await tx.match.updateMany({
-        where: { buyerLeadId: p.source.id },
+        where: { buyerLeadId: p.source.id, id: { in: movableMatches.map((m) => m.id) } },
         data: { buyerLeadId: p.target.id },
       })
       await tx.calendarEvent.updateMany({
@@ -265,7 +288,8 @@ export async function mergeBuyerLeads(
             sourceNextActionType: p.source.nextActionType,
             sourceNextActionDueAt: p.source.nextActionDueAt?.toISOString() ?? null,
             filledFields: Object.keys(fill),
-            movedMatchIds: sourceMatches.map((m) => m.id),
+            movedMatchIds: movableMatches.map((m) => m.id),
+            retainedSourceMatchIds: overlaps.map((m) => m.id),
             movedActivityIds: moved.map((a) => a.id),
             movedChatIds: chats.map((a) => a.id),
             movedEventIds: events.map((a) => a.id),
