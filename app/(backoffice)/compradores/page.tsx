@@ -2,6 +2,7 @@ import Link from 'next/link'
 import { Plus } from 'lucide-react'
 import { db } from '@/lib/db'
 import { requireAgente } from '@/lib/auth'
+import { leadListView } from '@/lib/lead-list-view'
 import { BuyerListFilters } from './buyer-list-filters'
 import { BuyerStatusSelect } from './buyer-status-select'
 import { BuyerNextActionControl, BuyerQuickSelect } from './buyer-quick-controls'
@@ -141,6 +142,7 @@ function buildViewConditions(
 }
 
 const VIEWS = [
+  { key: 'mis_leads', label: 'Mis leads' },
   { key: 'todos', label: 'Todos' },
   { key: 'sin_asignar', label: 'Sin asignar' },
   { key: 'con_matches', label: 'Con matches' },
@@ -152,7 +154,7 @@ const VIEWS = [
 export default async function CompradoresPage({ searchParams }: { searchParams: SearchParams }) {
   const currentUser = await requireAgente()
   const page = Math.max(1, parseInt(searchParams.page ?? '1', 10) || 1)
-  const view = searchParams.view ?? 'todos'
+  const view = leadListView(searchParams.view, 'mis_leads', searchParams.agentId)
 
   const viewConditions = buildViewConditions(view === 'todos' ? null : view, currentUser.id)
   const where = buildWhere(searchParams, viewConditions)
@@ -169,6 +171,8 @@ export default async function CompradoresPage({ searchParams }: { searchParams: 
     conMatchesCount,
     estaSemanaCount,
     assignableAgents,
+    misLeadsCount,
+    todosCount,
   ] = await Promise.all([
     db.buyerLead.count({ where }),
     db.buyerLead.findMany({
@@ -191,6 +195,8 @@ export default async function CompradoresPage({ searchParams }: { searchParams: 
       select: { id: true, name: true },
       orderBy: { name: 'asc' },
     }),
+    db.buyerLead.count({ where: { agentId: currentUser.id } }),
+    db.buyerLead.count(),
   ])
 
   const totalPages = Math.ceil(total / PAGE_SIZE)
@@ -198,7 +204,8 @@ export default async function CompradoresPage({ searchParams }: { searchParams: 
   const to = Math.min(page * PAGE_SIZE, total)
 
   const viewCounts: Record<string, number | undefined> = {
-    todos: total,
+    mis_leads: misLeadsCount,
+    todos: todosCount,
     sin_asignar: sinAsignarCount,
     con_matches: conMatchesCount,
     esta_semana: estaSemanaCount,
@@ -208,8 +215,8 @@ export default async function CompradoresPage({ searchParams }: { searchParams: 
     const sp = new URLSearchParams()
     if (searchParams.q) sp.set('q', searchParams.q)
     if (searchParams.status) sp.set('status', searchParams.status)
-    if (searchParams.agentId) sp.set('agentId', searchParams.agentId)
-    if (v !== 'todos') sp.set('view', v)
+    if (searchParams.agentId && v !== 'mis_leads') sp.set('agentId', searchParams.agentId)
+    sp.set('view', v)
     const qs = sp.toString()
     return `/compradores${qs ? `?${qs}` : ''}`
   }
@@ -335,6 +342,11 @@ export default async function CompradoresPage({ searchParams }: { searchParams: 
           </p>
         </div>
         <div className="flex items-center gap-2">
+          {currentUser.role === 'ADMIN' && (
+            <ButtonLink href="/compradores/duplicados" variant="secondary">
+              Revisar duplicados
+            </ButtonLink>
+          )}
           {/* Toggle Lista | Pipeline (mockup P1) */}
           <div className="inline-flex overflow-hidden rounded-[9px] border border-line bg-card">
             <span className="bg-brand-tint px-3 py-[7px] font-hanken text-[12px] font-semibold text-brand">

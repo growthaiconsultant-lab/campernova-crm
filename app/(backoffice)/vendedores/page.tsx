@@ -4,6 +4,7 @@ import { db } from '@/lib/db'
 import { landingCaptureSelection } from '@/lib/landing/attribution'
 import { LandingAttribution } from '@/components/landing-attribution'
 import { requireAgente } from '@/lib/auth'
+import { leadListView } from '@/lib/lead-list-view'
 import { LeadsFilters } from './leads-filters'
 import { SELLER_DEAL_TYPE_LABELS } from '@/lib/deal-terms'
 import { NEXT_ACTION_LABELS, isNextActionOverdue } from '@/lib/next-action'
@@ -137,6 +138,7 @@ function buildOrderBy(sp: SearchParams): Prisma.SellerLeadOrderByWithRelationInp
 }
 
 const VIEWS = [
+  { key: 'mis-leads', label: 'Mis leads' },
   { key: 'todos', label: 'En gestión' },
   { key: 'stock', label: 'Stock' },
   { key: 'leads-web', label: 'Solicitudes web' },
@@ -150,7 +152,7 @@ const VIEWS = [
 
 export default async function VendedoresPage({ searchParams }: { searchParams: SearchParams }) {
   const currentUser = await requireAgente()
-  const view = searchParams.view ?? 'todos'
+  const view = leadListView(searchParams.view, 'mis-leads', searchParams.agentId)
 
   const twoDaysAgo = new Date()
   twoDaysAgo.setDate(twoDaysAgo.getDate() - 2)
@@ -202,8 +204,8 @@ export default async function VendedoresPage({ searchParams }: { searchParams: S
     const sp = new URLSearchParams()
     if (searchParams.q) sp.set('q', searchParams.q)
     if (searchParams.status) sp.set('status', searchParams.status)
-    if (searchParams.agentId) sp.set('agentId', searchParams.agentId)
-    if (v !== 'todos') sp.set('view', v)
+    if (searchParams.agentId && v !== 'mis-leads') sp.set('agentId', searchParams.agentId)
+    sp.set('view', v)
     const qs = sp.toString()
     return `/vendedores${qs ? `?${qs}` : ''}`
   }
