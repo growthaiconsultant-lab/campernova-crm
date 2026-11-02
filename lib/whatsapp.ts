@@ -29,5 +29,10 @@ export function sellerWhatsAppMessage(
 }
 
 export function buyerWhatsAppMessage(name: string | null | undefined): string {
-  return `${greeting(name)}, te contactamos desde CampersNova. Tenemos vehículos que podrían interesarte. ¿Tienes un momento para hablar?`
+  return `${greeting(name)} 👋 Somos CampersNova.
+
+Te compartimos nuestro stock de campers y autocaravanas publicado en Wallapop 🚐
+https://www.wallapop.com/user/campersn-467095033?_pid=wi&_uid=467095033
+
+Si alguna te interesa, envíanos el enlace o una captura por aquí y te contamos más detalles. ¡También podemos ayudarte a elegir según lo que estés buscando!`
 }
