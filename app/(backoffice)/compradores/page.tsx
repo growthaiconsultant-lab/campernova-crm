@@ -1,9 +1,10 @@
 import Link from 'next/link'
-import { Plus } from 'lucide-react'
+import { Columns3, List, Plus } from 'lucide-react'
 import { db } from '@/lib/db'
 import { requireAgente } from '@/lib/auth'
 import { leadListView } from '@/lib/lead-list-view'
 import { buyerSearchWhere } from '@/lib/buyer-search'
+import { BuyerPreview } from './buyer-preview'
 import { BuyerListFilters } from './buyer-list-filters'
 import { BuyerStatusSelect } from './buyer-status-select'
 import { BuyerNextActionControl, BuyerQuickSelect } from './buyer-quick-controls'
@@ -12,14 +13,7 @@ import { BUYER_LEAD_STATUS_LABELS } from '@/lib/state-machine'
 import { landingCaptureSelection } from '@/lib/landing/attribution'
 import { LandingAttribution } from '@/components/landing-attribution'
 import { SearchRequestBadge } from '@/components/search-request-badge'
-import {
-  Eyebrow,
-  Card,
-  ActionableTable,
-  ButtonLink,
-  EmptyState,
-  type Column,
-} from '@/components/redesign'
+import { Card, ActionableTable, ButtonLink, EmptyState, type Column } from '@/components/redesign'
 import { cn } from '@/lib/utils'
 import type { Prisma } from '@prisma/client'
 
@@ -207,10 +201,9 @@ export default async function CompradoresPage({ searchParams }: { searchParams: 
   }
 
   function viewUrl(v: string) {
-    const sp = new URLSearchParams()
-    if (searchParams.q) sp.set('q', searchParams.q)
-    if (searchParams.status) sp.set('status', searchParams.status)
-    if (searchParams.agentId && v !== 'mis_leads') sp.set('agentId', searchParams.agentId)
+    const sp = new URLSearchParams(searchParams as Record<string, string>)
+    sp.delete('page')
+    if (v === 'mis_leads') sp.delete('agentId')
     sp.set('view', v)
     const qs = sp.toString()
     return `/compradores${qs ? `?${qs}` : ''}`
@@ -241,244 +234,300 @@ export default async function CompradoresPage({ searchParams }: { searchParams: 
     return parts.join(' · ')
   }
 
+  function identity(l: Lead) {
+    const initials = l.name
+      .trim()
+      .split(/\s+/)
+      .slice(0, 2)
+      .map((part) => part[0])
+      .join('')
+      .toLocaleUpperCase('es')
+    return (
+      <div className="flex items-start gap-3">
+        <span
+          aria-hidden="true"
+          className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-brand-tint text-xs font-bold text-brand"
+        >
+          {initials}
+        </span>
+        <div className="min-w-0">
+          <div className="break-words text-sm font-bold leading-tight text-ink">{l.name}</div>
+          <div className="mt-1 text-xs font-medium text-ink2">{prefs(l)}</div>
+          <SearchRequestBadge leadId={l.id} className="mt-1" />
+        </div>
+      </div>
+    )
+  }
+  function demand(l: Lead) {
+    return (
+      <div className="space-y-1">
+        <div className="text-[13px] font-semibold tabular-nums text-ink">
+          {l.maxBudget != null ? EUR(Number(l.maxBudget)) : 'Sin presupuesto'}
+        </div>
+        <div className="text-xs font-medium text-ink2">
+          {l._count.matches} {l._count.matches === 1 ? 'coincidencia' : 'coincidencias'}
+        </div>
+      </div>
+    )
+  }
+  function status(l: Lead) {
+    return <BuyerStatusSelect leadId={l.id} status={l.status} buyerName={l.name} />
+  }
+  function nextAction(l: Lead) {
+    return (
+      <BuyerNextActionControl
+        {...leadRef(l)}
+        nextActionType={l.nextActionType}
+        nextActionDueAt={l.nextActionDueAt?.toISOString() ?? null}
+      />
+    )
+  }
+  function owner(l: Lead) {
+    return (
+      <BuyerQuickSelect
+        {...leadRef(l)}
+        field="agentId"
+        value={l.agentId}
+        agentName={l.agent?.name ?? null}
+        agents={assignableAgents}
+      />
+    )
+  }
+  function source(l: Lead) {
+    return (
+      <div>
+        <BuyerQuickSelect {...leadRef(l)} field="source" value={l.source} />
+        <LandingAttribution activities={l.activities} compact />
+      </div>
+    )
+  }
+  function temperature(l: Lead) {
+    return <BuyerQuickSelect {...leadRef(l)} field="temperature" value={l.temperature} />
+  }
+  function preview(l: Lead) {
+    return (
+      <BuyerPreview name={l.name} href={`/compradores/${l.id}`}>
+        <div className="rounded-xl bg-canvas p-4">
+          <p className="mb-1 text-sm font-semibold">{prefs(l)}</p>
+          {demand(l)}
+          <SearchRequestBadge leadId={l.id} className="mt-2" />
+        </div>
+        <dl className="mt-4 divide-y divide-line2">
+          {[
+            { label: 'Estado', control: status(l) },
+            { label: 'Próxima acción', control: nextAction(l) },
+            { label: 'Temperatura', control: temperature(l) },
+            { label: 'Responsable', control: owner(l) },
+            { label: 'Origen', control: source(l) },
+          ].map(({ label, control }) => (
+            <div
+              key={label}
+              className="grid grid-cols-[7rem_minmax(0,1fr)] items-center gap-2 py-3"
+            >
+              <dt className="text-sm font-medium text-ink2">{label}</dt>
+              <dd>{control}</dd>
+            </div>
+          ))}
+        </dl>
+      </BuyerPreview>
+    )
+  }
   const columns: Column<Lead>[] = [
+    { key: 'buyer', header: 'Comprador', cell: identity },
     {
-      key: 'buyer',
-      header: 'Comprador',
+      key: 'followup',
+      header: 'Seguimiento',
+      rowLink: false,
       cell: (l) => (
-        <div>
-          <div className="text-ink">{l.name}</div>
-          <div className="mt-0.5 text-[11px] font-medium text-ink3">{prefs(l)}</div>
-          <SearchRequestBadge leadId={l.id} className="mt-1.5" />
+        <div className="grid justify-items-start gap-1">
+          {status(l)}
+          {nextAction(l)}
         </div>
       ),
     },
+    { key: 'demand', header: 'Presupuesto', cell: demand },
     {
-      key: 'source',
-      header: 'Origen',
+      key: 'contact',
+      header: 'Origen y temperatura',
       rowLink: false,
       cell: (l) => (
-        <div>
-          <BuyerQuickSelect {...leadRef(l)} field="source" value={l.source} />
-          <LandingAttribution activities={l.activities} compact />
+        <div className="grid justify-items-start gap-1.5">
+          {source(l)}
+          {temperature(l)}
         </div>
       ),
     },
+    { key: 'owner', header: 'Responsable', rowLink: false, cell: owner },
     {
-      key: 'temp',
-      header: 'Temp.',
+      key: 'preview',
+      header: <span className="sr-only">Vista rápida</span>,
       rowLink: false,
-      cell: (l) => <BuyerQuickSelect {...leadRef(l)} field="temperature" value={l.temperature} />,
-    },
-    {
-      key: 'stage',
-      header: 'Estado',
-      rowLink: false,
-      cell: (l) => <BuyerStatusSelect leadId={l.id} status={l.status} buyerName={l.name} />,
-    },
-    {
-      key: 'next',
-      header: 'Próxima acción',
-      rowLink: false,
-      cell: (l) => (
-        <BuyerNextActionControl
-          {...leadRef(l)}
-          nextActionType={l.nextActionType}
-          nextActionDueAt={l.nextActionDueAt?.toISOString() ?? null}
-        />
-      ),
-    },
-    {
-      key: 'budget',
-      header: 'Presup.',
-      mono: true,
-      align: 'right',
-      cell: (l) => (l.maxBudget ? EUR(Number(l.maxBudget)) : <span className="text-ink3">—</span>),
-    },
-    {
-      key: 'match',
-      header: 'Match',
-      mono: true,
-      align: 'center',
-      cell: (l) =>
-        l._count.matches > 0 ? (
-          <span className="text-brand">{l._count.matches}</span>
-        ) : (
-          <span className="text-ink3">—</span>
-        ),
-    },
-    {
-      key: 'agent',
-      header: 'Resp.',
-      rowLink: false,
-      cell: (l) => (
-        <BuyerQuickSelect
-          {...leadRef(l)}
-          field="agentId"
-          value={l.agentId}
-          agentName={l.agent?.name ?? null}
-          agents={assignableAgents}
-        />
-      ),
+      cell: preview,
     },
   ]
-
+  const filtered = [
+    'q',
+    'status',
+    'agentId',
+    'vehicleType',
+    'source',
+    'dateFrom',
+    'dateTo',
+    'budgetMin',
+    'seatsMin',
+    'temp',
+  ].some((key) => searchParams[key as keyof SearchParams])
   return (
-    <div>
-      {/* Título de módulo + acción */}
-      <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <Eyebrow>CRM · Demanda</Eyebrow>
-          <h1 className="mt-1 font-hanken text-[23px] font-bold tracking-[-0.02em] text-ink">
-            Compradores
-          </h1>
-          <p className="mt-1 font-hanken text-[13.5px] text-ink2">
-            <b className="text-ink">{total}</b> comprador{total === 1 ? '' : 'es'}
-          </p>
+    <div className="min-w-0 font-hanken">
+      <header className="mb-5 flex flex-wrap items-center justify-between gap-3">
+        <div className="flex items-center gap-2.5">
+          <h1 className="text-3xl font-bold tracking-tight text-ink">Compradores</h1>
+          <span
+            aria-label={`${total} resultados`}
+            className="rounded-full border border-line bg-card px-2.5 py-0.5 text-sm font-semibold tabular-nums text-ink2"
+          >
+            {total}
+          </span>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           {currentUser.role === 'ADMIN' && (
             <ButtonLink href="/compradores/duplicados" variant="secondary">
               Revisar duplicados
             </ButtonLink>
           )}
-          {/* Toggle Lista | Pipeline (mockup P1) */}
-          <div className="inline-flex overflow-hidden rounded-[9px] border border-line bg-card">
-            <span className="bg-brand-tint px-3 py-[7px] font-hanken text-[12px] font-semibold text-brand">
+          <ButtonLink href="/compradores/nuevo" variant="primary">
+            <Plus size={15} className="mr-1.5" />
+            Nuevo comprador
+          </ButtonLink>
+        </div>
+      </header>
+      <Card pad={false} className="min-w-0 shadow-sm">
+        <div className="flex flex-wrap-reverse items-center justify-between gap-x-3 gap-y-1 px-3 pt-2 sm:px-4">
+          <nav aria-label="Vistas de compradores" className="flex min-w-0 flex-wrap gap-x-3">
+            {VIEWS.map((v) => (
+              <Link
+                key={v.key}
+                href={viewUrl(v.key)}
+                aria-current={view === v.key ? 'page' : undefined}
+                className={cn(
+                  'flex items-center gap-1.5 border-b-2 px-1 py-2.5 text-[13px] font-semibold focus-visible:ring-2 focus-visible:ring-ring',
+                  view === v.key
+                    ? 'border-brand text-brand'
+                    : 'border-transparent text-ink2 hover:text-ink'
+                )}
+              >
+                {v.label}
+                <span
+                  className={cn(
+                    'rounded-md px-1.5 py-0.5 text-[10px] tabular-nums',
+                    view === v.key ? 'bg-brand-tint' : 'bg-canvas'
+                  )}
+                >
+                  {viewCounts[v.key]}
+                </span>
+              </Link>
+            ))}
+          </nav>
+          <nav
+            aria-label="Presentación"
+            className="my-1 inline-flex gap-1 rounded-lg bg-canvas p-1 text-xs font-semibold"
+          >
+            <span
+              aria-current="page"
+              className="inline-flex items-center gap-1.5 rounded-md bg-card px-2 py-1 text-ink shadow-sm"
+            >
+              <List size={14} />
               Lista
             </span>
             <Link
               href="/compradores/pipeline"
-              className="border-l border-line px-3 py-[7px] font-hanken text-[12px] font-medium text-ink2 transition-colors hover:bg-canvas"
+              className="inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-ink2 hover:text-brand"
             >
+              <Columns3 size={14} />
               Pipeline
             </Link>
-          </div>
-          <ButtonLink href="/compradores/nuevo" variant="primary">
-            <Plus size={15} strokeWidth={2.2} className="mr-1.5" />
-            Nuevo comprador
-          </ButtonLink>
+          </nav>
         </div>
-      </div>
-
-      {/* Vistas guardadas */}
-      <div className="mb-3 flex flex-wrap items-center gap-1.5">
-        {VIEWS.map((v) => {
-          const active = view === v.key
-          const count = viewCounts[v.key]
-          return (
-            <Link
-              key={v.key}
-              href={viewUrl(v.key)}
-              className={cn(
-                'inline-flex items-center gap-1.5 rounded-[9px] border px-3 py-1.5 font-hanken text-[12.5px] font-semibold transition-colors',
-                active
-                  ? 'border-brand bg-brand-tint text-brand'
-                  : 'border-line bg-card text-ink2 hover:bg-canvas'
-              )}
-            >
-              {v.label}
-              {count !== undefined && (
-                <span className={cn('font-mono text-[11px]', active ? 'text-brand' : 'text-ink3')}>
-                  {count}
-                </span>
-              )}
-            </Link>
-          )
-        })}
-      </div>
-
-      {/* Filtros */}
-      <div className="mb-4">
         <BuyerListFilters agents={agents} />
-      </div>
-
-      {/* Tabla / bandeja */}
-      <Card pad={false}>
         <ActionableTable
           columns={columns}
           rows={leads}
           rowKey={(l) => l.id}
           rowHref={(l) => `/compradores/${l.id}`}
+          className="[&_td]:px-3 [&_th]:px-3 [&_thead]:bg-canvas"
           mobileCard={(l) => (
-            <>
-              <div className="flex items-center justify-between gap-2">
-                <span className="truncate font-hanken text-[13.5px] font-semibold text-ink">
-                  {l.name}
-                </span>
-              </div>
-              <div className="mt-0.5 font-hanken text-[11.5px] font-medium text-ink3">
-                {prefs(l)}
-              </div>
-              <LandingAttribution activities={l.activities} compact />
-              <SearchRequestBadge leadId={l.id} className="mt-1.5" />
-              <div className="mt-2 flex items-center justify-between gap-2">
-                <span className="shrink-0 font-mono text-[12px] font-semibold text-ink">
-                  {l.maxBudget ? EUR(Number(l.maxBudget)) : '—'}
-                </span>
-              </div>
-            </>
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              {identity(l)}
+              {demand(l)}
+            </div>
           )}
           mobileCardActions={(l) => (
-            <div className="space-y-2">
-              <div className="flex flex-wrap items-start gap-2">
-                <BuyerStatusSelect leadId={l.id} status={l.status} buyerName={l.name} />
-                <BuyerQuickSelect {...leadRef(l)} field="source" value={l.source} />
-                <BuyerQuickSelect {...leadRef(l)} field="temperature" value={l.temperature} />
-                <BuyerQuickSelect
-                  {...leadRef(l)}
-                  field="agentId"
-                  value={l.agentId}
-                  agentName={l.agent?.name ?? null}
-                  agents={assignableAgents}
-                />
+            <div className="grid gap-2 border-t border-line2 pt-2">
+              <div className="flex flex-wrap items-center gap-2">
+                {status(l)}
+                {nextAction(l)}
               </div>
-              <BuyerNextActionControl
-                {...leadRef(l)}
-                nextActionType={l.nextActionType}
-                nextActionDueAt={l.nextActionDueAt?.toISOString() ?? null}
-              />
+              <div className="flex flex-wrap items-start gap-2">
+                {temperature(l)}
+                {owner(l)}
+                {source(l)}
+              </div>
+              <div>{preview(l)}</div>
             </div>
           )}
           empty={
             <EmptyState
-              title="Sin compradores que mostrar"
-              description="Cuando entren leads de comprador (chat, formulario o alta manual) aparecerán aquí, ordenados por temperatura y próxima acción."
-              cta={{ label: 'Nuevo comprador', href: '/compradores/nuevo' }}
+              title={
+                filtered
+                  ? 'Ningún comprador coincide con los filtros'
+                  : 'Sin compradores en esta vista'
+              }
+              description={
+                filtered
+                  ? 'Prueba otra búsqueda o ajusta los filtros.'
+                  : 'Puedes consultar todos los compradores o dar de alta uno nuevo.'
+              }
+              cta={
+                filtered
+                  ? {
+                      label: 'Limpiar filtros',
+                      href: `/compradores?view=${encodeURIComponent(view)}`,
+                    }
+                  : { label: 'Nuevo comprador', href: '/compradores/nuevo' }
+              }
             />
           }
         />
-      </Card>
-
-      {/* Paginación */}
-      {total > PAGE_SIZE && (
-        <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
-          <p className="font-hanken text-[12.5px] text-ink2">
-            {from}–{to} de {total}
-          </p>
-          <div className="flex items-center gap-2">
-            {page > 1 && (
-              <Link
-                href={pageUrl(page - 1)}
-                className="rounded-[9px] border border-line bg-card px-3 py-1.5 font-hanken text-[12.5px] font-semibold text-ink2 hover:bg-canvas"
-              >
-                Anterior
-              </Link>
-            )}
-            <span className="font-mono text-[12px] text-ink3">
-              {page} / {totalPages}
-            </span>
-            {page < totalPages && (
-              <Link
-                href={pageUrl(page + 1)}
-                className="rounded-[9px] border border-line bg-card px-3 py-1.5 font-hanken text-[12.5px] font-semibold text-ink2 hover:bg-canvas"
-              >
-                Siguiente
-              </Link>
-            )}
+        {/* Paginación */}
+        {total > PAGE_SIZE && (
+          <div className="flex flex-wrap items-center justify-between gap-3 border-t border-line px-4 py-3">
+            <p className="font-hanken text-[12.5px] text-ink2">
+              {from}–{to} de {total}
+            </p>
+            <div className="flex items-center gap-2">
+              {page > 1 && (
+                <Link
+                  href={pageUrl(page - 1)}
+                  className="rounded-[9px] border border-line bg-card px-3 py-1.5 font-hanken text-[12.5px] font-semibold text-ink2 hover:bg-canvas"
+                >
+                  Anterior
+                </Link>
+              )}
+              <span className="font-mono text-[12px] text-ink3">
+                {page} / {totalPages}
+              </span>
+              {page < totalPages && (
+                <Link
+                  href={pageUrl(page + 1)}
+                  className="rounded-[9px] border border-line bg-card px-3 py-1.5 font-hanken text-[12.5px] font-semibold text-ink2 hover:bg-canvas"
+                >
+                  Siguiente
+                </Link>
+              )}
+            </div>
           </div>
-        </div>
-      )}
+        )}
+      </Card>
     </div>
   )
 }

@@ -1,422 +1,169 @@
 'use client'
 
-import { useCallback, useRef } from 'react'
+import { useId, useState } from 'react'
+import { Search, SlidersHorizontal } from 'lucide-react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { BUYER_SOURCE_OPTIONS } from '@/lib/buyer-source'
+import { TEMPERATURE_OPTIONS } from '@/lib/lead-temperature'
 import { BUYER_LEAD_STATUS_LABELS } from '@/lib/state-machine'
 
-const STATUS_OPTIONS = Object.entries(BUYER_LEAD_STATUS_LABELS).map(([value, label]) => ({
+const advancedFilters = ['vehicleType', 'source', 'agentId', 'budgetMin', 'seatsMin', 'temp']
+const statusOptions = Object.entries(BUYER_LEAD_STATUS_LABELS).map(([value, label]) => ({
   value,
   label,
 }))
+const selectClass =
+  'h-9 max-w-full rounded-lg border border-line bg-card px-2.5 text-[13px] font-medium text-ink2 focus-visible:ring-2 focus-visible:ring-ring'
 
-const TYPE_OPTIONS = [
-  { value: 'CAMPER', label: 'Camper' },
-  { value: 'AUTOCARAVANA', label: 'Autocaravana' },
-]
-
-const SOURCE_OPTIONS = [
-  ...BUYER_SOURCE_OPTIONS,
-  { value: '__none__', label: 'Sin especificar / Backoffice' },
-]
-
-// CAM-62: temperatura del lead
-const TEMP_OPTIONS = [
-  { value: 'HOT', label: 'Caliente', dot: '#d64545' },
-  { value: 'WARM', label: 'Templado', dot: '#c9820a' },
-  { value: 'COLD', label: 'Frío', dot: '#38bdf8' },
-]
-
-type Agent = { id: string; name: string }
-type Props = { agents: Agent[] }
-
-// Status dot colors for chip indicator
-const STATUS_COLORS: Record<string, string> = {
-  NUEVO: '#3a6fd4',
-  NO_CONTESTA: '#c2410c',
-  BAJO_PEDIDO: '#0e7490',
-  CONTACTADO: '#7c3aed',
-  CUALIFICADO: '#0891b2',
-  EN_NEGOCIACION: '#c9820a',
-  CERRADO: '#1a9d5f',
-  PERDIDO: '#8b94a3',
-}
-
-export function BuyerListFilters({ agents }: Props) {
+export function BuyerListFilters({ agents }: { agents: { id: string; name: string }[] }) {
   const router = useRouter()
   const params = useSearchParams()
-  const searchRef = useRef<HTMLInputElement>(null)
-
-  const push = useCallback(
-    (updates: Record<string, string>) => {
-      const next = new URLSearchParams(params.toString())
-      for (const [key, value] of Object.entries(updates)) {
-        if (value) {
-          next.set(key, value)
-        } else {
-          next.delete(key)
-        }
-      }
-      next.delete('page')
-      router.push(`/compradores?${next.toString()}`)
-    },
-    [params, router]
-  )
-
-  const currentStatus = params.get('status') ?? ''
-  const currentType = params.get('vehicleType') ?? ''
-  const currentSource = params.get('source') ?? ''
-  const currentAgent = params.get('agentId') ?? ''
-  const currentSort = params.get('sort') ?? 'createdAt'
-  const currentBudget = params.get('budgetMin') ?? ''
-  const currentSeats = params.get('seatsMin') ?? ''
-  const currentTemp = params.get('temp') ?? ''
-  const currentQ = params.get('q') ?? ''
-
-  const hasFilters =
-    currentStatus ||
-    currentType ||
-    currentSource ||
-    currentAgent ||
-    currentBudget ||
-    currentSeats ||
-    currentTemp ||
-    currentQ
-
-  const sortLabel =
-    currentSort === 'updatedAt'
-      ? 'Actualización ↓'
-      : currentSort === 'maxBudget'
-        ? 'Presupuesto ↓'
-        : 'Entrada ↓'
-
-  function handleSearchSubmit(e: React.FormEvent) {
-    e.preventDefault()
-    const q = searchRef.current?.value.trim() ?? ''
-    push({ q })
+  const activeCount = advancedFilters.filter((key) => params.get(key)).length
+  const [expanded, setExpanded] = useState(activeCount > 0)
+  const filtersId = useId()
+  function navigate(next: URLSearchParams) {
+    next.delete('page')
+    router.push(`/compradores${next.size ? '?' + next.toString() : ''}`, { scroll: false })
   }
-
-  const chipBase =
-    'inline-flex items-center gap-2 px-3 py-2 rounded-[9px] border border-line bg-card font-hanken text-[12.5px] font-semibold text-ink2 cursor-pointer select-none whitespace-nowrap hover:bg-canvas transition-colors'
-  const chipActive =
-    'inline-flex items-center gap-2 px-3 py-2 rounded-[9px] border border-brand bg-brand-tint font-hanken text-[12.5px] font-semibold text-brand cursor-pointer select-none whitespace-nowrap'
-
+  function change(key: string, value: string) {
+    const next = new URLSearchParams(params.toString())
+    if (value) next.set(key, value)
+    else next.delete(key)
+    navigate(next)
+  }
+  function selectFilter(
+    key: string,
+    label: string,
+    options: readonly { value: string; label: string }[]
+  ) {
+    return (
+      <label className="grid min-w-0 gap-1 text-xs font-medium text-ink2">
+        {label}
+        <select
+          aria-label={label}
+          value={params.get(key) ?? ''}
+          onChange={(e) => change(key, e.target.value)}
+          className={selectClass}
+        >
+          <option value="">Cualquiera</option>
+          {options.map((o) => (
+            <option key={o.value} value={o.value}>
+              {o.label}
+            </option>
+          ))}
+        </select>
+      </label>
+    )
+  }
+  const hasFilters =
+    activeCount > 0 || ['q', 'status', 'dateFrom', 'dateTo'].some((key) => params.get(key))
   return (
-    <div className="mb-3 flex flex-wrap items-center gap-2 rounded-xl border border-[#e6e9ee] bg-white p-3">
-      {/* Search */}
-      <form
-        onSubmit={handleSearchSubmit}
-        className="flex min-w-[200px] flex-1 items-center gap-2 rounded-lg border border-transparent bg-[#f8fafc] px-3 focus-within:border-[#3a6fd4] focus-within:bg-white focus-within:shadow-[0_0_0_3px_rgba(37,99,235,0.12)]"
-      >
-        <svg
-          viewBox="0 0 24 24"
-          className="h-4 w-4 shrink-0 text-[#586173]"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth={1.6}
-          strokeLinecap="round"
-          strokeLinejoin="round"
+    <div className="border-t border-line2 p-3 sm:p-4">
+      <div className="flex flex-wrap items-center gap-2">
+        <form
+          className="flex h-10 w-full items-center gap-2 rounded-lg border border-line bg-canvas px-3 focus-within:border-brand sm:w-auto sm:min-w-52 sm:flex-1"
+          role="search"
+          onSubmit={(e) => {
+            e.preventDefault()
+            change('q', String(new FormData(e.currentTarget).get('q') ?? '').trim())
+          }}
         >
-          <circle cx="11" cy="11" r="8" />
-          <line x1="21" y1="21" x2="16.65" y2="16.65" />
-        </svg>
-        <input
-          ref={searchRef}
-          defaultValue={currentQ}
-          placeholder="Buscar por nombre, email, teléfono, tipo o zona…"
-          className="flex-1 border-none bg-transparent py-2 text-[13.5px] text-[#141922] placeholder-[#586173] outline-none"
-        />
-        <button type="submit" className="sr-only">
-          Buscar
-        </button>
-      </form>
-
-      {/* Estado chip */}
-      <label className="relative cursor-pointer">
-        <span className={currentStatus ? chipActive : chipBase}>
-          {currentStatus ? (
-            <>
-              <span
-                className="h-1.5 w-1.5 rounded-full"
-                style={{ background: STATUS_COLORS[currentStatus] ?? '#586173' }}
-              />
-              {STATUS_OPTIONS.find((o) => o.value === currentStatus)?.label ?? 'Estado'}
-            </>
-          ) : (
-            <>
-              <span className="h-1.5 w-1.5 rounded-full bg-[#3a6fd4]" />
-              Estado
-            </>
-          )}
-          <svg
-            viewBox="0 0 24 24"
-            className="h-3.5 w-3.5 opacity-60"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth={1.6}
-            strokeLinecap="round"
-            strokeLinejoin="round"
+          <button
+            type="submit"
+            aria-label="Buscar compradores"
+            className="rounded text-ink2 focus-visible:ring-2 focus-visible:ring-ring"
           >
-            <polyline points="6 9 12 15 18 9" />
-          </svg>
-        </span>
+            <Search size={16} />
+          </button>
+          <input
+            key={params.get('q') ?? ''}
+            name="q"
+            defaultValue={params.get('q') ?? ''}
+            aria-label="Buscar por nombre, email, teléfono, tipo o zona"
+            placeholder="Buscar por nombre, email, teléfono, tipo o zona…"
+            className="min-w-0 flex-1 bg-transparent text-sm text-ink outline-none"
+          />
+        </form>
         <select
-          className="absolute inset-0 cursor-pointer opacity-0"
-          value={currentStatus}
-          onChange={(e) => push({ status: e.target.value === '__all__' ? '' : e.target.value })}
+          aria-label="Filtrar por estado"
+          className={selectClass}
+          value={params.get('status') ?? ''}
+          onChange={(e) => change('status', e.target.value)}
         >
-          <option value="__all__">Todos los estados</option>
-          {STATUS_OPTIONS.map((o) => (
+          <option value="">Todos los estados</option>
+          {statusOptions.map((o) => (
             <option key={o.value} value={o.value}>
               {o.label}
             </option>
           ))}
         </select>
-      </label>
-
-      {/* Tipo chip */}
-      <label className="relative cursor-pointer">
-        <span className={currentType ? chipActive : chipBase}>
-          {currentType
-            ? (TYPE_OPTIONS.find((o) => o.value === currentType)?.label ?? 'Tipo')
-            : 'Tipo'}
-          <svg
-            viewBox="0 0 24 24"
-            className="h-3.5 w-3.5 opacity-60"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth={1.6}
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          >
-            <polyline points="6 9 12 15 18 9" />
-          </svg>
-        </span>
-        <select
-          className="absolute inset-0 cursor-pointer opacity-0"
-          value={currentType}
-          onChange={(e) =>
-            push({ vehicleType: e.target.value === '__all__' ? '' : e.target.value })
-          }
-        >
-          <option value="__all__">Cualquier tipo</option>
-          {TYPE_OPTIONS.map((o) => (
-            <option key={o.value} value={o.value}>
-              {o.label}
-            </option>
-          ))}
-        </select>
-      </label>
-
-      {/* Origen chip */}
-      <label className="relative cursor-pointer">
-        <span className={currentSource ? chipActive : chipBase}>
-          {currentSource
-            ? (SOURCE_OPTIONS.find((o) => o.value === currentSource)?.label ?? 'Origen')
-            : 'Origen'}
-          <svg
-            viewBox="0 0 24 24"
-            className="h-3.5 w-3.5 opacity-60"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth={1.6}
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          >
-            <polyline points="6 9 12 15 18 9" />
-          </svg>
-        </span>
-        <select
-          className="absolute inset-0 cursor-pointer opacity-0"
-          value={currentSource}
-          onChange={(e) => push({ source: e.target.value === '__all__' ? '' : e.target.value })}
-        >
-          <option value="__all__">Cualquier origen</option>
-          {SOURCE_OPTIONS.map((o) => (
-            <option key={o.value} value={o.value}>
-              {o.label}
-            </option>
-          ))}
-        </select>
-      </label>
-
-      {/* Temperatura chip (CAM-62) */}
-      <label className="relative cursor-pointer">
-        <span className={currentTemp ? chipActive : chipBase}>
-          {currentTemp ? (
-            <>
-              <span
-                className="h-1.5 w-1.5 rounded-full"
-                style={{
-                  background: TEMP_OPTIONS.find((o) => o.value === currentTemp)?.dot ?? '#586173',
-                }}
-              />
-              {TEMP_OPTIONS.find((o) => o.value === currentTemp)?.label ?? 'Temperatura'}
-            </>
-          ) : (
-            'Temperatura'
-          )}
-          <svg
-            viewBox="0 0 24 24"
-            className="h-3.5 w-3.5 opacity-60"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth={1.6}
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          >
-            <polyline points="6 9 12 15 18 9" />
-          </svg>
-        </span>
-        <select
-          className="absolute inset-0 cursor-pointer opacity-0"
-          value={currentTemp}
-          onChange={(e) => push({ temp: e.target.value === '__all__' ? '' : e.target.value })}
-        >
-          <option value="__all__">Cualquier temperatura</option>
-          {TEMP_OPTIONS.map((o) => (
-            <option key={o.value} value={o.value}>
-              {o.label}
-            </option>
-          ))}
-        </select>
-      </label>
-
-      {/* Presupuesto chip */}
-      <label className="relative cursor-pointer">
-        <span className={currentBudget ? chipActive : chipBase}>
-          {currentBudget
-            ? `Presup. ≥${Number(currentBudget).toLocaleString('es-ES')} €`
-            : 'Presupuesto'}
-          <svg
-            viewBox="0 0 24 24"
-            className="h-3.5 w-3.5 opacity-60"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth={1.6}
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          >
-            <polyline points="6 9 12 15 18 9" />
-          </svg>
-        </span>
-        <select
-          className="absolute inset-0 cursor-pointer opacity-0"
-          value={currentBudget}
-          onChange={(e) => push({ budgetMin: e.target.value === '__all__' ? '' : e.target.value })}
-        >
-          <option value="__all__">Cualquier presupuesto</option>
-          {[10000, 20000, 30000, 40000, 50000, 60000, 80000].map((v) => (
-            <option key={v} value={String(v)}>
-              ≥ {v.toLocaleString('es-ES')} €
-            </option>
-          ))}
-        </select>
-      </label>
-
-      {/* Plazas chip */}
-      <label className="relative cursor-pointer">
-        <span className={currentSeats ? chipActive : chipBase}>
-          {currentSeats ? `${currentSeats}+ plazas` : 'Plazas'}
-          <svg
-            viewBox="0 0 24 24"
-            className="h-3.5 w-3.5 opacity-60"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth={1.6}
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          >
-            <polyline points="6 9 12 15 18 9" />
-          </svg>
-        </span>
-        <select
-          className="absolute inset-0 cursor-pointer opacity-0"
-          value={currentSeats}
-          onChange={(e) => push({ seatsMin: e.target.value === '__all__' ? '' : e.target.value })}
-        >
-          <option value="__all__">Cualquier número</option>
-          {[2, 3, 4, 5, 6].map((n) => (
-            <option key={n} value={String(n)}>
-              {n}+ plazas
-            </option>
-          ))}
-        </select>
-      </label>
-
-      {/* Agente chip */}
-      <label className="relative cursor-pointer">
-        <span className={currentAgent ? chipActive : chipBase}>
-          {currentAgent === '__none__'
-            ? 'Sin asignar'
-            : currentAgent
-              ? (agents.find((a) => a.id === currentAgent)?.name ?? 'Agente')
-              : 'Agente'}
-          <svg
-            viewBox="0 0 24 24"
-            className="h-3.5 w-3.5 opacity-60"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth={1.6}
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          >
-            <polyline points="6 9 12 15 18 9" />
-          </svg>
-        </span>
-        <select
-          className="absolute inset-0 cursor-pointer opacity-0"
-          value={currentAgent}
-          onChange={(e) => push({ agentId: e.target.value === '__all__' ? '' : e.target.value })}
-        >
-          <option value="__all__">Todos los agentes</option>
-          <option value="__none__">Sin asignar</option>
-          {agents.map((a) => (
-            <option key={a.id} value={a.id}>
-              {a.name}
-            </option>
-          ))}
-        </select>
-      </label>
-
-      {/* Clear */}
-      {hasFilters && (
         <button
-          onClick={() => router.push('/compradores')}
-          className="px-2 py-2 text-[12px] text-[#586173] hover:text-[#141922]"
+          type="button"
+          aria-expanded={expanded}
+          aria-controls={filtersId}
+          onClick={() => setExpanded(!expanded)}
+          className="inline-flex h-9 items-center gap-2 rounded-lg border border-line px-3 text-[13px] font-semibold text-ink2 hover:bg-canvas focus-visible:ring-2 focus-visible:ring-ring"
         >
-          Limpiar
+          <SlidersHorizontal size={14} /> Filtros
+          {activeCount > 0 && (
+            <span className="rounded bg-brand-tint px-1.5 text-brand">{activeCount}</span>
+          )}
         </button>
-      )}
-
-      <div className="flex-1" />
-
-      {/* Sort chip */}
-      <label className="relative cursor-pointer">
-        <span className={chipBase}>
-          Ordenar: {sortLabel}
-          <svg
-            viewBox="0 0 24 24"
-            className="h-3.5 w-3.5 opacity-60"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth={1.6}
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          >
-            <polyline points="6 9 12 15 18 9" />
-          </svg>
-        </span>
         <select
-          className="absolute inset-0 cursor-pointer opacity-0"
-          value={currentSort}
-          onChange={(e) => push({ sort: e.target.value })}
+          aria-label="Ordenar compradores"
+          value={params.get('sort') ?? 'createdAt'}
+          className={selectClass}
+          onChange={(e) => change('sort', e.target.value)}
         >
-          <option value="createdAt">Entrada ↓</option>
-          <option value="updatedAt">Actualización ↓</option>
-          <option value="maxBudget">Presupuesto ↓</option>
+          <option value="createdAt">Por entrada</option>
+          <option value="updatedAt">Por actualización</option>
+          <option value="maxBudget">Por presupuesto</option>
         </select>
-      </label>
+        {hasFilters && (
+          <button
+            type="button"
+            className="rounded px-2 text-xs font-semibold text-brand focus-visible:ring-2 focus-visible:ring-ring"
+            onClick={() => {
+              const next = new URLSearchParams(params.toString())
+              for (const key of [...advancedFilters, 'q', 'status', 'dateFrom', 'dateTo'])
+                next.delete(key)
+              navigate(next)
+            }}
+          >
+            Limpiar filtros
+          </button>
+        )}
+      </div>
+      <div id={filtersId} hidden={!expanded}>
+        <div className="mt-3 grid grid-cols-2 gap-3 rounded-lg bg-canvas p-3 sm:grid-cols-3 xl:grid-cols-6">
+          {selectFilter('temp', 'Temperatura', TEMPERATURE_OPTIONS)}
+          {selectFilter('agentId', 'Responsable', [
+            { value: '__none__', label: 'Sin asignar' },
+            ...agents.map((a) => ({ value: a.id, label: a.name })),
+          ])}
+          {selectFilter('source', 'Origen', [
+            ...BUYER_SOURCE_OPTIONS,
+            { value: '__none__', label: 'Sin especificar / Backoffice' },
+          ])}
+          {selectFilter('vehicleType', 'Tipo de vehículo', [
+            { value: 'CAMPER', label: 'Camper' },
+            { value: 'AUTOCARAVANA', label: 'Autocaravana' },
+          ])}
+          {selectFilter(
+            'budgetMin',
+            'Presupuesto mínimo',
+            [10000, 20000, 30000, 40000, 50000, 60000, 80000].map((n) => ({
+              value: String(n),
+              label: n.toLocaleString('es-ES') + ' €',
+            }))
+          )}
+          {selectFilter(
+            'seatsMin',
+            'Plazas mínimas',
+            [2, 3, 4, 5, 6].map((n) => ({ value: String(n), label: n + ' plazas' }))
+          )}
+        </div>
+      </div>
     </div>
   )
 }
