@@ -30,7 +30,7 @@ const OPTIONS = [
   },
 ]
 
-export function NewLeadButton() {
+export function NewLeadButton({ compact = false }: { compact?: boolean } = {}) {
   const [open, setOpen] = useState(false)
 
   // Cerrar con Escape
@@ -48,10 +48,15 @@ export function NewLeadButton() {
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="ml-auto inline-flex items-center gap-[7px] rounded-[10px] bg-brand px-[15px] py-[10px] font-hanken text-[13px] font-semibold text-white transition-colors hover:bg-brand2"
+        aria-label={compact ? 'Crear un registro' : 'Nuevo lead'}
+        className={
+          compact
+            ? 'inline-flex min-h-11 min-w-11 items-center justify-center gap-1 rounded-lg px-2 text-sm font-semibold text-white hover:bg-white/10'
+            : 'ml-auto inline-flex items-center gap-[7px] rounded-[10px] bg-brand px-[15px] py-[10px] font-hanken text-[13px] font-semibold text-white transition-colors hover:bg-brand2'
+        }
       >
         <Plus size={15} strokeWidth={2.2} className="shrink-0" />
-        <span className="hidden sm:inline">Nuevo lead</span>
+        <span className="hidden sm:inline">{compact ? 'Crear' : 'Nuevo lead'}</span>
       </button>
 
       {open && (

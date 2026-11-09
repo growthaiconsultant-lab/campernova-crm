@@ -11,6 +11,7 @@ async function main() {
   await build({
     entryPoints: {
       app: 'tests/ui/buyer-followup-fixture.tsx',
+      header: 'tests/ui/buyer-header-fixture.tsx',
       autosave: 'tests/ui/buyer-autosave-fixture.tsx',
       searchRequest: 'tests/ui/search-request-fixture.tsx',
     },
@@ -28,17 +29,30 @@ async function main() {
               ? { path: 'buyer-actions', namespace: 'fixture' }
               : undefined
           )
+          plugin.onResolve({ filter: /^@\/app\/\(backoffice\)\/search-actions$/ }, () => ({
+            path: 'fixture-search',
+            namespace: 'fixture',
+          }))
+          plugin.onResolve({ filter: /^\.\/actions$/ }, (args) =>
+            args.importer.endsWith('buyer-topbar-actions.tsx')
+              ? { path: 'fixture-lost', namespace: 'fixture' }
+              : undefined
+          )
           plugin.onResolve({ filter: /^next\/(navigation|link)$/ }, ({ path }) => ({
             path,
             namespace: 'fixture',
           }))
           plugin.onLoad({ filter: /.*/, namespace: 'fixture' }, ({ path }) => ({
             contents:
-              path === 'buyer-actions'
-                ? 'export function updateBuyerLead(id, data, fields) { return window.autosaveHarness.save(data, fields) }'
-                : path.endsWith('navigation')
-                  ? 'const router = { refresh() {}, replace() {}, push(url) { window.autosaveHarness.destination = url } }; export function useRouter() { return router }'
-                  : 'import React from "react"; export default function Link(props) { return React.createElement("a", props) }',
+              path === 'fixture-search'
+                ? 'export async function globalSearch() { return {compradores:[],vendedores:[],vehiculos:[],captaciones:[]} }'
+                : path === 'fixture-lost'
+                  ? 'export function markBuyerLeadLost() { throw Error("La prueba de cancelación no debe guardar") }'
+                  : path === 'buyer-actions'
+                    ? 'export function updateBuyerLead(id, data, fields) { return window.autosaveHarness.save(data, fields) }'
+                    : path.endsWith('navigation')
+                      ? 'const router = { refresh() {}, replace() {}, push(url) { window.autosaveHarness.destination = url } }; export function useRouter() { return router } export const usePathname = () => location.pathname; export const useParams = () => ({id: location.pathname.split("/")[2]}); export const useSearchParams = () => new URLSearchParams(location.search);'
+                      : 'import React from "react"; export default function Link(props) { return React.createElement("a", props) }',
             resolveDir: process.cwd(),
           }))
         },

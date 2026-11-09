@@ -2,7 +2,12 @@ import { defineConfig } from '@playwright/test'
 
 export default defineConfig({
   testDir: './tests/ui',
-  testMatch: ['buyer-followup.spec.ts', 'buyer-autosave.spec.ts', 'search-request.spec.ts'],
+  testMatch: [
+    'buyer-followup.spec.ts',
+    'buyer-header.spec.ts',
+    'buyer-autosave.spec.ts',
+    'search-request.spec.ts',
+  ],
   fullyParallel: true,
   workers: 2,
   reporter: 'list',

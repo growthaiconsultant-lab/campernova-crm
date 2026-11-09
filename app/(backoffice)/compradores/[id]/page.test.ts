@@ -61,6 +61,40 @@ describe('navegación de la ficha integral', () => {
     expect(html).not.toContain('?tab=postventa')
   })
 
+  it.each(['ficha', 'busqueda', 'vehiculos', 'documentos', 'postventa'])(
+    'presenta una sola franja de llamada y cita antes de la navegación en %s',
+    async (tab) => {
+      mocks.buyer.mockResolvedValue({
+        ...base,
+        phone: '600000000',
+        calendarEvents: [
+          { id: 'event-qa', title: 'Enviar opciones', startAt: new Date('2026-11-15T11:30:00Z') },
+        ],
+      })
+      const html = await render({ tab })
+      const header = html.split('</header>')[0]
+      expect(header).toContain('href="/calendario/event-qa"')
+      expect(header).toContain('Enviar opciones')
+      expect(header).toContain('tel:600000000')
+      expect(header).toContain('Contactar')
+      expect(header).toContain('WhatsApp')
+      expect(header).toContain('Gestionar ficha')
+      expect(header).not.toContain('Marcar como perdido')
+      expect(html.match(/Registrar llamada/g)).toHaveLength(1)
+      expect(header.indexOf('Registrar llamada')).toBeLessThan(
+        header.indexOf('Apartados de la ficha')
+      )
+    }
+  )
+
+  it('muestra un recordatorio heredado sin fecha desde Documentos', async () => {
+    mocks.buyer.mockResolvedValue({ ...base, nextActionType: 'LLAMAR', nextActionDueAt: null })
+    const html = await render({ tab: 'documentos', actionsPage: '3' })
+    expect(html).toContain('Sin fecha')
+    expect(html).toContain('Registrar llamada')
+    expect(html).toContain('Presupuestos y documentos operativos')
+  })
+
   it('mantiene el formulario editable, el catálogo, la solicitud original y el vehículo a cambio', async () => {
     mocks.first.mockResolvedValue({ content: 'Formulario histórico', createdAt: base.createdAt })
     const html = await render({ tab: 'busqueda', ver: 'editar' })
