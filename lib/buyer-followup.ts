@@ -4,15 +4,26 @@ import type { CreateCalendarEventInput } from '@/lib/validators/calendar-event'
 export const FOLLOWUP_PAGE_SIZE = 10
 
 // Legacy NOTA also contains system-generated entries. Keep their audit trail in Activity.
+const automaticNotePrefixes = ['Origen cambiado:', 'COM-9: asignación automática inicial']
+
+export function isBuyerCommercialNote(activity: {
+  type: string
+  agentId: string | null
+  content: string | null
+}) {
+  return (
+    activity.type === 'NOTA' &&
+    activity.agentId !== null &&
+    !automaticNotePrefixes.some((prefix) => activity.content?.startsWith(prefix))
+  )
+}
+
 export function buyerCommercialNotesWhere(buyerLeadId: string): Prisma.ActivityWhereInput {
   return {
     buyerLeadId,
     type: 'NOTA',
     agentId: { not: null },
-    NOT: [
-      { content: { startsWith: 'Origen cambiado:' } },
-      { content: { startsWith: 'COM-9: asignación automática inicial' } },
-    ],
+    NOT: automaticNotePrefixes.map((prefix) => ({ content: { startsWith: prefix } })),
   }
 }
 

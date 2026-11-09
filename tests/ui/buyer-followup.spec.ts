@@ -141,3 +141,18 @@ test('obliga a indicar día y hora; bloquea doble envío y no desborda en móvil
     true
   )
 })
+
+test('asocia desde stock, permite reintentar y muestra el interés confirmado', async ({ page }) => {
+  await page.evaluate(() => {
+    window.followupHarness.mode = 'error'
+  })
+  const add = page.getByRole('button', { name: 'Añadir a vehículos de interés' })
+  await add.click()
+  await expect(page.getByRole('alert')).toHaveText('Vehículo no disponible')
+  await page.evaluate(() => {
+    window.followupHarness.mode = 'ok'
+  })
+  await add.click()
+  await expect(page.getByText('En vehículos de interés', { exact: true })).toBeVisible()
+  await expect(add).toHaveCount(0)
+})
