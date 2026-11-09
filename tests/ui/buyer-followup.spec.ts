@@ -2,14 +2,44 @@ import { test, expect, type Page } from '@playwright/test'
 import path from 'node:path'
 
 test.beforeEach(async ({ page }) => {
-  await page.setContent(
-    '<!doctype html><html lang="es"><head><meta name="viewport" content="width=device-width, initial-scale=1"></head><body><div id="root"></div></body></html>'
+  await page.route('http://localhost/seguimiento', (route) =>
+    route.fulfill({
+      contentType: 'text/html',
+      body: '<!doctype html><html lang="es"><head><meta name="viewport" content="width=device-width, initial-scale=1"></head><body><div id="root"></div></body></html>',
+    })
   )
+  await page.goto('http://localhost/seguimiento')
   await page.addStyleTag({ path: path.resolve('.artifacts/buyer-followup/style.css') })
   await page.addStyleTag({
     content: ':root { --font-crm: Arial; --font-inter: Arial; --font-hanken: Arial; }',
   })
   await page.addScriptTag({ path: path.resolve('.artifacts/buyer-followup/app.js') })
+})
+
+test('guarda el resultado y el siguiente paso desde el mismo formulario y permite reintentar', async ({
+  page,
+}) => {
+  await page.getByRole('button', { name: 'Registrar llamada' }).click()
+  const outcome = page.getByLabel('¿Qué ha pasado en la llamada?')
+  await outcome.fill('Ha pedido dos opciones.')
+  await page.getByLabel('Siguiente paso', { exact: true }).selectOption('ENVIAR_VEHICULOS')
+  await page.getByLabel('Fecha y hora').fill('2027-01-15T16:30')
+  await page.evaluate(() => {
+    window.followupHarness.mode = 'error'
+  })
+  const save = page.getByRole('button', { name: 'Guardar seguimiento' })
+  await save.click()
+  await expect(page.getByRole('alert')).toContainText('Error de conexión')
+  await expect(outcome).toHaveValue('Ha pedido dos opciones.')
+  await page.evaluate(() => {
+    window.followupHarness.mode = 'ok'
+  })
+  await save.click()
+  await expect(page.getByRole('status')).toContainText('siguiente paso programado')
+  const calls = await page.evaluate(() => window.followupHarness.calls)
+  expect(calls).toHaveLength(2)
+  expect(calls[0]).toEqual(calls[1])
+  expect(calls[1].next).toEqual({ action: 'ENVIAR_VEHICULOS', startAt: '2027-01-15T15:30:00.000Z' })
 })
 
 async function fillAction(page: Page, type = 'LLAMAR', date = '2026-10-22') {
