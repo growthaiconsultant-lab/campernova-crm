@@ -19,6 +19,7 @@ type Props = {
   /** ISO string (serializable RSC→client) */
   nextActionDueAt: string | null
   /** Texto sugerido por estado, mostrado cuando no hay acción programada */
+  editLabel?: string
   fallbackText: string
 }
 
@@ -38,6 +39,7 @@ export function NextActionEditor({
   nextActionType,
   nextActionDueAt,
   fallbackText,
+  editLabel,
 }: Props) {
   const router = useRouter()
   const [editing, setEditing] = useState(false)
@@ -87,8 +89,13 @@ export function NextActionEditor({
 
   if (editing) {
     return (
-      <div className="relative mt-2 space-y-2">
+      <div
+        className={
+          editLabel ? 'mt-2 space-y-2 rounded-lg bg-slate-900 p-3' : 'relative mt-2 space-y-2'
+        }
+      >
         <select
+          aria-label="Tipo de recordatorio"
           value={type}
           onChange={(e) => setType(e.target.value as NextActionType)}
           className="w-full rounded-lg border border-white/20 bg-white/10 px-2.5 py-2 text-[13px] text-white outline-none [&>option]:text-black"
@@ -101,6 +108,7 @@ export function NextActionEditor({
         </select>
         <input
           type="datetime-local"
+          aria-label="Fecha y hora del recordatorio (opcional)"
           value={due}
           onChange={(e) => setDue(e.target.value)}
           className="w-full rounded-lg border border-white/20 bg-white/10 px-2.5 py-1.5 text-[13px] text-white outline-none [color-scheme:dark]"
@@ -138,6 +146,24 @@ export function NextActionEditor({
           </button>
         </div>
       </div>
+    )
+  }
+
+  if (editLabel) {
+    return (
+      <button
+        type="button"
+        className="inline-flex items-center gap-1.5 py-2 text-sm font-medium text-brand underline"
+        onClick={() => {
+          setType(nextActionType ?? 'LLAMAR')
+          setDue(nextActionDueAt ? toDatetimeLocal(nextActionDueAt) : '')
+          setError(null)
+          setEditing(true)
+        }}
+      >
+        <Pencil size={14} aria-hidden="true" />
+        {editLabel}
+      </button>
     )
   }
 

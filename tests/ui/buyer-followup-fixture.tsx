@@ -1,9 +1,11 @@
 import { AddBuyerInterestButton } from '../../components/add-buyer-interest-button'
 import { useState } from 'react'
-import { BuyerCallForm, type BuyerCallInput } from '../../components/buyer-call-form'
+import { type BuyerCallInput } from '../../components/buyer-call-form'
 import { createRoot } from 'react-dom/client'
 import { BuyerNotesPanel, type BuyerCommercialNote } from '../../components/buyer-notes-panel'
-import { BuyerActionsPanel, type BuyerPendingAction } from '../../components/buyer-actions-panel'
+import { BuyerAgendaRow } from '../../components/buyer-agenda-row'
+import { buyerAgendaPage, type BuyerAgendaEntry } from '../../lib/buyer-agenda'
+import { BuyerActionsPanel } from '../../components/buyer-actions-panel'
 import type { CreateCalendarEventInput } from '../../lib/validators/calendar-event'
 
 declare global {
@@ -29,7 +31,7 @@ function Fixture() {
       createdAt: '2026-10-20T09:00:00Z',
     },
   ])
-  const [actions, setActions] = useState<BuyerPendingAction[]>([])
+  const [actions, setActions] = useState<BuyerAgendaEntry[]>([])
   async function addNote(content: string) {
     window.followupHarness.noteCalls++
     await delay()
@@ -57,16 +59,17 @@ function Fixture() {
     setActions((items) => [
       ...items,
       {
-        id,
+        eventId: id,
         title: input.title,
         description: input.description ?? null,
-        startAt: input.startAt,
+        due: new Date(input.startAt),
         assignee: 'Comercial de prueba',
-        overdue: false,
       },
     ])
     return { id }
   }
+  const ordered = [...actions].sort((a, b) => Number(a.due) - Number(b.due))
+  const agenda = buyerAgendaPage(ordered[0], ordered, undefined, 1, 10)
   return (
     <main className="crm-theme min-h-screen bg-background p-4 text-foreground md:p-8">
       <h1 className="mb-2 text-2xl font-semibold">Comprador de ejemplo</h1>
@@ -81,23 +84,25 @@ function Fixture() {
           return { ok: true, saved: true }
         }}
       />
-      <BuyerCallForm
-        archived={false}
-        save={async (input) => {
-          window.followupHarness.calls.push(input)
-          await delay()
-          return window.followupHarness.mode === 'ok'
-            ? { ok: true }
-            : { error: 'Error de conexión' }
-        }}
-      />
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
         <BuyerNotesPanel notes={notes} addNote={addNote} />
         <BuyerActionsPanel
           buyerLeadId="buyer-1"
           actorId="agent-1"
           archived={false}
-          actions={actions}
+          count={ordered.length}
+          page={1}
+          firstAction={agenda.first && <BuyerAgendaRow entry={agenda.first} />}
+          otherActions={agenda.others.map((entry) => (
+            <BuyerAgendaRow key={entry.eventId} entry={entry} />
+          ))}
+          saveCall={async (input) => {
+            window.followupHarness.calls.push(input)
+            await delay()
+            return window.followupHarness.mode === 'ok'
+              ? { ok: true }
+              : { error: 'Error de conexión' }
+          }}
           createAction={createAction}
         />
       </div>

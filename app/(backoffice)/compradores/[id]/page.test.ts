@@ -2,12 +2,18 @@ import { renderToStaticMarkup } from 'react-dom/server'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import Page from './page'
 
-const mocks = vi.hoisted(() => ({ buyer: vi.fn(), activities: vi.fn(), first: vi.fn() }))
+const mocks = vi.hoisted(() => ({
+  buyer: vi.fn(),
+  activities: vi.fn(),
+  first: vi.fn(),
+  calendarFirst: vi.fn(),
+}))
 vi.mock('@/lib/auth', () => ({ requireAgente: async () => ({ id: 'test-agent' }) }))
 vi.mock('@/lib/db', () => ({
   db: {
     buyerLead: { findUnique: mocks.buyer },
     user: { findMany: async () => [] },
+    calendarEvent: { findFirst: mocks.calendarFirst },
     activity: { findMany: mocks.activities, findFirst: mocks.first },
   },
 }))
@@ -31,6 +37,7 @@ const base = {
   phone: null,
   chatSessions: [],
   matches: [],
+  _count: { calendarEvents: 0 },
   calendarEvents: [],
   deliveries: [],
   offers: [],
@@ -61,7 +68,7 @@ describe('navegación de la ficha integral', () => {
     expect(html).not.toContain('?tab=postventa')
   })
 
-  it.each(['ficha', 'busqueda', 'vehiculos', 'documentos', 'postventa'])(
+  it.each(['busqueda', 'vehiculos', 'documentos', 'postventa'])(
     'presenta una sola franja de llamada y cita antes de la navegación en %s',
     async (tab) => {
       mocks.buyer.mockResolvedValue({
@@ -86,6 +93,83 @@ describe('navegación de la ficha integral', () => {
       )
     }
   )
+
+  it('presenta la primera acción una vez, con llamada y edición en la agenda antes del historial', async () => {
+    mocks.buyer.mockResolvedValue({
+      ...base,
+      _count: { calendarEvents: 1 },
+      nextActionType: 'WHATSAPP',
+      nextActionDueAt: null,
+      calendarEvents: [
+        {
+          id: 'evento',
+          title: 'Confirmar visita',
+          description: 'Quiere probar la cama',
+          assignedTo: { name: 'Ana' },
+          startAt: new Date('2026-11-15T10:00:00Z'),
+        },
+      ],
+    })
+    const html = await render()
+    expect(html.match(/Confirmar visita/g)).toHaveLength(1)
+    expect(html.match(/Registrar llamada/g)).toHaveLength(1)
+    expect(html).toContain('2 pendientes')
+    expect(html).toContain('Sin fecha')
+    expect(html).toContain('Editar recordatorio')
+    expect(html).toContain('Quiere probar la cama')
+    expect(html).toContain('Responsable · Ana')
+    expect(html.indexOf('Agenda del comprador')).toBeLessThan(html.indexOf('id="historial"'))
+    expect(html).not.toContain('Próximo paso')
+  })
+
+  it('conserva el editor de un recordatorio sin fecha en una ficha archivada', async () => {
+    mocks.buyer.mockResolvedValue({
+      ...base,
+      archivedAt: base.createdAt,
+      nextActionType: 'LLAMAR',
+      nextActionDueAt: null,
+    })
+    const html = await render()
+    expect(html).toContain('1 pendiente')
+    expect(html).toContain('Sin fecha')
+    expect(html).toContain('Editar recordatorio')
+    expect(html).toContain('Reactiva el comprador para programar')
+    expect(html).not.toContain('otras acciones pendientes')
+  })
+
+  it('destaca el recordatorio anterior a una cita también desde otras pestañas', async () => {
+    mocks.buyer.mockResolvedValue({
+      ...base,
+      _count: { calendarEvents: 1 },
+      nextActionType: 'WHATSAPP',
+      nextActionDueAt: base.createdAt,
+      calendarEvents: [
+        { id: 'evento', title: 'Confirmar visita', startAt: new Date('2026-11-15T10:00:00Z') },
+      ],
+    })
+    const html = await render()
+    expect(html.indexOf('Recordatorio de la ficha')).toBeLessThan(html.indexOf('Confirmar visita'))
+    expect(await render({ tab: 'documentos' })).toContain(
+      'href="/compradores/test-buyer?tab=ficha#buyer-actions-title"'
+    )
+  })
+
+  it('conserva la primera acción y abre las restantes al paginar', async () => {
+    mocks.calendarFirst.mockResolvedValue({
+      id: 'primero',
+      title: 'Primera cita',
+      startAt: base.createdAt,
+    })
+    mocks.buyer.mockResolvedValue({
+      ...base,
+      _count: { calendarEvents: 11 },
+      calendarEvents: [{ id: 'otro', title: 'Otra cita', startAt: new Date('2027-01-01') }],
+    })
+    const html = await render({ actionsPage: '2' })
+    expect(html).toMatch(/<details[^>]*open[^>]*>[\s\S]*Otra cita/)
+    expect(html).toContain('href="/calendario/primero"')
+    expect(html).toContain('Páginas de acciones')
+  })
 
   it('muestra un recordatorio heredado sin fecha desde Documentos', async () => {
     mocks.buyer.mockResolvedValue({ ...base, nextActionType: 'LLAMAR', nextActionDueAt: null })

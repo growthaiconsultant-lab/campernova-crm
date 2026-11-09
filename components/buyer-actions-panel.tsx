@@ -2,35 +2,34 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import Link from 'next/link'
-import { CalendarPlus } from 'lucide-react'
+import { BuyerCallForm, type BuyerCallInput } from './buyer-call-form'
+import { CalendarDays, CalendarPlus } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { BUYER_ACTION_OPTIONS, buyerActionInput } from '@/lib/buyer-followup'
 import type { CreateCalendarEventInput } from '@/lib/validators/calendar-event'
 
-export type BuyerPendingAction = {
-  id: string
-  title: string
-  description: string | null
-  startAt: string
-  assignee: string | null
-  overdue: boolean
-}
-
 export function BuyerActionsPanel({
   buyerLeadId,
   actorId,
-  actions,
+  count,
+  firstAction,
+  otherActions,
+  page,
+  expandOtherActions,
   createAction,
-  legacyAction,
+  saveCall,
   pagination,
   archived,
 }: {
   buyerLeadId: string
   actorId: string
-  actions: BuyerPendingAction[]
+  count: number
+  firstAction: React.ReactNode
+  otherActions: React.ReactNode
+  expandOtherActions?: boolean
+  page: number
   createAction: (input: CreateCalendarEventInput) => Promise<{ error?: string; id?: string }>
-  legacyAction?: React.ReactNode
+  saveCall: (input: BuyerCallInput) => Promise<{ ok?: boolean; error?: string; eventId?: string }>
   pagination?: React.ReactNode
   archived: boolean
 }) {
@@ -99,27 +98,45 @@ export function BuyerActionsPanel({
       className="min-w-0 rounded-xl border border-border bg-card p-5"
     >
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <h2 id="buyer-actions-title" className="scroll-mt-20 text-base font-semibold">
-          Próximas acciones
+        <h2
+          id="buyer-actions-title"
+          className="flex scroll-mt-20 items-center gap-2 text-lg font-semibold"
+        >
+          <CalendarDays size={18} aria-hidden="true" /> Agenda del comprador
         </h2>
-        {!open && (
-          <Button
-            type="button"
-            size="sm"
-            onClick={() => {
-              setOpen(true)
-              setSuccess(false)
-            }}
-            disabled={archived}
-          >
-            <CalendarPlus className="mr-2 h-4 w-4" />
-            Programar acción
-          </Button>
+        <span className="rounded-full bg-brand-tint px-2.5 py-1 text-xs font-medium text-brand">
+          {count} {count === 1 ? 'pendiente' : 'pendientes'}
+        </span>
+      </div>
+      <div className="my-4 rounded-lg border-l-4 border-brand bg-brand-tint p-4">
+        {firstAction ? (
+          <>
+            <p className="mb-1 text-xs font-semibold text-brand">Primera pendiente</p>
+            {firstAction}
+          </>
+        ) : (
+          <p>Sin acciones pendientes.</p>
         )}
       </div>
-      <p className="mt-1 text-sm text-muted-foreground">
-        Puedes dejar varias acciones pendientes. Se verán también en el calendario.
-      </p>
+      <div hidden={open}>
+        <BuyerCallForm
+          archived={archived}
+          save={saveCall}
+          additionalAction={
+            <Button
+              type="button"
+              variant="outline"
+              disabled={archived}
+              onClick={() => {
+                setOpen(true)
+                setSuccess(false)
+              }}
+            >
+              <CalendarPlus size={16} className="mr-2" aria-hidden="true" /> Programar acción
+            </Button>
+          }
+        />
+      </div>
       {archived && (
         <p className="mt-2 text-sm text-muted-foreground">
           Reactiva el comprador para programar nuevas acciones.
@@ -253,51 +270,21 @@ export function BuyerActionsPanel({
           Acción programada en la ficha y en el calendario.
         </p>
       )}
-      <div className="mt-4 space-y-3">
-        {legacyAction}
-        {actions.length === 0 ? (
-          <p className="text-sm text-muted-foreground">No hay más acciones de agenda pendientes.</p>
-        ) : (
-          <ol className="max-h-[420px] space-y-3 overflow-y-auto pr-1">
-            {actions.map((item) => (
-              <li key={item.id} className="rounded-lg border border-border p-3">
-                <div className="flex flex-wrap items-start justify-between gap-2">
-                  <p className="break-words text-sm font-medium">{item.title}</p>
-                  <Link
-                    className="text-xs font-medium text-sidebar-primary underline"
-                    href={`/calendario/${item.id}`}
-                  >
-                    Ver / gestionar
-                  </Link>
-                </div>
-                <p
-                  className={`mt-1 text-xs ${item.overdue ? 'font-medium text-amber-700' : 'text-muted-foreground'}`}
-                >
-                  {item.overdue && 'Vencida · '}
-                  <time dateTime={item.startAt}>
-                    {new Date(item.startAt).toLocaleString('es-ES', {
-                      day: 'numeric',
-                      month: 'short',
-                      year: 'numeric',
-                      hour: '2-digit',
-                      minute: '2-digit',
-                      timeZone: 'Europe/Madrid',
-                    })}
-                  </time>{' '}
-                  · hora de Madrid
-                </p>
-                {item.description && (
-                  <p className="mt-2 whitespace-pre-wrap break-words text-sm">{item.description}</p>
-                )}
-                {item.assignee && (
-                  <p className="mt-2 text-xs text-muted-foreground">Responsable: {item.assignee}</p>
-                )}
-              </li>
-            ))}
-          </ol>
-        )}
-        {pagination}
-      </div>
+      {(count > 1 || pagination) && (
+        <details
+          key={page}
+          open={expandOtherActions || undefined}
+          className="mt-4 border-t border-border pt-2"
+        >
+          <summary className="cursor-pointer py-2 text-sm font-semibold text-brand">
+            {count === 2
+              ? 'Ver otra acción pendiente (1)'
+              : `Ver las otras acciones pendientes (${Math.max(0, count - 1)})`}
+          </summary>
+          {otherActions}
+          {pagination}
+        </details>
+      )}
     </section>
   )
 }

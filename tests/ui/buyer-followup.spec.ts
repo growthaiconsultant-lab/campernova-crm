@@ -84,7 +84,9 @@ test('programa dos acciones sin reemplazar la primera y guarda hora y notas', as
   await expect(page.getByRole('status')).toContainText('Acción programada')
   await fillAction(page, 'WHATSAPP', '2026-10-23')
   await page.getByRole('button', { name: 'Guardar acción' }).click()
-  await expect(page.getByRole('link', { name: 'Ver / gestionar' })).toHaveCount(2)
+  await expect(page.getByRole('link', { name: 'Gestionar acción' })).toHaveCount(1)
+  await page.getByText('Ver otra acción pendiente (1)', { exact: true }).click()
+  await expect(page.getByRole('link', { name: 'Gestionar acción' })).toHaveCount(2)
   const calls = await page.evaluate(() => window.followupHarness.actionCalls)
   expect(calls[0]).toMatchObject({
     type: 'LLAMADA',
