@@ -153,4 +153,23 @@ describe('globalSearch', () => {
       captaciones: [],
     })
   })
+
+  it('finds compact, spaced and hyphenated plate formats in vehicles and sellers', async () => {
+    mockRole('AGENTE')
+    mockEmptyQueries()
+    await globalSearch('1234abc')
+    for (const plate of ['1234ABC', '1234 ABC', '1234-ABC']) {
+      const condition = { plate: { contains: plate, mode: 'insensitive' } }
+      expect(vehicleFindMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { OR: expect.arrayContaining([condition]) },
+        })
+      )
+      expect(sellerFindMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { OR: expect.arrayContaining([{ vehicle: condition }]) },
+        })
+      )
+    }
+  })
 })

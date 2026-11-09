@@ -4,6 +4,7 @@ import { buyerSearchWhere } from '@/lib/buyer-search'
 import { db } from '@/lib/db'
 import { requireAuth } from '@/lib/auth'
 import { personLabel, vehicleLabel } from '@/lib/display'
+import { vehiclePlateSearchConditions } from '@/lib/vehicle-plate-search'
 
 /**
  * Búsqueda global (⌘K): compradores, vendedores, vehículos y captaciones por
@@ -35,6 +36,7 @@ export async function globalSearch(query: string): Promise<SearchResults> {
   const canSearchCommercial = user.role === 'ADMIN' || user.role === 'AGENTE'
 
   const contains = { contains: q, mode: 'insensitive' as const }
+  const plates = vehiclePlateSearchConditions(q)
 
   const [buyers, sellers, vehicles, captures] = await Promise.all([
     canSearchCommercial
@@ -54,6 +56,7 @@ export async function globalSearch(query: string): Promise<SearchResults> {
               { phone: contains },
               { vehicle: { brand: contains } },
               { vehicle: { model: contains } },
+              ...plates.map((vehicle) => ({ vehicle })),
             ],
           },
           select: {
@@ -67,7 +70,7 @@ export async function globalSearch(query: string): Promise<SearchResults> {
       : Promise.resolve([]),
     canSearchCommercial
       ? db.vehicle.findMany({
-          where: { OR: [{ brand: contains }, { model: contains }, { plate: contains }] },
+          where: { OR: [{ brand: contains }, { model: contains }, ...plates] },
           select: {
             id: true,
             brand: true,

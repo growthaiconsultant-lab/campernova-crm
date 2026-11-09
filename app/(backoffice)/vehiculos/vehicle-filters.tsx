@@ -74,13 +74,14 @@ export function VehicleFilters() {
 
   return (
     <div className="flex flex-wrap items-end gap-3">
-      {/* Marca */}
+      {/* Marca, modelo o matrícula; se conserva brand en la URL por compatibilidad. */}
       <form onSubmit={handleBrandSubmit} className="flex gap-2">
         <Input
           name="brand"
           defaultValue={params.get('brand') ?? ''}
-          placeholder="Marca o modelo…"
-          className="w-44"
+          placeholder="Marca, modelo o matrícula…"
+          aria-label="Buscar por marca, modelo o matrícula"
+          className="w-60"
         />
         <Button type="submit" variant="secondary" size="sm">
           Buscar
