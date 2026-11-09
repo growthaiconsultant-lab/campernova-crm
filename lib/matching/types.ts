@@ -10,8 +10,14 @@ import type {
 import type { EquipmentFlags } from '../valuation/types'
 
 /// Datos mínimos de un vehículo para el matching.
-/// `price` = `desiredPrice ?? valuationRecommended` (decidido en el adapter).
+/// `price` = `salePrice ?? desiredPrice` (decidido en el adapter).
 export type MatchingVehicleInput = {
+  catalog?: import('./catalog').Catalog
+  brand?: string | null
+  model?: string | null
+  hasGarage?: boolean | null
+  winterized?: boolean | null
+  sellerLeadId?: string
   id: string
   // CAP-1: datos estructurales pueden faltar (captación progresiva) → null.
   type: VehicleType | null
@@ -40,6 +46,9 @@ export type MatchingVehicleInput = {
 
 /// Datos mínimos de un comprador para el matching.
 export type MatchingBuyerInput = {
+  catalog?: import('./catalog').Catalog
+  needsGarage?: boolean | null
+  needsWinter?: boolean | null
   id: string
   vehicleType: VehicleType | null
   minSeats: number | null

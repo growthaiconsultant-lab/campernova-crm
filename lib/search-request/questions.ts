@@ -234,4 +234,21 @@ export const FORM_STEPS = [
   { title: 'Estado y prioridades', sections: [7, 8, 9] },
   { title: 'Revisar y enviar', sections: [] },
 ]
+// These fields are captured once in the shared catalog. Keep the historical question IDs for snapshots.
+export const isCatalogQuestion = (key: string) =>
+  key.startsWith('equipment_') ||
+  [
+    'gearbox',
+    'beds',
+    'shower',
+    'toilet',
+    'hotWater',
+    'fridge',
+    'conversion',
+    'origin',
+    'engine',
+    'preferredModels',
+    'minYear',
+    'maxKm',
+  ].includes(key)
 export type SearchAnswers = Record<string, string | string[]>

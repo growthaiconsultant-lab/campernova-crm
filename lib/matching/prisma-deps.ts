@@ -3,7 +3,14 @@ import type { EquipmentFlags } from '../valuation/types'
 import { eligibleBuyerWhere, eligibleVehicleWhere } from './eligibility'
 import type { MatchingBuyerInput, MatchingDeps, MatchingVehicleInput } from './types'
 
+import { readCatalog } from './catalog'
 const VEHICLE_SELECT = {
+  matchCatalog: true,
+  brand: true,
+  model: true,
+  hasGarage: true,
+  winterized: true,
+  sellerLeadId: true,
   id: true,
   type: true,
   seats: true,
@@ -12,7 +19,7 @@ const VEHICLE_SELECT = {
   equipment: true,
   location: true,
   desiredPrice: true,
-  valuationRecommended: true,
+  salePrice: true,
   category: true,
   bedLayout: true,
   sleepingPlaces: true,
@@ -27,6 +34,9 @@ const VEHICLE_SELECT = {
 } as const
 
 const BUYER_SELECT = {
+  matchCatalog: true,
+  needsGarage: true,
+  needsWinter: true,
   id: true,
   vehicleType: true,
   minSeats: true,
@@ -45,6 +55,12 @@ const BUYER_SELECT = {
 } as const
 
 type VehicleRow = {
+  matchCatalog: unknown
+  brand: string | null
+  model: string | null
+  hasGarage: boolean | null
+  winterized: boolean | null
+  sellerLeadId: string
   id: string
   type: MatchingVehicleInput['type']
   seats: number | null
@@ -53,7 +69,7 @@ type VehicleRow = {
   equipment: unknown
   location: string | null
   desiredPrice: { toString(): string } | null
-  valuationRecommended: { toString(): string } | null
+  salePrice: { toString(): string } | null
   category: MatchingVehicleInput['category']
   bedLayout: MatchingVehicleInput['bedLayout']
   sleepingPlaces: number | null
@@ -68,6 +84,9 @@ type VehicleRow = {
 }
 
 type BuyerRow = {
+  matchCatalog: unknown
+  needsGarage: boolean | null
+  needsWinter: boolean | null
   id: string
   vehicleType: MatchingBuyerInput['vehicleType']
   minSeats: number | null
@@ -96,16 +115,22 @@ function toNumber(value: { toString(): string } | null): number | null {
 
 function vehicleRowToInput(row: VehicleRow): MatchingVehicleInput {
   const desired = toNumber(row.desiredPrice)
-  const valuation = toNumber(row.valuationRecommended)
+  const salePrice = toNumber(row.salePrice)
   return {
     id: row.id,
+    catalog: readCatalog(row.matchCatalog),
+    brand: row.brand,
+    model: row.model,
+    hasGarage: row.hasGarage,
+    winterized: row.winterized,
+    sellerLeadId: row.sellerLeadId,
     type: row.type,
     seats: row.seats,
     year: row.year,
     km: row.km,
     equipment: toEquipment(row.equipment),
     location: row.location,
-    price: desired ?? valuation,
+    price: salePrice ?? desired,
     category: row.category,
     bedLayout: row.bedLayout,
     sleepingPlaces: row.sleepingPlaces,
@@ -123,6 +148,9 @@ function vehicleRowToInput(row: VehicleRow): MatchingVehicleInput {
 function buyerRowToInput(row: BuyerRow): MatchingBuyerInput {
   return {
     id: row.id,
+    catalog: readCatalog(row.matchCatalog),
+    needsGarage: row.needsGarage,
+    needsWinter: row.needsWinter,
     vehicleType: row.vehicleType,
     minSeats: row.minSeats,
     maxBudget: toNumber(row.maxBudget),

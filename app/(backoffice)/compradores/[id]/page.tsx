@@ -21,16 +21,15 @@ import { BuyerActionsPanel } from '@/components/buyer-actions-panel'
 import { buyerCommercialNotesWhere, followupPage, FOLLOWUP_PAGE_SIZE } from '@/lib/buyer-followup'
 import { createCalendarEvent } from '@/app/(backoffice)/calendario/actions'
 import { MatchesSection } from '@/components/matches-section'
+import { currentMatches } from '@/lib/matching/current-matches'
+import { CatalogEditor } from '@/components/match-catalog-editor'
+import { BuyerCatalogResults } from '@/components/buyer-catalog-results'
+import { readCatalog } from '@/lib/matching/catalog'
 import { OffersSection } from '@/components/offers-section'
 import { isActiveHold } from '@/lib/offers'
 import { buyerScore } from '@/lib/scoring'
 import { ScoreInfo } from '@/components/score-info'
-import {
-  buildMatchExplanation,
-  isBuyerEligible,
-  isVehicleEligible,
-  prismaMatchingDeps,
-} from '@/lib/matching'
+import { isBuyerEligible, isVehicleEligible, prismaMatchingDeps } from '@/lib/matching'
 import { classifyBuyerCriteria } from '@/lib/buyer-criteria'
 import type { BuyerMatchData } from '@/components/matches-section'
 import { ActivityTimeline } from '@/components/activity-timeline'
@@ -137,7 +136,7 @@ export default async function FichaCompradorPage({
                 entryValidatedAt: true,
                 entryAnnulledAt: true,
                 desiredPrice: true,
-                valuationRecommended: true,
+                salePrice: true,
                 photos: { select: { url: true }, orderBy: { order: 'asc' }, take: 1 },
                 sellerLead: { select: { id: true, archivedAt: true } },
               },
@@ -238,7 +237,7 @@ export default async function FichaCompradorPage({
     status: lead.status,
     archivedAt: lead.archivedAt,
   })
-  const visibleMatches = subjectBuyerEligible
+  const eligibleMatches = subjectBuyerEligible
     ? lead.matches.filter((m) =>
         isVehicleEligible({
           status: m.vehicle.status,
@@ -248,6 +247,13 @@ export default async function FichaCompradorPage({
         })
       )
     : []
+
+  const deps = prismaMatchingDeps(db)
+  const subject = eligibleMatches.length ? await deps.getBuyer(lead.id) : null
+  const visibleMatches = await currentMatches(eligibleMatches, async (m) => [
+    await deps.getVehicle(m.vehicle.id),
+    subject,
+  ])
 
   // Resumen de la necesidad — la unidad de trabajo del comprador
   const tipoLabel =
@@ -337,27 +343,14 @@ export default async function FichaCompradorPage({
     hasKids: lead.hasKids ?? null,
   }
 
-  // CAM-64: explicación determinista por match (motivos + riesgos)
-  const matchDeps = prismaMatchingDeps(db)
-  const buyerMatchInput = visibleMatches.length > 0 ? await matchDeps.getBuyer(lead.id) : null
-  const matchExplanations = new Map<string, { reasons: string[]; risks: string[] }>()
-  if (buyerMatchInput) {
-    await Promise.all(
-      visibleMatches.map(async (m) => {
-        const v = await matchDeps.getVehicle(m.vehicle.id)
-        if (v) matchExplanations.set(m.id, buildMatchExplanation(v, buyerMatchInput))
-      })
-    )
-  }
-
   const buyerMatches: BuyerMatchData[] = visibleMatches.map((m) => {
-    const rawPrice = m.vehicle.desiredPrice ?? m.vehicle.valuationRecommended
+    const rawPrice = m.vehicle.salePrice ?? m.vehicle.desiredPrice
     return {
       id: m.id,
       score: m.score,
       status: m.status,
       generatedBy: m.generatedBy,
-      explanation: matchExplanations.get(m.id) ?? null,
+      explanation: m.explanation,
       vehicle: {
         id: m.vehicle.id,
         brand: m.vehicle.brand,
@@ -734,6 +727,12 @@ export default async function FichaCompradorPage({
                 agents={agents}
                 legacySource={lead.source && !isBuyerSource(lead.source) ? lead.source : null}
               />
+              <CatalogEditor
+                side="buyer"
+                id={lead.id}
+                initial={readCatalog(lead.matchCatalog)}
+                family={lead.vehicleType}
+              />
               <TradeInCard
                 leadId={lead.id}
                 hasTradeIn={lead.hasTradeIn}
@@ -782,6 +781,11 @@ export default async function FichaCompradorPage({
           {/* ── TAB: MATCHES ── */}
           {activeTab === 'matches' && (
             <>
+              {subjectBuyerEligible && <BuyerCatalogResults id={lead.id} />}
+              <details className="my-4 rounded border p-3">
+                <summary>¿Recomendarías otro vehículo? Anota cuál y por qué.</summary>
+                <NoteForm addNote={addBuyerLeadNote.bind(null, lead.id)} />
+              </details>
               {buyerMatches.length > 0 ? (
                 <MatchesSection side="buyer" matches={buyerMatches} defaultOpen />
               ) : (

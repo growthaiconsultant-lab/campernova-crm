@@ -2,6 +2,8 @@
 
 import { useRef, useState } from 'react'
 import Link from 'next/link'
+import { CatalogFields } from '@/components/match-catalog-fields'
+import { fieldById, type Catalog } from '@/lib/matching/catalog'
 import {
   FORM_STEPS,
   QUESTION_SECTIONS,
@@ -10,8 +12,11 @@ import {
 } from '@/lib/search-request/questions'
 import { searchAnswersSchema } from '@/lib/search-request/schema'
 
+import { isCatalogQuestion } from '@/lib/search-request/questions'
 export function SearchForm() {
   const [step, setStep] = useState(0)
+  const [catalog, setCatalog] = useState<Catalog>({})
+  const [vehicleBudget, setVehicleBudget] = useState('')
   const [answers, setAnswers] = useState<SearchAnswers>({})
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [consent, setConsent] = useState(false)
@@ -34,6 +39,17 @@ export function SearchForm() {
     setError('')
   }
   function validate(onlyCurrent: boolean) {
+    if (
+      (!onlyCurrent || step === 0) &&
+      vehicleBudget &&
+      (!Number.isInteger(Number(vehicleBudget)) ||
+        Number(vehicleBudget) < 1 ||
+        Number(vehicleBudget) > 2000000)
+    ) {
+      setError('Revisa el precio máximo del vehículo (entre 1 y 2.000.000 €).')
+      setStep(0)
+      return false
+    }
     const result = searchAnswersSchema.safeParse(answers)
     const keys = new Set(
       FORM_STEPS[step].sections.flatMap((i) => QUESTION_SECTIONS[i].questions.map((q) => q.key))
@@ -70,7 +86,7 @@ export function SearchForm() {
     sending.current = true
     setBusy(true)
     setError('')
-    const fingerprint = JSON.stringify({ answers, consent, website })
+    const fingerprint = JSON.stringify({ answers, consent, website, catalog, vehicleBudget })
     if (!request.current || request.current.fingerprint !== fingerprint)
       request.current = { fingerprint, id: crypto.randomUUID() }
     const controller = new AbortController()
@@ -84,6 +100,8 @@ export function SearchForm() {
           requestId: request.current.id,
           version: '2026-10-21',
           answers,
+          catalog,
+          vehicleBudget: vehicleBudget ? Number(vehicleBudget) : undefined,
           consent,
           website,
         }),
@@ -297,18 +315,69 @@ export function SearchForm() {
             onChange={(e) => setWebsite(e.target.value)}
           />
         </div>
-        {FORM_STEPS[step].sections.map((index) => (
-          <section className="cn-question-section" key={index} aria-labelledby={`section-${index}`}>
-            <h3 id={`section-${index}`}>{QUESTION_SECTIONS[index].title}</h3>
-            {QUESTION_SECTIONS[index].intro && (
-              <p className="cn-section-intro">{QUESTION_SECTIONS[index].intro}</p>
-            )}
-            <div className="cn-question-grid">{QUESTION_SECTIONS[index].questions.map(field)}</div>
-          </section>
-        ))}
+        {FORM_STEPS[step].sections
+          .filter((i) => QUESTION_SECTIONS[i].questions.some((q) => !isCatalogQuestion(q.key)))
+          .map((index) => (
+            <section
+              className="cn-question-section"
+              key={index}
+              aria-labelledby={`section-${index}`}
+            >
+              <h3 id={`section-${index}`}>{QUESTION_SECTIONS[index].title}</h3>
+              {QUESTION_SECTIONS[index].intro && (
+                <p className="cn-section-intro">{QUESTION_SECTIONS[index].intro}</p>
+              )}
+              <div className="cn-question-grid">
+                {QUESTION_SECTIONS[index].questions
+                  .filter((q) => !isCatalogQuestion(q.key))
+                  .map(field)}
+              </div>
+            </section>
+          ))}
+        {step === 0 && (
+          <label className="cn-question">
+            Precio máximo del vehículo (€), si tienes un límite firme
+            <input
+              type="number"
+              min="1"
+              max="2000000"
+              step="1"
+              value={vehicleBudget}
+              onChange={(e) => setVehicleBudget(e.target.value)}
+            />
+          </label>
+        )}
+        {step === 2 && (
+          <CatalogFields
+            publicForm
+            buyer
+            family={
+              answers.vehicle === 'Camper'
+                ? 'CAMPER'
+                : answers.vehicle === 'Autocaravana'
+                  ? 'AUTOCARAVANA'
+                  : null
+            }
+            value={catalog}
+            onChange={setCatalog}
+          />
+        )}
         {step === 4 && (
           <>
             <div className="cn-review">
+              <section>
+                <h3>Características para la búsqueda</h3>
+                {vehicleBudget && <p>Precio máximo del vehículo: {vehicleBudget} €</p>}
+                {Object.entries(catalog).map(([key, e]) => (
+                  <p key={key}>
+                    {fieldById.get(key)?.label}: {e.values.join(e.all ? ' y ' : ' o ')} ·{' '}
+                    {e.required ? 'Imprescindible' : 'Preferido'}
+                  </p>
+                ))}
+                <button type="button" onClick={() => move(2)}>
+                  Editar características
+                </button>
+              </section>
               {QUESTION_SECTIONS.map((section, index) => {
                 const filled = section.questions.filter((q) =>
                   Array.isArray(answers[q.key]) ? answers[q.key].length : !!answers[q.key]
