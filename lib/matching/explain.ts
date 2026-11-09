@@ -1,4 +1,5 @@
 import { RV_CATEGORY_OPTIONS, RV_BED_OPTIONS } from '../rv-taxonomy'
+import { vehicleFacts, legacyProjection } from './vehicle-characteristics'
 import { assessPair } from './assessment'
 import type { MatchingBuyerInput, MatchingVehicleInput, ScoreBreakdown } from './types'
 
@@ -76,8 +77,9 @@ export function explainMatch(
     if (breakdown.equipment === 100) {
       reasons.push('Tiene todo el equipamiento crítico que pide')
     } else {
+      const { equipment } = legacyProjection(vehicleFacts(vehicle.catalog ?? {}, vehicle), vehicle)
       const missing = required
-        .filter((k) => vehicle.equipment[k as keyof typeof vehicle.equipment] !== true)
+        .filter((k) => equipment[k as keyof typeof equipment] !== true)
         .map((k) => EQUIPMENT_LABELS[k] ?? k)
       risks.push(
         missing.length ? `Le falta: ${missing.join(', ')}` : 'Falta parte del equipamiento crítico'

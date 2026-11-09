@@ -22,14 +22,10 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { updateVehicleSchema, type UpdateVehicleValues } from '@/lib/validators/seller-lead'
-import {
-  EQUIPMENT_OPTIONS,
-  RV_CATEGORY_OPTIONS,
-  RV_BED_OPTIONS,
-  RV_BATHROOM_OPTIONS,
-  RV_HEATING_OPTIONS,
-  RV_NONE,
-} from '@/lib/rv-taxonomy'
+import { RV_HEATING_OPTIONS, RV_NONE } from '@/lib/rv-taxonomy'
+import { CatalogFields } from '@/components/match-catalog-fields'
+import type { Catalog } from '@/lib/matching/catalog'
+import { editableCharacteristics } from '@/lib/matching/vehicle-characteristics'
 import { Sparkles, Loader2 } from 'lucide-react'
 import { updateVehicle } from './actions'
 import { suggestVehicleRvTaxonomy } from './rv-suggest-actions'
@@ -40,32 +36,29 @@ import {
 } from '@/lib/state-machine'
 import type { VehicleStatus } from '@prisma/client'
 
-// Opciones desde la fuente única (lib/rv-taxonomy). Baño = bathroomType (no flag de equipo).
-const EQUIPMENT_ITEMS = EQUIPMENT_OPTIONS
-type EquipmentKey = (typeof EQUIPMENT_ITEMS)[number]['id']
-const CATEGORY_OPTIONS = RV_CATEGORY_OPTIONS
-const BED_OPTIONS = RV_BED_OPTIONS
-const BATHROOM_OPTIONS = RV_BATHROOM_OPTIONS
 const HEATING_OPTIONS = RV_HEATING_OPTIONS
 const NONE = RV_NONE
 
 const RV_BOOLEANS = [
   { id: 'winterized', label: 'Preparada invierno' },
-  { id: 'hasGarage', label: 'Garaje (bici/moto)' },
+
   { id: 'offGrid', label: 'Autonomía off-grid' },
 ] as const
 
 type RvBoolKey = (typeof RV_BOOLEANS)[number]['id']
 
 type Props = {
+  catalog: Catalog
+  version: string
   vehicleId: string
   defaultValues: UpdateVehicleValues
 }
 
-export function VehicleEditForm({ vehicleId, defaultValues }: Props) {
+export function VehicleEditForm({ vehicleId, defaultValues, catalog, version }: Props) {
   const [saved, setSaved] = useState(false)
   const [serverError, setServerError] = useState<string | null>(null)
 
+  const [features, setFeatures] = useState(() => editableCharacteristics(catalog, defaultValues))
   const currentStatus = defaultValues.status as VehicleStatus
   const allowedStatuses: VehicleStatus[] = [
     currentStatus,
@@ -96,21 +89,15 @@ export function VehicleEditForm({ vehicleId, defaultValues }: Props) {
     const dirty = { shouldDirty: true } as const
     // La IA solo AÑADE información: rellena lo que propone con criterio y no borra
     // lo que ya hubiera (los null se ignoran; el equipamiento solo se activa, no se apaga).
-    if (s.category !== null) form.setValue('category', s.category, dirty)
-    if (s.bedLayout !== null) form.setValue('bedLayout', s.bedLayout, dirty)
-    if (s.bathroomType !== null) form.setValue('bathroomType', s.bathroomType, dirty)
-    if (s.heatingType !== null) form.setValue('heatingType', s.heatingType, dirty)
+    setFeatures((current) => editableCharacteristics(current, s))
+    if (!features.heating && s.heatingType !== null)
+      form.setValue('heatingType', s.heatingType, dirty)
     if (s.sleepingPlaces !== null) form.setValue('sleepingPlaces', s.sleepingPlaces, dirty)
     if (s.maxMassKg !== null) form.setValue('maxMassKg', s.maxMassKg, dirty)
     if (s.heightM !== null) form.setValue('heightM', s.heightM, dirty)
     if (s.length !== null) form.setValue('length', s.length, dirty)
     if (s.winterized !== null) form.setValue('winterized', s.winterized, dirty)
-    if (s.hasGarage !== null) form.setValue('hasGarage', s.hasGarage, dirty)
     if (s.offGrid !== null) form.setValue('offGrid', s.offGrid, dirty)
-    if (s.equipment.solar) form.setValue('equipment.solar', true, dirty)
-    if (s.equipment.kitchen) form.setValue('equipment.kitchen', true, dirty)
-    if (s.equipment.shower) form.setValue('equipment.shower', true, dirty)
-    if (s.equipment.heating) form.setValue('equipment.heating', true, dirty)
     setSuggestNote(
       s.notes
         ? `Sugerido por IA — revisa y guarda. ${s.notes}`
@@ -121,7 +108,7 @@ export function VehicleEditForm({ vehicleId, defaultValues }: Props) {
   async function onSubmit(data: UpdateVehicleValues) {
     setSaved(false)
     setServerError(null)
-    const result = await updateVehicle(vehicleId, data)
+    const result = await updateVehicle(vehicleId, data, { catalog: features, version })
     if ('error' in result) {
       const fe = (result.error as { formErrors?: string[] })?.formErrors
       setServerError(fe?.[0] ?? 'Error al guardar. Revisa los datos.')
@@ -384,28 +371,6 @@ export function VehicleEditForm({ vehicleId, defaultValues }: Props) {
           />
         </div>
 
-        {/* Equipamiento */}
-        <div>
-          <p className="mb-3 text-sm font-medium leading-none">Equipamiento</p>
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-            {EQUIPMENT_ITEMS.map((item) => (
-              <FormField
-                key={item.id}
-                control={form.control}
-                name={`equipment.${item.id}` as `equipment.${EquipmentKey}`}
-                render={({ field }) => (
-                  <FormItem className="flex items-center space-x-2 space-y-0">
-                    <FormControl>
-                      <Checkbox checked={field.value as boolean} onCheckedChange={field.onChange} />
-                    </FormControl>
-                    <FormLabel className="cursor-pointer font-normal">{item.label}</FormLabel>
-                  </FormItem>
-                )}
-              />
-            ))}
-          </div>
-        </div>
-
         {/* Ficha técnica (RV) — alimenta el matching */}
         <div className="border-t pt-4">
           <div className="flex items-start justify-between gap-3">
@@ -439,96 +404,6 @@ export function VehicleEditForm({ vehicleId, defaultValues }: Props) {
           )}
           {suggestError && <p className="mb-3 text-xs text-destructive">{suggestError}</p>}
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            {/* Categoría / carrocería */}
-            <FormField
-              control={form.control}
-              name="category"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Distribución</FormLabel>
-                  <Select
-                    value={field.value ?? NONE}
-                    onValueChange={(v) => field.onChange(v === NONE ? null : v)}
-                  >
-                    <FormControl>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Sin especificar" />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      <SelectItem value={NONE}>Sin especificar</SelectItem>
-                      {CATEGORY_OPTIONS.map((o) => (
-                        <SelectItem key={o.value} value={o.value}>
-                          {o.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            {/* Tipo de cama */}
-            <FormField
-              control={form.control}
-              name="bedLayout"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Tipo de cama</FormLabel>
-                  <Select
-                    value={field.value ?? NONE}
-                    onValueChange={(v) => field.onChange(v === NONE ? null : v)}
-                  >
-                    <FormControl>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Sin especificar" />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      <SelectItem value={NONE}>Sin especificar</SelectItem>
-                      {BED_OPTIONS.map((o) => (
-                        <SelectItem key={o.value} value={o.value}>
-                          {o.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            {/* Baño */}
-            <FormField
-              control={form.control}
-              name="bathroomType"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Baño</FormLabel>
-                  <Select
-                    value={field.value ?? NONE}
-                    onValueChange={(v) => field.onChange(v === NONE ? null : v)}
-                  >
-                    <FormControl>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Sin especificar" />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      <SelectItem value={NONE}>Sin especificar</SelectItem>
-                      {BATHROOM_OPTIONS.map((o) => (
-                        <SelectItem key={o.value} value={o.value}>
-                          {o.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
             {/* Calefacción */}
             <FormField
               control={form.control}
@@ -537,8 +412,22 @@ export function VehicleEditForm({ vehicleId, defaultValues }: Props) {
                 <FormItem>
                   <FormLabel>Calefacción</FormLabel>
                   <Select
-                    value={field.value ?? NONE}
-                    onValueChange={(v) => field.onChange(v === NONE ? null : v)}
+                    value={
+                      features.heating?.values[0] === 'No'
+                        ? 'NINGUNA'
+                        : features.heating
+                          ? field.value && field.value !== 'NINGUNA'
+                            ? field.value
+                            : 'PRESENTE'
+                          : NONE
+                    }
+                    onValueChange={(v) => {
+                      field.onChange(v === NONE || v === 'PRESENTE' ? null : v)
+                      const next = { ...features }
+                      if (v === NONE) delete next.heating
+                      else next.heating = { values: [v === 'NINGUNA' ? 'No' : 'Sí'] }
+                      setFeatures(next)
+                    }}
                   >
                     <FormControl>
                       <SelectTrigger>
@@ -547,6 +436,7 @@ export function VehicleEditForm({ vehicleId, defaultValues }: Props) {
                     </FormControl>
                     <SelectContent>
                       <SelectItem value={NONE}>Sin especificar</SelectItem>
+                      <SelectItem value="PRESENTE">Sí, fuente por confirmar</SelectItem>
                       {HEATING_OPTIONS.map((o) => (
                         <SelectItem key={o.value} value={o.value}>
                           {o.label}
@@ -656,6 +546,16 @@ export function VehicleEditForm({ vehicleId, defaultValues }: Props) {
 
         {serverError && <p className="text-sm text-destructive">{serverError}</p>}
 
+        <details className="rounded-xl border p-4">
+          <summary className="cursor-pointer font-semibold">Características del vehículo</summary>
+          <CatalogFields
+            buyer={false}
+            family={form.watch('type')}
+            value={features}
+            onChange={setFeatures}
+            unifiedVehicle
+          />
+        </details>
         <div className="flex items-center gap-3">
           <Button type="submit" size="sm" disabled={form.formState.isSubmitting}>
             {form.formState.isSubmitting ? 'Guardando…' : 'Guardar cambios'}

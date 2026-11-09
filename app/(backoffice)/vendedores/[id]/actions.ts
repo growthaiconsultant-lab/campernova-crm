@@ -1,6 +1,8 @@
 'use server'
 
 import { revalidatePath } from 'next/cache'
+import { catalogSchema } from '@/lib/matching/catalog'
+import { legacyProjection } from '@/lib/matching/vehicle-characteristics'
 import { z } from 'zod'
 import { db } from '@/lib/db'
 import { requireAgente } from '@/lib/auth'
@@ -26,6 +28,7 @@ import { isValidLostReason, LOST_REASON_LABELS } from '@/lib/lost-reason'
 import {
   applyManualVehicleUpdateTx,
   buildVehicleUpdateRoots,
+  VehicleStatusConflictError,
   VehicleUpdateError,
   isVehicleStatusConflict,
   isVehicleUpdateError,
@@ -150,7 +153,7 @@ export async function updateSellerLead(leadId: string, data: unknown) {
   return { ok: true }
 }
 
-export async function updateVehicle(vehicleId: string, data: unknown) {
+export async function updateVehicle(vehicleId: string, data: unknown, characteristics?: unknown) {
   const actor = await requireAgente()
 
   const parsed = updateVehicleSchema.safeParse(data)
@@ -183,8 +186,17 @@ export async function updateVehicle(vehicleId: string, data: unknown) {
     offGrid,
   } = parsed.data
 
+  const snapshot = z
+    .object({ catalog: catalogSchema, version: z.string().datetime() })
+    .optional()
+    .safeParse(characteristics)
+  if (!snapshot.success)
+    return { error: { formErrors: ['Revisa las características del vehículo.'], fieldErrors: {} } }
+  const unified = snapshot.data
+  const projected = unified ? legacyProjection(unified.catalog, parsed.data) : null
+
   // Baño = fuente única (bathroomType): derivamos el flag de equipo para coherencia.
-  const equipmentResolved = {
+  const equipmentResolved = projected?.equipment ?? {
     ...equipment,
     bathroom: bathroomType != null ? bathroomType !== 'NINGUNO' : equipment.bathroom,
   }
@@ -238,6 +250,7 @@ export async function updateVehicle(vehicleId: string, data: unknown) {
             maxMassKg: maxMassKg ?? null,
             heightM: heightM ?? null,
             offGrid: offGrid ?? null,
+            ...(unified && { ...projected, matchCatalog: unified.catalog }),
           },
         },
         {
@@ -247,6 +260,14 @@ export async function updateVehicle(vehicleId: string, data: unknown) {
           // primera transición a TASADO ya no es alcanzable por esta vía (la posee la tasación
           // oficial), así que aquí solo queda `TASADO → PUBLICADO`.
           beforeWrite: async ({ fromStatus, tx }) => {
+            if (unified) {
+              const current = await tx.vehicle.findUnique({
+                where: { id: vehicleId },
+                select: { updatedAt: true },
+              })
+              if (current?.updatedAt.toISOString() !== unified.version)
+                throw new VehicleStatusConflictError()
+            }
             const isTransitioningTo = (s: string) => status === s && fromStatus !== s
             if (!isTransitioningTo('PUBLICADO')) return
             const targetStatus = status as 'PUBLICADO'

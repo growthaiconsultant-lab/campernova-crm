@@ -15,6 +15,7 @@ export type MatchingVehicleInput = {
   catalog?: import('./catalog').Catalog
   brand?: string | null
   model?: string | null
+  heatingType?: import('@prisma/client').HeatingType | null
   hasGarage?: boolean | null
   winterized?: boolean | null
   sellerLeadId?: string
