@@ -18,8 +18,10 @@ export function BuyerCallForm({
   archived,
   save,
   children,
+  additionalAction,
 }: {
   children?: React.ReactNode
+  additionalAction?: React.ReactNode
   archived: boolean
   save: (input: BuyerCallInput) => Promise<{ ok?: boolean; error?: string; eventId?: string }>
 }) {
@@ -89,19 +91,22 @@ export function BuyerCallForm({
       <div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-3">
         {children}
         {!open && (
-          <Button
-            ref={trigger}
-            type="button"
-            aria-expanded={false}
-            onClick={() => {
-              setOpen(true)
-              setError('')
-              setMessage('')
-            }}
-          >
-            <PhoneCall size={16} className="mr-2" aria-hidden="true" />
-            Registrar llamada
-          </Button>
+          <div className="flex flex-wrap items-center gap-2">
+            <Button
+              ref={trigger}
+              type="button"
+              aria-expanded={false}
+              onClick={() => {
+                setOpen(true)
+                setError('')
+                setMessage('')
+              }}
+            >
+              <PhoneCall size={16} className="mr-2" aria-hidden="true" />
+              Registrar llamada
+            </Button>
+            {additionalAction}
+          </div>
         )}
       </div>
       {open && (

@@ -14,7 +14,9 @@ import { SearchRequestBadge } from '@/components/search-request-badge'
 import { SearchRequestCard } from '@/components/search-request-card'
 import { TradeInCard } from './trade-in-card'
 import { BuyerTopbarActions } from './buyer-topbar-actions'
-import { ProximaAccionCard } from './proxima-accion-card'
+import { NextActionEditor } from '@/components/next-action-editor'
+import { buyerAgendaPage, type BuyerAgendaEntry } from '@/lib/buyer-agenda'
+import { BuyerAgendaRow } from '@/components/buyer-agenda-row'
 import { BuyerCallForm } from '@/components/buyer-call-form'
 import { registerBuyerCall } from './call-actions'
 import { NEXT_ACTION_LABELS } from '@/lib/next-action'
@@ -49,10 +51,33 @@ import { BuyerStatusSelect } from '../buyer-status-select'
 import { TemperatureChip } from './temperature-chip'
 import { InfoTooltip } from '@/components/info-tooltip'
 import { BUYER_LEAD_STATUS_LABELS, BUYER_LEAD_TRANSITIONS } from '@/lib/state-machine'
-import type { BuyerLeadStatus } from '@prisma/client'
+import type { BuyerLeadStatus, Prisma } from '@prisma/client'
 import { CalendarClock, Phone, Mail, Shield, UserRound } from 'lucide-react'
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
+
+const pendingEvents = {
+  status: { notIn: ['CANCELADO', 'COMPLETADO', 'NO_SHOW'] },
+} satisfies Prisma.CalendarEventWhereInput
+const agendaEventFields = {
+  id: true,
+  title: true,
+  startAt: true,
+  description: true,
+  assignedTo: { select: { name: true } },
+} satisfies Prisma.CalendarEventSelect
+
+function calendarEntry(
+  event: Prisma.CalendarEventGetPayload<{ select: typeof agendaEventFields }>
+): BuyerAgendaEntry {
+  return {
+    eventId: event.id,
+    title: event.title,
+    due: event.startAt,
+    description: event.description,
+    assignee: event.assignedTo?.name,
+  }
+}
 
 const EUR = (v: number) =>
   v.toLocaleString('es-ES', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 })
@@ -162,20 +187,13 @@ export default async function FichaCompradorPage({
             },
             orderBy: { score: 'desc' },
           },
+          _count: { select: { calendarEvents: { where: pendingEvents } } },
           calendarEvents: {
-            where: { status: { notIn: ['CANCELADO', 'COMPLETADO', 'NO_SHOW'] } },
+            where: pendingEvents,
             orderBy: [{ startAt: 'asc' }, { id: 'asc' }],
             skip: (actionsPage - 1) * FOLLOWUP_PAGE_SIZE,
             take: FOLLOWUP_PAGE_SIZE + 1,
-            select: {
-              id: true,
-              type: true,
-              title: true,
-              description: true,
-              startAt: true,
-              status: true,
-              assignedTo: { select: { name: true } },
-            },
+            select: agendaEventFields,
           },
           offers: {
             orderBy: { createdAt: 'desc' },
@@ -219,6 +237,7 @@ export default async function FichaCompradorPage({
             },
             orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
             select: {
+              id: true,
               type: true,
               content: true,
               createdAt: true,
@@ -230,10 +249,10 @@ export default async function FichaCompradorPage({
         ? db.calendarEvent.findFirst({
             where: {
               buyerLeadId: params.id,
-              status: { notIn: ['CANCELADO', 'COMPLETADO', 'NO_SHOW'] },
+              ...pendingEvents,
             },
             orderBy: [{ startAt: 'asc' }, { id: 'asc' }],
-            select: { id: true, title: true, startAt: true },
+            select: agendaEventFields,
           })
         : null,
     ])
@@ -244,7 +263,27 @@ export default async function FichaCompradorPage({
 
   if (Object.prototype.hasOwnProperty.call(legacyTabs, requested))
     redirect(`/compradores/${params.id}?tab=${legacyTabs[requested]}`)
-  const scheduled = actionsPage === 1 ? lead.calendarEvents[0] : firstScheduled
+  const events = lead.calendarEvents.map(calendarEntry)
+  const firstEvent =
+    actionsPage === 1 ? events[0] : firstScheduled ? calendarEntry(firstScheduled) : undefined
+  const reminder = lead.nextActionType
+    ? { eventId: null, title: NEXT_ACTION_LABELS[lead.nextActionType], due: lead.nextActionDueAt }
+    : undefined
+  const agenda = buyerAgendaPage(firstEvent, events, reminder, actionsPage, FOLLOWUP_PAGE_SIZE)
+  const pendingCount = lead._count.calendarEvents + Number(Boolean(reminder))
+  const reminderEditor = lead.nextActionType && (
+    <NextActionEditor
+      key={lead.id}
+      leadType="buyer"
+      leadId={lead.id}
+      nextActionType={lead.nextActionType}
+      nextActionDueAt={lead.nextActionDueAt?.toISOString() ?? null}
+      fallbackText=""
+      editLabel="Editar recordatorio"
+    />
+  )
+  const saveCall = registerBuyerCall.bind(null, lead.id)
+
   const dateTime = (date: Date) =>
     date.toLocaleString('es-ES', {
       dateStyle: 'medium',
@@ -260,6 +299,7 @@ export default async function FichaCompradorPage({
         notesPage: String(notesPage),
         actionsPage: String(actionsPage),
       })
+      if (searchParams.historial) query.set('historial', searchParams.historial)
       query.set(kind, String(next))
       return `/compradores/${params.id}?${query}#${kind === 'notesPage' ? 'buyer-notes-title' : 'buyer-actions-title'}`
     }
@@ -600,52 +640,48 @@ export default async function FichaCompradorPage({
             </BuyerTopbarActions>
           </div>
         </div>
-        <section
-          aria-labelledby="buyer-next-heading"
-          className="mt-4 rounded-xl bg-brand-tint p-4 sm:px-5"
-        >
-          <BuyerCallForm
-            key={lead.id}
-            archived={Boolean(lead.archivedAt)}
-            save={registerBuyerCall.bind(null, lead.id)}
+        {activeTab !== 'ficha' && (
+          <section
+            aria-labelledby="buyer-next-heading"
+            className="mt-4 rounded-xl bg-brand-tint p-4 sm:px-5"
           >
-            <div className="flex min-w-0 items-start gap-2.5">
-              <CalendarClock size={19} className="mt-0.5 shrink-0 text-brand" aria-hidden="true" />
-              <div className="min-w-0">
-                <h2 id="buyer-next-heading" className="text-xs font-semibold text-brand">
-                  Próximo paso
-                </h2>
-                {scheduled ? (
-                  <>
-                    <Link
-                      href={`/calendario/${scheduled.id}`}
-                      className="break-words text-lg font-semibold hover:underline"
-                    >
-                      {scheduled.title}
-                    </Link>
-                    <p className="text-sm text-muted-foreground">
-                      {scheduled.startAt < new Date() ? 'Pendiente · ' : ''}
-                      {dateTime(scheduled.startAt)} · hora de Madrid
-                    </p>
-                  </>
-                ) : lead.nextActionType ? (
-                  <>
-                    <p className="text-lg font-semibold">
-                      {NEXT_ACTION_LABELS[lead.nextActionType]}
-                    </p>
-                    <p className="text-sm text-muted-foreground">
-                      {lead.nextActionDueAt
-                        ? dateTime(lead.nextActionDueAt) + ' · hora de Madrid'
-                        : 'Sin fecha'}
-                    </p>
-                  </>
-                ) : (
-                  <p className="text-base font-medium">Sin seguimiento pendiente.</p>
-                )}
+            <BuyerCallForm key={lead.id} archived={Boolean(lead.archivedAt)} save={saveCall}>
+              <div className="flex min-w-0 items-start gap-2.5">
+                <CalendarClock
+                  size={19}
+                  className="mt-0.5 shrink-0 text-brand"
+                  aria-hidden="true"
+                />
+                <div className="min-w-0">
+                  <h2 id="buyer-next-heading" className="text-xs font-semibold text-brand">
+                    Próximo paso
+                  </h2>
+                  {agenda.first ? (
+                    <>
+                      <Link
+                        href={
+                          agenda.first.eventId
+                            ? `/calendario/${agenda.first.eventId}`
+                            : `${path}?tab=ficha#buyer-actions-title`
+                        }
+                        className="break-words text-lg font-semibold hover:underline"
+                      >
+                        {agenda.first.title}
+                      </Link>
+                      <p className="text-sm text-muted-foreground">
+                        {agenda.first.due
+                          ? `${agenda.first.due < new Date() ? 'Vencida · ' : ''}${dateTime(agenda.first.due)} · hora de Madrid`
+                          : 'Sin fecha'}
+                      </p>
+                    </>
+                  ) : (
+                    <p className="text-base font-medium">Sin acciones pendientes.</p>
+                  )}
+                </div>
               </div>
-            </div>
-          </BuyerCallForm>
-        </section>
+            </BuyerCallForm>
+          </section>
+        )}
         <nav
           aria-label="Apartados de la ficha"
           className="mt-5 flex flex-wrap gap-x-2 border-t border-border"
@@ -667,114 +703,200 @@ export default async function FichaCompradorPage({
       </header>
       <div className="mx-auto w-full max-w-[1440px] flex-1 p-4 pb-12 md:p-8">
         {activeTab === 'ficha' && (
-          <div id="seguimiento" className={columns}>
-            <div className={stack}>
-              <a href="#buyer-actions-title" className={textLink + ' lg:hidden'}>
-                Ver agenda y programar otra acción ↓
-              </a>
-              <section id="historial" className={card + ' scroll-mt-20'}>
-                <h2 className="text-lg font-semibold">Historial</h2>
-                <p className="text-sm text-muted-foreground">
-                  {activities.length === 50
-                    ? 'Últimos 50 registros'
-                    : `${activities.length} registros`}
-                </p>
-                <div className="mt-4 space-y-2">
-                  {' '}
-                  <details open={Boolean(searchParams.notesPage) || undefined} className="min-w-0">
-                    <summary className="cursor-pointer rounded-lg border border-border bg-card px-4 py-3 text-sm font-semibold">
-                      Añadir o consultar notas comerciales
-                    </summary>
-                    <BuyerNotesPanel
-                      notes={commercialNotes.slice(0, FOLLOWUP_PAGE_SIZE).map((note) => ({
-                        id: note.id,
-                        content: note.content,
-                        createdAt: note.createdAt.toISOString(),
-                        author: note.agent?.name ?? 'Comercial',
-                      }))}
-                      addNote={addBuyerLeadNote.bind(null, lead.id)}
-                      afterSaveHref={
-                        notesPage > 1
-                          ? `/compradores/${lead.id}?tab=ficha&notesPage=1&actionsPage=${actionsPage}#buyer-notes-title`
-                          : undefined
-                      }
-                      pagination={pagination(
-                        'notesPage',
-                        notesPage,
-                        commercialNotes.length > FOLLOWUP_PAGE_SIZE
-                      )}
-                    />
-                  </details>
-                  {hasChat && (
-                    <details
-                      id="conversacion"
-                      open={searchParams.ver === 'chat' || undefined}
-                      className={card + ' scroll-mt-20'}
+          <div id="seguimiento" className="mx-auto max-w-4xl space-y-5">
+            <BuyerActionsPanel
+              key={lead.id}
+              buyerLeadId={lead.id}
+              actorId={currentUser.id}
+              archived={Boolean(lead.archivedAt)}
+              count={pendingCount}
+              expandOtherActions={Boolean(searchParams.actionsPage)}
+              page={actionsPage}
+              saveCall={saveCall}
+              createAction={createCalendarEvent}
+              firstAction={
+                agenda.first && (
+                  <BuyerAgendaRow
+                    entry={agenda.first}
+                    reminderEditor={agenda.first.eventId ? undefined : reminderEditor}
+                  />
+                )
+              }
+              otherActions={
+                <ol className="divide-y divide-border">
+                  {agenda.others.map((entry) => (
+                    <li
+                      key={entry.eventId ? 'event-' + entry.eventId : 'reminder'}
+                      className="py-3"
                     >
-                      <summary className="cursor-pointer font-semibold">
-                        Conversación del chat · {chatUserMsgCount}{' '}
-                        {chatUserMsgCount === 1 ? 'mensaje' : 'mensajes'} del comprador
+                      <BuyerAgendaRow
+                        entry={entry}
+                        reminderEditor={entry.eventId ? undefined : reminderEditor}
+                      />
+                    </li>
+                  ))}
+                </ol>
+              }
+              pagination={pagination(
+                'actionsPage',
+                actionsPage,
+                events.length > FOLLOWUP_PAGE_SIZE
+              )}
+            />
+            <section id="historial" className={card + ' scroll-mt-20'}>
+              <h2 className="text-lg font-semibold">Historial</h2>
+              <p className="text-sm text-muted-foreground">
+                {activities.length === 50
+                  ? 'Últimos 50 registros'
+                  : `${activities.length} ${activities.length === 1 ? 'registro' : 'registros'}`}
+              </p>
+              <div className="mt-4 space-y-2">
+                {' '}
+                <details open={Boolean(searchParams.notesPage) || undefined} className="min-w-0">
+                  <summary className="cursor-pointer rounded-lg border border-border bg-card px-4 py-3 text-sm font-semibold">
+                    Añadir nota o consultar notas anteriores
+                  </summary>
+                  <BuyerNotesPanel
+                    notes={commercialNotes.slice(0, FOLLOWUP_PAGE_SIZE).map((note) => ({
+                      id: note.id,
+                      content: note.content,
+                      createdAt: note.createdAt.toISOString(),
+                      author: note.agent?.name ?? 'Comercial',
+                    }))}
+                    addNote={addBuyerLeadNote.bind(null, lead.id)}
+                    afterSaveHref={
+                      notesPage > 1
+                        ? `/compradores/${lead.id}?tab=ficha&notesPage=1&actionsPage=${actionsPage}#buyer-notes-title`
+                        : undefined
+                    }
+                    pagination={pagination(
+                      'notesPage',
+                      notesPage,
+                      commercialNotes.length > FOLLOWUP_PAGE_SIZE
+                    )}
+                  />
+                </details>
+                {hasChat && (
+                  <details
+                    id="conversacion"
+                    open={searchParams.ver === 'chat' || undefined}
+                    className={card + ' scroll-mt-20'}
+                  >
+                    <summary className="cursor-pointer font-semibold">
+                      Conversación del chat · {chatUserMsgCount}{' '}
+                      {chatUserMsgCount === 1 ? 'mensaje' : 'mensajes'} del comprador
+                    </summary>
+                    <div className="space-y-6">
+                      {lead.chatSessions.map((session) => (
+                        <ChatTranscript
+                          key={session.id}
+                          messages={
+                            Array.isArray(session.messages)
+                              ? (session.messages as unknown as ChatMessage[])
+                              : []
+                          }
+                          status={session.status}
+                          startedAt={session.startedAt}
+                          lastMessageAt={session.lastMessageAt}
+                          completedAt={session.completedAt}
+                          totalTokens={session.totalTokens}
+                          llmModel={session.llmModel}
+                        />
+                      ))}
+                    </div>
+                  </details>
+                )}
+              </div>
+              <nav aria-label="Filtrar historial" className="my-4 flex flex-wrap gap-2">
+                {historyFilters.map((filter) => (
+                  <Link
+                    key={filter}
+                    aria-current={historyFilter === filter ? 'true' : undefined}
+                    href={`${path}?tab=ficha&historial=${filter}#historial`}
+                    className={`rounded-full border px-3 py-1.5 text-sm ${historyFilter === filter ? 'border-sidebar-primary bg-sidebar-primary text-white' : 'border-border'}`}
+                  >
+                    {filter}
+                  </Link>
+                ))}
+              </nav>
+              {history.length ? (
+                <>
+                  <ActivityTimeline
+                    activities={history.slice(0, 5)}
+                    currentUserId={currentUser.id}
+                  />
+                  {history.length > 5 && (
+                    <details className="mt-3">
+                      <summary className="cursor-pointer text-sm font-semibold">
+                        Ver los {history.length - 5} registros anteriores
                       </summary>
-                      <div className="space-y-6">
-                        {lead.chatSessions.map((session) => (
-                          <ChatTranscript
-                            key={session.id}
-                            messages={
-                              Array.isArray(session.messages)
-                                ? (session.messages as unknown as ChatMessage[])
-                                : []
-                            }
-                            status={session.status}
-                            startedAt={session.startedAt}
-                            lastMessageAt={session.lastMessageAt}
-                            completedAt={session.completedAt}
-                            totalTokens={session.totalTokens}
-                            llmModel={session.llmModel}
-                          />
-                        ))}
+                      <div className="mt-4">
+                        <ActivityTimeline
+                          activities={history.slice(5)}
+                          currentUserId={currentUser.id}
+                        />
                       </div>
                     </details>
                   )}
-                </div>
-                <nav aria-label="Filtrar historial" className="my-4 flex flex-wrap gap-2">
-                  {historyFilters.map((filter) => (
-                    <Link
-                      key={filter}
-                      aria-current={historyFilter === filter ? 'true' : undefined}
-                      href={`${path}?tab=ficha&historial=${filter}#historial`}
-                      className={`rounded-full border px-3 py-1.5 text-sm ${historyFilter === filter ? 'border-sidebar-primary bg-sidebar-primary text-white' : 'border-border'}`}
-                    >
-                      {filter}
-                    </Link>
+                </>
+              ) : (
+                <p className="text-sm text-muted-foreground">Sin registros en esta vista.</p>
+              )}
+              {lastContact && !activities.some((activity) => activity.id === lastContact.id) && (
+                <details className="mt-4 border-t pt-3">
+                  <summary className="cursor-pointer text-sm font-semibold">
+                    {lastContact.type === 'NOTA'
+                      ? 'Última nota comercial'
+                      : 'Último contacto registrado'}
+                  </summary>
+                  <p className="mt-2 text-sm font-medium">
+                    {lastContact.type === 'LLAMADA'
+                      ? 'Llamada'
+                      : lastContact.type === 'EMAIL'
+                        ? 'Email'
+                        : lastContact.type === 'NOTA'
+                          ? 'Nota'
+                          : 'WhatsApp iniciado'}{' '}
+                    · {dateTime(lastContact.createdAt)} · hora de Madrid
+                  </p>
+                  {lastContact.agent && (
+                    <p className="text-xs text-muted-foreground">{lastContact.agent.name}</p>
+                  )}
+                  {lastContact.content && (
+                    <p className="mt-2 whitespace-pre-wrap break-words text-sm">
+                      {lastContact.content}
+                    </p>
+                  )}
+                </details>
+              )}
+            </section>
+            {hasAlert && (
+              <div className="rounded-xl border border-amber-200 bg-amber-50 p-4">
+                <p className="flex items-center gap-2 text-[12.5px] font-semibold text-amber-800">
+                  <span className="h-2 w-2 rounded-full bg-amber-500" />
+                  {openTickets.length} incidencia{openTickets.length !== 1 ? 's' : ''} abierta
+                  {openTickets.length !== 1 ? 's' : ''}
+                </p>
+                <div className="mt-2 space-y-1">
+                  {openTickets.slice(0, 2).map((t) => (
+                    <p key={t.id} className="text-[11px] text-amber-700">
+                      · {t.title}
+                    </p>
                   ))}
-                </nav>
-                {history.length ? (
-                  <>
-                    <ActivityTimeline
-                      activities={history.slice(0, 5)}
-                      currentUserId={currentUser.id}
-                    />
-                    {history.length > 5 && (
-                      <details className="mt-3">
-                        <summary className="cursor-pointer text-sm font-semibold">
-                          Ver los {history.length - 5} registros anteriores
-                        </summary>
-                        <div className="mt-4">
-                          <ActivityTimeline
-                            activities={history.slice(5)}
-                            currentUserId={currentUser.id}
-                          />
-                        </div>
-                      </details>
-                    )}
-                  </>
-                ) : (
-                  <p className="text-sm text-muted-foreground">Sin registros en esta vista.</p>
+                </div>
+                {warranty && (
+                  <Link
+                    href={`${path}?tab=postventa`}
+                    className="mt-2 block text-[11px] font-medium text-amber-700 underline hover:text-amber-900"
+                  >
+                    Ver en postventa →
+                  </Link>
                 )}
-              </section>
-            </div>
-            <aside className={stack}>
-              <section className={card}>
+              </div>
+            )}
+            <details className={card}>
+              <summary className="cursor-pointer font-semibold">Información comercial</summary>
+              <section className="mt-3">
                 <h2 className="text-sm font-medium text-muted-foreground">Qué busca</h2>
                 <p className="mt-2 text-lg font-semibold">{needSummary}</p>
                 <p className="mt-1 text-sm">Plazo de compra · {timelineLabel}</p>
@@ -785,223 +907,131 @@ export default async function FichaCompradorPage({
                   Ver preferencias →
                 </Link>
               </section>
-              <BuyerActionsPanel
-                buyerLeadId={lead.id}
-                actorId={currentUser.id}
-                archived={lead.archivedAt !== null}
-                createAction={createCalendarEvent}
-                actions={lead.calendarEvents.slice(0, FOLLOWUP_PAGE_SIZE).map((event) => ({
-                  id: event.id,
-                  title: event.title,
-                  description: event.description,
-                  startAt: event.startAt.toISOString(),
-                  assignee: event.assignedTo?.name ?? null,
-                  overdue: event.startAt < new Date(),
-                }))}
-                pagination={pagination(
-                  'actionsPage',
-                  actionsPage,
-                  lead.calendarEvents.length > FOLLOWUP_PAGE_SIZE
-                )}
-                legacyAction={
-                  lead.nextActionType ? (
-                    <ProximaAccionCard
-                      phone={null}
-                      leadId={lead.id}
-                      leadName={lead.name}
-                      status={lead.status}
-                      nextActionType={lead.nextActionType}
-                      nextActionDueAt={lead.nextActionDueAt?.toISOString() ?? null}
-                    />
-                  ) : undefined
-                }
-              />
-              <section className="min-w-0 rounded-xl border border-border bg-card p-5">
-                <h2 className="text-base font-semibold">
-                  {lastContact?.type === 'NOTA'
-                    ? 'Última nota comercial'
-                    : 'Último contacto registrado'}
-                </h2>
-                {lastContact ? (
-                  <>
-                    <p className="mt-2 text-sm font-medium">
-                      {lastContact.type === 'LLAMADA'
-                        ? 'Llamada'
-                        : lastContact.type === 'EMAIL'
-                          ? 'Email'
-                          : lastContact.type === 'NOTA'
-                            ? 'Nota'
-                            : 'WhatsApp iniciado'}{' '}
-                      · {dateTime(lastContact.createdAt)} · hora de Madrid
+
+              <div className="mt-2 text-xs text-muted-foreground">
+                Referencia #{lead.id.slice(-8)} · Alta {lead.createdAt.toLocaleDateString('es-ES')}
+              </div>
+              <LandingAttribution activities={activities} />
+              <p className="my-2 text-sm">
+                Mejor coincidencia con el stock ·{' '}
+                {bestMatch ? `${bestMatchScore}%` : 'Sin sugerencias'}
+              </p>
+              <div className="mt-4 border-t pt-4">
+                <div className="mb-3 flex items-center gap-2 font-medium">
+                  Prioridad comercial <ScoreInfo breakdown={scoreResult.breakdown} side="bottom" />
+                </div>
+                <div className="flex items-center gap-4">
+                  <div
+                    className="relative flex h-16 w-16 shrink-0 items-center justify-center rounded-full"
+                    style={{
+                      background: `conic-gradient(${
+                        leadScore >= 75 ? '#1a9d5f' : leadScore >= 50 ? '#c9820a' : '#d64545'
+                      } ${leadScore * 3.6}deg, #eef1f5 0)`,
+                    }}
+                  >
+                    <div className="flex h-11 w-11 items-center justify-center rounded-full bg-card">
+                      <span
+                        className="text-[14px] font-bold"
+                        style={{
+                          color:
+                            leadScore >= 75 ? '#1a9d5f' : leadScore >= 50 ? '#c9820a' : '#d64545',
+                        }}
+                      >
+                        {leadScore}
+                      </span>
+                    </div>
+                  </div>
+                  <div className="flex-1">
+                    <p className="text-[13px] font-semibold text-foreground">
+                      {leadScore >= 75 ? 'Alto potencial' : leadScore >= 50 ? 'Moderado' : 'Bajo'}
                     </p>
-                    {lastContact.agent && (
-                      <p className="text-xs text-muted-foreground">{lastContact.agent.name}</p>
-                    )}
-                    {lastContact.content && (
-                      <p className="mt-2 whitespace-pre-wrap break-words text-sm">
-                        {lastContact.content}
-                      </p>
-                    )}
-                  </>
-                ) : (
-                  <p className="mt-2 text-sm text-muted-foreground">
-                    Todavía no hay llamadas, emails ni contactos por WhatsApp registrados.
-                  </p>
-                )}
-              </section>
-              {hasAlert && (
-                <div className="rounded-xl border border-amber-200 bg-amber-50 p-4">
-                  <p className="flex items-center gap-2 text-[12.5px] font-semibold text-amber-800">
-                    <span className="h-2 w-2 rounded-full bg-amber-500" />
-                    {openTickets.length} incidencia{openTickets.length !== 1 ? 's' : ''} abierta
-                    {openTickets.length !== 1 ? 's' : ''}
-                  </p>
-                  <div className="mt-2 space-y-1">
-                    {openTickets.slice(0, 2).map((t) => (
-                      <p key={t.id} className="text-[11px] text-amber-700">
-                        · {t.title}
-                      </p>
-                    ))}
+                    <p className="mt-0.5 text-[11px] text-muted-foreground">
+                      {leadScore >= 75
+                        ? 'Perfil muy completo'
+                        : leadScore >= 50
+                          ? 'Completar preferencias'
+                          : 'Contactar y completar datos'}
+                    </p>
                   </div>
-                  {warranty && (
-                    <Link
-                      href={`${path}?tab=postventa`}
-                      className="mt-2 block text-[11px] font-medium text-amber-700 underline hover:text-amber-900"
-                    >
-                      Ver en postventa →
-                    </Link>
-                  )}
                 </div>
-              )}
-              <details className={card}>
-                <summary className="cursor-pointer font-semibold">Información comercial</summary>
-                <div className="mt-2 text-xs text-muted-foreground">
-                  Referencia #{lead.id.slice(-8)} · Alta{' '}
-                  {lead.createdAt.toLocaleDateString('es-ES')}
-                </div>
-                <LandingAttribution activities={activities} />
-                <p className="my-2 text-sm">
-                  Mejor coincidencia con el stock ·{' '}
-                  {bestMatch ? `${bestMatchScore}%` : 'Sin sugerencias'}
-                </p>
-                <div className="mt-4 border-t pt-4">
-                  <div className="mb-3 flex items-center gap-2 font-medium">
-                    Prioridad comercial{' '}
-                    <ScoreInfo breakdown={scoreResult.breakdown} side="bottom" />
-                  </div>
-                  <div className="flex items-center gap-4">
-                    <div
-                      className="relative flex h-16 w-16 shrink-0 items-center justify-center rounded-full"
-                      style={{
-                        background: `conic-gradient(${
-                          leadScore >= 75 ? '#1a9d5f' : leadScore >= 50 ? '#c9820a' : '#d64545'
-                        } ${leadScore * 3.6}deg, #eef1f5 0)`,
-                      }}
-                    >
-                      <div className="flex h-11 w-11 items-center justify-center rounded-full bg-card">
+                <div className="mt-4 space-y-2.5">
+                  {[
+                    { label: 'Contacto', value: scoreContacto },
+                    { label: 'Preferencias', value: scorePref },
+                    { label: 'Afinidad con el stock', value: scoreMatches },
+                    { label: 'Avance comercial', value: scoreEngagement },
+                  ].map((row) => (
+                    <div key={row.label}>
+                      <div className="mb-1 flex items-center justify-between">
+                        <span className="text-[11px] text-muted-foreground">{row.label}</span>
                         <span
-                          className="text-[14px] font-bold"
-                          style={{
-                            color:
-                              leadScore >= 75 ? '#1a9d5f' : leadScore >= 50 ? '#c9820a' : '#d64545',
-                          }}
+                          className="text-[11px] font-medium"
+                          style={{ color: scoreColor(row.value) }}
                         >
-                          {leadScore}
+                          {row.value}%
                         </span>
                       </div>
+                      <div className="h-1 overflow-hidden rounded-full bg-muted">
+                        <div
+                          className="h-full rounded-full transition-all"
+                          style={{ width: `${row.value}%`, background: scoreColor(row.value) }}
+                        />
+                      </div>
                     </div>
-                    <div className="flex-1">
-                      <p className="text-[13px] font-semibold text-foreground">
-                        {leadScore >= 75 ? 'Alto potencial' : leadScore >= 50 ? 'Moderado' : 'Bajo'}
-                      </p>
-                      <p className="mt-0.5 text-[11px] text-muted-foreground">
-                        {leadScore >= 75
-                          ? 'Perfil muy completo'
-                          : leadScore >= 50
-                            ? 'Completar preferencias'
-                            : 'Contactar y completar datos'}
-                      </p>
-                    </div>
-                  </div>
-                  <div className="mt-4 space-y-2.5">
-                    {[
-                      { label: 'Contacto', value: scoreContacto },
-                      { label: 'Preferencias', value: scorePref },
-                      { label: 'Afinidad con el stock', value: scoreMatches },
-                      { label: 'Avance comercial', value: scoreEngagement },
-                    ].map((row) => (
-                      <div key={row.label}>
-                        <div className="mb-1 flex items-center justify-between">
-                          <span className="text-[11px] text-muted-foreground">{row.label}</span>
-                          <span
-                            className="text-[11px] font-medium"
-                            style={{ color: scoreColor(row.value) }}
-                          >
-                            {row.value}%
-                          </span>
-                        </div>
-                        <div className="h-1 overflow-hidden rounded-full bg-muted">
-                          <div
-                            className="h-full rounded-full transition-all"
-                            style={{ width: `${row.value}%`, background: scoreColor(row.value) }}
-                          />
-                        </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Resumen rápido */}
+              <div className="rounded-xl border border-border bg-card p-5">
+                <p className="mb-3 font-mono text-[10px] uppercase tracking-[0.12em] text-muted-foreground">
+                  Resumen
+                </p>
+                <div className="space-y-2">
+                  {(
+                    [
+                      {
+                        label: 'Días en seguimiento',
+                        value: `${daysInPipeline}d`,
+                        warn: daysInPipeline > 60,
+                      },
+                      { label: 'Estado', value: statusLabel },
+                      { label: 'Vehículos vinculados', value: String(visibleMatches.length) },
+                      lead.financingNeeded != null
+                        ? {
+                            label: 'Financiación',
+                            value: lead.financingNeeded
+                              ? lead.maxMonthlyPayment
+                                ? `Sí · ${EUR(Number(lead.maxMonthlyPayment))}/mes`
+                                : 'Sí'
+                              : 'No',
+                          }
+                        : null,
+                      { label: 'Origen de captación', value: buyerSourceLabel(lead.source) },
+                      lead.vehicleType
+                        ? {
+                            label: 'Tipo buscado',
+                            value: lead.vehicleType === 'CAMPER' ? 'Camper' : 'Autocaravana',
+                          }
+                        : null,
+                    ] as Array<{ label: string; value: string; warn?: boolean } | null>
+                  )
+                    .filter(Boolean)
+                    .map((row) => (
+                      <div key={row!.label} className="flex items-center justify-between">
+                        <span className="text-[11px] text-muted-foreground">{row!.label}</span>
+                        <span
+                          className={`text-[12px] font-medium ${
+                            row!.warn ? 'text-amber-600' : 'text-foreground'
+                          }`}
+                        >
+                          {row!.value}
+                        </span>
                       </div>
                     ))}
-                  </div>
                 </div>
-
-                {/* Resumen rápido */}
-                <div className="rounded-xl border border-border bg-card p-5">
-                  <p className="mb-3 font-mono text-[10px] uppercase tracking-[0.12em] text-muted-foreground">
-                    Resumen
-                  </p>
-                  <div className="space-y-2">
-                    {(
-                      [
-                        {
-                          label: 'Días en seguimiento',
-                          value: `${daysInPipeline}d`,
-                          warn: daysInPipeline > 60,
-                        },
-                        { label: 'Estado', value: statusLabel },
-                        { label: 'Vehículos vinculados', value: String(visibleMatches.length) },
-                        lead.financingNeeded != null
-                          ? {
-                              label: 'Financiación',
-                              value: lead.financingNeeded
-                                ? lead.maxMonthlyPayment
-                                  ? `Sí · ${EUR(Number(lead.maxMonthlyPayment))}/mes`
-                                  : 'Sí'
-                                : 'No',
-                            }
-                          : null,
-                        { label: 'Origen de captación', value: buyerSourceLabel(lead.source) },
-                        lead.vehicleType
-                          ? {
-                              label: 'Tipo buscado',
-                              value: lead.vehicleType === 'CAMPER' ? 'Camper' : 'Autocaravana',
-                            }
-                          : null,
-                      ] as Array<{ label: string; value: string; warn?: boolean } | null>
-                    )
-                      .filter(Boolean)
-                      .map((row) => (
-                        <div key={row!.label} className="flex items-center justify-between">
-                          <span className="text-[11px] text-muted-foreground">{row!.label}</span>
-                          <span
-                            className={`text-[12px] font-medium ${
-                              row!.warn ? 'text-amber-600' : 'text-foreground'
-                            }`}
-                          >
-                            {row!.value}
-                          </span>
-                        </div>
-                      ))}
-                  </div>
-                </div>
-              </details>
-            </aside>
+              </div>
+            </details>
           </div>
         )}
         {activeTab === 'busqueda' && (
