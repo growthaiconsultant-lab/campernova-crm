@@ -18,7 +18,7 @@ const GROUPS: { key: keyof SearchResults; label: string }[] = [
   { key: 'captaciones', label: 'Captaciones' },
 ]
 
-export function GlobalSearch() {
+export function GlobalSearch({ compact = false }: { compact?: boolean } = {}) {
   const [open, setOpen] = useState(false)
   const [query, setQuery] = useState('')
   const [results, setResults] = useState<SearchResults | null>(null)
@@ -92,28 +92,41 @@ export function GlobalSearch() {
 
   return (
     <>
-      {/* Trigger — el input fantasma del header */}
-      <button
-        type="button"
-        onClick={() => setOpen(true)}
-        className="hover:border-ink3/40 hidden max-w-[420px] flex-1 items-center gap-[9px] rounded-[10px] border border-line bg-canvas px-[13px] py-[9px] text-left transition-colors lg:flex"
-      >
-        <Search size={16} strokeWidth={2} className="shrink-0 text-ink3" />
-        <span className="flex-1 truncate font-hanken text-[13px] text-ink3">Buscar…</span>
-        <kbd className="rounded-[5px] border border-line bg-card px-1.5 py-0.5 font-mono text-[10px] font-semibold text-ink3">
-          ⌘K
-        </kbd>
-      </button>
-      {/* Trigger móvil — icono */}
-      <button
-        type="button"
-        onClick={() => setOpen(true)}
-        aria-label="Buscar"
-        className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[10px] border border-line bg-card text-ink2 transition-colors hover:bg-canvas lg:hidden"
-      >
-        <Search size={16} strokeWidth={2} />
-      </button>
-
+      {compact ? (
+        <button
+          type="button"
+          onClick={() => setOpen(true)}
+          aria-label="Buscar en el CRM"
+          className="inline-flex min-h-11 min-w-11 items-center justify-center gap-2 rounded-lg px-2 text-sm text-white hover:bg-white/10 sm:min-h-9 sm:border sm:border-white/25 sm:px-3"
+        >
+          <Search size={16} aria-hidden="true" />
+          <span className="hidden sm:inline">Buscar en el CRM</span>
+        </button>
+      ) : (
+        <>
+          {/* Trigger — el input fantasma del header */}
+          <button
+            type="button"
+            onClick={() => setOpen(true)}
+            className="hover:border-ink3/40 hidden max-w-[420px] flex-1 items-center gap-[9px] rounded-[10px] border border-line bg-canvas px-[13px] py-[9px] text-left transition-colors lg:flex"
+          >
+            <Search size={16} strokeWidth={2} className="shrink-0 text-ink3" />
+            <span className="flex-1 truncate font-hanken text-[13px] text-ink3">Buscar…</span>
+            <kbd className="rounded-[5px] border border-line bg-card px-1.5 py-0.5 font-mono text-[10px] font-semibold text-ink3">
+              ⌘K
+            </kbd>
+          </button>
+          {/* Trigger móvil — icono */}
+          <button
+            type="button"
+            onClick={() => setOpen(true)}
+            aria-label="Buscar"
+            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[10px] border border-line bg-card text-ink2 transition-colors hover:bg-canvas lg:hidden"
+          >
+            <Search size={16} strokeWidth={2} />
+          </button>
+        </>
+      )}
       {open && (
         <div
           className="fixed inset-0 z-50 flex items-start justify-center p-4 pt-[10vh]"

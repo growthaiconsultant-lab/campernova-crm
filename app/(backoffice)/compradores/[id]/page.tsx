@@ -45,13 +45,12 @@ import type { ChatMessage } from '@/components/chat-transcript'
 import { addBuyerLeadNote } from './actions'
 import { WhatsAppButton } from '@/components/whatsapp-button'
 import { buyerWhatsAppMessage } from '@/lib/whatsapp'
-import { MobileFichaActions } from '@/components/mobile-ficha-actions'
 import { BuyerStatusSelect } from '../buyer-status-select'
 import { TemperatureChip } from './temperature-chip'
 import { InfoTooltip } from '@/components/info-tooltip'
 import { BUYER_LEAD_STATUS_LABELS, BUYER_LEAD_TRANSITIONS } from '@/lib/state-machine'
 import type { BuyerLeadStatus } from '@prisma/client'
-import { ChevronLeft, Phone, Mail, Shield } from 'lucide-react'
+import { CalendarClock, Phone, Mail, Shield, UserRound } from 'lucide-react'
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
@@ -104,7 +103,7 @@ export default async function FichaCompradorPage({
     ? requested
     : 'ficha'
   const notesPage = followupPage(searchParams.notesPage)
-  const actionsPage = followupPage(searchParams.actionsPage)
+  const actionsPage = activeTab === 'ficha' ? followupPage(searchParams.actionsPage) : 1
 
   const currentUser = await requireAgente()
   const legacyTabs: Record<string, string> = {
@@ -523,110 +522,130 @@ export default async function FichaCompradorPage({
 
   return (
     <div className="-mx-6 -mt-6 flex min-h-[calc(100%_+_1.5rem)] flex-col lg:-mb-6 lg:min-h-[calc(100%_+_3rem)]">
-      {/* ── Topbar ── */}
-      <header className="z-20 flex min-h-[56px] flex-wrap items-center gap-x-2 gap-y-1 border-b border-border bg-card px-4 py-2 md:flex-nowrap md:gap-x-3 md:px-8 lg:sticky lg:top-0 lg:h-[60px] lg:py-0">
-        <Link
-          href="/compradores"
-          className="flex items-center gap-1 font-mono text-[11px] uppercase tracking-[0.12em] text-muted-foreground transition-colors hover:text-foreground"
-        >
-          <ChevronLeft className="h-3.5 w-3.5" />
-          Compradores
-        </Link>
-        <span className="hidden font-mono text-[11px] uppercase tracking-[0.12em] text-muted-foreground/40 sm:inline">
-          /
-        </span>
-        <span className="hidden min-w-0 max-w-[280px] truncate font-mono text-[11px] uppercase tracking-[0.12em] text-foreground sm:inline">
-          {lead.name}
-        </span>
-        <div className="flex-1" />
-        <div className="flex items-center gap-2">
-          <BuyerTopbarActions leadId={lead.id} isTerminal={isTerminal} />
-          {lead.phone && (
-            <WhatsAppButton
-              phone={lead.phone}
-              message={buyerWhatsAppMessage(lead.name)}
-              leadId={lead.id}
-              leadType="buyer"
-            />
-          )}
-        </div>
-      </header>
-
-      {/* ── Hero section ── */}
-      <section className="border-b border-border bg-card px-4 pb-0 pt-6 md:px-8">
-        <div className="flex items-start gap-4">
-          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-sidebar-primary/10 text-lg font-semibold text-sidebar-primary">
-            {lead.name
-              .trim()
-              .split(/\s+/)
-              .slice(0, 2)
-              .map((part) => part.charAt(0))
-              .join('')
-              .toUpperCase()}
+      <header className="border-b border-border bg-card px-4 pt-4 sm:px-7 sm:pt-5">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div className="flex min-w-0 flex-1 items-center gap-3 sm:min-w-64">
+            <span
+              aria-hidden="true"
+              className="hidden h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-brand-tint text-lg font-bold text-brand sm:flex"
+            >
+              {lead.name
+                .trim()
+                .split(/\s+/)
+                .slice(0, 2)
+                .map((part) => part.charAt(0))
+                .join('')
+                .toUpperCase()}
+            </span>
+            <div className="min-w-0">
+              <div className="flex flex-wrap items-center gap-2">
+                <h1 className="break-words text-2xl font-bold tracking-tight sm:text-3xl">
+                  {lead.name}
+                </h1>
+                <BuyerStatusSelect leadId={lead.id} status={lead.status} buyerName={lead.name} />
+                <SearchRequestBadge leadId={lead.id} />
+                {isTerminal && <span className="text-xs text-muted-foreground">Estado final</span>}
+              </div>
+              <p className="mt-1 text-sm">{needSummary}</p>
+              <p className="mt-1 flex items-center gap-1.5 text-xs text-muted-foreground">
+                <UserRound size={14} aria-hidden="true" />
+                Responsable · {lead.agent?.name ?? 'Sin asignar'}
+              </p>
+            </div>
           </div>
-
-          <div className="min-w-0 flex-1">
-            <div className="flex flex-wrap items-center gap-2">
-              <h1 className="break-words text-2xl font-bold leading-tight tracking-[-0.02em] text-foreground">
-                {lead.name}
-              </h1>
-              <BuyerStatusSelect leadId={lead.id} status={lead.status} buyerName={lead.name} />
-              <SearchRequestBadge leadId={lead.id} />
-              <TemperatureChip leadId={lead.id} temperature={lead.temperature} />
-              {isTerminal && (
-                <span className="text-[11px] text-muted-foreground">Estado final</span>
-              )}
-            </div>
-
-            <div className="mt-1 flex flex-wrap items-center gap-x-4 gap-y-1 text-[12px] text-muted-foreground">
-              <span className="font-medium text-foreground">{needSummary}</span>
-              {lead.agent && (
-                <span className="flex items-center gap-1.5">
-                  <span className="inline-flex h-4 w-4 items-center justify-center rounded-full bg-sidebar-primary text-[8px] font-bold text-sidebar-primary-foreground">
-                    {lead.agent.name.charAt(0).toUpperCase()}
-                  </span>
-                  Responsable: {lead.agent.name}
-                </span>
-              )}
-              {lead.source && (
-                <span className="rounded bg-muted px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-[0.08em] text-muted-foreground">
-                  {buyerSourceLabel(lead.source)}
-                </span>
-              )}
-            </div>
-            <details className="mt-3 min-w-0">
-              <summary className="cursor-pointer text-sm font-medium">Datos de contacto</summary>
-              <div className="mt-2 flex flex-wrap items-center gap-2">
+          <div className="flex w-full min-w-0 items-start gap-2 sm:w-auto">
+            <details className="group min-w-0 max-w-full">
+              <summary className="flex min-h-11 w-fit cursor-pointer list-none items-center gap-2 rounded-lg border border-border bg-card px-3 text-sm font-semibold hover:bg-muted [&::-webkit-details-marker]:hidden">
+                <Phone size={16} aria-hidden="true" /> Contactar
+              </summary>
+              <div className="mt-2 grid max-w-64 gap-2 rounded-lg border bg-card p-3 text-sm">
+                {lead.phone && (
+                  <>
+                    <a
+                      href={`tel:${lead.phone}`}
+                      className="inline-flex min-h-10 items-center gap-2 break-all text-brand underline"
+                    >
+                      <Phone size={15} aria-hidden="true" /> {lead.phone}
+                    </a>
+                    <WhatsAppButton
+                      phone={lead.phone}
+                      message={buyerWhatsAppMessage(lead.name)}
+                      leadId={lead.id}
+                      leadType="buyer"
+                    />
+                  </>
+                )}
                 {lead.email && (
                   <a
                     href={`mailto:${lead.email}`}
-                    className="inline-flex max-w-full items-center gap-1.5 break-all rounded-full border border-border bg-muted px-3 py-1 text-[12px] text-foreground transition-colors hover:bg-card"
+                    className="inline-flex min-h-10 items-center gap-2 break-all text-brand underline"
                   >
-                    <Mail className="h-3 w-3 text-muted-foreground" />
-                    {lead.email}
+                    <Mail size={15} className="shrink-0" aria-hidden="true" /> {lead.email}
                   </a>
                 )}
-                {lead.phone && (
-                  <a
-                    href={`tel:${lead.phone}`}
-                    className="inline-flex max-w-full items-center gap-1.5 break-all rounded-full border border-border bg-muted px-3 py-1 text-[12px] text-foreground transition-colors hover:bg-card"
-                  >
-                    <Phone className="h-3 w-3 text-muted-foreground" />
-                    {lead.phone}
-                  </a>
-                )}
-                {!lead.email && !lead.phone && (
-                  <span className="text-sm text-muted-foreground">
-                    Contacto pendiente de completar.
-                  </span>
-                )}
-                <Link href={`${path}?tab=busqueda&ver=editar#editar`} className={textLink}>
-                  Editar datos
+                {!lead.phone && !lead.email && <p>Contacto pendiente de completar.</p>}
+                <Link className={textLink} href={`${path}?tab=busqueda&ver=editar#editar`}>
+                  Editar datos de contacto
                 </Link>
               </div>
             </details>
+            <BuyerTopbarActions key={lead.id} leadId={lead.id} isTerminal={isTerminal}>
+              <div className="space-y-3 text-sm">
+                <div>
+                  <p className="mb-1 font-medium">Temperatura</p>
+                  <TemperatureChip leadId={lead.id} temperature={lead.temperature} />
+                </div>
+                <p>Origen · {buyerSourceLabel(lead.source)}</p>
+              </div>
+            </BuyerTopbarActions>
           </div>
         </div>
+        <section
+          aria-labelledby="buyer-next-heading"
+          className="mt-4 rounded-xl bg-brand-tint p-4 sm:px-5"
+        >
+          <BuyerCallForm
+            key={lead.id}
+            archived={Boolean(lead.archivedAt)}
+            save={registerBuyerCall.bind(null, lead.id)}
+          >
+            <div className="flex min-w-0 items-start gap-2.5">
+              <CalendarClock size={19} className="mt-0.5 shrink-0 text-brand" aria-hidden="true" />
+              <div className="min-w-0">
+                <h2 id="buyer-next-heading" className="text-xs font-semibold text-brand">
+                  Próximo paso
+                </h2>
+                {scheduled ? (
+                  <>
+                    <Link
+                      href={`/calendario/${scheduled.id}`}
+                      className="break-words text-lg font-semibold hover:underline"
+                    >
+                      {scheduled.title}
+                    </Link>
+                    <p className="text-sm text-muted-foreground">
+                      {scheduled.startAt < new Date() ? 'Pendiente · ' : ''}
+                      {dateTime(scheduled.startAt)} · hora de Madrid
+                    </p>
+                  </>
+                ) : lead.nextActionType ? (
+                  <>
+                    <p className="text-lg font-semibold">
+                      {NEXT_ACTION_LABELS[lead.nextActionType]}
+                    </p>
+                    <p className="text-sm text-muted-foreground">
+                      {lead.nextActionDueAt
+                        ? dateTime(lead.nextActionDueAt) + ' · hora de Madrid'
+                        : 'Sin fecha'}
+                    </p>
+                  </>
+                ) : (
+                  <p className="text-base font-medium">Sin seguimiento pendiente.</p>
+                )}
+              </div>
+            </div>
+          </BuyerCallForm>
+        </section>
         <nav
           aria-label="Apartados de la ficha"
           className="mt-5 flex flex-wrap gap-x-2 border-t border-border"
@@ -645,49 +664,14 @@ export default async function FichaCompradorPage({
             </Link>
           ))}
         </nav>
-      </section>
+      </header>
       <div className="mx-auto w-full max-w-[1440px] flex-1 p-4 pb-12 md:p-8">
         {activeTab === 'ficha' && (
           <div id="seguimiento" className={columns}>
             <div className={stack}>
-              <section
-                className="min-w-0 rounded-xl border border-sidebar-primary/30 bg-sidebar-primary/5 p-5 sm:p-6"
-                aria-labelledby="buyer-next-heading"
-              >
-                <h2 id="buyer-next-heading" className="text-base font-semibold">
-                  Próximo paso
-                </h2>
-                {scheduled ? (
-                  <div className="mt-2">
-                    <Link
-                      className="break-words text-xl font-semibold text-foreground hover:underline"
-                      href={`/calendario/${scheduled.id}`}
-                    >
-                      {scheduled.title}
-                    </Link>
-                    <p className="text-sm text-muted-foreground">
-                      {scheduled.startAt < new Date() ? 'Pendiente · ' : ''}
-                      {dateTime(scheduled.startAt)} · hora de Madrid
-                    </p>
-                  </div>
-                ) : lead.nextActionType ? (
-                  <p className="mt-2 text-sm">
-                    {NEXT_ACTION_LABELS[lead.nextActionType]}
-                    {lead.nextActionDueAt &&
-                      ` · ${dateTime(lead.nextActionDueAt)} · hora de Madrid`}
-                  </p>
-                ) : (
-                  <p className="mt-2 text-sm text-muted-foreground">Sin seguimiento pendiente.</p>
-                )}
-                <BuyerCallForm
-                  key={lead.id}
-                  archived={Boolean(lead.archivedAt)}
-                  save={registerBuyerCall.bind(null, lead.id)}
-                />
-                <a href="#buyer-actions-title" className={textLink + ' mt-3 lg:hidden'}>
-                  Ver agenda y programar otra acción ↓
-                </a>
-              </section>
+              <a href="#buyer-actions-title" className={textLink + ' lg:hidden'}>
+                Ver agenda y programar otra acción ↓
+              </a>
               <section id="historial" className={card + ' scroll-mt-20'}>
                 <h2 className="text-lg font-semibold">Historial</h2>
                 <p className="text-sm text-muted-foreground">
@@ -1330,15 +1314,6 @@ export default async function FichaCompradorPage({
           />
         )}
       </div>
-      {/* Barra de acción móvil (mockup MC2): Llamar / WhatsApp fijos abajo */}
-      {lead.phone && (
-        <MobileFichaActions
-          phone={lead.phone}
-          message={buyerWhatsAppMessage(lead.name)}
-          leadId={lead.id}
-          leadType="buyer"
-        />
-      )}
     </div>
   )
 }
