@@ -4,7 +4,17 @@ import { prismaMatchingDeps } from '@/lib/matching/prisma-deps'
 import { scorePair, compareMatches } from '@/lib/matching/find'
 import { assessPair } from '@/lib/matching/assessment'
 
-export async function BuyerCatalogResults({ id }: { id: string }) {
+import { createManualMatch } from '@/app/(backoffice)/matches/manual-actions'
+import { AddBuyerInterestButton } from './add-buyer-interest-button'
+
+export async function BuyerCatalogResults({
+  id,
+  selectedVehicleIds,
+}: {
+  id: string
+  selectedVehicleIds: string[]
+}) {
+  const selected = new Set(selectedVehicleIds)
   const deps = prismaMatchingDeps(db)
   const buyer = await deps.getBuyer(id)
   if (!buyer) return null
@@ -21,8 +31,13 @@ export async function BuyerCatalogResults({ id }: { id: string }) {
   )
     return <p>Añade criterios a la búsqueda para comparar el stock.</p>
   return (
-    <section className="space-y-3 rounded-xl border p-4">
+    <section className="space-y-3 rounded-xl border border-border bg-card p-5">
       <h2 className="font-semibold">Comparación con el stock disponible</h2>
+      {rows.length === 0 && (
+        <p className="text-sm text-muted-foreground">
+          Todavía no hay vehículos disponibles para comparar.
+        </p>
+      )}
       {(['apto', 'pendiente', 'descartado'] as const).map((state) => {
         const group = rows
           .filter((r) => r.result.state === state)
@@ -66,6 +81,10 @@ export async function BuyerCatalogResults({ id }: { id: string }) {
                         .join('; ')}
                     </p>
                   )}
+                  <AddBuyerInterestButton
+                    save={createManualMatch.bind(null, { buyerLeadId: id, vehicleId: v.id })}
+                    selected={selected.has(v.id)}
+                  />
                 </li>
               ))}
             </ul>

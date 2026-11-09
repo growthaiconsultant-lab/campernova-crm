@@ -1,3 +1,4 @@
+import { AddBuyerInterestButton } from '../../components/add-buyer-interest-button'
 import { useState } from 'react'
 import { BuyerCallForm, type BuyerCallInput } from '../../components/buyer-call-form'
 import { createRoot } from 'react-dom/client'
@@ -19,6 +20,7 @@ window.followupHarness = { mode: 'ok', noteCalls: 0, actionCalls: [], calls: [] 
 const delay = () => new Promise((resolve) => setTimeout(resolve, 180))
 
 function Fixture() {
+  const [selected, setSelected] = useState(false)
   const [notes, setNotes] = useState<BuyerCommercialNote[]>([
     {
       id: 'old',
@@ -69,6 +71,16 @@ function Fixture() {
     <main className="crm-theme min-h-screen bg-background p-4 text-foreground md:p-8">
       <h1 className="mb-2 text-2xl font-semibold">Comprador de ejemplo</h1>
       <p className="mb-6 text-sm text-muted-foreground">Vista de prueba con datos ficticios</p>
+      <AddBuyerInterestButton
+        selected={selected}
+        save={async () => {
+          await delay()
+          if (window.followupHarness.mode === 'error')
+            return { ok: false, error: 'Vehículo no disponible' }
+          setSelected(true)
+          return { ok: true, saved: true }
+        }}
+      />
       <BuyerCallForm
         archived={false}
         save={async (input) => {
