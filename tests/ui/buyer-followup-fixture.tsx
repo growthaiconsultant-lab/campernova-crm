@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { BuyerCallForm, type BuyerCallInput } from '../../components/buyer-call-form'
 import { createRoot } from 'react-dom/client'
 import { BuyerNotesPanel, type BuyerCommercialNote } from '../../components/buyer-notes-panel'
 import { BuyerActionsPanel, type BuyerPendingAction } from '../../components/buyer-actions-panel'
@@ -8,12 +9,13 @@ declare global {
   interface Window {
     followupHarness: {
       mode: 'ok' | 'error' | 'throw'
+      calls: BuyerCallInput[]
       noteCalls: number
       actionCalls: CreateCalendarEventInput[]
     }
   }
 }
-window.followupHarness = { mode: 'ok', noteCalls: 0, actionCalls: [] }
+window.followupHarness = { mode: 'ok', noteCalls: 0, actionCalls: [], calls: [] }
 const delay = () => new Promise((resolve) => setTimeout(resolve, 180))
 
 function Fixture() {
@@ -67,6 +69,16 @@ function Fixture() {
     <main className="crm-theme min-h-screen bg-background p-4 text-foreground md:p-8">
       <h1 className="mb-2 text-2xl font-semibold">Comprador de ejemplo</h1>
       <p className="mb-6 text-sm text-muted-foreground">Vista de prueba con datos ficticios</p>
+      <BuyerCallForm
+        archived={false}
+        save={async (input) => {
+          window.followupHarness.calls.push(input)
+          await delay()
+          return window.followupHarness.mode === 'ok'
+            ? { ok: true }
+            : { error: 'Error de conexión' }
+        }}
+      />
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
         <BuyerNotesPanel notes={notes} addNote={addNote} />
         <BuyerActionsPanel

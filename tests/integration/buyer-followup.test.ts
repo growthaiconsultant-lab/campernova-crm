@@ -1,6 +1,8 @@
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
 import type { User } from '@prisma/client'
 import { uniqueSuffix } from './db'
+import { randomUUID, createHash } from 'node:crypto'
+import { registerBuyerCall } from '@/app/(backoffice)/compradores/[id]/call-actions'
 
 vi.mock('@/lib/db', async () => {
   const { createGuardedTestPrisma } = await import('./db')
@@ -58,6 +60,88 @@ async function buyer() {
   ids.push(lead.id)
   return lead
 }
+
+describe('registro de llamadas desde ficha — PostgreSQL', () => {
+  const call = () => ({
+    requestId: randomUUID(),
+    outcome: 'Prefiere cama fija.',
+    next: { action: 'VISITA', startAt: new Date(Date.now() + 86400000).toISOString() },
+  })
+
+  it('guarda la llamada y la cita una sola vez en envíos concurrentes y reintentos', async () => {
+    const lead = await buyer()
+    const input = call()
+    const results = await Promise.all([
+      registerBuyerCall(lead.id, input),
+      registerBuyerCall(lead.id, input),
+    ])
+    expect(results).toMatchObject([
+      { ok: true, eventId: expect.any(String) },
+      { ok: true, eventId: expect.any(String) },
+    ])
+    expect(results[0]).toEqual(results[1])
+    expect(await db.activity.findMany({ where: { buyerLeadId: lead.id } })).toMatchObject([
+      { type: 'LLAMADA', content: input.outcome, agentId: actor.id },
+    ])
+    expect(await db.calendarEvent.findMany({ where: { buyerLeadId: lead.id } })).toMatchObject([
+      {
+        type: 'CITA',
+        title: 'Visita con el comprador',
+        assignedToId: actor.id,
+        commitment: 'EXTERNO',
+        startAt: new Date(input.next.startAt),
+      },
+    ])
+    expect(
+      await registerBuyerCall(lead.id, { ...input, outcome: 'Otro resultado' })
+    ).toHaveProperty('error')
+    expect(await registerBuyerCall(lead.id, { ...call(), next: null })).toEqual({ ok: true })
+    expect(await db.calendarEvent.count({ where: { buyerLeadId: lead.id } })).toBe(1)
+  })
+
+  it('revierte la llamada si el evento no se puede insertar', async () => {
+    const lead = await buyer()
+    const input = call()
+    const key = createHash('sha256')
+      .update(JSON.stringify([actor.id, lead.id, input.requestId]))
+      .digest('hex')
+    await db.calendarEvent.create({
+      data: {
+        id: 'call_step_' + key,
+        type: 'OTRO',
+        title: 'Evento ya existente',
+        startAt: new Date(),
+        buyerLeadId: lead.id,
+        createdById: actor.id,
+      },
+    })
+    expect(await registerBuyerCall(lead.id, input)).toHaveProperty('error')
+    expect(await db.activity.count({ where: { buyerLeadId: lead.id } })).toBe(0)
+  })
+
+  it('rechaza fechas pasadas, acceso no autorizado, fichas fusionadas y programación archivada', async () => {
+    const lead = await buyer()
+    const input = call()
+    expect(
+      await registerBuyerCall(lead.id, {
+        ...input,
+        next: { ...input.next, startAt: new Date(0).toISOString() },
+      })
+    ).toHaveProperty('error')
+    vi.mocked(requireAgente).mockRejectedValueOnce(new Error('FORBIDDEN'))
+    await expect(registerBuyerCall(lead.id, input)).rejects.toThrow('FORBIDDEN')
+    await db.buyerLead.update({ where: { id: lead.id }, data: { archivedAt: new Date() } })
+    expect(await registerBuyerCall(lead.id, input)).toHaveProperty('error')
+    expect(await db.activity.count({ where: { buyerLeadId: lead.id } })).toBe(0)
+    const target = await buyer()
+    await db.buyerLead.update({
+      where: { id: lead.id },
+      data: { mergedIntoId: target.id, mergedAt: new Date() },
+    })
+    expect(await registerBuyerCall(lead.id, { ...input, next: null })).toHaveProperty('error')
+    expect(await db.calendarEvent.count({ where: { buyerLeadId: lead.id } })).toBe(0)
+  })
+})
 
 describe('COM-10 seguimiento desde ficha — PostgreSQL', () => {
   it('las notas humanas sobreviven a 60 actividades recientes; excluye origen, reparto y sistema', async () => {

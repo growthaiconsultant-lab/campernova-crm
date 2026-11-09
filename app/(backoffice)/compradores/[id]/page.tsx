@@ -16,6 +16,9 @@ import { SearchRequestCard } from '@/components/search-request-card'
 import { TradeInCard } from './trade-in-card'
 import { BuyerTopbarActions } from './buyer-topbar-actions'
 import { ProximaAccionCard } from './proxima-accion-card'
+import { BuyerCallForm } from '@/components/buyer-call-form'
+import { registerBuyerCall } from './call-actions'
+import { NEXT_ACTION_LABELS } from '@/lib/next-action'
 import { BuyerNotesPanel } from '@/components/buyer-notes-panel'
 import { BuyerActionsPanel } from '@/components/buyer-actions-panel'
 import { buyerCommercialNotesWhere, followupPage, FOLLOWUP_PAGE_SIZE } from '@/lib/buyer-followup'
@@ -34,7 +37,6 @@ import { classifyBuyerCriteria } from '@/lib/buyer-criteria'
 import type { BuyerMatchData } from '@/components/matches-section'
 import { ActivityTimeline } from '@/components/activity-timeline'
 import type { ActivityItem } from '@/components/activity-timeline'
-import { NoteForm } from '@/components/note-form'
 import { ChatTranscript } from '@/components/chat-transcript'
 import type { ChatMessage } from '@/components/chat-transcript'
 import { addBuyerLeadNote } from './actions'
@@ -95,106 +97,143 @@ export default async function FichaCompradorPage({
   const actionsPage = followupPage(searchParams.actionsPage)
 
   const currentUser = await requireAgente()
-  const [lead, agents, activities, commercialNotes, searchRequest] = await Promise.all([
-    db.buyerLead.findUnique({
-      where: { id: params.id },
-      include: {
-        agent: true,
-        chatSessions: {
-          orderBy: { startedAt: 'asc' },
-          select: {
-            id: true,
-            messages: true,
-            status: true,
-            startedAt: true,
-            lastMessageAt: true,
-            completedAt: true,
-            totalTokens: true,
-            llmModel: true,
-          },
-        },
-        warranty: {
-          include: {
-            tickets: {
-              where: { status: { in: ['ABIERTO', 'EN_PROGRESO'] } },
-              select: { id: true, priority: true, title: true, status: true },
+  const [lead, agents, activities, commercialNotes, searchRequest, lastContact, firstScheduled] =
+    await Promise.all([
+      db.buyerLead.findUnique({
+        where: { id: params.id },
+        include: {
+          agent: true,
+          chatSessions: {
+            orderBy: { startedAt: 'asc' },
+            select: {
+              id: true,
+              messages: true,
+              status: true,
+              startedAt: true,
+              lastMessageAt: true,
+              completedAt: true,
+              totalTokens: true,
+              llmModel: true,
             },
           },
-        },
-        deliveries: completedSalesQuery,
-        matches: {
-          include: {
-            vehicle: {
-              select: {
-                id: true,
-                brand: true,
-                model: true,
-                year: true,
-                plate: true,
-                km: true,
-                status: true,
-                entryValidatedAt: true,
-                entryAnnulledAt: true,
-                desiredPrice: true,
-                salePrice: true,
-                photos: { select: { url: true }, orderBy: { order: 'asc' }, take: 1 },
-                sellerLead: { select: { id: true, archivedAt: true } },
+          warranty: {
+            include: {
+              tickets: {
+                where: { status: { in: ['ABIERTO', 'EN_PROGRESO'] } },
+                select: { id: true, priority: true, title: true, status: true },
               },
             },
           },
-          orderBy: { score: 'desc' },
-        },
-        calendarEvents: {
-          where: { status: { notIn: ['CANCELADO', 'COMPLETADO', 'NO_SHOW'] } },
-          orderBy: [{ startAt: 'asc' }, { id: 'asc' }],
-          skip: (actionsPage - 1) * FOLLOWUP_PAGE_SIZE,
-          take: FOLLOWUP_PAGE_SIZE + 1,
-          select: {
-            id: true,
-            type: true,
-            title: true,
-            description: true,
-            startAt: true,
-            status: true,
-            assignedTo: { select: { name: true } },
+          deliveries: completedSalesQuery,
+          matches: {
+            include: {
+              vehicle: {
+                select: {
+                  id: true,
+                  brand: true,
+                  model: true,
+                  year: true,
+                  plate: true,
+                  km: true,
+                  status: true,
+                  entryValidatedAt: true,
+                  entryAnnulledAt: true,
+                  desiredPrice: true,
+                  salePrice: true,
+                  photos: { select: { url: true }, orderBy: { order: 'asc' }, take: 1 },
+                  sellerLead: { select: { id: true, archivedAt: true } },
+                },
+              },
+            },
+            orderBy: { score: 'desc' },
+          },
+          calendarEvents: {
+            where: { status: { notIn: ['CANCELADO', 'COMPLETADO', 'NO_SHOW'] } },
+            orderBy: [{ startAt: 'asc' }, { id: 'asc' }],
+            skip: (actionsPage - 1) * FOLLOWUP_PAGE_SIZE,
+            take: FOLLOWUP_PAGE_SIZE + 1,
+            select: {
+              id: true,
+              type: true,
+              title: true,
+              description: true,
+              startAt: true,
+              status: true,
+              assignedTo: { select: { name: true } },
+            },
+          },
+          offers: {
+            orderBy: { createdAt: 'desc' },
+            include: {
+              vehicle: { select: { brand: true, model: true, year: true, sellerLeadId: true } },
+            },
           },
         },
-        offers: {
-          orderBy: { createdAt: 'desc' },
-          include: {
-            vehicle: { select: { brand: true, model: true, year: true, sellerLeadId: true } },
-          },
-        },
-      },
-    }),
-    db.user.findMany({
-      where: { active: true, role: { in: ['ADMIN', 'AGENTE'] } },
-      select: { id: true, name: true },
-      orderBy: { name: 'asc' },
-    }),
-    db.activity.findMany({
-      where: { buyerLeadId: params.id },
-      include: { agent: { select: { name: true } } },
-      orderBy: { createdAt: 'desc' },
-      take: 50,
-    }),
-    db.activity.findMany({
-      where: buyerCommercialNotesWhere(params.id),
-      select: { id: true, content: true, createdAt: true, agent: { select: { name: true } } },
-      orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
-      skip: (notesPage - 1) * FOLLOWUP_PAGE_SIZE,
-      take: FOLLOWUP_PAGE_SIZE + 1,
-    }),
-    db.activity.findFirst({
-      where: { id: { startsWith: 'search_answers_' }, buyerLeadId: params.id, agentId: null },
-      orderBy: { createdAt: 'desc' },
-      select: { content: true, createdAt: true },
-    }),
-  ])
+      }),
+      db.user.findMany({
+        where: { active: true, role: { in: ['ADMIN', 'AGENTE'] } },
+        select: { id: true, name: true },
+        orderBy: { name: 'asc' },
+      }),
+      db.activity.findMany({
+        where: { buyerLeadId: params.id },
+        include: { agent: { select: { name: true } } },
+        orderBy: { createdAt: 'desc' },
+        take: 50,
+      }),
+      db.activity.findMany({
+        where: buyerCommercialNotesWhere(params.id),
+        select: { id: true, content: true, createdAt: true, agent: { select: { name: true } } },
+        orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+        skip: (notesPage - 1) * FOLLOWUP_PAGE_SIZE,
+        take: FOLLOWUP_PAGE_SIZE + 1,
+      }),
+      db.activity.findFirst({
+        where: { id: { startsWith: 'search_answers_' }, buyerLeadId: params.id, agentId: null },
+        orderBy: { createdAt: 'desc' },
+        select: { content: true, createdAt: true },
+      }),
+      activeTab === 'ficha'
+        ? db.activity.findFirst({
+            where: {
+              buyerLeadId: params.id,
+              OR: [
+                { type: { in: ['LLAMADA', 'EMAIL', 'WHATSAPP_INICIADO'] } },
+                buyerCommercialNotesWhere(params.id),
+              ],
+            },
+            orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+            select: {
+              type: true,
+              content: true,
+              createdAt: true,
+              agent: { select: { name: true } },
+            },
+          })
+        : null,
+      activeTab === 'ficha' && actionsPage > 1
+        ? db.calendarEvent.findFirst({
+            where: {
+              buyerLeadId: params.id,
+              status: { notIn: ['CANCELADO', 'COMPLETADO', 'NO_SHOW'] },
+            },
+            orderBy: [{ startAt: 'asc' }, { id: 'asc' }],
+            select: { id: true, title: true, startAt: true },
+          })
+        : null,
+    ])
 
   if (!lead) notFound()
   if (lead.mergedIntoId)
     redirect(`/compradores/${lead.mergedIntoId}?tab=${encodeURIComponent(activeTab)}`)
+
+  const scheduled = actionsPage === 1 ? lead.calendarEvents[0] : firstScheduled
+  const dateTime = (date: Date) =>
+    date.toLocaleString('es-ES', {
+      dateStyle: 'medium',
+      timeStyle: 'short',
+      timeZone: 'Europe/Madrid',
+    })
 
   function pagination(kind: 'notesPage' | 'actionsPage', page: number, hasMore: boolean) {
     if (page === 1 && !hasMore) return null
@@ -432,7 +471,7 @@ export default async function FichaCompradorPage({
 
   // Tabs definition
   const tabs: LeadTab[] = [
-    { key: 'ficha', label: 'Ficha' },
+    { key: 'ficha', label: 'Seguimiento' },
     { key: 'actividad', label: 'Actividad', badge: activities.length },
     { key: 'matches', label: 'Vehículos de interés', badge: visibleMatches.length },
     { key: 'ofertas', label: 'Ofertas', badge: offerRows.length || undefined },
@@ -458,7 +497,7 @@ export default async function FichaCompradorPage({
           /
         </span>
         <span className="max-w-[280px] truncate font-mono text-[11px] uppercase tracking-[0.12em] text-foreground">
-          {needSummary}
+          {lead.name}
         </span>
         <div className="flex-1" />
         <div className="flex items-center gap-2">
@@ -485,7 +524,7 @@ export default async function FichaCompradorPage({
           <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-center gap-2">
               <h1 className="text-[22px] font-bold leading-tight tracking-[-0.02em] text-foreground">
-                {needSummary}
+                {lead.name}
               </h1>
               <BuyerStatusSelect leadId={lead.id} status={lead.status} buyerName={lead.name} />
               <SearchRequestBadge leadId={lead.id} />
@@ -496,22 +535,13 @@ export default async function FichaCompradorPage({
             </div>
 
             <div className="mt-1 flex flex-wrap items-center gap-x-4 gap-y-1 text-[12px] text-muted-foreground">
-              <span className="font-medium text-foreground">{lead.name}</span>
-              <span>#{lead.id.slice(-8)}</span>
-              <span>
-                Alta:{' '}
-                {new Date(lead.createdAt).toLocaleDateString('es-ES', {
-                  day: 'numeric',
-                  month: 'short',
-                  year: 'numeric',
-                })}
-              </span>
+              <span className="font-medium text-foreground">{needSummary}</span>
               {lead.agent && (
                 <span className="flex items-center gap-1.5">
                   <span className="inline-flex h-4 w-4 items-center justify-center rounded-full bg-sidebar-primary text-[8px] font-bold text-sidebar-primary-foreground">
                     {lead.agent.name.charAt(0).toUpperCase()}
                   </span>
-                  {lead.agent.name}
+                  Responsable: {lead.agent.name}
                 </span>
               )}
               {lead.source && (
@@ -522,18 +552,6 @@ export default async function FichaCompradorPage({
             </div>
 
             <div className="mt-2 flex flex-wrap items-center gap-2">
-              <Link
-                href={`/compradores/${lead.id}?tab=ficha#buyer-notes-title`}
-                className="rounded-full border border-border bg-card px-3 py-1 text-[12px] font-medium text-sidebar-primary"
-              >
-                Escribir nota
-              </Link>
-              <Link
-                href={`/compradores/${lead.id}?tab=ficha#buyer-actions-title`}
-                className="rounded-full border border-border bg-card px-3 py-1 text-[12px] font-medium text-sidebar-primary"
-              >
-                Próximas acciones
-              </Link>
               {lead.email && (
                 <a
                   href={`mailto:${lead.email}`}
@@ -569,83 +587,96 @@ export default async function FichaCompradorPage({
           </div>
         </div>
 
-        {/* KPI tiles — mismo lenguaje que la ficha de vendedor */}
-        <LandingAttribution activities={activities} />
         {searchRequest && (
-          <SearchRequestCard
-            content={searchRequest.content}
-            receivedAt={searchRequest.createdAt.toLocaleDateString('es-ES')}
-          />
+          <details className="mt-3 rounded-lg border border-border bg-card px-4 py-2">
+            <summary className="cursor-pointer text-sm font-medium">
+              Ver solicitud bajo pedido
+            </summary>
+            <SearchRequestCard
+              content={searchRequest.content}
+              receivedAt={searchRequest.createdAt.toLocaleDateString('es-ES')}
+            />
+          </details>
         )}
-        <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-5">
-          {/* Mejor match (ancla) */}
-          <div className="rounded-xl border border-border bg-card px-4 py-3">
-            <div className="mb-1 flex items-center gap-1">
-              <p className="font-mono text-[10px] uppercase tracking-[0.12em] text-muted-foreground">
-                Mejor match
+
+        <details className="mt-4 rounded-lg border border-border bg-card px-4 py-2">
+          <summary className="cursor-pointer text-sm font-medium">
+            Datos de captación e indicadores
+          </summary>
+          <div className="mt-2 text-xs text-muted-foreground">
+            Referencia #{lead.id.slice(-8)} · Alta {lead.createdAt.toLocaleDateString('es-ES')}
+          </div>
+          <LandingAttribution activities={activities} />
+          <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-5">
+            {/* Mejor match (ancla) */}
+            <div className="rounded-xl border border-border bg-card px-4 py-3">
+              <div className="mb-1 flex items-center gap-1">
+                <p className="font-mono text-[10px] uppercase tracking-[0.12em] text-muted-foreground">
+                  Mejor match
+                </p>
+                <InfoTooltip
+                  text="Puntuación del vehículo en stock que mejor encaja con sus preferencias. Verde ≥80."
+                  side="bottom"
+                />
+              </div>
+              <p
+                className={`text-xl font-bold tracking-[-0.02em] ${bestMatchScore >= 80 ? 'text-green-600' : bestMatchScore >= 60 ? 'text-sidebar-primary' : 'text-foreground'}`}
+              >
+                {bestMatch ? `${bestMatchScore}%` : '—'}
               </p>
-              <InfoTooltip
-                text="Puntuación del vehículo en stock que mejor encaja con sus preferencias. Verde ≥80."
-                side="bottom"
-              />
             </div>
-            <p
-              className={`text-xl font-bold tracking-[-0.02em] ${bestMatchScore >= 80 ? 'text-green-600' : bestMatchScore >= 60 ? 'text-sidebar-primary' : 'text-foreground'}`}
-            >
-              {bestMatch ? `${bestMatchScore}%` : '—'}
-            </p>
-          </div>
 
-          {/* Presupuesto */}
-          <div className="rounded-xl border border-border bg-card px-4 py-3">
-            <p className="mb-1 font-mono text-[10px] uppercase tracking-[0.12em] text-muted-foreground">
-              Presupuesto
-            </p>
-            <p className="text-xl font-bold tracking-[-0.02em] text-foreground">
-              {lead.maxBudget ? EUR(Number(lead.maxBudget)) : '—'}
-            </p>
-          </div>
-
-          {/* Plazo de compra */}
-          <div className="rounded-xl border border-border bg-card px-4 py-3">
-            <p className="mb-1 font-mono text-[10px] uppercase tracking-[0.12em] text-muted-foreground">
-              Plazo de compra
-            </p>
-            <p className="text-xl font-bold tracking-[-0.02em] text-foreground">
-              {lead.purchaseTimeline
-                ? (PURCHASE_TIMELINE_LABELS[lead.purchaseTimeline] ?? lead.purchaseTimeline)
-                : '—'}
-            </p>
-          </div>
-
-          {/* Calidad del lead */}
-          <div className="rounded-xl border border-border bg-card px-4 py-3">
-            <div className="mb-1 flex items-center gap-1">
-              <p className="font-mono text-[10px] uppercase tracking-[0.12em] text-muted-foreground">
-                Calidad lead
-              </p>
-              <ScoreInfo breakdown={scoreResult.breakdown} side="bottom" />
-            </div>
-            <p
-              className={`text-xl font-bold tracking-[-0.02em] ${leadScore >= 75 ? 'text-green-600' : leadScore >= 50 ? 'text-amber-600' : 'text-muted-foreground'}`}
-            >
-              {leadScore}
-              <span className="text-sm font-normal text-muted-foreground">/100</span>
-            </p>
-          </div>
-
-          {/* Garantía (si aplica) */}
-          {warrantyMonthsLeft !== null && (
+            {/* Presupuesto */}
             <div className="rounded-xl border border-border bg-card px-4 py-3">
               <p className="mb-1 font-mono text-[10px] uppercase tracking-[0.12em] text-muted-foreground">
-                Garantía
+                Presupuesto
               </p>
               <p className="text-xl font-bold tracking-[-0.02em] text-foreground">
-                {warrantyMonthsLeft} m
+                {lead.maxBudget ? EUR(Number(lead.maxBudget)) : '—'}
               </p>
             </div>
-          )}
-        </div>
+
+            {/* Plazo de compra */}
+            <div className="rounded-xl border border-border bg-card px-4 py-3">
+              <p className="mb-1 font-mono text-[10px] uppercase tracking-[0.12em] text-muted-foreground">
+                Plazo de compra
+              </p>
+              <p className="text-xl font-bold tracking-[-0.02em] text-foreground">
+                {lead.purchaseTimeline
+                  ? (PURCHASE_TIMELINE_LABELS[lead.purchaseTimeline] ?? lead.purchaseTimeline)
+                  : '—'}
+              </p>
+            </div>
+
+            {/* Calidad del lead */}
+            <div className="rounded-xl border border-border bg-card px-4 py-3">
+              <div className="mb-1 flex items-center gap-1">
+                <p className="font-mono text-[10px] uppercase tracking-[0.12em] text-muted-foreground">
+                  Calidad lead
+                </p>
+                <ScoreInfo breakdown={scoreResult.breakdown} side="bottom" />
+              </div>
+              <p
+                className={`text-xl font-bold tracking-[-0.02em] ${leadScore >= 75 ? 'text-green-600' : leadScore >= 50 ? 'text-amber-600' : 'text-muted-foreground'}`}
+              >
+                {leadScore}
+                <span className="text-sm font-normal text-muted-foreground">/100</span>
+              </p>
+            </div>
+
+            {/* Garantía (si aplica) */}
+            {warrantyMonthsLeft !== null && (
+              <div className="rounded-xl border border-border bg-card px-4 py-3">
+                <p className="mb-1 font-mono text-[10px] uppercase tracking-[0.12em] text-muted-foreground">
+                  Garantía
+                </p>
+                <p className="text-xl font-bold tracking-[-0.02em] text-foreground">
+                  {warrantyMonthsLeft} m
+                </p>
+              </div>
+            )}
+          </div>
+        </details>
 
         {/* Tabs — via LeadTabNav (client, URL-driven) */}
         <div className="-mx-4 mt-6 md:-mx-8">
@@ -660,56 +691,139 @@ export default async function FichaCompradorPage({
           id="seguimiento"
           className="grid scroll-mt-20 grid-cols-1 gap-4 border-b border-border p-4 md:p-8 xl:grid-cols-2"
         >
-          <BuyerNotesPanel
-            notes={commercialNotes.slice(0, FOLLOWUP_PAGE_SIZE).map((note) => ({
-              id: note.id,
-              content: note.content,
-              createdAt: note.createdAt.toISOString(),
-              author: note.agent?.name ?? 'Comercial',
-            }))}
-            addNote={addBuyerLeadNote.bind(null, lead.id)}
-            afterSaveHref={
-              notesPage > 1
-                ? `/compradores/${lead.id}?tab=ficha&actionsPage=${actionsPage}#buyer-notes-title`
-                : undefined
-            }
-            pagination={pagination(
-              'notesPage',
-              notesPage,
-              commercialNotes.length > FOLLOWUP_PAGE_SIZE
+          <section
+            className="border-brand/25 min-w-0 rounded-xl border bg-card p-5"
+            aria-labelledby="buyer-next-heading"
+          >
+            <h2 id="buyer-next-heading" className="text-base font-semibold">
+              Próximo paso
+            </h2>
+            {scheduled ? (
+              <div className="mt-2">
+                <Link
+                  className="font-medium text-brand hover:underline"
+                  href={`/calendario/${scheduled.id}`}
+                >
+                  {scheduled.title}
+                </Link>
+                <p className="text-sm text-muted-foreground">
+                  {scheduled.startAt < new Date() ? 'Pendiente · ' : ''}
+                  {dateTime(scheduled.startAt)} · hora de Madrid
+                </p>
+              </div>
+            ) : lead.nextActionType ? (
+              <p className="mt-2 text-sm">
+                {NEXT_ACTION_LABELS[lead.nextActionType]}
+                {lead.nextActionDueAt && ` · ${dateTime(lead.nextActionDueAt)} · hora de Madrid`}
+              </p>
+            ) : (
+              <p className="mt-2 text-sm text-muted-foreground">Sin seguimiento pendiente.</p>
             )}
-          />
-          <BuyerActionsPanel
-            buyerLeadId={lead.id}
-            actorId={currentUser.id}
-            archived={lead.archivedAt !== null}
-            createAction={createCalendarEvent}
-            actions={lead.calendarEvents.slice(0, FOLLOWUP_PAGE_SIZE).map((event) => ({
-              id: event.id,
-              title: event.title,
-              description: event.description,
-              startAt: event.startAt.toISOString(),
-              assignee: event.assignedTo?.name ?? null,
-              overdue: event.startAt < new Date(),
-            }))}
-            pagination={pagination(
-              'actionsPage',
-              actionsPage,
-              lead.calendarEvents.length > FOLLOWUP_PAGE_SIZE
+            <BuyerCallForm
+              key={lead.id}
+              archived={Boolean(lead.archivedAt)}
+              save={registerBuyerCall.bind(null, lead.id)}
+            />
+          </section>
+          <section className="min-w-0 rounded-xl border border-border bg-card p-5">
+            <h2 className="text-base font-semibold">
+              {lastContact?.type === 'NOTA'
+                ? 'Última nota comercial'
+                : 'Último contacto registrado'}
+            </h2>
+            {lastContact ? (
+              <>
+                <p className="mt-2 text-sm font-medium">
+                  {lastContact.type === 'LLAMADA'
+                    ? 'Llamada'
+                    : lastContact.type === 'EMAIL'
+                      ? 'Email'
+                      : lastContact.type === 'NOTA'
+                        ? 'Nota'
+                        : 'WhatsApp iniciado'}{' '}
+                  · {dateTime(lastContact.createdAt)} · hora de Madrid
+                </p>
+                {lastContact.agent && (
+                  <p className="text-xs text-muted-foreground">{lastContact.agent.name}</p>
+                )}
+                {lastContact.content && (
+                  <p className="mt-2 whitespace-pre-wrap break-words text-sm">
+                    {lastContact.content}
+                  </p>
+                )}
+              </>
+            ) : (
+              <p className="mt-2 text-sm text-muted-foreground">
+                Todavía no hay llamadas, emails ni contactos por WhatsApp registrados.
+              </p>
             )}
-            legacyAction={
-              lead.nextActionType ? (
-                <ProximaAccionCard
-                  phone={null}
-                  leadId={lead.id}
-                  leadName={lead.name}
-                  status={lead.status}
-                  nextActionType={lead.nextActionType}
-                  nextActionDueAt={lead.nextActionDueAt?.toISOString() ?? null}
-                />
-              ) : undefined
-            }
-          />
+            <Link
+              href={`/compradores/${lead.id}?tab=actividad`}
+              className="mt-3 inline-block text-sm font-medium text-brand underline"
+            >
+              Ver historial de actividad
+            </Link>
+          </section>
+          <details open={Boolean(searchParams.notesPage) || undefined} className="min-w-0">
+            <summary className="cursor-pointer rounded-lg border border-border bg-card px-4 py-3 text-sm font-semibold">
+              Notas comerciales
+            </summary>
+            <BuyerNotesPanel
+              notes={commercialNotes.slice(0, FOLLOWUP_PAGE_SIZE).map((note) => ({
+                id: note.id,
+                content: note.content,
+                createdAt: note.createdAt.toISOString(),
+                author: note.agent?.name ?? 'Comercial',
+              }))}
+              addNote={addBuyerLeadNote.bind(null, lead.id)}
+              afterSaveHref={
+                notesPage > 1
+                  ? `/compradores/${lead.id}?tab=ficha&actionsPage=${actionsPage}#buyer-notes-title`
+                  : undefined
+              }
+              pagination={pagination(
+                'notesPage',
+                notesPage,
+                commercialNotes.length > FOLLOWUP_PAGE_SIZE
+              )}
+            />
+          </details>
+          <details open={Boolean(searchParams.actionsPage) || undefined} className="min-w-0">
+            <summary className="cursor-pointer rounded-lg border border-border bg-card px-4 py-3 text-sm font-semibold">
+              Agenda y acciones pendientes
+            </summary>
+            <BuyerActionsPanel
+              buyerLeadId={lead.id}
+              actorId={currentUser.id}
+              archived={lead.archivedAt !== null}
+              createAction={createCalendarEvent}
+              actions={lead.calendarEvents.slice(0, FOLLOWUP_PAGE_SIZE).map((event) => ({
+                id: event.id,
+                title: event.title,
+                description: event.description,
+                startAt: event.startAt.toISOString(),
+                assignee: event.assignedTo?.name ?? null,
+                overdue: event.startAt < new Date(),
+              }))}
+              pagination={pagination(
+                'actionsPage',
+                actionsPage,
+                lead.calendarEvents.length > FOLLOWUP_PAGE_SIZE
+              )}
+              legacyAction={
+                lead.nextActionType ? (
+                  <ProximaAccionCard
+                    phone={null}
+                    leadId={lead.id}
+                    leadName={lead.name}
+                    status={lead.status}
+                    nextActionType={lead.nextActionType}
+                    nextActionDueAt={lead.nextActionDueAt?.toISOString() ?? null}
+                  />
+                ) : undefined
+              }
+            />
+          </details>
         </div>
       )}
 
@@ -720,19 +834,29 @@ export default async function FichaCompradorPage({
           {/* ── TAB: FICHA ── */}
           {activeTab === 'ficha' && (
             <div className="space-y-4">
-              <BuyerLeadEditForm
-                key={lead.id}
-                leadId={lead.id}
-                defaultValues={defaultValues}
-                agents={agents}
-                legacySource={lead.source && !isBuyerSource(lead.source) ? lead.source : null}
-              />
-              <CatalogEditor
-                side="buyer"
-                id={lead.id}
-                initial={readCatalog(lead.matchCatalog)}
-                family={lead.vehicleType}
-              />
+              <details className="rounded-xl border border-border bg-card p-4">
+                <summary className="cursor-pointer font-semibold">
+                  Editar datos y preferencias de compra
+                </summary>
+                <BuyerLeadEditForm
+                  key={lead.id}
+                  leadId={lead.id}
+                  defaultValues={defaultValues}
+                  agents={agents}
+                  legacySource={lead.source && !isBuyerSource(lead.source) ? lead.source : null}
+                />
+              </details>
+              <details className="rounded-xl border border-border bg-card p-4">
+                <summary className="cursor-pointer font-semibold">
+                  Características del vehículo buscado
+                </summary>
+                <CatalogEditor
+                  side="buyer"
+                  id={lead.id}
+                  initial={readCatalog(lead.matchCatalog)}
+                  family={lead.vehicleType}
+                />
+              </details>
               <TradeInCard
                 leadId={lead.id}
                 hasTradeIn={lead.hasTradeIn}
@@ -760,7 +884,12 @@ export default async function FichaCompradorPage({
                 </h2>
               </div>
               <div className="space-y-4 p-6">
-                <NoteForm addNote={addBuyerLeadNote.bind(null, lead.id)} />
+                <Link
+                  className="text-sm font-medium text-brand underline"
+                  href={`/compradores/${lead.id}?tab=ficha&notesPage=1#buyer-note`}
+                >
+                  Añadir una nota comercial
+                </Link>
                 {activities.length > 0 && (
                   <div className="border-t border-border pt-4">
                     <ActivityTimeline
@@ -782,10 +911,12 @@ export default async function FichaCompradorPage({
           {activeTab === 'matches' && (
             <>
               {subjectBuyerEligible && <BuyerCatalogResults id={lead.id} />}
-              <details className="my-4 rounded border p-3">
-                <summary>¿Recomendarías otro vehículo? Anota cuál y por qué.</summary>
-                <NoteForm addNote={addBuyerLeadNote.bind(null, lead.id)} />
-              </details>
+              <Link
+                className="my-4 inline-block text-sm font-medium text-brand underline"
+                href={`/compradores/${lead.id}?tab=ficha&notesPage=1#buyer-note`}
+              >
+                Anotar una recomendación de vehículo
+              </Link>
               {buyerMatches.length > 0 ? (
                 <MatchesSection side="buyer" matches={buyerMatches} defaultOpen />
               ) : (
@@ -1104,122 +1235,126 @@ export default async function FichaCompradorPage({
               </div>
             )}
 
-            {/* Calidad del lead */}
-            <div className="rounded-xl border border-border bg-card p-5">
-              <p className="mb-4 font-mono text-[10px] uppercase tracking-[0.12em] text-muted-foreground">
-                Calidad del lead
-              </p>
-              <div className="flex items-center gap-4">
-                <div
-                  className="relative flex h-16 w-16 shrink-0 items-center justify-center rounded-full"
-                  style={{
-                    background: `conic-gradient(${
-                      leadScore >= 75 ? '#1a9d5f' : leadScore >= 50 ? '#c9820a' : '#d64545'
-                    } ${leadScore * 3.6}deg, #eef1f5 0)`,
-                  }}
-                >
-                  <div className="flex h-11 w-11 items-center justify-center rounded-full bg-card">
-                    <span
-                      className="text-[14px] font-bold"
-                      style={{
-                        color:
-                          leadScore >= 75 ? '#1a9d5f' : leadScore >= 50 ? '#c9820a' : '#d64545',
-                      }}
-                    >
-                      {leadScore}
-                    </span>
-                  </div>
-                </div>
-                <div className="flex-1">
-                  <p className="text-[13px] font-semibold text-foreground">
-                    {leadScore >= 75 ? 'Alto potencial' : leadScore >= 50 ? 'Moderado' : 'Bajo'}
-                  </p>
-                  <p className="mt-0.5 text-[11px] text-muted-foreground">
-                    {leadScore >= 75
-                      ? 'Perfil muy completo'
-                      : leadScore >= 50
-                        ? 'Completar preferencias'
-                        : 'Contactar y completar datos'}
-                  </p>
-                </div>
-              </div>
-              <div className="mt-4 space-y-2.5">
-                {[
-                  { label: 'Contacto', value: scoreContacto },
-                  { label: 'Preferencias', value: scorePref },
-                  { label: 'Matches', value: scoreMatches },
-                  { label: 'Engagement', value: scoreEngagement },
-                ].map((row) => (
-                  <div key={row.label}>
-                    <div className="mb-1 flex items-center justify-between">
-                      <span className="text-[11px] text-muted-foreground">{row.label}</span>
+            <details>
+              <summary className="cursor-pointer rounded-lg border bg-card px-4 py-3 text-sm font-semibold">
+                Análisis comercial y resumen
+              </summary>
+              <div className="rounded-xl border border-border bg-card p-5">
+                <p className="mb-4 font-mono text-[10px] uppercase tracking-[0.12em] text-muted-foreground">
+                  Calidad del lead
+                </p>
+                <div className="flex items-center gap-4">
+                  <div
+                    className="relative flex h-16 w-16 shrink-0 items-center justify-center rounded-full"
+                    style={{
+                      background: `conic-gradient(${
+                        leadScore >= 75 ? '#1a9d5f' : leadScore >= 50 ? '#c9820a' : '#d64545'
+                      } ${leadScore * 3.6}deg, #eef1f5 0)`,
+                    }}
+                  >
+                    <div className="flex h-11 w-11 items-center justify-center rounded-full bg-card">
                       <span
-                        className="text-[11px] font-medium"
-                        style={{ color: scoreColor(row.value) }}
+                        className="text-[14px] font-bold"
+                        style={{
+                          color:
+                            leadScore >= 75 ? '#1a9d5f' : leadScore >= 50 ? '#c9820a' : '#d64545',
+                        }}
                       >
-                        {row.value}%
+                        {leadScore}
                       </span>
                     </div>
-                    <div className="h-1 overflow-hidden rounded-full bg-muted">
-                      <div
-                        className="h-full rounded-full transition-all"
-                        style={{ width: `${row.value}%`, background: scoreColor(row.value) }}
-                      />
-                    </div>
                   </div>
-                ))}
-              </div>
-            </div>
-
-            {/* Resumen rápido */}
-            <div className="rounded-xl border border-border bg-card p-5">
-              <p className="mb-3 font-mono text-[10px] uppercase tracking-[0.12em] text-muted-foreground">
-                Resumen
-              </p>
-              <div className="space-y-2">
-                {(
-                  [
-                    {
-                      label: 'Días en pipeline',
-                      value: `${daysInPipeline}d`,
-                      warn: daysInPipeline > 60,
-                    },
-                    { label: 'Estado', value: statusLabel },
-                    { label: 'Matches activos', value: String(visibleMatches.length) },
-                    lead.financingNeeded != null
-                      ? {
-                          label: 'Financiación',
-                          value: lead.financingNeeded
-                            ? lead.maxMonthlyPayment
-                              ? `Sí · ${EUR(Number(lead.maxMonthlyPayment))}/mes`
-                              : 'Sí'
-                            : 'No',
-                        }
-                      : null,
-                    { label: 'Origen de captación', value: buyerSourceLabel(lead.source) },
-                    lead.vehicleType
-                      ? {
-                          label: 'Tipo buscado',
-                          value: lead.vehicleType === 'CAMPER' ? 'Camper' : 'Autocaravana',
-                        }
-                      : null,
-                  ] as Array<{ label: string; value: string; warn?: boolean } | null>
-                )
-                  .filter(Boolean)
-                  .map((row) => (
-                    <div key={row!.label} className="flex items-center justify-between">
-                      <span className="text-[11px] text-muted-foreground">{row!.label}</span>
-                      <span
-                        className={`text-[12px] font-medium ${
-                          row!.warn ? 'text-amber-600' : 'text-foreground'
-                        }`}
-                      >
-                        {row!.value}
-                      </span>
+                  <div className="flex-1">
+                    <p className="text-[13px] font-semibold text-foreground">
+                      {leadScore >= 75 ? 'Alto potencial' : leadScore >= 50 ? 'Moderado' : 'Bajo'}
+                    </p>
+                    <p className="mt-0.5 text-[11px] text-muted-foreground">
+                      {leadScore >= 75
+                        ? 'Perfil muy completo'
+                        : leadScore >= 50
+                          ? 'Completar preferencias'
+                          : 'Contactar y completar datos'}
+                    </p>
+                  </div>
+                </div>
+                <div className="mt-4 space-y-2.5">
+                  {[
+                    { label: 'Contacto', value: scoreContacto },
+                    { label: 'Preferencias', value: scorePref },
+                    { label: 'Matches', value: scoreMatches },
+                    { label: 'Engagement', value: scoreEngagement },
+                  ].map((row) => (
+                    <div key={row.label}>
+                      <div className="mb-1 flex items-center justify-between">
+                        <span className="text-[11px] text-muted-foreground">{row.label}</span>
+                        <span
+                          className="text-[11px] font-medium"
+                          style={{ color: scoreColor(row.value) }}
+                        >
+                          {row.value}%
+                        </span>
+                      </div>
+                      <div className="h-1 overflow-hidden rounded-full bg-muted">
+                        <div
+                          className="h-full rounded-full transition-all"
+                          style={{ width: `${row.value}%`, background: scoreColor(row.value) }}
+                        />
+                      </div>
                     </div>
                   ))}
+                </div>
               </div>
-            </div>
+
+              {/* Resumen rápido */}
+              <div className="rounded-xl border border-border bg-card p-5">
+                <p className="mb-3 font-mono text-[10px] uppercase tracking-[0.12em] text-muted-foreground">
+                  Resumen
+                </p>
+                <div className="space-y-2">
+                  {(
+                    [
+                      {
+                        label: 'Días en pipeline',
+                        value: `${daysInPipeline}d`,
+                        warn: daysInPipeline > 60,
+                      },
+                      { label: 'Estado', value: statusLabel },
+                      { label: 'Matches activos', value: String(visibleMatches.length) },
+                      lead.financingNeeded != null
+                        ? {
+                            label: 'Financiación',
+                            value: lead.financingNeeded
+                              ? lead.maxMonthlyPayment
+                                ? `Sí · ${EUR(Number(lead.maxMonthlyPayment))}/mes`
+                                : 'Sí'
+                              : 'No',
+                          }
+                        : null,
+                      { label: 'Origen de captación', value: buyerSourceLabel(lead.source) },
+                      lead.vehicleType
+                        ? {
+                            label: 'Tipo buscado',
+                            value: lead.vehicleType === 'CAMPER' ? 'Camper' : 'Autocaravana',
+                          }
+                        : null,
+                    ] as Array<{ label: string; value: string; warn?: boolean } | null>
+                  )
+                    .filter(Boolean)
+                    .map((row) => (
+                      <div key={row!.label} className="flex items-center justify-between">
+                        <span className="text-[11px] text-muted-foreground">{row!.label}</span>
+                        <span
+                          className={`text-[12px] font-medium ${
+                            row!.warn ? 'text-amber-600' : 'text-foreground'
+                          }`}
+                        >
+                          {row!.value}
+                        </span>
+                      </div>
+                    ))}
+                </div>
+              </div>
+            </details>
           </div>
         </aside>
       </div>
