@@ -18,14 +18,12 @@ import { SellerLeadEditForm } from './seller-lead-edit-form'
 import { VehicleEditForm } from './vehicle-edit-form'
 import { OfficialValuationPanel } from './official-valuation-panel'
 import { MatchesSection } from '@/components/matches-section'
+import { currentMatches } from '@/lib/matching/current-matches'
+import { CatalogEditor } from '@/components/match-catalog-editor'
+import { readCatalog } from '@/lib/matching/catalog'
 import type { VehicleMatchData } from '@/components/matches-section'
 import { OffersSection } from '@/components/offers-section'
-import {
-  buildMatchExplanation,
-  isBuyerEligible,
-  isVehicleEligible,
-  prismaMatchingDeps,
-} from '@/lib/matching'
+import { isBuyerEligible, isVehicleEligible, prismaMatchingDeps } from '@/lib/matching'
 import { ActivityTimeline } from '@/components/activity-timeline'
 import type { ActivityItem } from '@/components/activity-timeline'
 import { NoteForm } from '@/components/note-form'
@@ -224,36 +222,30 @@ export default async function FichaVendedorPage({
         entryAnnulledAt: v.entryAnnulledAt,
       })
     : false
-  const visibleMatches = subjectVehicleEligible
+  const eligibleMatches = subjectVehicleEligible
     ? (v?.matches ?? []).filter((m) =>
         isBuyerEligible({ status: m.buyerLead.status, archivedAt: m.buyerLead.archivedAt })
       )
     : []
+
+  const deps = prismaMatchingDeps(db)
+  const subject = eligibleMatches.length ? await deps.getVehicle(v!.id) : null
+  const visibleMatches = await currentMatches(eligibleMatches, async (m) => [
+    subject,
+    await deps.getBuyer(m.buyerLead.id),
+  ])
 
   // ── Cálculos derivados ────────────────────────────────────────────────────
   const daysPipeline = daysSince(lead.createdAt)
   const lastActivity = activities[0]?.createdAt ?? null
   const daysSinceActivity = lastActivity ? daysSince(lastActivity) : daysPipeline
 
-  // CAM-64: explicación determinista por match (motivos + riesgos)
-  const matchDeps = prismaMatchingDeps(db)
-  const vehicleMatchInput = v && visibleMatches.length > 0 ? await matchDeps.getVehicle(v.id) : null
-  const matchExplanations = new Map<string, { reasons: string[]; risks: string[] }>()
-  if (vehicleMatchInput) {
-    await Promise.all(
-      visibleMatches.map(async (m) => {
-        const b = await matchDeps.getBuyer(m.buyerLead.id)
-        if (b) matchExplanations.set(m.id, buildMatchExplanation(vehicleMatchInput, b))
-      })
-    )
-  }
-
   const vehicleMatches: VehicleMatchData[] = visibleMatches.map((m) => ({
     id: m.id,
     score: m.score,
     status: m.status,
     generatedBy: m.generatedBy,
-    explanation: matchExplanations.get(m.id) ?? null,
+    explanation: m.explanation,
     buyerLead: {
       id: m.buyerLead.id,
       name: m.buyerLead.name,
@@ -1073,6 +1065,12 @@ export default async function FichaVendedorPage({
                   </CardHeader>
                   <CardContent>
                     <VehicleEditForm vehicleId={v.id} defaultValues={vehicleDefaultValues} />
+                    <CatalogEditor
+                      side="vehicle"
+                      id={v.id}
+                      initial={readCatalog(v.matchCatalog)}
+                      family={v.type}
+                    />
                   </CardContent>
                 </Card>
               )}

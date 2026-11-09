@@ -6,6 +6,7 @@ import { Prisma, VehicleType, ConservationState, VehicleStatus } from '@prisma/c
 function makeVehicle(overrides: Partial<VehicleWithRelations> = {}): VehicleWithRelations {
   return {
     id: 'v1',
+    matchCatalog: {},
     sellerLeadId: 'sl1',
     brand: 'Adria',
     model: 'Matrix 650',

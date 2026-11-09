@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { catalogSchema } from '@/lib/matching/catalog'
 import { QUESTIONS, type Question } from './questions'
 
 function fieldSchema(question: Question): z.ZodType {
@@ -72,6 +73,8 @@ export const searchRequestSchema = z
     requestId: z.uuid(),
     version: z.literal('2026-10-21'),
     answers: searchAnswersSchema,
+    catalog: catalogSchema.optional(),
+    vehicleBudget: z.number().int().min(1).max(2000000).optional(),
     consent: z.literal(true),
     website: z.literal(''),
   })

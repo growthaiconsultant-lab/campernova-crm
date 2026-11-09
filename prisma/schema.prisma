@@ -690,6 +690,7 @@ model SellerLead {
 /// Vehículo asociado 1:1 a un SellerLead.
 /// equipment es JSONB con flags booleanos: solar, kitchen, bathroom, shower, heating, etc.
 model Vehicle {
+  matchCatalog         Json                  @default("{}") @map("match_catalog")
   id                   String                @id @default(cuid())
   sellerLeadId         String                @unique @map("seller_lead_id")
   // CAP-1: datos de negocio del vehículo opcionales al crear/editar (captación progresiva).
@@ -892,6 +893,7 @@ model BuyerLeadAssignment {
 }
 
 model BuyerLead {
+  matchCatalog           Json                @default("{}") @map("match_catalog")
   id                     String              @id @default(cuid())
   mergedIntoId           String?             @map("merged_into_id")
   mergedAt               DateTime?           @map("merged_at")

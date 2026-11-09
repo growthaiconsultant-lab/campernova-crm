@@ -1,5 +1,5 @@
 import { RV_CATEGORY_OPTIONS, RV_BED_OPTIONS } from '../rv-taxonomy'
-import { scorePair } from './find'
+import { assessPair } from './assessment'
 import type { MatchingBuyerInput, MatchingVehicleInput, ScoreBreakdown } from './types'
 
 /**
@@ -128,9 +128,20 @@ export function explainMatch(
  */
 export function buildMatchExplanation(
   vehicle: MatchingVehicleInput,
-  buyer: MatchingBuyerInput,
-  nowYear: number = new Date().getFullYear()
+  buyer: MatchingBuyerInput
 ): MatchExplanation {
-  const { breakdown } = scorePair(vehicle, buyer, nowYear)
-  return explainMatch(vehicle, buyer, breakdown)
+  return explainAssessment(assessPair(vehicle, buyer))
+}
+export function explainAssessment(a: ReturnType<typeof assessPair>): MatchExplanation {
+  return {
+    reasons: [...a.met, ...a.confirmed],
+    risks: [
+      ...a.failed.map((x) => 'Incumple: ' + x),
+      ...a.missing.map((x) => 'Imprescindible por confirmar: ' + x),
+      ...a.unknown.map((x) => 'Preferencia por confirmar: ' + x),
+      ...a.wanted
+        .filter((x) => !a.confirmed.includes(x) && !a.unknown.includes(x))
+        .map((x) => 'Preferencia no cubierta: ' + x),
+    ],
+  }
 }

@@ -1,5 +1,5 @@
 import { isBuyerEligible, isVehicleEligible } from './eligibility'
-import { passesHardFilters } from './filters'
+import { assessPair } from './assessment'
 import {
   scoreAgeKm,
   scoreBedLayout,
@@ -33,7 +33,8 @@ function weightedTotal(breakdown: ScoreBreakdown): number {
 export function scorePair(
   vehicle: MatchingVehicleInput,
   buyer: MatchingBuyerInput,
-  nowYear: number = new Date().getFullYear()
+  nowYear: number = new Date().getFullYear(),
+  assessment = assessPair(vehicle, buyer)
 ): ScoredMatch {
   const breakdown: ScoreBreakdown = {
     category: scoreCategory(vehicle.category, buyer.preferredCategory),
@@ -47,13 +48,32 @@ export function scorePair(
   return {
     vehicleId: vehicle.id,
     buyerLeadId: buyer.id,
-    score: weightedTotal(breakdown),
+    score: assessment.state === 'apto' ? assessment.score : 0,
     breakdown,
   }
 }
 
+function addRecommendation(
+  matches: ScoredMatch[],
+  vehicle: MatchingVehicleInput,
+  buyer: MatchingBuyerInput,
+  nowYear: number
+) {
+  const assessment = assessPair(vehicle, buyer)
+  if (assessment.state !== 'apto' || (!assessment.met.length && !assessment.wanted.length)) return
+  matches.push(scorePair(vehicle, buyer, nowYear, assessment))
+}
+
 function topN(matches: ScoredMatch[]): ScoredMatch[] {
-  return matches.sort((a, b) => b.score - a.score).slice(0, TOP_N)
+  return matches.sort(compareMatches).slice(0, TOP_N)
+}
+export function compareMatches(a: ScoredMatch, b: ScoredMatch) {
+  return (
+    b.score - a.score ||
+    weightedTotal(b.breakdown) - weightedTotal(a.breakdown) ||
+    a.vehicleId.localeCompare(b.vehicleId) ||
+    a.buyerLeadId.localeCompare(b.buyerLeadId)
+  )
 }
 
 /// Encuentra los top 10 compradores para un vehículo dado.
@@ -84,8 +104,7 @@ export async function findMatchesForVehicle(
   const matches: ScoredMatch[] = []
 
   for (const buyer of buyers) {
-    if (!passesHardFilters(vehicle, buyer)) continue
-    matches.push(scorePair(vehicle, buyer, nowYear))
+    addRecommendation(matches, vehicle, buyer, nowYear)
   }
 
   return topN(matches)
@@ -113,8 +132,7 @@ export async function findMatchesForBuyer(
   const matches: ScoredMatch[] = []
 
   for (const vehicle of vehicles) {
-    if (!passesHardFilters(vehicle, buyer)) continue
-    matches.push(scorePair(vehicle, buyer, nowYear))
+    addRecommendation(matches, vehicle, buyer, nowYear)
   }
 
   return topN(matches)

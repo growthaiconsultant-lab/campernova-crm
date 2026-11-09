@@ -14,7 +14,8 @@ export type SearchAnswerSection = { title: string; rows: SearchAnswerRow[] }
 /** Read-only adapter for WEB-12 snapshots. Ambiguous text falls back to the full original. */
 export function readSearchSnapshot(content: string | null): SearchAnswerSection[] | null {
   if (!content) return null
-  const lines = content.replace(/\r\n/g, '\n').split('\n')
+  const [base, details] = content.split('\nCARACTERÍSTICAS PARA EL MATCH\n')
+  const lines = base.replace(/\r\n/g, '\n').split('\n')
   if (
     lines[0] !== 'FICHA DE BÚSQUEDA WEB · /busqueda-bajo-pedido' ||
     !lines[1]?.startsWith('Versión ') ||
@@ -74,6 +75,23 @@ export function readSearchSnapshot(content: string | null): SearchAnswerSection[
       provided: !!value.trim() && value !== 'Sin indicar',
     })
   })
+  if (details)
+    sections.push({
+      title: 'Características para el match',
+      rows: details
+        .trim()
+        .split('\n')
+        .map((line, i) => {
+          const pos = line.indexOf(': ')
+          return {
+            key: 'catalog_' + i,
+            label: pos >= 0 ? line.slice(0, pos) : 'Detalle',
+            kind: 'text',
+            value: pos >= 0 ? line.slice(pos + 2) : line,
+            provided: true,
+          }
+        }),
+    })
   return sections
 }
 

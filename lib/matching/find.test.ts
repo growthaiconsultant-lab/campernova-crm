@@ -3,6 +3,7 @@ import { passesHardFilters } from './filters'
 import { findMatchesForBuyer, findMatchesForVehicle, scorePair } from './find'
 import type { MatchingBuyerInput, MatchingDeps, MatchingVehicleInput } from './types'
 
+import { assessPair } from './assessment'
 const NOW_YEAR = 2026
 
 function makeVehicle(overrides: Partial<MatchingVehicleInput> = {}): MatchingVehicleInput {
@@ -58,6 +59,28 @@ function makeDeps(vehicles: MatchingVehicleInput[], buyers: MatchingBuyerInput[]
   }
 }
 
+describe('catálogo de las comerciales', () => {
+  it('acepta camas alternativas y diferencia una combinación imprescindible', () => {
+    const v = makeVehicle({ catalog: { beds: { values: ['Literas'] } } })
+    const alternatives = { values: ['Cama isla', 'Literas'], required: true }
+    expect(assessPair(v, makeBuyer({ catalog: { beds: alternatives } })).state).toBe('apto')
+    expect(
+      assessPair(v, makeBuyer({ catalog: { beds: { ...alternatives, all: true } } })).state
+    ).toBe('descartado')
+  })
+  it('un garaje grande no confirma sitio para dos bicicletas', () => {
+    const b = makeBuyer({ catalog: { garageBikes: { values: ['2'], required: true } } })
+    expect(
+      assessPair(makeVehicle({ catalog: { garageSize: { values: ['Grande'] } } }), b).state
+    ).toBe('pendiente')
+    expect(assessPair(makeVehicle({ catalog: { garageBikes: { values: ['2'] } } }), b).state).toBe(
+      'apto'
+    )
+    expect(assessPair(makeVehicle({ catalog: { garage: { values: ['No'] } } }), b).state).toBe(
+      'descartado'
+    )
+  })
+})
 describe('passesHardFilters', () => {
   it('match perfecto pasa', () => {
     expect(passesHardFilters(makeVehicle(), makeBuyer())).toBe(true)
@@ -72,20 +95,20 @@ describe('passesHardFilters', () => {
     ).toBe(true)
   })
 
-  it('falla si tipo no coincide', () => {
+  it('el tipo actúa como preferencia salvo que sea imprescindible', () => {
     expect(
       passesHardFilters(makeVehicle({ type: 'AUTOCARAVANA' }), makeBuyer({ vehicleType: 'CAMPER' }))
-    ).toBe(false)
+    ).toBe(true)
   })
 
   it('falla si plazas insuficientes', () => {
     expect(passesHardFilters(makeVehicle({ seats: 3 }), makeBuyer({ minSeats: 4 }))).toBe(false)
   })
 
-  it('precio dentro del +10% pasa', () => {
+  it('un precio superior al máximo no pasa', () => {
     expect(
       passesHardFilters(makeVehicle({ price: 33_000 }), makeBuyer({ maxBudget: 30_000 }))
-    ).toBe(true)
+    ).toBe(false)
   })
 
   it('precio por encima del +10% falla', () => {
@@ -133,7 +156,7 @@ describe('passesHardFilters', () => {
     )
   })
 
-  it('fail-open: stock sin etiquetar no se descarta aunque el comprador exija criterios RV', () => {
+  it('un imprescindible sin confirmar queda fuera de las sugerencias', () => {
     expect(
       passesHardFilters(
         makeVehicle(), // category/bathroom/maxMass/length/sleepingPlaces todos null
@@ -144,7 +167,7 @@ describe('passesHardFilters', () => {
           maxLengthM: 5,
         })
       )
-    ).toBe(true)
+    ).toBe(false)
   })
 })
 
@@ -184,14 +207,13 @@ describe('scorePair', () => {
     expect(result.breakdown.equipment).toBe(0)
   })
 
-  it('score final pondera correctamente (cat/cama sin pref=100, equip=100, price=100, ageKm=0, zone=0 → 75)', () => {
+  it('la familia coincide y la zona no: una de dos preferencias', () => {
     const result = scorePair(
       makeVehicle({ year: 2011, km: 200_000, location: 'Barcelona' }),
       makeBuyer(),
       NOW_YEAR
     )
-    // category22 + bedLayout18 + equipment15 + price20 + ageKm15*0 + zone10*0 = 75
-    expect(result.score).toBe(75)
+    expect(result.score).toBe(50)
   })
 
   it('coincidir distribución y cama preferidas sube el score; no coincidir lo baja', () => {
@@ -230,7 +252,7 @@ describe('findMatchesForVehicle', () => {
     const deps = makeDeps([vehicle], buyers)
 
     const results = await findMatchesForVehicle('v-base', deps, NOW_YEAR)
-    expect(results.map((m) => m.buyerLeadId)).toEqual(['b-ok'])
+    expect(results.map((m) => m.buyerLeadId)).toEqual(['b-ok', 'b-tipo-mal'])
   })
 
   it('ordena por score descendente y limita a 10', async () => {
@@ -273,7 +295,7 @@ describe('findMatchesForBuyer', () => {
     const deps = makeDeps(vehicles, [buyer])
 
     const results = await findMatchesForBuyer('b-base', deps, NOW_YEAR)
-    expect(results.map((m) => m.vehicleId)).toEqual(['v-ok'])
+    expect(results.map((m) => m.vehicleId)).toEqual(['v-ok', 'v-tipo-mal'])
   })
 
   it('vehículo más nuevo y con menos km gana al más viejo', async () => {

@@ -4,6 +4,9 @@ import { defaultNextActionData } from '@/lib/next-action'
 import { KPI_EVENTS } from '@/lib/kpi/events'
 import { LandingRateLimitError } from '@/lib/landing/seller-intake'
 import { QUESTION_SECTIONS } from './questions'
+import { preferencesFromRequest } from './match-preferences'
+import { fieldById } from '@/lib/matching/catalog'
+import { recalculateMatchesForBuyer } from '@/lib/matching/recalculate'
 import type { SearchRequestInput } from './schema'
 import {
   lockBuyerIdentity,
@@ -32,6 +35,20 @@ export function searchRequestSummary(input: SearchRequestInput) {
         return `${q.label}: ${Array.isArray(value) ? value.join(' · ') || 'Sin indicar' : value || 'Sin indicar'}`
       }),
     ]),
+    ...(input.vehicleBudget || Object.keys(input.catalog ?? {}).length
+      ? ['', 'CARACTERÍSTICAS PARA EL MATCH']
+      : []),
+    ...(input.vehicleBudget ? ['Precio máximo del vehículo (€): ' + input.vehicleBudget] : []),
+    ...Object.entries(input.catalog ?? {})
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(
+        ([key, e]) =>
+          (fieldById.get(key)?.label ?? key) +
+          ': ' +
+          e.values.join(e.all ? ' y ' : ' o ') +
+          ' · ' +
+          (e.required ? 'Imprescindible' : 'Preferido')
+      ),
   ].join('\n')
 }
 
@@ -43,7 +60,7 @@ export async function saveSearchRequest(
 ) {
   const id = searchRequestId(input.requestId)
   const content = searchRequestSummary(input)
-  await client.$transaction(
+  const created = await client.$transaction(
     async (tx) => {
       await lockBuyerIdentity(tx)
       await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${id}, 0))`
@@ -102,6 +119,8 @@ export async function saveSearchRequest(
                 : a.vehicle === 'Autocaravana'
                   ? 'AUTOCARAVANA'
                   : null,
+            matchCatalog: preferencesFromRequest(input),
+            maxBudget: input.vehicleBudget,
             minSeats: number('seats'),
             sleepingPlacesRequired: number('sleeping'),
             maxLengthM: number('maxLength'),
@@ -145,7 +164,9 @@ export async function saveSearchRequest(
             metadata: { campaign: 'busqueda-bajo-pedido', buyerSource: 'WEB' },
           },
         })
+      return !existingBuyer
     },
     { maxWait: 5000, timeout: 10000 }
   )
+  if (created) await recalculateMatchesForBuyer(id, client)
 }

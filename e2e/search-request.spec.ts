@@ -1,7 +1,7 @@
 import { test, expect, type Page } from '@playwright/test'
 import { randomInt } from 'node:crypto'
 import { searchPayload } from '../tests/fixtures/search-request'
-import { FORM_STEPS, QUESTION_SECTIONS } from '../lib/search-request/questions'
+import { FORM_STEPS, QUESTION_SECTIONS, isCatalogQuestion } from '../lib/search-request/questions'
 import {
   searchRequestId,
   searchRequestSummary,
@@ -68,6 +68,8 @@ test('complete revised questionnaire reaches real CRM with assignment and follow
   page,
 }, info) => {
   const input = searchPayload(true)
+  for (const key of Object.keys(input.answers))
+    if (isCatalogQuestion(key)) delete input.answers[key]
   input.answers.phone = `6${randomInt(10000000, 99999999)}`
   input.answers.email = `${prefix}-${uniqueSuffix()}@example.invalid`
   await expect(page.getByRole('img', { name: 'CampersNova', exact: true })).toBeVisible()
@@ -76,6 +78,11 @@ test('complete revised questionnaire reaches real CRM with assignment and follow
   await page.screenshot({ path: `.artifacts/search-${info.project.name}.png`, fullPage: true })
   for (let step = 0; step < 4; step++) {
     await fillStep(page, input, step)
+    if (step === 2) {
+      await page.getByRole('searchbox').fill('Placas solares')
+      await page.getByRole('combobox', { name: 'Placas solares' }).selectOption('Sí')
+      await page.getByRole('checkbox', { name: 'Imprescindible', exact: true }).check()
+    }
     expect(
       await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)
     ).toBe(true)
@@ -97,6 +104,7 @@ test('complete revised questionnaire reaches real CRM with assignment and follow
   await page.getByRole('button', { name: 'Enviar mi solicitud' }).click()
   const actual = (await post).postDataJSON() as SearchRequestInput
   expect(actual.answers).toEqual(input.answers)
+  expect(actual.catalog?.solar).toMatchObject({ values: ['Sí'], required: true })
   expect((await confirmation).status()).toBe(200)
   await expect(page.getByRole('heading', { name: 'Ya tenemos tu ficha.' })).toBeVisible()
   const id = searchRequestId(actual.requestId)
