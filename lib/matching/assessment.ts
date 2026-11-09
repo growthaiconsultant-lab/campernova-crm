@@ -2,6 +2,8 @@ import { RV_CATEGORY_OPTIONS, RV_BED_OPTIONS } from '@/lib/rv-taxonomy'
 import { fieldById, type Catalog } from './catalog'
 import type { MatchingBuyerInput, MatchingVehicleInput } from './types'
 
+import { vehicleFacts, legacyProjection } from './vehicle-characteristics'
+
 export function assessPair(v: MatchingVehicleInput, b: MatchingBuyerInput) {
   const missing: string[] = [],
     failed: string[] = [],
@@ -34,8 +36,14 @@ export function assessPair(v: MatchingVehicleInput, b: MatchingBuyerInput) {
   limit('Longitud (m)', v.length, b.maxLengthM, true)
   limit('Altura (m)', v.heightM, b.maxHeightM, true)
   if (b.licenseType === 'B') limit('MMA (kg)', v.maxMassKg, 3500, true)
-  if (b.bathroomRequired)
-    check('Baño interior', true, v.bathroomType === null ? null : v.bathroomType !== 'NINGUNO')
+  const facts = vehicleFacts(v.catalog ?? {}, v)
+  const bathType = legacyProjection(facts, v).bathroomType
+  const bathroom = bathType
+    ? bathType !== 'NINGUNO'
+    : facts.fullBath?.values.includes('Sí') || v.equipment.bathroom === true
+      ? true
+      : null
+  if (b.bathroomRequired) check('Baño interior', true, bathroom)
   if (b.useZone)
     check(
       'Zona · ' + b.useZone,
@@ -44,8 +52,7 @@ export function assessPair(v: MatchingVehicleInput, b: MatchingBuyerInput) {
         ? null
         : v.location.trim().toLowerCase() === b.useZone.trim().toLowerCase()
     )
-  const facts: Catalog = { ...v.catalog },
-    prefs: Catalog = { ...b.catalog }
+  const prefs: Catalog = { ...b.catalog }
   function fact(id: string, val: string | undefined) {
     if (val && !facts[id]) facts[id] = { values: [val] }
   }
@@ -62,8 +69,6 @@ export function assessPair(v: MatchingVehicleInput, b: MatchingBuyerInput) {
   fact('km', v.km?.toString())
   fact('brand', v.brand ?? undefined)
   fact('model', v.model ?? undefined)
-  fact('format', RV_CATEGORY_OPTIONS.find((o) => o.value === v.category)?.label)
-  fact('beds', RV_BED_OPTIONS.find((o) => o.value === v.bedLayout)?.label)
   if (
     facts.roof?.values.includes('Elevable') &&
     facts.roofBed?.values.includes('Sí') &&
@@ -73,30 +78,15 @@ export function assessPair(v: MatchingVehicleInput, b: MatchingBuyerInput) {
   pref('format', RV_CATEGORY_OPTIONS.find((o) => o.value === b.preferredCategory)?.label)
   pref('beds', RV_BED_OPTIONS.find((o) => o.value === b.preferredBedLayout)?.label)
   for (const key of ['solar', 'heating', 'shower', 'kitchen'] as const) {
-    // Las casillas antiguas se guardaban en falso incluso sin revisión.
-    if (v.equipment[key] === true) fact(key, 'Sí')
     if (b.criticalEquipment[key]) pref(key, 'Sí', true)
   }
-  if (b.criticalEquipment.bathroom && !b.bathroomRequired)
-    check(
-      'Baño',
-      true,
-      v.bathroomType !== null ? v.bathroomType !== 'NINGUNO' : (v.equipment.bathroom ?? null)
-    )
-  if (v.hasGarage != null) fact('garage', v.hasGarage ? 'Sí' : 'No')
-  if (
-    facts.garageSize?.values.some((x) => x !== 'No tiene') ||
-    Number(facts.garageBikes?.values[0]) > 0
-  )
-    fact('garage', 'Sí')
+  if (b.criticalEquipment.bathroom && !b.bathroomRequired) check('Baño', true, bathroom)
   if (facts.garage?.values.includes('No')) {
     fact('garageSize', 'No tiene')
     fact('garageBikes', '0')
   }
   if (b.needsGarage) pref('garage', 'Sí', true)
   if (b.needsWinter) check('Preparación de invierno', true, v.winterized ?? null)
-  if (v.bathroomType === 'SEPARADO') fact('showerOptions', 'Independiente del inodoro')
-  if (v.bathroomType === 'HUMEDO') fact('showerOptions', 'Integrada')
   for (const [id, p] of Object.entries(prefs)) {
     const f = fieldById.get(id)
     if (!f) continue

@@ -89,7 +89,11 @@ group('Cocina', [
 group('Baño', [
   ['fullBath', 'Baño completo'],
   ['shower', 'Ducha'],
-  ['showerOptions', 'Opciones de ducha', 'Interior|Independiente del inodoro|Integrada|Exterior'],
+  [
+    'showerOptions',
+    'Opciones de ducha',
+    'Interior|Independiente del inodoro|Integrada|Exterior|Sin baño interior',
+  ],
   ['bathRear', 'Baño trasero'],
   ['wc', 'Inodoro', 'Fijo|Portátil'],
   ['pullBath', 'Baño extraíble'],

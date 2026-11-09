@@ -1,4 +1,5 @@
 import { isBuyerEligible, isVehicleEligible } from './eligibility'
+import { vehicleFacts, legacyProjection } from './vehicle-characteristics'
 import { assessPair } from './assessment'
 import {
   scoreAgeKm,
@@ -36,10 +37,16 @@ export function scorePair(
   nowYear: number = new Date().getFullYear(),
   assessment = assessPair(vehicle, buyer)
 ): ScoredMatch {
+  const facts = vehicleFacts(vehicle.catalog ?? {}, vehicle)
+  const effective = legacyProjection(facts, {
+    ...vehicle,
+    category: buyer.preferredCategory,
+    bedLayout: buyer.preferredBedLayout,
+  })
   const breakdown: ScoreBreakdown = {
-    category: scoreCategory(vehicle.category, buyer.preferredCategory),
-    bedLayout: scoreBedLayout(vehicle.bedLayout, buyer.preferredBedLayout),
-    equipment: scoreEquipment(vehicle.equipment, buyer.criticalEquipment),
+    category: scoreCategory(effective.category, buyer.preferredCategory),
+    bedLayout: scoreBedLayout(effective.bedLayout, buyer.preferredBedLayout),
+    equipment: scoreEquipment(effective.equipment, buyer.criticalEquipment),
     price: scorePrice(vehicle.price, buyer.maxBudget),
     ageKm: scoreAgeKm(vehicle.year, vehicle.km, nowYear),
     zone: scoreZone(vehicle.location, buyer.useZone),

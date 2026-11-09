@@ -1,14 +1,17 @@
 'use client'
+import { inferredPresence } from '@/lib/matching/vehicle-characteristics'
 import { useId, useState } from 'react'
 import { catalogFields, type Catalog, type Field } from '@/lib/matching/catalog'
 
 export function CatalogFields({
   buyer,
   family,
+  unifiedVehicle = false,
   publicForm = false,
   value,
   onChange,
 }: {
+  unifiedVehicle?: boolean
   publicForm?: boolean
   buyer: boolean
   family?: string | null
@@ -19,6 +22,7 @@ export function CatalogFields({
   const [query, setQuery] = useState('')
   const visible = catalogFields.filter(
     (f) =>
+      (!unifiedVehicle || f.id !== 'heating') &&
       (!publicForm || !/^use[1-5]$/.test(f.id)) &&
       (!f.family || !family || f.family === family || value[f.id]) &&
       (buyer || !['km', 'year', 'brand', 'model', 'family'].includes(f.id)) &&
@@ -34,6 +38,14 @@ export function CatalogFields({
     if (values.length)
       next[f.id] = buyer ? { values, required, all: all && values.length > 1 } : { values }
     else delete next[f.id]
+    if (unifiedVehicle) {
+      for (const id of ['garage', 'shower', 'kitchen']) {
+        const inferred = inferredPresence(next, id)
+        const previous = inferredPresence(value, id)
+        if (id !== f.id && inferred !== previous && (inferred || next[id]?.values[0] === previous))
+          delete next[id]
+      }
+    }
     onChange(next)
   }
   return (
@@ -67,8 +79,17 @@ export function CatalogFields({
                     <legend>{f.label}</legend>
                     {isFlag ? (
                       <select
+                        disabled={
+                          unifiedVehicle &&
+                          !!inferredPresence(value, f.id) &&
+                          (!e || e.values[0] === inferredPresence(value, f.id))
+                        }
                         aria-label={f.label}
-                        value={e?.values[0] ?? ''}
+                        value={
+                          e?.values[0] ??
+                          (unifiedVehicle ? inferredPresence(value, f.id) : undefined) ??
+                          ''
+                        }
                         onChange={(ev) => change(f, ev.target.value ? [ev.target.value] : [])}
                       >
                         <option value="">{buyer ? 'Indiferente' : 'Por confirmar'}</option>
@@ -77,7 +98,10 @@ export function CatalogFields({
                       </select>
                     ) : f.options ? (
                       <div className="flex flex-wrap gap-x-3 gap-y-1">
-                        {(buyer ? f.options : [...f.options, 'No tiene']).map((o) => (
+                        {(buyer
+                          ? f.options.filter((o) => o !== 'Sin baño interior')
+                          : [...f.options, 'No tiene']
+                        ).map((o) => (
                           <label key={o}>
                             <input
                               type="checkbox"
@@ -88,7 +112,26 @@ export function CatalogFields({
                                   ev.target.checked
                                     ? o === 'No tiene'
                                       ? [o]
-                                      : [...(e?.values ?? []).filter((x) => x !== 'No tiene'), o]
+                                      : [
+                                          ...(e?.values ?? []).filter(
+                                            (x) =>
+                                              x !== 'No tiene' &&
+                                              !(
+                                                f.id === 'showerOptions' &&
+                                                ((o === 'Sin baño interior' &&
+                                                  [
+                                                    'Integrada',
+                                                    'Independiente del inodoro',
+                                                  ].includes(x)) ||
+                                                  (x === 'Sin baño interior' &&
+                                                    [
+                                                      'Integrada',
+                                                      'Independiente del inodoro',
+                                                    ].includes(o)))
+                                              )
+                                          ),
+                                          o,
+                                        ]
                                     : (e?.values ?? []).filter((x) => x !== o)
                                 )
                               }

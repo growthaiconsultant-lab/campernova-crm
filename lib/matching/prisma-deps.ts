@@ -8,6 +8,7 @@ const VEHICLE_SELECT = {
   matchCatalog: true,
   brand: true,
   model: true,
+  heatingType: true,
   hasGarage: true,
   winterized: true,
   sellerLeadId: true,
@@ -58,6 +59,7 @@ type VehicleRow = {
   matchCatalog: unknown
   brand: string | null
   model: string | null
+  heatingType?: MatchingVehicleInput['heatingType']
   hasGarage: boolean | null
   winterized: boolean | null
   sellerLeadId: string
@@ -121,6 +123,7 @@ function vehicleRowToInput(row: VehicleRow): MatchingVehicleInput {
     catalog: readCatalog(row.matchCatalog),
     brand: row.brand,
     model: row.model,
+    heatingType: row.heatingType,
     hasGarage: row.hasGarage,
     winterized: row.winterized,
     sellerLeadId: row.sellerLeadId,

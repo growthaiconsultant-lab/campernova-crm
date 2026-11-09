@@ -19,7 +19,6 @@ import { VehicleEditForm } from './vehicle-edit-form'
 import { OfficialValuationPanel } from './official-valuation-panel'
 import { MatchesSection } from '@/components/matches-section'
 import { currentMatches } from '@/lib/matching/current-matches'
-import { CatalogEditor } from '@/components/match-catalog-editor'
 import { readCatalog } from '@/lib/matching/catalog'
 import type { VehicleMatchData } from '@/components/matches-section'
 import { OffersSection } from '@/components/offers-section'
@@ -1064,12 +1063,12 @@ export default async function FichaVendedorPage({
                     <CardTitle className="text-base">Datos del vehículo</CardTitle>
                   </CardHeader>
                   <CardContent>
-                    <VehicleEditForm vehicleId={v.id} defaultValues={vehicleDefaultValues} />
-                    <CatalogEditor
-                      side="vehicle"
-                      id={v.id}
-                      initial={readCatalog(v.matchCatalog)}
-                      family={v.type}
+                    <VehicleEditForm
+                      key={v.updatedAt.toISOString()}
+                      version={v.updatedAt.toISOString()}
+                      vehicleId={v.id}
+                      defaultValues={vehicleDefaultValues}
+                      catalog={readCatalog(v.matchCatalog)}
                     />
                   </CardContent>
                 </Card>
