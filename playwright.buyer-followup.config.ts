@@ -10,6 +10,7 @@ export default defineConfig({
     'buyer-stock.spec.ts',
     'buyer-offers.spec.ts',
     'buyer-documents.spec.ts',
+    'buyer-postventa.spec.ts',
     'search-request.spec.ts',
   ],
   fullyParallel: true,

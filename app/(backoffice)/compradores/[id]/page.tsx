@@ -4,7 +4,8 @@ import { DocumentsPanel } from '@/components/operations/documents-panel'
 import { db } from '@/lib/db'
 import { requireAgente } from '@/lib/auth'
 import { completedSalesQuery } from '@/lib/completed-sales'
-import { CompletedSaleCard } from '@/components/completed-sale-card'
+import { BuyerPostventa } from '@/components/buyer-postventa'
+import { buyerPostventaSummary, buyerPostventaDetail } from '@/lib/buyer-postventa'
 import { BuyerTrackedVehicles, type TrackedVehicle } from '@/components/buyer-tracked-vehicles'
 import { vehicleLabel } from '@/lib/display'
 import { BuyerLeadEditForm } from './buyer-lead-edit-form'
@@ -53,7 +54,7 @@ import { BuyerStatusSelect } from '../buyer-status-select'
 import { TemperatureChip } from './temperature-chip'
 import { BUYER_LEAD_STATUS_LABELS, BUYER_LEAD_TRANSITIONS } from '@/lib/state-machine'
 import type { BuyerLeadStatus, Prisma } from '@prisma/client'
-import { CalendarClock, Phone, Mail, Shield, UserRound } from 'lucide-react'
+import { CalendarClock, Phone, Mail, UserRound } from 'lucide-react'
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
@@ -85,12 +86,6 @@ const EUR = (v: number) =>
 
 function daysSince(date: Date): number {
   return Math.floor((Date.now() - date.getTime()) / 86_400_000)
-}
-
-function monthsRemainingFrom(endDate: Date): number {
-  const now = new Date()
-  const diff = endDate.getTime() - now.getTime()
-  return Math.max(0, Math.ceil(diff / (30 * 24 * 60 * 60 * 1000)))
 }
 
 const PURCHASE_TIMELINE_LABELS: Record<string, string> = {
@@ -157,14 +152,10 @@ export default async function FichaCompradorPage({
               llmModel: true,
             },
           },
-          warranty: {
-            include: {
-              tickets: {
-                where: { status: { in: ['ABIERTO', 'EN_PROGRESO'] } },
-                select: { id: true, priority: true, title: true, status: true },
-              },
-            },
-          },
+          warranty:
+            activeTab === 'postventa'
+              ? { select: buyerPostventaDetail }
+              : { select: buyerPostventaSummary },
           deliveries: completedSalesQuery,
           matches: {
             include: {
@@ -392,20 +383,7 @@ export default async function FichaCompradorPage({
 
   const daysInPipeline = daysSince(lead.createdAt)
   const warranty = lead.warranty
-  const openTickets = warranty?.tickets ?? []
-  const hasAlert = openTickets.length > 0
-
-  const warrantyMonthsLeft = warranty ? monthsRemainingFrom(warranty.endDate) : null
-  const warrantyElapsedPct = warranty
-    ? Math.min(
-        100,
-        Math.round(
-          ((Date.now() - warranty.startDate.getTime()) /
-            (warranty.endDate.getTime() - warranty.startDate.getTime())) *
-            100
-        )
-      )
-    : 0
+  const postventaCount = warranty ? warranty._count.tickets + warranty._count.followups : 0
 
   const defaultValues = {
     name: lead.name,
@@ -698,8 +676,8 @@ export default async function FichaCompradorPage({
               className={`border-b-2 px-2 py-3 text-sm font-medium sm:px-4 ${activeTab === tab.key ? 'border-sidebar-primary text-sidebar-primary' : 'border-transparent text-muted-foreground hover:text-foreground'}`}
             >
               {tab.label}
-              {tab.key === 'postventa' && hasAlert && (
-                <span className="ml-1 text-amber-700">({openTickets.length})</span>
+              {tab.key === 'postventa' && postventaCount > 0 && (
+                <span className="ml-1 text-amber-700">({postventaCount})</span>
               )}
             </Link>
           ))}
@@ -874,28 +852,32 @@ export default async function FichaCompradorPage({
                 </details>
               )}
             </section>
-            {hasAlert && (
+            {warranty && postventaCount > 0 && (
               <div className="rounded-xl border border-amber-200 bg-amber-50 p-4">
                 <p className="flex items-center gap-2 text-[12.5px] font-semibold text-amber-800">
                   <span className="h-2 w-2 rounded-full bg-amber-500" />
-                  {openTickets.length} incidencia{openTickets.length !== 1 ? 's' : ''} abierta
-                  {openTickets.length !== 1 ? 's' : ''}
+                  {postventaCount === 1
+                    ? '1 asunto pendiente de postventa'
+                    : postventaCount + ' asuntos pendientes de postventa'}
                 </p>
                 <div className="mt-2 space-y-1">
-                  {openTickets.slice(0, 2).map((t) => (
+                  {warranty._count.followups > 0 && (
+                    <p className="text-[11px] text-amber-700">
+                      Correos con envío fallido · {warranty._count.followups}
+                    </p>
+                  )}
+                  {warranty.tickets.map((t) => (
                     <p key={t.id} className="text-[11px] text-amber-700">
                       · {t.title}
                     </p>
                   ))}
                 </div>
-                {warranty && (
-                  <Link
-                    href={`${path}?tab=postventa`}
-                    className="mt-2 block text-[11px] font-medium text-amber-700 underline hover:text-amber-900"
-                  >
-                    Ver en postventa →
-                  </Link>
-                )}
+                <Link
+                  href={`${path}?tab=postventa`}
+                  className="mt-2 block text-[11px] font-medium text-amber-700 underline hover:text-amber-900"
+                >
+                  Ver en postventa →
+                </Link>
               </div>
             )}
             <details className={card}>
@@ -1189,133 +1171,10 @@ export default async function FichaCompradorPage({
           </div>
         )}
         {activeTab === 'postventa' && (
-          <div className="space-y-5">
-            <CompletedSaleCard side="buyer" sales={lead.deliveries} />
-            {warranty ? (
-              <div className="space-y-5">
-                {/* Warranty card */}
-                <div className="overflow-hidden rounded-xl border border-border bg-card">
-                  <div className="border-b border-border px-6 py-4">
-                    <div className="flex items-center justify-between">
-                      <h2 className="flex items-center gap-2 text-[14px] font-semibold text-foreground">
-                        <Shield className="h-4 w-4 text-sidebar-primary" />
-                        {warrantyMonthsLeft ? 'Garantía activa' : 'Garantía vencida'}
-                      </h2>
-                      <span className="rounded-full bg-sidebar-primary/10 px-2.5 py-1 text-[11px] font-medium text-sidebar-primary">
-                        {warrantyMonthsLeft} meses restantes
-                      </span>
-                    </div>
-                  </div>
-                  <div className="p-6">
-                    <div className="mb-4 grid grid-cols-2 gap-4 sm:grid-cols-4">
-                      {[
-                        {
-                          label: 'Inicio',
-                          value: new Date(warranty.startDate).toLocaleDateString('es-ES'),
-                        },
-                        {
-                          label: 'Vencimiento',
-                          value: new Date(warranty.endDate).toLocaleDateString('es-ES'),
-                        },
-                        {
-                          label: 'Meses restantes',
-                          value: `${warrantyMonthsLeft}`,
-                        },
-                        {
-                          label: 'Estado',
-                          value: warrantyMonthsLeft! > 0 ? 'Activa' : 'Vencida',
-                        },
-                      ].map((row) => (
-                        <div key={row.label}>
-                          <p className="font-mono text-[10px] uppercase tracking-[0.1em] text-muted-foreground">
-                            {row.label}
-                          </p>
-                          <p className="mt-1 text-[14px] font-medium text-foreground">
-                            {row.value}
-                          </p>
-                        </div>
-                      ))}
-                    </div>
-                    <div className="h-2 overflow-hidden rounded-full bg-muted">
-                      <div
-                        className="h-full rounded-full bg-sidebar-primary transition-all"
-                        style={{ width: `${Math.max(2, 100 - warrantyElapsedPct)}%` }}
-                      />
-                    </div>
-                  </div>
-                </div>
-
-                {/* Tickets */}
-                {openTickets.length > 0 && (
-                  <div className="overflow-hidden rounded-xl border border-amber-200 bg-card">
-                    <div className="border-b border-amber-200 bg-amber-50 px-6 py-4">
-                      <h2 className="text-[14px] font-semibold text-amber-800">
-                        Incidencias abiertas ({openTickets.length})
-                      </h2>
-                    </div>
-                    <div className="divide-y divide-border">
-                      {openTickets.map((t) => (
-                        <div key={t.id} className="flex items-center justify-between px-6 py-4">
-                          <p className="text-[13px] font-medium text-foreground">{t.title}</p>
-                          <div className="flex items-center gap-2">
-                            <span
-                              className={`rounded-full px-2 py-0.5 text-[10px] font-medium ${
-                                t.priority === 'CRITICA'
-                                  ? 'bg-red-100 text-red-700'
-                                  : t.priority === 'ALTA'
-                                    ? 'bg-amber-100 text-amber-700'
-                                    : 'bg-muted text-muted-foreground'
-                              }`}
-                            >
-                              {t.priority}
-                            </span>
-                            <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] text-muted-foreground">
-                              {t.status}
-                            </span>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                    <div className="border-t border-border px-6 py-3">
-                      <Link
-                        href={`/postventa/${warranty.id}`}
-                        className="text-[12px] font-medium text-sidebar-primary hover:underline"
-                      >
-                        Ver en módulo postventa →
-                      </Link>
-                    </div>
-                  </div>
-                )}
-
-                {openTickets.length === 0 && (
-                  <div className="flex items-center gap-3 rounded-xl border border-border bg-card px-6 py-4">
-                    <span className="flex h-8 w-8 items-center justify-center rounded-full bg-sidebar-primary/10 text-sidebar-primary">
-                      ✓
-                    </span>
-                    <div>
-                      <p className="text-[13px] font-medium text-foreground">
-                        Sin incidencias abiertas
-                      </p>
-                      <Link
-                        href={`/postventa/${warranty.id}`}
-                        className="text-[12px] text-sidebar-primary hover:underline"
-                      >
-                        Ver historial completo →
-                      </Link>
-                    </div>
-                  </div>
-                )}
-              </div>
-            ) : (
-              <div className="flex flex-col items-center justify-center rounded-xl border border-border bg-card py-16">
-                <Shield className="mb-3 h-8 w-8 text-muted-foreground/30" />
-                <p className="text-[15px] font-medium text-foreground">Sin garantía activa</p>
-                <p className="mt-1 text-[13px] text-muted-foreground">
-                  La garantía se genera automáticamente al completar la entrega del vehículo
-                </p>
-              </div>
-            )}
-          </div>
+          <BuyerPostventa
+            warranty={warranty && 'followups' in warranty ? warranty : null}
+            sales={lead.deliveries}
+          />
         )}
         {activeTab === 'documentos' && (
           <DocumentsPanel
