@@ -184,12 +184,53 @@ describe('navegación de la ficha integral', () => {
     const html = await render({ tab: 'busqueda', ver: 'editar' })
     expect(html).toMatch(/id="editar" open/)
     for (const text of [
-      'Preferencias de compra',
-      'Características del vehículo buscado',
-      'Ver solicitud bajo pedido',
+      'Editar búsqueda',
+      'Condiciones de compra',
+      'Características y uso',
+      'Solicitud original',
       'Vehículo de parte de pago',
     ])
       expect(html).toContain(text)
+  })
+
+  it('distingue plazas, prioridad y altura pendiente con los datos actuales', async () => {
+    const buyer = {
+      ...base,
+      minSeats: 4,
+      sleepingPlacesRequired: 2,
+      maxLengthM: 6,
+      maxHeightM: null,
+      criticalEquipment: { bathroom: true },
+      matchCatalog: { heating: { values: ['Sí'], required: false } },
+    }
+    mocks.buyer.mockResolvedValue(buyer)
+    const html = await render({ tab: 'busqueda' })
+    const summary = html.split('id="busqueda"')[1].split('id="editar"')[0]
+    expect(summary).toContain('45.000')
+    expect(summary).toMatch(/Para viajar<\/dt>.*?4 plazas mín\./)
+    expect(summary).toMatch(/Para dormir<\/dt>.*?2 plazas mín\./)
+    expect(html).toContain('¿Hay también un límite de altura para aparcar?')
+    mocks.buyer.mockResolvedValue({ ...buyer, maxHeightM: 2.65 })
+    const updated = await render({ tab: 'busqueda' })
+    expect(updated).toContain('Altura máxima de 2,65 m')
+    expect(updated).not.toContain('¿Hay también un límite de altura')
+  })
+  it('muestra los datos desconocidos sin asumir que necesita aparcamiento', async () => {
+    mocks.buyer.mockResolvedValue({
+      ...base,
+      minSeats: 1,
+      vehicleType: null,
+      maxBudget: null,
+      sleepingPlacesRequired: null,
+      needsGarage: true,
+    })
+    const html = await render({ tab: 'busqueda' })
+    expect(html).toContain('Tipo por confirmar')
+    expect(html).toContain('1 plaza mín.')
+    expect(html).toMatch(/Para dormir<\/dt>.*?Por confirmar/)
+    expect(html).toContain('Garaje para equipaje en el vehículo')
+    expect(html).not.toContain('límite de altura para aparcar')
+    expect(html).not.toContain('Formulario bajo pedido')
   })
 
   it('reúne interés, comparación y oferta, y conserva la restricción de una ficha archivada', async () => {

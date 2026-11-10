@@ -36,6 +36,20 @@ test('guarda números, texto, casillas y desplegables automáticamente', async (
   await page.screenshot({ path: test.info().outputPath('autosave.png'), fullPage: true })
 })
 
+test('guarda por separado las plazas de viaje, las de dormir y la altura de aparcamiento', async ({
+  page,
+}) => {
+  await page.getByLabel('Plazas para viajar (mín.)', { exact: true }).fill('4')
+  await page.getByLabel('Plazas para dormir (mín.)', { exact: true }).fill('2')
+  await page.getByLabel('Alto máximo (m)', { exact: true }).fill('2.65')
+  await expect(page.getByRole('status')).toHaveText('Guardado')
+  expect(await page.evaluate(() => window.autosaveHarness.persisted)).toMatchObject({
+    minSeats: 4,
+    sleepingPlacesRequired: 2,
+    maxHeightM: 2.65,
+  })
+})
+
 test('activa aviso de salida sólo mientras hay cambios pendientes', async ({ page }) => {
   const guarded = () =>
     page.evaluate(() => {

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { classifyBuyerCriteria, type BuyerCriteriaInput } from './buyer-criteria'
+import { buyerSearchCriteria, type BuyerCriteriaInput } from './buyer-criteria'
 
 const empty: BuyerCriteriaInput = {
   vehicleType: null,
@@ -19,50 +19,61 @@ const empty: BuyerCriteriaInput = {
   hasKids: null,
 }
 
-describe('classifyBuyerCriteria', () => {
-  it('sin criterios → lista vacía', () => {
-    expect(classifyBuyerCriteria(empty)).toEqual([])
-  })
-
-  it('marca los filtros duros como excluyentes', () => {
-    const res = classifyBuyerCriteria({
-      ...empty,
-      vehicleType: 'CAMPER',
-      minSeats: 4,
-      maxBudget: 45000,
-      bathroomRequired: true,
-      licenseType: 'B',
-      maxLengthM: 6.5,
+describe('resumen de la búsqueda', () => {
+  it('no inventa requisitos en una ficha vacía', () => {
+    expect(buyerSearchCriteria(empty, {})).toEqual({
+      family: undefined,
+      required: [],
+      preferred: [],
     })
-    const hard = res.filter((c) => c.kind === 'excluyente').map((c) => c.label)
-    expect(hard).toEqual(
-      expect.arrayContaining(['Tipo', 'Plazas mín.', 'Presupuesto', 'Baño', 'Carnet', 'Largo máx.'])
+  })
+  it('distingue equipamiento imprescindible de opciones deseadas', () => {
+    const result = buyerSearchCriteria(
+      {
+        ...empty,
+        vehicleType: 'CAMPER',
+        bathroomRequired: true,
+        needsWinter: true,
+        criticalEquipment: { solar: true },
+        maxHeightM: 2.65,
+      },
+      {
+        solar: { values: ['Sí'] },
+        gearbox: { values: ['Automático'] },
+        beds: { values: ['Literas', 'Camas gemelas'] },
+      }
     )
-    expect(res.every((c) => c.kind === 'excluyente')).toBe(true)
+    expect(result.family).toBe('Camper')
+    expect(result.required).toEqual([
+      'Baño interior',
+      'Altura máxima de 2,65 m',
+      'Preparación para invierno',
+      'Placas solares',
+    ])
+    expect(result.preferred).toContain('Cambio · Automático')
+    expect(result.preferred).toContain('Distribuciones de cama · Literas o Camas gemelas')
   })
-
-  it('marca distribución, cama, equipo y zona como preferencias', () => {
-    const res = classifyBuyerCriteria({
-      ...empty,
-      preferredCategory: 'PERFILADA',
-      preferredBedLayout: 'ISLA',
-      criticalEquipment: { solar: true, heating: false },
-      useZone: 'Cataluña',
-      needsWinter: true,
+  it('conserva los límites, prioridades y alternativas del catálogo', () => {
+    const result = buyerSearchCriteria(empty, {
+      family: { values: ['Camper', 'Autocaravana'] },
+      year: { values: ['2020'], required: true },
+      showerOptions: {
+        values: ['Interior', 'Independiente del inodoro'],
+        all: true,
+        required: true,
+      },
     })
-    expect(res.every((c) => c.kind === 'preferencia')).toBe(true)
-    const equipo = res.filter((c) => c.label === 'Equipo')
-    expect(equipo).toHaveLength(1) // solo solar (heating=false no cuenta)
-    expect(res.some((c) => c.value === 'Cataluña')).toBe(true)
+    expect(result.family).toBe('Camper o Autocaravana')
+    expect(result.required).toContain('Opciones de ducha · Interior y Independiente del inodoro')
+    expect(result.required).toContain('Año de matriculación · mínimo 2020')
   })
-
-  it('bathroomRequired=false no genera criterio', () => {
-    const res = classifyBuyerCriteria({ ...empty, bathroomRequired: false })
-    expect(res).toEqual([])
-  })
-
-  it('acepta maxBudget como string (Decimal serializado)', () => {
-    const res = classifyBuyerCriteria({ ...empty, maxBudget: '50000' })
-    expect(res[0].value).toContain('50.000')
+  it('conserva la familia de la ficha y el criterio detallado cuando difieren', () => {
+    const result = buyerSearchCriteria(
+      { ...empty, vehicleType: 'CAMPER', needsGarage: true },
+      { family: { values: ['Autocaravana'], required: true } }
+    )
+    expect(result.family).toBe('Camper')
+    expect(result.required).toContain('Familia · Autocaravana')
+    expect(result.required).toContain('Garaje para equipaje en el vehículo')
   })
 })

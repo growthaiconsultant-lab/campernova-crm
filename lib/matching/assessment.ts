@@ -1,5 +1,4 @@
-import { RV_CATEGORY_OPTIONS, RV_BED_OPTIONS } from '@/lib/rv-taxonomy'
-import { fieldById, type Catalog } from './catalog'
+import { fieldById, buyerCatalogPreferences, familyLabel } from './catalog'
 import type { MatchingBuyerInput, MatchingVehicleInput } from './types'
 
 import { vehicleFacts, legacyProjection } from './vehicle-characteristics'
@@ -52,19 +51,11 @@ export function assessPair(v: MatchingVehicleInput, b: MatchingBuyerInput) {
         ? null
         : v.location.trim().toLowerCase() === b.useZone.trim().toLowerCase()
     )
-  const prefs: Catalog = { ...b.catalog }
+  const prefs = buyerCatalogPreferences(b, b.catalog)
   function fact(id: string, val: string | undefined) {
     if (val && !facts[id]) facts[id] = { values: [val] }
   }
-  function pref(id: string, val: string | undefined, required = false) {
-    if (val && !prefs[id]) prefs[id] = { values: [val], required }
-    else if (required && val && prefs[id]?.values.includes(val))
-      prefs[id] = { ...prefs[id], required: true }
-  }
-  const familyLabel = (type: string | null) =>
-    type === 'AUTOCARAVANA' ? 'Autocaravana' : type === 'CAMPER' ? 'Camper' : undefined
   fact('family', familyLabel(v.type))
-  pref('family', familyLabel(b.vehicleType))
   fact('year', v.year?.toString())
   fact('km', v.km?.toString())
   fact('brand', v.brand ?? undefined)
@@ -75,17 +66,11 @@ export function assessPair(v: MatchingVehicleInput, b: MatchingBuyerInput) {
     !facts.beds
   )
     fact('beds', 'Cama en techo elevable')
-  pref('format', RV_CATEGORY_OPTIONS.find((o) => o.value === b.preferredCategory)?.label)
-  pref('beds', RV_BED_OPTIONS.find((o) => o.value === b.preferredBedLayout)?.label)
-  for (const key of ['solar', 'heating', 'shower', 'kitchen'] as const) {
-    if (b.criticalEquipment[key]) pref(key, 'Sí', true)
-  }
   if (b.criticalEquipment.bathroom && !b.bathroomRequired) check('Baño', true, bathroom)
   if (facts.garage?.values.includes('No')) {
     fact('garageSize', 'No tiene')
     fact('garageBikes', '0')
   }
-  if (b.needsGarage) pref('garage', 'Sí', true)
   if (b.needsWinter) check('Preparación de invierno', true, v.winterized ?? null)
   for (const [id, p] of Object.entries(prefs)) {
     const f = fieldById.get(id)
