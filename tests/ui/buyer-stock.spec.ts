@@ -33,8 +33,9 @@ test('compara criterios, conserva la selección y permite retomar un vehículo f
     .getByRole('link', { name: /^Reserva/ })
     .click()
   await expect(page).toHaveURL(/#oferta-reserve$/)
-  await expect(page.locator('#oferta-reserve')).toContainText('Señal registrada')
-  await expect(page.locator('#oferta-reserve')).toContainText('reserva hasta')
+  await expect(page.locator('#oferta-reserve').getByText('Reservado hasta')).toBeVisible()
+  await page.locator('#oferta-reserve').getByText('Detalles de la reserva').click()
+  await expect(page.locator('#oferta-reserve').getByText('Señal registrada')).toBeVisible()
   await expect(page.getByRole('button', { name: 'Añadir a vehículos de interés' })).toHaveCount(0)
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(
     true

@@ -1,17 +1,13 @@
 'use client'
 
-import { useState, useTransition } from 'react'
+import { useId, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { Plus, Check, HandCoins, ExternalLink } from 'lucide-react'
-import { createOffer, updateOfferStatus } from '@/app/(backoffice)/ofertas/actions'
-import {
-  OFFER_STATUS_LABELS,
-  OFFER_STATUS_COLORS,
-  OFFER_TRANSITIONS,
-  isReservation,
-} from '@/lib/offers'
-import { LOST_REASON_OPTIONS } from '@/lib/lost-reason'
+import { Plus, HandCoins, ExternalLink } from 'lucide-react'
+import { createOffer } from '@/app/(backoffice)/ofertas/actions'
+import { OFFER_STATUS_LABELS, OFFER_STATUS_COLORS, isReservation } from '@/lib/offers'
+import { OfferActions } from './offer-actions'
+import { BuyerOfferGroups } from './buyer-offer-groups'
 import { formatEur } from '@/lib/format/currency'
 import type { OfferStatus } from '@prisma/client'
 
@@ -22,6 +18,7 @@ export type OfferRow = {
   status: OfferStatus
   reservedUntil: string | null
   notes: string | null
+  createdAt?: string
   counterpartLabel: string
   counterpartHref: string
 }
@@ -33,18 +30,21 @@ type Props = {
   fixedId: string
   candidates: Candidate[]
   offers: OfferRow[]
+  initialDay?: string
 }
 
-export function OffersSection({ side, fixedId, candidates, offers }: Props) {
+export function OffersSection({ side, fixedId, candidates, offers, initialDay }: Props) {
   const router = useRouter()
-  const [pending, startTransition] = useTransition()
+  const formId = useId()
+  const [pending, setPending] = useState(false)
   const [adding, setAdding] = useState(false)
   const [counterpart, setCounterpart] = useState('')
   const [amount, setAmount] = useState('')
   const [notes, setNotes] = useState('')
   const [error, setError] = useState<string | null>(null)
 
-  function submitNew() {
+  async function submitNew() {
+    if (pending) return
     if (!counterpart) return setError(side === 'buyer' ? 'Elige un vehículo' : 'Elige un comprador')
     if (!amount || Number(amount) <= 0) return setError('Indica un importe')
     setError(null)
@@ -52,7 +52,8 @@ export function OffersSection({ side, fixedId, candidates, offers }: Props) {
       side === 'buyer'
         ? { buyerLeadId: fixedId, vehicleId: counterpart }
         : { vehicleId: fixedId, buyerLeadId: counterpart }
-    startTransition(async () => {
+    setPending(true)
+    try {
       const res = await createOffer({ ...payload, amount: Number(amount), notes })
       if (res.error) setError(res.error)
       else {
@@ -62,12 +63,16 @@ export function OffersSection({ side, fixedId, candidates, offers }: Props) {
         setNotes('')
         router.refresh()
       }
-    })
+    } catch {
+      setError('No se ha podido confirmar el registro. Comprueba la lista de ofertas.')
+    } finally {
+      setPending(false)
+    }
   }
 
   return (
     <div className="overflow-hidden rounded-xl border border-border bg-card">
-      <div className="flex items-center justify-between border-b border-border px-6 py-4">
+      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border px-4 py-4">
         <h2 className="flex items-center gap-2 text-[14px] font-semibold text-foreground">
           <HandCoins className="h-4 w-4 text-muted-foreground" />
           Ofertas y reservas
@@ -83,15 +88,19 @@ export function OffersSection({ side, fixedId, candidates, offers }: Props) {
         )}
       </div>
 
-      <div className="p-6">
+      <div className="p-4">
         {adding && (
           <div className="mb-4 space-y-3 rounded-lg border border-border bg-muted/30 p-4">
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <div>
-                <label className="mb-1 block text-[11px] font-medium text-muted-foreground">
+                <label
+                  htmlFor={formId + '-counterpart'}
+                  className="mb-1 block text-[11px] font-medium text-muted-foreground"
+                >
                   {side === 'buyer' ? 'Vehículo' : 'Comprador'}
                 </label>
                 <select
+                  id={formId + '-counterpart'}
                   value={counterpart}
                   onChange={(e) => setCounterpart(e.target.value)}
                   className="h-9 w-full rounded-lg border border-border bg-background px-2 text-[13px]"
@@ -105,13 +114,17 @@ export function OffersSection({ side, fixedId, candidates, offers }: Props) {
                 </select>
               </div>
               <div>
-                <label className="mb-1 block text-[11px] font-medium text-muted-foreground">
+                <label
+                  htmlFor={formId + '-amount'}
+                  className="mb-1 block text-[11px] font-medium text-muted-foreground"
+                >
                   Importe ofertado (€)
                 </label>
                 <input
                   type="number"
                   min={0}
-                  step="500"
+                  id={formId + '-amount'}
+                  step="0.01"
                   value={amount}
                   onChange={(e) => setAmount(e.target.value)}
                   placeholder="Ej: 38000"
@@ -120,12 +133,17 @@ export function OffersSection({ side, fixedId, candidates, offers }: Props) {
               </div>
             </div>
             <input
+              aria-label="Notas de la oferta"
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
               placeholder="Notas (condiciones, financiación pendiente…)"
               className="h-9 w-full rounded-lg border border-border bg-background px-3 text-[13px]"
             />
-            {error && <p className="text-[12px] text-red-600">{error}</p>}
+            {error && (
+              <p role="alert" className="text-[12px] text-red-600">
+                {error}
+              </p>
+            )}
             <div className="flex gap-2">
               <button
                 type="button"
@@ -137,6 +155,7 @@ export function OffersSection({ side, fixedId, candidates, offers }: Props) {
               </button>
               <button
                 type="button"
+                disabled={pending}
                 onClick={() => {
                   setAdding(false)
                   setError(null)
@@ -152,8 +171,17 @@ export function OffersSection({ side, fixedId, candidates, offers }: Props) {
         {offers.length === 0 && !adding ? (
           <p className="py-6 text-center text-[13px] text-muted-foreground">
             Sin ofertas todavía.
-            {candidates.length === 0 && ' Genera un match primero para poder registrar una oferta.'}
+            {candidates.length === 0 &&
+              (side === 'buyer'
+                ? ' Asocia un vehículo disponible para registrar la primera oferta.'
+                : ' Genera un match primero para poder registrar una oferta.')}
           </p>
+        ) : side === 'buyer' ? (
+          <BuyerOfferGroups
+            offers={offers}
+            initialDay={initialDay}
+            onDone={() => router.refresh()}
+          />
         ) : (
           <div className="space-y-3">
             {offers.map((o) => (
@@ -167,36 +195,7 @@ export function OffersSection({ side, fixedId, candidates, offers }: Props) {
 }
 
 function OfferCard({ offer, onDone }: { offer: OfferRow; onDone: () => void }) {
-  const [pending, startTransition] = useTransition()
-  const [accepting, setAccepting] = useState(false)
-  const [rejecting, setRejecting] = useState(false)
-  const [deposit, setDeposit] = useState('')
-  const [reservedUntil, setReservedUntil] = useState('')
-  const [reason, setReason] = useState('')
-  const [error, setError] = useState<string | null>(null)
-
-  const nextStates = OFFER_TRANSITIONS[offer.status] ?? []
   const reservation = isReservation(offer.status, offer.depositAmount)
-
-  function move(next: OfferStatus, extra = {}) {
-    setError(null)
-    startTransition(async () => {
-      const res = await updateOfferStatus(offer.id, next, extra)
-      if (res.error) setError(res.error)
-      else {
-        setAccepting(false)
-        setRejecting(false)
-        onDone()
-      }
-    })
-  }
-
-  function pick(next: OfferStatus) {
-    if (next === 'ACEPTADA') return setAccepting(true)
-    if (next === 'RECHAZADA') return setRejecting(true)
-    move(next)
-  }
-
   return (
     <div id={`oferta-${offer.id}`} className="scroll-mt-20 rounded-lg border border-border p-4">
       <div className="flex items-start justify-between gap-3">
@@ -239,105 +238,7 @@ function OfferCard({ offer, onDone }: { offer: OfferRow; onDone: () => void }) {
         </div>
       </div>
 
-      {accepting && (
-        <div className="mt-3 space-y-2 rounded border border-cyan-200 bg-cyan-50 p-3">
-          <p className="text-[11px] font-medium text-cyan-800">
-            Aceptar la oferta. Añade la señal para que quede reservado.
-          </p>
-          <div className="grid grid-cols-2 gap-2">
-            <input
-              type="number"
-              min={0}
-              step="100"
-              value={deposit}
-              onChange={(e) => setDeposit(e.target.value)}
-              placeholder="Señal (€)"
-              className="h-8 rounded border border-cyan-200 px-2 text-[12px]"
-            />
-            <input
-              type="date"
-              value={reservedUntil}
-              onChange={(e) => setReservedUntil(e.target.value)}
-              className="h-8 rounded border border-cyan-200 px-2 text-[12px]"
-            />
-          </div>
-          <div className="flex gap-2">
-            <button
-              type="button"
-              disabled={pending}
-              onClick={() =>
-                move('ACEPTADA', {
-                  depositAmount: deposit ? Number(deposit) : null,
-                  reservedUntil: reservedUntil || null,
-                })
-              }
-              className="rounded bg-cyan-700 px-3 py-1 text-[11px] font-semibold text-white disabled:opacity-50"
-            >
-              Aceptar
-            </button>
-            <button
-              type="button"
-              onClick={() => setAccepting(false)}
-              className="rounded border border-cyan-200 px-3 py-1 text-[11px] text-cyan-700"
-            >
-              Cancelar
-            </button>
-          </div>
-        </div>
-      )}
-
-      {rejecting && (
-        <div className="mt-3 space-y-2 rounded border border-red-200 bg-red-50 p-3">
-          <select
-            value={reason}
-            onChange={(e) => setReason(e.target.value)}
-            className="h-8 w-full rounded border border-red-200 px-2 text-[12px]"
-          >
-            <option value="">Motivo del rechazo…</option>
-            {LOST_REASON_OPTIONS.map((o) => (
-              <option key={o.value} value={o.value}>
-                {o.label}
-              </option>
-            ))}
-          </select>
-          <div className="flex gap-2">
-            <button
-              type="button"
-              disabled={pending}
-              onClick={() => move('RECHAZADA', { rejectionReason: reason || null })}
-              className="rounded bg-red-600 px-3 py-1 text-[11px] font-semibold text-white disabled:opacity-50"
-            >
-              Rechazar
-            </button>
-            <button
-              type="button"
-              onClick={() => setRejecting(false)}
-              className="rounded border border-red-200 px-3 py-1 text-[11px] text-red-600"
-            >
-              Cancelar
-            </button>
-          </div>
-        </div>
-      )}
-
-      {error && <p className="mt-2 text-[11px] text-red-600">{error}</p>}
-
-      {nextStates.length > 0 && !accepting && !rejecting && (
-        <div className="mt-3 flex flex-wrap gap-1.5">
-          {nextStates.map((s) => (
-            <button
-              key={s}
-              type="button"
-              disabled={pending}
-              onClick={() => pick(s)}
-              className="inline-flex items-center gap-1 rounded border border-border px-2.5 py-1 text-[11.5px] font-medium text-foreground hover:bg-muted disabled:opacity-50"
-            >
-              {s === 'CONVERTIDA' && <Check className="h-3 w-3" />}
-              {OFFER_STATUS_LABELS[s]}
-            </button>
-          ))}
-        </div>
-      )}
+      <OfferActions offer={offer} onDone={onDone} />
     </div>
   )
 }

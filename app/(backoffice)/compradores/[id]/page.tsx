@@ -36,6 +36,7 @@ import { usageLabel } from '@/lib/buyer-vehicle-use'
 import { BuyerEquipmentEditor } from '@/components/match-catalog-editor'
 import { BuyerCatalogResults } from '@/components/buyer-catalog-results'
 import { readCatalog } from '@/lib/matching/catalog'
+import { offerDay } from '@/lib/buyer-offers'
 import { OffersSection } from '@/components/offers-section'
 import { isActiveHold } from '@/lib/offers'
 import { buyerScore } from '@/lib/scoring'
@@ -448,6 +449,7 @@ export default async function FichaCompradorPage({
     id: o.id,
     vehicleId: o.vehicleId,
     amount: Number(o.amount),
+    createdAt: o.createdAt.toISOString(),
     depositAmount: o.depositAmount == null ? null : Number(o.depositAmount),
     status: o.status,
     reservedUntil: o.reservedUntil ? o.reservedUntil.toISOString() : null,
@@ -1176,6 +1178,7 @@ export default async function FichaCompradorPage({
                 fixedId={lead.id}
                 candidates={offerCandidates}
                 offers={offerRows}
+                initialDay={offerDay(new Date())}
               />
               {showPostventa && (
                 <Link href={`${path}?tab=postventa`} className={textLink}>

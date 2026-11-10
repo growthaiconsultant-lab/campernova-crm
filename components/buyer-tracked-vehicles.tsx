@@ -126,7 +126,7 @@ export function BuyerTrackedVehicles({
                         {isReservation(o.status, o.depositAmount)
                           ? 'Reserva'
                           : 'Oferta · ' + OFFER_STATUS_LABELS[o.status]}{' '}
-                        · {formatEur(o.amount)}
+                        · {formatEur(o.amount, 'cents')}
                       </a>
                     </li>
                   ))}
