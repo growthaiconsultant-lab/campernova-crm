@@ -14,6 +14,7 @@ async function main() {
       header: 'tests/ui/buyer-header-fixture.tsx',
       autosave: 'tests/ui/buyer-autosave-fixture.tsx',
       usage: 'tests/ui/buyer-usage-fixture.tsx',
+      stock: 'tests/ui/buyer-stock-fixture.tsx',
       searchRequest: 'tests/ui/search-request-fixture.tsx',
     },
     bundle: true,
@@ -25,6 +26,26 @@ async function main() {
       {
         name: 'next-browser-fixture',
         setup(plugin) {
+          const stockStubs = {
+            '@/app/(backoffice)/ofertas/actions':
+              'export const createOffer = () => ({}); export const updateOfferStatus = () => ({})',
+            '@/lib/db': 'export const db = {}',
+            '@/lib/matching/prisma-deps':
+              'export const prismaMatchingDeps = () => window.stockFixture',
+            '@/app/(backoffice)/matches/manual-actions':
+              'export const createManualMatch = x => window.stockFixture.save(x); export const searchManualMatches = () => ({ok:true,items:[],hasMore:false})',
+            '@/app/(backoffice)/matches/actions': 'export const updateMatchStatus = () => ({})',
+          }
+          plugin.onResolve(
+            {
+              filter:
+                /^@\/(lib\/(db|matching\/prisma-deps)|app\/\(backoffice\)\/(matches\/(manual-actions|actions)|ofertas\/actions))$/,
+            },
+            ({ path }) => ({ path, namespace: 'stock-stub' })
+          )
+          plugin.onLoad({ filter: /.*/, namespace: 'stock-stub' }, ({ path }) => ({
+            contents: stockStubs[path],
+          }))
           plugin.onResolve({ filter: /\/(usage-action|catalog-actions)$/ }, () => ({
             path: 'usage-actions',
             namespace: 'fixture',

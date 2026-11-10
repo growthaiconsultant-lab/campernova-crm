@@ -32,12 +32,14 @@ export function ManualAssociationsCard({
   entries,
   listHref,
   disabledReason,
+  actionOnly = false,
 }: {
   side: 'buyer' | 'vehicle'
   fixedId: string
   entries: ManualAssociationSummary[]
   listHref: string
   disabledReason?: string
+  actionOnly?: boolean
 }) {
   const router = useRouter()
   const [open, setOpen] = useState(false)
@@ -136,38 +138,45 @@ export function ManualAssociationsCard({
   }
 
   return (
-    <section aria-label={title} className="rounded-xl border border-border bg-card p-5">
-      <div className="mb-3 flex items-center justify-between gap-2">
-        <h2 className="font-mono text-[10px] uppercase tracking-[0.12em] text-muted-foreground">
-          {title}
-        </h2>
-        {entries.length > 0 && (
-          <span className="rounded-full bg-sidebar-primary/10 px-2 py-0.5 text-[11px] font-semibold text-sidebar-primary">
-            {entries.length}
-          </span>
-        )}
-      </div>
-      {entries.length ? (
-        <ul className="mb-4 space-y-3">
-          {entries.slice(0, 3).map((entry) => (
-            <li key={entry.id}>
-              <Link
-                href={entry.href}
-                className="block truncate text-[13px] font-semibold text-foreground hover:text-sidebar-primary hover:underline"
-                title={entry.label}
-              >
-                {entry.label}
-              </Link>
-              <p className="mt-0.5 text-[11px] text-muted-foreground">{entry.detail}</p>
-            </li>
-          ))}
-        </ul>
-      ) : (
-        <p className="mb-4 text-[12px] leading-relaxed text-muted-foreground">
-          {isBuyer
-            ? 'Asocia las furgos que este cliente quiere comprar.'
-            : 'Asocia los clientes interesados en este vehículo.'}
-        </p>
+    <section
+      aria-label={actionOnly ? action : title}
+      className={actionOnly ? undefined : 'rounded-xl border border-border bg-card p-5'}
+    >
+      {!actionOnly && (
+        <>
+          <div className="mb-3 flex items-center justify-between gap-2">
+            <h2 className="font-mono text-[10px] uppercase tracking-[0.12em] text-muted-foreground">
+              {title}
+            </h2>
+            {entries.length > 0 && (
+              <span className="rounded-full bg-sidebar-primary/10 px-2 py-0.5 text-[11px] font-semibold text-sidebar-primary">
+                {entries.length}
+              </span>
+            )}
+          </div>
+          {entries.length ? (
+            <ul className="mb-4 space-y-3">
+              {entries.slice(0, 3).map((entry) => (
+                <li key={entry.id}>
+                  <Link
+                    href={entry.href}
+                    className="block truncate text-[13px] font-semibold text-foreground hover:text-sidebar-primary hover:underline"
+                    title={entry.label}
+                  >
+                    {entry.label}
+                  </Link>
+                  <p className="mt-0.5 text-[11px] text-muted-foreground">{entry.detail}</p>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="mb-4 text-[12px] leading-relaxed text-muted-foreground">
+              {isBuyer
+                ? 'Asocia las furgos que este cliente quiere comprar.'
+                : 'Asocia los clientes interesados en este vehículo.'}
+            </p>
+          )}
+        </>
       )}
       {disabledReason ? (
         <p className="text-[12px] leading-relaxed text-muted-foreground">{disabledReason}</p>
@@ -181,7 +190,7 @@ export function ManualAssociationsCard({
           {action}
         </Button>
       )}
-      {entries.length > 0 && (
+      {!actionOnly && entries.length > 0 && (
         <Link
           href={listHref}
           className="mt-3 block text-[12px] font-medium text-sidebar-primary hover:underline"

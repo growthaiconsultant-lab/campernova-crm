@@ -132,7 +132,13 @@ function MatchExplanation({ explanation }: { explanation?: MatchExplanationData 
 
 // ─── Status transition buttons ────────────────────────────────────────────────
 
-function StatusButtons({ matchId, currentStatus }: { matchId: string; currentStatus: string }) {
+export function StatusButtons({
+  matchId,
+  currentStatus,
+}: {
+  matchId: string
+  currentStatus: string
+}) {
   const [isPending, startTransition] = useTransition()
   const [error, setError] = useState('')
   const transitions =
