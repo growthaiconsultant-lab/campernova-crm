@@ -1,21 +1,15 @@
 'use client'
-import { useEffect, useRef, useState } from 'react'
+import { useId, useRef, useState } from 'react'
 import type { OperationalTarget } from '@/lib/operations-input'
 import { MAX_OPERATIONAL_DOCUMENT_BYTES } from '@/lib/operations-limits'
+import { BuyerDocumentList, OperationalDocumentList } from './document-list'
+import { Upload } from 'lucide-react'
 import { TargetPicker } from './target-picker'
 import {
-  listOperationalDocuments,
   openOperationalDocument,
   uploadOperationalDocument,
 } from '@/app/(backoffice)/operaciones/documentos/actions'
 
-type Item = {
-  id: string
-  name: string
-  category: string
-  createdAt: string
-  fileSize: number | null
-}
 export function DocumentsPanel({
   initialTarget,
   fixedTarget = false,
@@ -23,51 +17,21 @@ export function DocumentsPanel({
   initialTarget?: OperationalTarget
   fixedTarget?: boolean
 }) {
+  const buyerView = fixedTarget && initialTarget?.type === 'buyerLead'
+  const formId = useId()
+  const trigger = useRef<HTMLButtonElement>(null)
+  const [uploadOpen, setUploadOpen] = useState(false)
   const [type, setType] = useState<OperationalTarget['type']>(initialTarget?.type ?? 'vehicle')
   const [id, setId] = useState(initialTarget?.id ?? '')
   const [category, setCategory] = useState<'PRESUPUESTO' | 'OPERATIVO'>('PRESUPUESTO')
   const [name, setName] = useState(''),
     [file, setFile] = useState<File | null>(null)
-  const [items, setItems] = useState<Item[]>([]),
-    [page, setPage] = useState(0),
-    [more, setMore] = useState(false)
-  const [loading, setLoading] = useState(false),
-    [busy, setBusy] = useState(false),
-    [revision, setRevision] = useState(0)
+  const [busy, setBusy] = useState(false)
+  const [revision, setRevision] = useState(0)
   const [error, setError] = useState(''),
-    [listError, setListError] = useState(''),
     [notice, setNotice] = useState('')
   const operationId = useRef<string>(),
     fileInput = useRef<HTMLInputElement>(null)
-  useEffect(() => {
-    let cancelled = false
-    setItems([])
-    setListError('')
-    setMore(false)
-    if (!id) {
-      setLoading(false)
-      return
-    }
-    setLoading(true)
-    void listOperationalDocuments({ type, id }, page)
-      .then((result) => {
-        if (cancelled) return
-        if (!result.ok) setListError(result.error)
-        else {
-          setItems(result.items)
-          setMore(result.hasMore)
-        }
-      })
-      .catch(() => {
-        if (!cancelled) setListError('No se pudieron cargar los documentos.')
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false)
-      })
-    return () => {
-      cancelled = true
-    }
-  }, [type, id, page, revision])
   async function upload(e: React.FormEvent) {
     e.preventDefault()
     if (!file || !id || busy) return
@@ -93,7 +57,10 @@ export function DocumentsPanel({
         setName('')
         operationId.current = undefined
         if (fileInput.current) fileInput.current.value = ''
-        setPage(0)
+        if (buyerView) {
+          setUploadOpen(false)
+          requestAnimationFrame(() => trigger.current?.focus())
+        }
         setRevision((r) => r + 1)
       }
     } catch {
@@ -116,15 +83,45 @@ export function DocumentsPanel({
     }
   }
   return (
-    <section className="space-y-4 rounded-xl border bg-card p-5">
-      <div>
-        <h2 className="text-lg font-semibold">Presupuestos y documentos operativos</h2>
+    <section
+      data-sentry-mask={buyerView || undefined}
+      className={
+        buyerView
+          ? 'ph-no-capture ph-mask mx-auto max-w-4xl space-y-4 rounded-xl border border-border bg-card p-4 sm:p-5'
+          : 'space-y-4 rounded-xl border bg-card p-5'
+      }
+    >
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <h2 className="text-lg font-semibold">
+          {buyerView ? 'Documentos del comprador' : 'Presupuestos y documentos operativos'}
+        </h2>
+        {buyerView && (
+          <button
+            ref={trigger}
+            type="button"
+            disabled={busy}
+            aria-expanded={uploadOpen}
+            aria-controls={formId}
+            onClick={() => setUploadOpen(!uploadOpen)}
+            className="inline-flex items-center gap-2 rounded-lg bg-sidebar-primary px-3 py-2 text-sm font-semibold text-white"
+          >
+            <Upload aria-hidden className="h-4 w-4" />
+            {uploadOpen ? 'Cerrar formulario' : 'Subir documento'}
+          </button>
+        )}
+      </div>
+      <form
+        id={formId}
+        hidden={buyerView && !uploadOpen}
+        onSubmit={upload}
+        className={
+          buyerView ? 'space-y-3 rounded-lg border border-border bg-muted/20 p-4' : 'space-y-3'
+        }
+      >
         <p className="text-sm text-muted-foreground">
           Archivos privados compartidos con Administración, Comerciales y Taller. Sin oferta ni
           orden de trabajo obligatoria. No adjuntes aquí DNI ni contratos comerciales.
         </p>
-      </div>
-      <form onSubmit={upload} className="space-y-3">
         <fieldset disabled={busy} className="space-y-3">
           {!fixedTarget && (
             <>
@@ -136,7 +133,6 @@ export function DocumentsPanel({
                   onChange={(e) => {
                     setType(e.target.value as OperationalTarget['type'])
                     setId('')
-                    setPage(0)
                     setNotice('')
                   }}
                 >
@@ -152,23 +148,11 @@ export function DocumentsPanel({
                 value={id}
                 onChange={(newId) => {
                   setId(newId)
-                  setPage(0)
                   setNotice('')
                 }}
               />
             </>
           )}
-          <label className="block text-sm">
-            Categoría
-            <select
-              className="ml-2 rounded border p-2"
-              value={category}
-              onChange={(e) => setCategory(e.target.value as typeof category)}
-            >
-              <option value="PRESUPUESTO">Presupuesto</option>
-              <option value="OPERATIVO">Otro documento operativo</option>
-            </select>
-          </label>
           <label className="block text-sm">
             Archivo (PDF, JPEG, PNG o WebP; hasta 3 MiB)
             <input
@@ -183,6 +167,17 @@ export function DocumentsPanel({
                 setName(selected?.name ?? '')
               }}
             />
+          </label>
+          <label className="block text-sm">
+            Categoría
+            <select
+              className="ml-2 rounded border p-2"
+              value={category}
+              onChange={(e) => setCategory(e.target.value as typeof category)}
+            >
+              <option value="PRESUPUESTO">Presupuesto</option>
+              <option value="OPERATIVO">Otro documento operativo</option>
+            </select>
           </label>
           <label className="block text-sm">
             Nombre
@@ -234,63 +229,20 @@ export function DocumentsPanel({
       )}
       {!id ? (
         <p>Selecciona el destino para ver sus documentos.</p>
-      ) : loading ? (
-        <p role="status">Cargando documentos…</p>
-      ) : listError ? (
-        <div role="alert">
-          <p>{listError}</p>
-          <button type="button" className="underline" onClick={() => setRevision((r) => r + 1)}>
-            Reintentar
-          </button>
-        </div>
+      ) : buyerView ? (
+        <BuyerDocumentList
+          key={id + ':' + revision}
+          target={{ type, id }}
+          busy={busy}
+          download={download}
+        />
       ) : (
-        <>
-          {items.length === 0 ? (
-            <p className="text-sm text-muted-foreground">
-              No hay documentos operativos en este destino.
-            </p>
-          ) : (
-            <ul className="divide-y">
-              {items.map((item) => (
-                <li key={item.id} className="flex items-center justify-between gap-3 py-3">
-                  <div className="min-w-0">
-                    <p className="break-words font-medium">{item.name}</p>
-                    <p className="text-xs text-muted-foreground">
-                      {item.category === 'PRESUPUESTO' ? 'Presupuesto' : 'Documento operativo'} ·{' '}
-                      {new Date(item.createdAt).toLocaleDateString('es-ES')}
-                      {item.fileSize != null && ` · ${Math.ceil(item.fileSize / 1024)} KiB`}
-                    </p>
-                  </div>
-                  <button
-                    disabled={busy}
-                    type="button"
-                    className="shrink-0 underline"
-                    onClick={() => download(item.id)}
-                  >
-                    Descargar
-                  </button>
-                </li>
-              ))}
-            </ul>
-          )}
-          <div className="flex gap-3 text-sm">
-            <button type="button" disabled={!page || busy} onClick={() => setPage(page - 1)}>
-              Anterior
-            </button>
-            <span>Página {page + 1}</span>
-            <button type="button" disabled={!more || busy} onClick={() => setPage(page + 1)}>
-              Siguiente
-            </button>
-            <button
-              type="button"
-              disabled={busy}
-              className="ml-auto underline"
-              onClick={() => setRevision((r) => r + 1)}
-            >
-              Actualizar lista
-            </button>
-          </div>
-        </>
+        <OperationalDocumentList
+          key={type + ':' + id + ':' + revision}
+          target={{ type, id }}
+          busy={busy}
+          download={download}
+        />
       )}
     </section>
   )

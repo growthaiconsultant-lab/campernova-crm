@@ -178,7 +178,7 @@ describe('navegación de la ficha integral', () => {
     const html = await render({ tab: 'documentos', actionsPage: '3' })
     expect(html).toContain('Sin fecha')
     expect(html).toContain('Registrar llamada')
-    expect(html).toContain('Presupuestos y documentos operativos')
+    expect(html).toContain('Documentos del comprador')
   })
 
   it('mantiene el formulario editable, el catálogo, la solicitud original y el vehículo a cambio', async () => {
@@ -381,7 +381,7 @@ describe('navegación de la ficha integral', () => {
   })
 
   it('conserva los documentos operativos', async () => {
-    expect(await render({ tab: 'documentos' })).toContain('Presupuestos y documentos operativos')
+    expect(await render({ tab: 'documentos' })).toContain('Subir documento')
   })
 
   it('da acceso a una entrega histórica sin garantía ni cierre comercial', async () => {

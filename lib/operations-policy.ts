@@ -9,3 +9,4 @@ export function canManageOperationalDeliveries(user: { role: UserRole; active: b
   return user.active && OPERATIONAL_DELIVERY_ROLES.includes(user.role)
 }
 export const OPERATIONAL_DOCUMENT_CATEGORIES = ['PRESUPUESTO', 'OPERATIVO'] as const
+export type OperationalDocumentCategory = (typeof OPERATIONAL_DOCUMENT_CATEGORIES)[number]
