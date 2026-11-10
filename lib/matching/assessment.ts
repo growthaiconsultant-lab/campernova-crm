@@ -99,8 +99,13 @@ export function assessPair(v: MatchingVehicleInput, b: MatchingBuyerInput) {
     }
     check(f.label + ' · ' + p.values.join(p.all ? ' y ' : ' o '), !!p.required, ok)
   }
+  const state: 'apto' | 'pendiente' | 'descartado' = failed.length
+    ? 'descartado'
+    : missing.length
+      ? 'pendiente'
+      : 'apto'
   return {
-    state: failed.length ? 'descartado' : missing.length ? 'pendiente' : 'apto',
+    state,
     failed,
     missing,
     met,

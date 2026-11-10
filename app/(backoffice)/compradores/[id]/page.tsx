@@ -5,7 +5,7 @@ import { db } from '@/lib/db'
 import { requireAgente } from '@/lib/auth'
 import { completedSalesQuery } from '@/lib/completed-sales'
 import { CompletedSaleCard } from '@/components/completed-sale-card'
-import { ManualAssociationsCard } from '@/components/manual-associations-card'
+import { BuyerTrackedVehicles, type TrackedVehicle } from '@/components/buyer-tracked-vehicles'
 import { vehicleLabel } from '@/lib/display'
 import { BuyerLeadEditForm } from './buyer-lead-edit-form'
 import { buyerSourceLabel, isBuyerSource } from '@/lib/buyer-source'
@@ -29,7 +29,7 @@ import {
   FOLLOWUP_PAGE_SIZE,
 } from '@/lib/buyer-followup'
 import { createCalendarEvent } from '@/app/(backoffice)/calendario/actions'
-import { MatchesSection } from '@/components/matches-section'
+import { BuyerStockBrief } from '@/components/buyer-stock-brief'
 import { currentMatches } from '@/lib/matching/current-matches'
 import { BuyerUsageEditor } from '@/components/buyer-usage-editor'
 import { usageLabel } from '@/lib/buyer-vehicle-use'
@@ -42,7 +42,6 @@ import { buyerScore } from '@/lib/scoring'
 import { ScoreInfo } from '@/components/score-info'
 import { isBuyerEligible, isVehicleEligible, prismaMatchingDeps } from '@/lib/matching'
 import { BuyerSearchBrief } from '@/components/buyer-search-brief'
-import type { BuyerMatchData } from '@/components/matches-section'
 import { ActivityTimeline } from '@/components/activity-timeline'
 import { ChatTranscript } from '@/components/chat-transcript'
 import type { ChatMessage } from '@/components/chat-transcript'
@@ -440,41 +439,20 @@ export default async function FichaCompradorPage({
     hasKids: lead.hasKids ?? null,
   }
 
-  const buyerMatches: BuyerMatchData[] = visibleMatches.map((m) => {
-    const rawPrice = m.vehicle.salePrice ?? m.vehicle.desiredPrice
-    return {
-      id: m.id,
-      score: m.score,
-      status: m.status,
-      generatedBy: m.generatedBy,
-      explanation: m.explanation,
-      vehicle: {
-        id: m.vehicle.id,
-        brand: m.vehicle.brand,
-        model: m.vehicle.model,
-        year: m.vehicle.year,
-        plate: m.vehicle.plate,
-        km: m.vehicle.km,
-        price: rawPrice ? Number(rawPrice) : null,
-        photoUrl: m.vehicle.photos[0]?.url ?? null,
-        sellerLeadId: m.vehicle.sellerLead.id,
-      },
-    }
-  })
-
   // Block 18 — ofertas del comprador + candidatos (vehículos matcheados)
   const offerCandidates = visibleMatches.map((m) => ({
     id: m.vehicle.id,
-    label: `${m.vehicle.brand} ${m.vehicle.model} (${m.vehicle.year})`,
+    label: vehicleLabel(m.vehicle, { withId: true }),
   }))
   const offerRows = lead.offers.map((o) => ({
     id: o.id,
+    vehicleId: o.vehicleId,
     amount: Number(o.amount),
-    depositAmount: o.depositAmount ? Number(o.depositAmount) : null,
+    depositAmount: o.depositAmount == null ? null : Number(o.depositAmount),
     status: o.status,
     reservedUntil: o.reservedUntil ? o.reservedUntil.toISOString() : null,
     notes: o.notes,
-    counterpartLabel: `${o.vehicle.brand} ${o.vehicle.model} (${o.vehicle.year})`,
+    counterpartLabel: vehicleLabel(o.vehicle),
     counterpartHref: `/vendedores/${o.vehicle.sellerLeadId}`,
   }))
 
@@ -483,7 +461,8 @@ export default async function FichaCompradorPage({
     otherUse: lead.otherUse ?? null,
     useZone: lead.useZone ?? null,
   }
-  const buyerCatalog = activeTab === 'busqueda' ? readCatalog(lead.matchCatalog) : {}
+  const buyerCatalog =
+    activeTab === 'busqueda' || activeTab === 'vehiculos' ? readCatalog(lead.matchCatalog) : {}
 
   const scoreContacto = lead.phone ? 100 : 70
   const prefCount = [
@@ -524,7 +503,41 @@ export default async function FichaCompradorPage({
     { key: 'documentos', label: 'Documentos' },
     ...(showPostventa ? [{ key: 'postventa', label: 'Postventa' }] : []),
   ]
-  const manualInterests = buyerMatches.filter((match) => match.generatedBy === 'manual')
+  const tracked = new Map<string, TrackedVehicle>()
+  if (activeTab === 'vehiculos') {
+    const current = new Map(visibleMatches.map((m) => [m.id, m]))
+    const inStock = new Set(eligibleMatches.map((m) => m.id))
+    const withOffer = new Set(offerRows.map((o) => o.vehicleId))
+    for (const m of lead.matches) {
+      const manual = m.generatedBy === 'manual'
+      if (!manual && m.status === 'SUGERIDO' && !withOffer.has(m.vehicle.id)) continue
+      const visible = current.get(m.id)
+      const price = m.vehicle.salePrice ?? m.vehicle.desiredPrice
+      tracked.set(m.vehicle.id, {
+        vehicleId: m.vehicle.id,
+        label: vehicleLabel(m.vehicle, { withId: true }),
+        href: `/vendedores/${m.vehicle.sellerLead.id}`,
+        plate: m.vehicle.plate,
+        km: m.vehicle.km,
+        price: price == null ? null : Number(price),
+        photoUrl: m.vehicle.photos[0]?.url,
+        fit: visible?.fit,
+        outsideStock: subjectBuyerEligible && !inStock.has(m.id),
+        match: { id: m.id, status: m.status, manual, editable: !!visible },
+        offers: [],
+      })
+    }
+    for (const o of offerRows) {
+      const row: TrackedVehicle = tracked.get(o.vehicleId) ?? {
+        vehicleId: o.vehicleId,
+        label: o.counterpartLabel,
+        href: o.counterpartHref,
+        offers: [],
+      }
+      row.offers.push(o)
+      tracked.set(o.vehicleId, row)
+    }
+  }
   const path = `/compradores/${lead.id}`
   const historyFilters = ['Todo', 'Contactos', 'Notas', 'Cambios']
   const historyFilter = historyFilters.find((value) => value === searchParams.historial) ?? 'Todo'
@@ -1117,38 +1130,39 @@ export default async function FichaCompradorPage({
           </div>
         )}
         {activeTab === 'vehiculos' && (
-          <div className={columns}>
+          <div className={columns + ' ph-no-capture ph-mask'} data-sentry-mask>
             <div className={stack} id="intereses">
-              <a href="#ofertas" className={textLink + ' lg:hidden'}>
-                Ir a ofertas y reservas ↓
-              </a>
-              <ManualAssociationsCard
-                side="buyer"
-                fixedId={lead.id}
-                entries={manualInterests.map((m) => ({
-                  id: m.id,
-                  label: vehicleLabel(m.vehicle),
-                  href: `/vendedores/${m.vehicle.sellerLeadId}`,
-                  detail: `${m.vehicle.plate || 'Sin matrícula'} · Manual${m.status === 'RECHAZADO' ? ' · Rechazado' : ''}`,
-                }))}
-                listHref="#sugerencias"
-                disabledReason={
-                  subjectBuyerEligible
-                    ? undefined
-                    : 'Esta ficha está cerrada, perdida o archivada. No admite nuevos intereses.'
-                }
+              <BuyerStockBrief
+                buyer={{ ...defaultValues, criticalEquipment: equipment }}
+                catalog={buyerCatalog}
+                usage={usageLabel(usage)}
+                href={`${path}?tab=busqueda`}
               />
-              <div id="sugerencias" className="scroll-mt-20">
-                {buyerMatches.length > 0 && (
-                  <MatchesSection side="buyer" matches={buyerMatches} defaultOpen />
-                )}
-              </div>
+              <nav
+                aria-label="Accesos a vehículos y operaciones"
+                className="flex flex-wrap gap-x-5 gap-y-2"
+              >
+                <a href="#sugerencias" className={textLink}>
+                  En seguimiento ({tracked.size}) ↓
+                </a>
+                <a href="#ofertas" className={textLink}>
+                  Ofertas y reservas ({offerRows.length}) ↓
+                </a>
+              </nav>
               {subjectBuyerEligible && (
                 <BuyerCatalogResults
                   id={lead.id}
-                  selectedVehicleIds={manualInterests.map((match) => match.vehicle.id)}
+                  selectedVehicleIds={Array.from(tracked.keys())}
+                  suggestions={visibleMatches
+                    .filter((m) => !tracked.has(m.vehicle.id))
+                    .map((m) => ({ id: m.id, vehicleId: m.vehicle.id, status: m.status }))}
                 />
               )}
+              <BuyerTrackedVehicles
+                id={lead.id}
+                vehicles={Array.from(tracked.values())}
+                eligible={subjectBuyerEligible}
+              />
               <Link
                 className="my-4 inline-block text-sm font-medium text-brand underline"
                 href={`/compradores/${lead.id}?tab=ficha&notesPage=1#buyer-note`}

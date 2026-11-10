@@ -23,6 +23,13 @@ export async function currentMatches<
       return {
         ...row,
         score: assessment.state === 'apto' ? assessment.score : 0,
+        fit:
+          assessment.met.length ||
+          assessment.missing.length ||
+          assessment.failed.length ||
+          assessment.wanted.length
+            ? assessment.state
+            : null,
         explanation: explainAssessment(assessment),
       }
     })

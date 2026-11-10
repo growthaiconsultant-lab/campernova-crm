@@ -4,6 +4,7 @@ import Page from './page'
 
 const mocks = vi.hoisted(() => ({
   buyer: vi.fn(),
+  vehicle: vi.fn(),
   activities: vi.fn(),
   first: vi.fn(),
   calendarFirst: vi.fn(),
@@ -12,6 +13,7 @@ vi.mock('@/lib/auth', () => ({ requireAgente: async () => ({ id: 'test-agent' })
 vi.mock('@/lib/db', () => ({
   db: {
     buyerLead: { findUnique: mocks.buyer },
+    vehicle: { findUnique: mocks.vehicle },
     user: { findMany: async () => [] },
     calendarEvent: { findFirst: mocks.calendarFirst },
     activity: { findMany: mocks.activities, findFirst: mocks.first },
@@ -250,6 +252,117 @@ describe('navegación de la ficha integral', () => {
     const archived = await render({ tab: 'vehiculos' })
     expect(archived).toContain('No admite nuevos intereses')
     expect(archived).not.toContain('Comparación con el stock')
+  })
+
+  it('permite retomar una visita aunque el vehículo supere el nuevo presupuesto', async () => {
+    const vehicle = {
+      id: 'van-visita',
+      location: null,
+      sellerLead: { id: 'seller-2', archivedAt: null },
+      sellerLeadId: 'seller-2',
+      brand: 'Marca',
+      model: 'Visita',
+      year: 2021,
+      photos: [],
+      status: 'PUBLICADO',
+      salePrice: 53000,
+      desiredPrice: null,
+      entryValidatedAt: new Date('2026-10-01'),
+      entryAnnulledAt: null,
+      seats: 4,
+      type: 'CAMPER',
+    }
+    mocks.vehicle.mockResolvedValue(vehicle)
+    mocks.buyer.mockResolvedValue({
+      ...base,
+      sleepingPlacesRequired: null,
+      maxLengthM: null,
+      maxHeightM: null,
+      useZone: 'Costa',
+      matches: [{ id: 'm-visita', score: 40, status: 'VISITA', generatedBy: 'auto', vehicle }],
+    })
+    const html = await render({ tab: 'vehiculos' })
+    expect(html).toContain('id="interes-van-visita"')
+    expect(html).toContain('Visita · Fuera de criterios')
+    expect(html).toContain('Zona · Costa')
+    expect(html).toContain('>Cambiar estado</summary>')
+    expect(html).toContain('Registrar oferta')
+  })
+
+  it('conserva el vehículo seguido, sus operaciones originales y un interés sin oferta fuera del stock', async () => {
+    const vehicle = {
+      id: 'van-1',
+      brand: 'Marca',
+      model: 'Reserva',
+      year: 2022,
+      status: 'RESERVADO',
+      photos: [],
+      plate: 'QA-2001',
+      sellerLead: { id: 'seller-1', archivedAt: null },
+      sellerLeadId: 'seller-1',
+    }
+    const offer = {
+      vehicleId: vehicle.id,
+      vehicle,
+      amount: 42750,
+      notes: 'Condiciones originales',
+      reservedUntil: null,
+    }
+    mocks.buyer.mockResolvedValue({
+      ...base,
+      matches: [
+        { id: 'm1', status: 'PROPUESTO_CLIENTE', generatedBy: 'auto', vehicle },
+        {
+          id: 'm2',
+          status: 'SUGERIDO',
+          generatedBy: 'manual',
+          vehicle: { ...vehicle, id: 'van-2', model: 'Manual' },
+        },
+        {
+          id: 'm3',
+          status: 'SUGERIDO',
+          generatedBy: 'auto',
+          vehicle: { ...vehicle, id: 'van-3', model: 'Sugerencia caducada' },
+        },
+      ],
+      offers: [
+        {
+          ...offer,
+          id: 'o1',
+          status: 'ACEPTADA',
+          depositAmount: 2000,
+          reservedUntil: new Date('2027-03-08T12:00:00Z'),
+        },
+        { ...offer, id: 'o2', status: 'RECHAZADA', depositAmount: null },
+        {
+          ...offer,
+          id: 'o3',
+          vehicleId: 'van-4',
+          vehicle: { ...vehicle, model: 'Sin asociación' },
+          status: 'PROPUESTA',
+          depositAmount: null,
+        },
+      ],
+    })
+    const html = await render({ tab: 'vehiculos' })
+    expect(html.match(/id="interes-van-1"/g)).toHaveLength(1)
+    for (const value of [
+      'Propuesto al comprador',
+      'QA-2001',
+      'Fuera del stock disponible',
+      'Añadido por el equipo',
+      'id="interes-van-4"',
+      'Señal:',
+      'reserva hasta',
+      'Condiciones originales',
+    ])
+      expect(html).toContain(value)
+    for (const id of ['o1', 'o2', 'o3']) {
+      expect(html).toContain(`href="#oferta-${id}"`)
+      expect(html).toContain(`id="oferta-${id}"`)
+    }
+    expect(html).not.toContain('id="interes-van-3"')
+    expect(html).not.toContain('>Cambiar estado</summary>')
   })
 
   it('recupera la conversación original abierta desde un enlace guardado', async () => {
