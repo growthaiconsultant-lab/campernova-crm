@@ -66,6 +66,7 @@ type Props = {
   leadId: string
   defaultValues: UpdateBuyerLeadValues
   agents: Agent[]
+  showContact?: boolean
   legacySource?: string | null
 }
 
@@ -84,7 +85,13 @@ const inputCls =
 
 // ── Component ─────────────────────────────────────────────────────────────────
 
-export function BuyerLeadEditForm({ leadId, defaultValues, agents, legacySource }: Props) {
+export function BuyerLeadEditForm({
+  leadId,
+  defaultValues,
+  agents,
+  legacySource,
+  showContact,
+}: Props) {
   const router = useRouter()
   const [saveState, setSaveState] = useState<AutosaveState>({ status: 'idle' })
 
@@ -221,14 +228,13 @@ export function BuyerLeadEditForm({ leadId, defaultValues, agents, legacySource 
             </Button>
           )}
         </div>
-        {/* ── Card 1: Datos del comprador ── */}
-        <div className="overflow-hidden rounded-xl border border-[#e6e9ee] bg-white">
-          <div className="border-b border-[#e6e9ee] px-6 py-4">
-            <h2 className="text-[14px] font-semibold text-[#141922]">Datos del comprador</h2>
-            <p className="mt-1 text-xs text-muted-foreground">
-              Guardado automático de datos y preferencias
-            </p>
-          </div>
+        <details
+          open={showContact || undefined}
+          className="overflow-hidden rounded-xl border border-[#e6e9ee] bg-white"
+        >
+          <summary className="cursor-pointer px-4 py-3 text-sm font-semibold">
+            Datos del comprador
+          </summary>
           <div className="p-6">
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               {/* Nombre */}
@@ -396,7 +402,7 @@ export function BuyerLeadEditForm({ leadId, defaultValues, agents, legacySource 
               />
             </div>
           </div>
-        </div>
+        </details>
 
         {/* ── Card 2: Preferencias de búsqueda ── */}
         <div className="mt-5 overflow-hidden rounded-xl border border-[#e6e9ee] bg-white">
@@ -438,7 +444,7 @@ export function BuyerLeadEditForm({ leadId, defaultValues, agents, legacySource 
                 name="minSeats"
                 render={({ field }) => (
                   <FormItem>
-                    <FieldLabel>Plazas mínimas</FieldLabel>
+                    <FieldLabel>Plazas para viajar (mín.)</FieldLabel>
                     <FormControl>
                       <input
                         type="number"

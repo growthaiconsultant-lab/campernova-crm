@@ -1,39 +1,5 @@
-import { RV_CATEGORY_OPTIONS, RV_BED_OPTIONS } from './rv-taxonomy'
 import type { VehicleType, VehicleCategory, BedLayout, LicenseType } from '@prisma/client'
-
-/**
- * CAM-65: clasifica los criterios de búsqueda de un comprador en
- * **excluyentes** (filtros duros del matching — descartan stock) vs
- * **preferencias** (ejes de scoring — puntúan pero no descartan).
- * La verdad de qué es duro vive en `lib/matching/filters.ts`; aquí se refleja.
- */
-export type CriterionKind = 'excluyente' | 'preferencia'
-
-export type BuyerCriterion = {
-  label: string
-  value: string
-  kind: CriterionKind
-}
-
-const CATEGORY_LABELS: Record<string, string> = Object.fromEntries(
-  RV_CATEGORY_OPTIONS.map((o) => [o.value, o.label])
-)
-const BED_LABELS: Record<string, string> = Object.fromEntries(
-  RV_BED_OPTIONS.map((o) => [o.value, o.label])
-)
-
-const VEHICLE_TYPE_LABELS: Record<string, string> = {
-  CAMPER: 'Camper',
-  AUTOCARAVANA: 'Autocaravana',
-}
-
-const EQUIPMENT_LABELS: Record<string, string> = {
-  solar: 'Placa solar',
-  kitchen: 'Cocina',
-  bathroom: 'Baño',
-  shower: 'Ducha',
-  heating: 'Calefacción',
-}
+import { buyerCatalogPreferences, familyLabel, fieldById, type Catalog } from './matching/catalog'
 
 export type BuyerCriteriaInput = {
   vehicleType: VehicleType | null
@@ -53,39 +19,46 @@ export type BuyerCriteriaInput = {
   hasKids: boolean | null
 }
 
-function eur(n: number): string {
-  return n.toLocaleString('es-ES', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 })
-}
-
-/** Devuelve los criterios activos del comprador clasificados por tipo. */
-export function classifyBuyerCriteria(b: BuyerCriteriaInput): BuyerCriterion[] {
-  const out: BuyerCriterion[] = []
-  const hard = (label: string, value: string) => out.push({ label, value, kind: 'excluyente' })
-  const soft = (label: string, value: string) => out.push({ label, value, kind: 'preferencia' })
-
-  // ── Excluyentes (filtros duros) ──
-  if (b.vehicleType) hard('Tipo', VEHICLE_TYPE_LABELS[b.vehicleType] ?? b.vehicleType)
-  if (b.minSeats != null) hard('Plazas mín.', `${b.minSeats}`)
-  if (b.maxBudget != null) hard('Presupuesto', `≤ ${eur(Number(b.maxBudget))}`)
-  if (b.sleepingPlacesRequired != null) hard('Plazas dormir', `${b.sleepingPlacesRequired}`)
-  if (b.bathroomRequired === true) hard('Baño', 'obligatorio')
-  if (b.licenseType === 'B') hard('Carnet', 'B (máx 3.500 kg)')
-  if (b.maxLengthM != null) hard('Largo máx.', `${b.maxLengthM} m`)
-  if (b.maxHeightM != null) hard('Alto máx.', `${b.maxHeightM} m`)
-
-  // ── Preferencias (scoring) ──
-  if (b.preferredCategory)
-    soft('Distribución', CATEGORY_LABELS[b.preferredCategory] ?? b.preferredCategory)
-  if (b.preferredBedLayout) soft('Cama', BED_LABELS[b.preferredBedLayout] ?? b.preferredBedLayout)
-  if (b.criticalEquipment) {
-    for (const [k, v] of Object.entries(b.criticalEquipment)) {
-      if (v === true) soft('Equipo', EQUIPMENT_LABELS[k] ?? k)
-    }
+/** Reading order for the buyer brief; the four headline facts are displayed separately. */
+export function buyerSearchCriteria(b: BuyerCriteriaInput, catalog: Catalog) {
+  const required: string[] = []
+  const preferred: string[] = []
+  if (b.bathroomRequired || b.criticalEquipment?.bathroom) required.push('Baño interior')
+  if (b.licenseType === 'B') required.push('Permiso B · hasta 3.500 kg')
+  if (b.maxLengthM != null)
+    required.push(`Longitud máxima de ${b.maxLengthM.toLocaleString('es-ES')} m`)
+  if (b.maxHeightM != null)
+    required.push(`Altura máxima de ${b.maxHeightM.toLocaleString('es-ES')} m`)
+  if (b.needsWinter) required.push('Preparación para invierno')
+  const prefs = buyerCatalogPreferences(b, catalog)
+  const declaredFamily = familyLabel(b.vehicleType)
+  const catalogFamily = prefs.family?.values.join(prefs.family.all ? ' y ' : ' o ')
+  for (const [id, entry] of Object.entries(prefs)) {
+    if (id === 'family' && (!declaredFamily || declaredFamily === catalogFamily)) continue
+    const f = fieldById.get(id)
+    if (!f) continue
+    const value = entry.values.join(entry.all ? ' y ' : ' o ')
+    let text = f.label + ' · ' + value
+    if (f.kind === 'min' || f.kind === 'max')
+      text =
+        f.label +
+        ' · ' +
+        (f.kind === 'min' ? 'mínimo ' : 'máximo ') +
+        Number(value).toLocaleString('es-ES')
+    else if (value === 'Sí')
+      text = id === 'garage' ? 'Garaje para equipaje en el vehículo' : f.label
+    else if (/^use[1-5]$/.test(id)) text = value
+    const group = entry.required ? required : preferred
+    group.push(text)
   }
-  if (b.useZone && b.useZone.trim()) soft('Zona', b.useZone.trim())
-  if (b.needsWinter === true) soft('Uso', 'invierno')
-  if (b.needsGarage === true) soft('Garaje', 'sí')
-  if (b.hasKids === true) soft('Viaja con', 'niños')
-
-  return out
+  for (const [key, enabled] of Object.entries(b.criticalEquipment ?? {})) {
+    if (enabled && !['solar', 'heating', 'shower', 'kitchen', 'bathroom'].includes(key))
+      preferred.push(key)
+  }
+  if (b.hasKids) preferred.push('Viaja con niños')
+  return {
+    family: declaredFamily ?? catalogFamily,
+    required: Array.from(new Set(required)),
+    preferred: Array.from(new Set(preferred)),
+  }
 }

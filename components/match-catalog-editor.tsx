@@ -8,10 +8,14 @@ export function CatalogEditor({
   id,
   initial,
   family,
+  heading,
+  children,
 }: {
   side: 'buyer' | 'vehicle'
   id: string
   initial: Catalog
+  heading?: string
+  children?: React.ReactNode
   family?: string | null
 }) {
   const [value, setValue] = useState(initial),
@@ -36,10 +40,12 @@ export function CatalogEditor({
   return (
     <details className="rounded-xl border bg-card p-4">
       <summary className="cursor-pointer font-semibold">
-        {side === 'buyer'
-          ? 'Preferencias de búsqueda detalladas'
-          : 'Características detalladas del vehículo'}
+        {heading ??
+          (side === 'buyer'
+            ? 'Preferencias de búsqueda detalladas'
+            : 'Características detalladas del vehículo')}
       </summary>
+      {children}
       <fieldset disabled={busy} className="mt-3">
         <CatalogFields
           family={family}

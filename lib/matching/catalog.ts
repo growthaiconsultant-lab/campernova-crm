@@ -178,3 +178,32 @@ export function readCatalog(value: unknown): Catalog {
   const result = catalogSchema.safeParse(value)
   return result.success ? result.data : {}
 }
+
+export const familyLabel = (type: string | null) =>
+  type === 'AUTOCARAVANA' ? 'Autocaravana' : type === 'CAMPER' ? 'Camper' : undefined
+
+export function buyerCatalogPreferences(
+  b: {
+    vehicleType: string | null
+    preferredCategory: string | null
+    preferredBedLayout: string | null
+    criticalEquipment: Record<string, boolean> | null
+    needsGarage?: boolean | null
+  },
+  catalog?: Catalog
+): Catalog {
+  const prefs: Catalog = { ...catalog }
+  function pref(id: string, val: string | undefined, required = false) {
+    if (val && !prefs[id]) prefs[id] = { values: [val], required }
+    else if (required && val && prefs[id]?.values.includes(val))
+      prefs[id] = { ...prefs[id], required: true }
+  }
+  pref('family', familyLabel(b.vehicleType))
+  pref('format', RV_CATEGORY_OPTIONS.find((o) => o.value === b.preferredCategory)?.label)
+  pref('beds', RV_BED_OPTIONS.find((o) => o.value === b.preferredBedLayout)?.label)
+  for (const key of ['solar', 'heating', 'shower', 'kitchen'] as const) {
+    if (b.criticalEquipment?.[key]) pref(key, 'Sí', true)
+  }
+  if (b.needsGarage) pref('garage', 'Sí', true)
+  return prefs
+}

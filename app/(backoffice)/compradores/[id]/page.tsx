@@ -39,7 +39,7 @@ import { isActiveHold } from '@/lib/offers'
 import { buyerScore } from '@/lib/scoring'
 import { ScoreInfo } from '@/components/score-info'
 import { isBuyerEligible, isVehicleEligible, prismaMatchingDeps } from '@/lib/matching'
-import { classifyBuyerCriteria } from '@/lib/buyer-criteria'
+import { BuyerSearchBrief } from '@/components/buyer-search-brief'
 import type { BuyerMatchData } from '@/components/matches-section'
 import { ActivityTimeline } from '@/components/activity-timeline'
 import { ChatTranscript } from '@/components/chat-transcript'
@@ -49,7 +49,6 @@ import { WhatsAppButton } from '@/components/whatsapp-button'
 import { buyerWhatsAppMessage } from '@/lib/whatsapp'
 import { BuyerStatusSelect } from '../buyer-status-select'
 import { TemperatureChip } from './temperature-chip'
-import { InfoTooltip } from '@/components/info-tooltip'
 import { BUYER_LEAD_STATUS_LABELS, BUYER_LEAD_TRANSITIONS } from '@/lib/state-machine'
 import type { BuyerLeadStatus, Prisma } from '@prisma/client'
 import { CalendarClock, Phone, Mail, Shield, UserRound } from 'lucide-react'
@@ -477,24 +476,7 @@ export default async function FichaCompradorPage({
     counterpartHref: `/vendedores/${o.vehicle.sellerLeadId}`,
   }))
 
-  // CAM-65: criterios excluyentes vs preferencias
-  const buyerCriteria = classifyBuyerCriteria({
-    vehicleType: lead.vehicleType,
-    minSeats: lead.minSeats,
-    maxBudget: lead.maxBudget ? Number(lead.maxBudget) : null,
-    sleepingPlacesRequired: lead.sleepingPlacesRequired,
-    bathroomRequired: lead.bathroomRequired,
-    licenseType: lead.licenseType,
-    maxLengthM: lead.maxLengthM,
-    maxHeightM: lead.maxHeightM,
-    preferredCategory: lead.preferredCategory,
-    preferredBedLayout: lead.preferredBedLayout,
-    criticalEquipment: (lead.criticalEquipment ?? {}) as Record<string, boolean>,
-    useZone: lead.useZone,
-    needsWinter: lead.needsWinter,
-    needsGarage: lead.needsGarage,
-    hasKids: lead.hasKids,
-  })
+  const buyerCatalog = activeTab === 'busqueda' ? readCatalog(lead.matchCatalog) : {}
 
   const scoreContacto = lead.phone ? 100 : 70
   const prefCount = [
@@ -1035,108 +1017,50 @@ export default async function FichaCompradorPage({
           </div>
         )}
         {activeTab === 'busqueda' && (
-          <div className={columns}>
-            <div className={stack}>
-              <section className={card}>
-                <h2 className="text-lg font-semibold">Preferencias de compra</h2>
-                <p className="mt-2 font-medium">{needSummary}</p>
-                <dl className="my-4 grid gap-3 text-sm sm:grid-cols-2">
-                  {[
-                    [
-                      'Presupuesto máximo',
-                      lead.maxBudget ? EUR(Number(lead.maxBudget)) : 'Por concretar',
-                    ],
-                    ['Plazo de compra', timelineLabel],
-                    ['Zona de uso', lead.useZone || 'Por concretar'],
-                    [
-                      'Financiación',
-                      lead.financingNeeded == null
-                        ? 'Por concretar'
-                        : lead.financingNeeded
-                          ? lead.maxMonthlyPayment
-                            ? `Hasta ${EUR(Number(lead.maxMonthlyPayment))}/mes`
-                            : 'Sí'
-                          : 'No',
-                    ],
-                  ].map(([label, value]) => (
-                    <div key={label}>
-                      <dt className="text-muted-foreground">{label}</dt>
-                      <dd className="break-words font-medium">{value}</dd>
-                    </div>
-                  ))}
-                </dl>
-                <details
-                  id="editar"
-                  open={searchParams.ver === 'editar' || undefined}
-                  className="rounded-xl border border-border bg-card p-4"
-                >
-                  <summary className="cursor-pointer font-semibold">
-                    Editar datos y preferencias de compra
-                  </summary>
-                  <BuyerLeadEditForm
-                    key={lead.id}
-                    leadId={lead.id}
-                    defaultValues={defaultValues}
-                    agents={agents}
-                    legacySource={lead.source && !isBuyerSource(lead.source) ? lead.source : null}
-                  />
-                </details>
-              </section>
-              {buyerCriteria.length > 0 && (
-                <div className="rounded-xl border border-border bg-card p-5">
-                  <div className="mb-3 flex items-center justify-between">
-                    <p className="font-mono text-[10px] uppercase tracking-[0.12em] text-muted-foreground">
-                      Requisitos del vehículo
-                    </p>
-                    <InfoTooltip
-                      text="Los requisitos imprescindibles determinan qué vehículos encajan. Las preferencias ayudan a ordenarlos."
-                      side="left"
-                    />
-                  </div>
-                  <div className="space-y-1.5">
-                    {buyerCriteria.map((c, i) => (
-                      <div key={i} className="flex items-center justify-between gap-2">
-                        <span className="min-w-0 break-words text-[12px] text-muted-foreground">
-                          {c.label}: <span className="text-foreground">{c.value}</span>
-                        </span>
-                        <span
-                          className={`shrink-0 rounded-full px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide ${
-                            c.kind === 'excluyente'
-                              ? 'bg-red-50 text-red-600'
-                              : 'bg-slate-100 text-slate-500'
-                          }`}
-                        >
-                          {c.kind === 'excluyente' ? 'Imprescindible' : 'Preferencia'}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
+          <div
+            id="busqueda"
+            className="ph-no-capture ph-mask mx-auto max-w-4xl space-y-4"
+            data-sentry-mask
+          >
+            <BuyerSearchBrief
+              buyer={{ ...defaultValues, criticalEquipment: equipment }}
+              catalog={buyerCatalog}
+              editOpen={searchParams.ver === 'editar'}
+            >
+              <BuyerLeadEditForm
+                key={lead.id}
+                leadId={lead.id}
+                defaultValues={defaultValues}
+                showContact={searchParams.ver === 'editar'}
+                agents={agents}
+                legacySource={lead.source && !isBuyerSource(lead.source) ? lead.source : null}
+              />
+            </BuyerSearchBrief>
+            <details className={card}>
+              <summary className="cursor-pointer font-semibold">
+                Condiciones de compra{' '}
+                <span className="ml-2 text-sm font-normal text-muted-foreground">
+                  {timelineLabel}
+                </span>
+              </summary>
+              <dl className="my-4 grid gap-3 text-sm sm:grid-cols-2">
+                <div>
+                  <dt className="text-muted-foreground">Plazo de compra</dt>
+                  <dd>{timelineLabel}</dd>
                 </div>
-              )}
-              <details className="rounded-xl border border-border bg-card p-4">
-                <summary className="cursor-pointer font-semibold">
-                  Características del vehículo buscado
-                </summary>
-                <CatalogEditor
-                  side="buyer"
-                  id={lead.id}
-                  initial={readCatalog(lead.matchCatalog)}
-                  family={lead.vehicleType}
-                />
-              </details>
-            </div>
-            <aside className={stack}>
-              {searchRequest && (
-                <details className="mt-3 rounded-lg border border-border bg-card px-4 py-2">
-                  <summary className="cursor-pointer text-sm font-medium">
-                    Ver solicitud bajo pedido
-                  </summary>
-                  <SearchRequestCard
-                    content={searchRequest.content}
-                    receivedAt={searchRequest.createdAt.toLocaleDateString('es-ES')}
-                  />
-                </details>
-              )}
+                <div>
+                  <dt className="text-muted-foreground">Financiación</dt>
+                  <dd>
+                    {lead.financingNeeded == null
+                      ? 'Por confirmar'
+                      : lead.financingNeeded
+                        ? lead.maxMonthlyPayment != null
+                          ? `Hasta ${EUR(Number(lead.maxMonthlyPayment))}/mes`
+                          : 'Sí'
+                        : 'No'}
+                  </dd>
+                </div>
+              </dl>
               <TradeInCard
                 leadId={lead.id}
                 hasTradeIn={lead.hasTradeIn}
@@ -1149,7 +1073,33 @@ export default async function FichaCompradorPage({
                 notes={lead.tradeInNotes}
                 sellerLeadId={lead.tradeInSellerLeadId}
               />
-            </aside>
+            </details>
+            <CatalogEditor
+              side="buyer"
+              id={lead.id}
+              initial={buyerCatalog}
+              family={lead.vehicleType}
+              heading="Características y uso"
+            >
+              <p className="my-3 text-sm">
+                <span className="font-medium">Zona de uso</span> ·{' '}
+                {lead.useZone?.trim() || 'Por confirmar'}
+              </p>
+            </CatalogEditor>
+            {searchRequest && (
+              <details className={card}>
+                <summary className="cursor-pointer font-semibold">
+                  Solicitud original{' '}
+                  <span className="ml-2 text-sm font-normal text-muted-foreground">
+                    Formulario bajo pedido
+                  </span>
+                </summary>
+                <SearchRequestCard
+                  content={searchRequest.content}
+                  receivedAt={searchRequest.createdAt.toLocaleDateString('es-ES')}
+                />
+              </details>
+            )}
           </div>
         )}
         {activeTab === 'vehiculos' && (
