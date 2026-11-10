@@ -134,6 +134,13 @@ describe('OPS-1 actions: autorización y archivos privados', () => {
     )
     expect(mock.admin).not.toHaveBeenCalled()
   })
+  it('rechaza categorías ajenas al listado operativo antes de consultar', async () => {
+    // Simula una petición que no pasó por los tipos del cliente.
+    // @ts-expect-error Categoría privada no operativa.
+    const result = await listOperationalDocuments(request().target, 0, 'CONTRATO_COMPRAVENTA')
+    expect(result.ok).toBe(false)
+    expect(mock.doc.findMany).not.toHaveBeenCalled()
+  })
   it('no firma documentos de otro destino, inexistentes ni comerciales', async () => {
     expect(await openOperationalDocument('qa-doc', { type: 'vehicle', id: 'other' })).toEqual({
       ok: false,

@@ -7,6 +7,7 @@ import { operationalWritesPaused, OPS1_PAUSED_MESSAGE } from '@/lib/operations-c
 import {
   OPERATIONAL_DOCUMENT_ROLES,
   OPERATIONAL_DOCUMENT_CATEGORIES,
+  type OperationalDocumentCategory,
 } from '@/lib/operations-policy'
 import { operationalTargetSchema, documentTargetWhere } from '@/lib/operations-input'
 import {
@@ -23,16 +24,22 @@ import {
 import { OperationalError, operationFingerprint } from '@/lib/operational-deliveries'
 import { withLockedRoots, isLockError } from '@/lib/locking'
 
-export async function listOperationalDocuments(raw: unknown, page = 0) {
+export async function listOperationalDocuments(
+  raw: unknown,
+  page = 0,
+  category?: OperationalDocumentCategory
+) {
   await requireRole(OPERATIONAL_DOCUMENT_ROLES)
   const target = operationalTargetSchema.safeParse(raw)
   if (!target.success || !Number.isInteger(page) || page < 0 || page > 10000)
     return { ok: false as const, error: 'Destino inválido.' }
+  if (category !== undefined && !OPERATIONAL_DOCUMENT_CATEGORIES.includes(category))
+    return { ok: false as const, error: 'Categoría de documento inválida.' }
   try {
     const rows = await db.vehicleDocument.findMany({
       where: {
         ...documentTargetWhere(target.data),
-        category: { in: [...OPERATIONAL_DOCUMENT_CATEGORIES] },
+        category: category ?? { in: [...OPERATIONAL_DOCUMENT_CATEGORIES] },
       },
       select: { id: true, name: true, category: true, createdAt: true, fileSize: true },
       orderBy: [{ createdAt: 'desc' }, { id: 'asc' }],

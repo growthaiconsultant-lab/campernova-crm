@@ -9,6 +9,7 @@ export default defineConfig({
     'buyer-usage.spec.ts',
     'buyer-stock.spec.ts',
     'buyer-offers.spec.ts',
+    'buyer-documents.spec.ts',
     'search-request.spec.ts',
   ],
   fullyParallel: true,
