@@ -6,6 +6,7 @@ export default defineConfig({
     'buyer-followup.spec.ts',
     'buyer-header.spec.ts',
     'buyer-autosave.spec.ts',
+    'buyer-usage.spec.ts',
     'search-request.spec.ts',
   ],
   fullyParallel: true,

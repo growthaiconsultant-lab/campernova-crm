@@ -13,6 +13,8 @@ vi.mock('@/lib/matching', () => ({ recalculateMatchesForBuyer: vi.fn() }))
 import { db } from '@/lib/db'
 import { requireAgente } from '@/lib/auth'
 import { updateBuyerLead } from '@/app/(backoffice)/compradores/[id]/actions'
+import { saveBuyerUsage } from '@/app/(backoffice)/compradores/[id]/usage-action'
+import { recalculateMatchesForBuyer } from '@/lib/matching'
 
 let actor: User
 const ids: string[] = []
@@ -60,6 +62,44 @@ async function buyer() {
 }
 
 describe('COM-11 autoguardado parcial — PostgreSQL', () => {
+  it('guarda el uso independientemente del catálogo y rechaza escrituras obsoletas', async () => {
+    const lead = await buyer()
+    const catalog = { beds: { values: ['Doble fija', 'Elevable'], all: true, required: true } }
+    await db.buyerLead.update({ where: { id: lead.id }, data: { matchCatalog: catalog } })
+    const before = { intendedUse: lead.intendedUse, otherUse: lead.otherUse, useZone: lead.useZone }
+    expect(before.intendedUse).toBeNull()
+    vi.mocked(recalculateMatchesForBuyer).mockClear()
+    const update = { id: lead.id, before, after: { ...before, intendedUse: 'VIVIENDA_TEMPORADAS' } }
+    expect(await saveBuyerUsage(update)).toEqual({ ok: true })
+    expect(await saveBuyerUsage(update)).toEqual({ ok: true })
+    expect(
+      await saveBuyerUsage({
+        ...update,
+        after: { ...before, intendedUse: 'OTRO', otherUse: 'Rodajes' },
+      })
+    ).toHaveProperty('error')
+    expect(recalculateMatchesForBuyer).not.toHaveBeenCalled()
+    const after = { ...before, intendedUse: 'OTRO', otherUse: 'Rodajes', useZone: 'Costa' }
+    expect(await saveBuyerUsage({ id: lead.id, before: update.after, after })).toEqual({ ok: true })
+    expect(vi.mocked(recalculateMatchesForBuyer).mock.calls.map(([id]) => id)).toEqual([lead.id])
+    expect(await db.buyerLead.findUniqueOrThrow({ where: { id: lead.id } })).toMatchObject({
+      ...after,
+      matchCatalog: catalog,
+    })
+    expect(
+      await saveBuyerUsage({
+        id: lead.id,
+        before: after,
+        after: { ...after, intendedUse: 'VIVIENDA' },
+      })
+    ).toHaveProperty('error')
+    await db.buyerLead.update({ where: { id: lead.id }, data: { archivedAt: new Date() } })
+    expect(await saveBuyerUsage({ id: lead.id, before: after, after: before })).toHaveProperty(
+      'error'
+    )
+    vi.mocked(requireAgente).mockRejectedValueOnce(Error('Unauthorized'))
+    await expect(saveBuyerUsage(update)).rejects.toThrow('Unauthorized')
+  })
   it('dos fichas guardan campos distintos sin revertir datos, estado ni comercial', async () => {
     const lead = await buyer()
     const results = await Promise.all([
@@ -76,6 +116,26 @@ describe('COM-11 autoguardado parcial — PostgreSQL', () => {
     })
     expect(Number(persisted.maxBudget)).toBe(65000)
     expect(await db.activity.count({ where: { buyerLeadId: lead.id } })).toBe(0)
+  })
+  it('conserva una sola respuesta si dos agentes indican usos diferentes a la vez', async () => {
+    const lead = await buyer()
+    const before = { intendedUse: null, otherUse: null, useZone: lead.useZone }
+    const choices = ['VIVIENDA_ANUAL', 'VIAJES_LARGOS'] as const
+    const results = await Promise.all(
+      choices.map((intendedUse) =>
+        saveBuyerUsage({ id: lead.id, before, after: { ...before, intendedUse } })
+      )
+    )
+    expect(results.filter((r) => r.ok)).toHaveLength(1)
+    expect(results.filter((r) => r.error)).toHaveLength(1)
+    const intendedUse = choices[results.findIndex((r) => r.ok)]
+    expect(await db.buyerLead.findUniqueOrThrow({ where: { id: lead.id } })).toMatchObject({
+      intendedUse,
+    })
+    expect(
+      await saveBuyerUsage({ id: lead.id, before: { ...before, intendedUse }, after: before })
+    ).toEqual({ ok: true })
+    expect(await db.buyerLead.findUniqueOrThrow({ where: { id: lead.id } })).toMatchObject(before)
   })
   it('persiste casillas y permite vaciar preferencias opcionales', async () => {
     const lead = await buyer()

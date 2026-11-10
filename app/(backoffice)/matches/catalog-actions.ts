@@ -20,14 +20,20 @@ export async function saveCatalog(input: unknown) {
   const change =
     side === 'buyer'
       ? await db.buyerLead.updateMany({
-          where: { ...where, archivedAt: null },
+          where: { ...where, archivedAt: null, mergedIntoId: null },
           data: { matchCatalog: after },
         })
       : await db.vehicle.updateMany({
           where: { ...where, sellerLead: { archivedAt: null } },
           data: { matchCatalog: after },
         })
-  if (!change.count)
+  const alreadySaved =
+    side === 'buyer' &&
+    !change.count &&
+    (await db.buyerLead.count({
+      where: { id, archivedAt: null, mergedIntoId: null, matchCatalog: { equals: after } },
+    }))
+  if (!change.count && !alreadySaved)
     return { error: 'La ficha ha cambiado. Actualiza la página antes de volver a guardar.' }
   if (side === 'buyer') {
     await recalculateMatchesForBuyer(id, db)

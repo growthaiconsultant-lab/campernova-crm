@@ -66,6 +66,7 @@ type Props = {
   leadId: string
   defaultValues: UpdateBuyerLeadValues
   agents: Agent[]
+  zoneInUsagePanel?: boolean
   showContact?: boolean
   legacySource?: string | null
 }
@@ -90,6 +91,7 @@ export function BuyerLeadEditForm({
   defaultValues,
   agents,
   legacySource,
+  zoneInUsagePanel,
   showContact,
 }: Props) {
   const router = useRouter()
@@ -405,7 +407,10 @@ export function BuyerLeadEditForm({
         </details>
 
         {/* ── Card 2: Preferencias de búsqueda ── */}
-        <div className="mt-5 overflow-hidden rounded-xl border border-[#e6e9ee] bg-white">
+        <div
+          id="preferencias-comprador"
+          className="mt-5 scroll-mt-20 overflow-hidden rounded-xl border border-[#e6e9ee] bg-white"
+        >
           <div className="border-b border-[#e6e9ee] px-6 py-4">
             <h2 className="text-[14px] font-semibold text-[#141922]">Preferencias de búsqueda</h2>
           </div>
@@ -551,23 +556,25 @@ export function BuyerLeadEditForm({
               />
 
               {/* Zona preferida */}
-              <FormField
-                control={form.control}
-                name="useZone"
-                render={({ field }) => (
-                  <FormItem>
-                    <FieldLabel>Zona preferida</FieldLabel>
-                    <FormControl>
-                      <input
-                        placeholder="Montaña, Costa, Europa…"
-                        {...field}
-                        className={inputCls}
-                      />
-                    </FormControl>
-                    <FormMessage className="text-[11px]" />
-                  </FormItem>
-                )}
-              />
+              {!zoneInUsagePanel && (
+                <FormField
+                  control={form.control}
+                  name="useZone"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FieldLabel>Zona preferida</FieldLabel>
+                      <FormControl>
+                        <input
+                          placeholder="Montaña, Costa, Europa…"
+                          {...field}
+                          className={inputCls}
+                        />
+                      </FormControl>
+                      <FormMessage className="text-[11px]" />
+                    </FormItem>
+                  )}
+                />
+              )}
 
               {/* Plazo de compra */}
               <FormField
