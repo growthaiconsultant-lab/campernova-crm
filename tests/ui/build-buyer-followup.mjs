@@ -13,6 +13,7 @@ async function main() {
       app: 'tests/ui/buyer-followup-fixture.tsx',
       header: 'tests/ui/buyer-header-fixture.tsx',
       autosave: 'tests/ui/buyer-autosave-fixture.tsx',
+      usage: 'tests/ui/buyer-usage-fixture.tsx',
       searchRequest: 'tests/ui/search-request-fixture.tsx',
     },
     bundle: true,
@@ -24,6 +25,14 @@ async function main() {
       {
         name: 'next-browser-fixture',
         setup(plugin) {
+          plugin.onResolve({ filter: /\/(usage-action|catalog-actions)$/ }, () => ({
+            path: 'usage-actions',
+            namespace: 'fixture',
+          }))
+          plugin.onLoad({ filter: /^usage-actions$/, namespace: 'fixture' }, () => ({
+            contents:
+              'export const saveBuyerUsage = (x) => window.usageFixture.save("usage",x.after); export const saveCatalog = (x) => window.usageFixture.save("catalog",x.after);',
+          }))
           plugin.onResolve({ filter: /^\.\/actions$/ }, (args) =>
             args.importer.endsWith('buyer-lead-edit-form.tsx')
               ? { path: 'buyer-actions', namespace: 'fixture' }

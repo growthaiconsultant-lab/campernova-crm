@@ -50,10 +50,16 @@ export function BuyerSearchBrief({
   buyer,
   catalog,
   editOpen,
+  usage,
+  usageEditor,
+  equipmentEditor,
   children,
 }: {
   buyer: BuyerCriteriaInput
   catalog: Catalog
+  usage: string
+  usageEditor: React.ReactNode
+  equipmentEditor: React.ReactNode
   editOpen: boolean
   children: React.ReactNode
 }) {
@@ -100,6 +106,10 @@ export function BuyerSearchBrief({
             </div>
           ))}
         </dl>
+        <p className="mt-3 break-words border-t border-white/25 pt-3 text-sm [overflow-wrap:anywhere]">
+          <span className="text-white/80">Uso principal</span>
+          <span className="ml-2 font-semibold">{usage}</span>
+        </p>
         <details id="editar" open={editOpen || undefined} className="scroll-mt-20">
           <summary className="absolute right-3 top-2 inline-flex min-h-10 cursor-pointer list-none items-center gap-1.5 rounded-lg border border-white/40 px-2 text-xs font-medium hover:bg-white/10 sm:right-5 sm:top-3 [&::-webkit-details-marker]:hidden">
             <Pencil size={14} aria-hidden="true" />
@@ -110,20 +120,25 @@ export function BuyerSearchBrief({
           </div>
         </details>
       </section>
-      <div className="grid gap-3 sm:grid-cols-2">
-        <CriteriaGroup
-          title="Imprescindible"
-          items={required}
-          icon={<ListChecks size={18} className="text-brand" aria-hidden="true" />}
-          empty="Sin otros requisitos registrados."
-        />
-        <CriteriaGroup
-          title="Preferiría"
-          items={preferred}
-          icon={<Star size={17} className="text-brand" aria-hidden="true" />}
-          empty="Sin preferencias registradas."
-        />
-      </div>
+      {usageEditor}
+      <section aria-label="Equipamiento y requisitos" className="space-y-3">
+        <h2 className="text-lg font-semibold">¿Qué necesita el vehículo?</h2>
+        <div className="grid gap-3 sm:grid-cols-2">
+          <CriteriaGroup
+            title="Imprescindible"
+            items={required}
+            icon={<ListChecks size={18} className="text-brand" aria-hidden="true" />}
+            empty="Sin otros requisitos registrados."
+          />
+          <CriteriaGroup
+            title="Preferiría"
+            items={preferred}
+            icon={<Star size={17} className="text-brand" aria-hidden="true" />}
+            empty="Sin preferencias registradas."
+          />
+        </div>
+        {equipmentEditor}
+      </section>
       {(missing.length > 0 || dimensionQuestion) && (
         <aside
           aria-label="Por confirmar"

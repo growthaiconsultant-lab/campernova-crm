@@ -892,6 +892,15 @@ model BuyerLeadAssignment {
   @@map("buyer_lead_assignment")
 }
 
+enum BuyerVehicleUse {
+  ESCAPADAS
+  VIAJES_LARGOS
+  VIVIENDA
+  VIVIENDA_TEMPORADAS
+  VIVIENDA_ANUAL
+  OTRO
+}
+
 model BuyerLead {
   matchCatalog           Json                @default("{}") @map("match_catalog")
   id                     String              @id @default(cuid())
@@ -911,6 +920,8 @@ model BuyerLead {
   maxMonthlyPayment      Decimal?            @map("max_monthly_payment") @db.Decimal(10, 2) // cuota máx. mensual
   criticalEquipment      Json                @default("{}") @map("critical_equipment")
   useZone                String?             @map("use_zone")
+  intendedUse            BuyerVehicleUse?    @map("intended_use")
+  otherUse               String?             @map("other_use")
   purchaseTimeline       String?             @map("purchase_timeline")
   // ── Preferencias RV (Fase #3 v1) — nullable / additivo ──
   preferredCategory      VehicleCategory?    @map("preferred_category") // preferencia (puntúa)

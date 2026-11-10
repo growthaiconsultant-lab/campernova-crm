@@ -31,7 +31,9 @@ import {
 import { createCalendarEvent } from '@/app/(backoffice)/calendario/actions'
 import { MatchesSection } from '@/components/matches-section'
 import { currentMatches } from '@/lib/matching/current-matches'
-import { CatalogEditor } from '@/components/match-catalog-editor'
+import { BuyerUsageEditor } from '@/components/buyer-usage-editor'
+import { usageLabel } from '@/lib/buyer-vehicle-use'
+import { BuyerEquipmentEditor } from '@/components/match-catalog-editor'
 import { BuyerCatalogResults } from '@/components/buyer-catalog-results'
 import { readCatalog } from '@/lib/matching/catalog'
 import { OffersSection } from '@/components/offers-section'
@@ -476,6 +478,11 @@ export default async function FichaCompradorPage({
     counterpartHref: `/vendedores/${o.vehicle.sellerLeadId}`,
   }))
 
+  const usage = {
+    intendedUse: lead.intendedUse ?? null,
+    otherUse: lead.otherUse ?? null,
+    useZone: lead.useZone ?? null,
+  }
   const buyerCatalog = activeTab === 'busqueda' ? readCatalog(lead.matchCatalog) : {}
 
   const scoreContacto = lead.phone ? 100 : 70
@@ -1023,14 +1030,32 @@ export default async function FichaCompradorPage({
             data-sentry-mask
           >
             <BuyerSearchBrief
+              key={lead.id}
               buyer={{ ...defaultValues, criticalEquipment: equipment }}
               catalog={buyerCatalog}
+              usage={usageLabel(usage)}
+              usageEditor={
+                <BuyerUsageEditor id={lead.id} initial={usage} readOnly={!!lead.archivedAt} />
+              }
+              equipmentEditor={
+                lead.archivedAt ? null : (
+                  <BuyerEquipmentEditor
+                    id={lead.id}
+                    initial={buyerCatalog}
+                    basicRequirements={['solar', 'heating', 'shower', 'kitchen']
+                      .filter((key) => equipment[key])
+                      .concat(lead.needsGarage ? ['garage'] : [])}
+                    family={lead.vehicleType}
+                  />
+                )
+              }
               editOpen={searchParams.ver === 'editar'}
             >
               <BuyerLeadEditForm
                 key={lead.id}
                 leadId={lead.id}
                 defaultValues={defaultValues}
+                zoneInUsagePanel
                 showContact={searchParams.ver === 'editar'}
                 agents={agents}
                 legacySource={lead.source && !isBuyerSource(lead.source) ? lead.source : null}
@@ -1074,18 +1099,7 @@ export default async function FichaCompradorPage({
                 sellerLeadId={lead.tradeInSellerLeadId}
               />
             </details>
-            <CatalogEditor
-              side="buyer"
-              id={lead.id}
-              initial={buyerCatalog}
-              family={lead.vehicleType}
-              heading="Características y uso"
-            >
-              <p className="my-3 text-sm">
-                <span className="font-medium">Zona de uso</span> ·{' '}
-                {lead.useZone?.trim() || 'Por confirmar'}
-              </p>
-            </CatalogEditor>
+
             {searchRequest && (
               <details className={card}>
                 <summary className="cursor-pointer font-semibold">

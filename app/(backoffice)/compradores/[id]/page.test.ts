@@ -186,7 +186,9 @@ describe('navegación de la ficha integral', () => {
     for (const text of [
       'Editar búsqueda',
       'Condiciones de compra',
-      'Características y uso',
+      '¿Cómo la va a usar?',
+      '¿Qué necesita el vehículo?',
+      'Añadir característica',
       'Solicitud original',
       'Vehículo de parte de pago',
     ])
@@ -231,6 +233,13 @@ describe('navegación de la ficha integral', () => {
     expect(html).toContain('Garaje para equipaje en el vehículo')
     expect(html).not.toContain('límite de altura para aparcar')
     expect(html).not.toContain('Formulario bajo pedido')
+  })
+  it('muestra el uso residencial en el resumen sin convertirlo en equipamiento', async () => {
+    mocks.buyer.mockResolvedValue({ ...base, intendedUse: 'VIVIENDA_TEMPORADAS' })
+    const html = await render({ tab: 'busqueda' })
+    expect(html.split('id="editar"')[0]).toContain('Vivir en ella · Por temporadas')
+    expect(html).toContain('¿Durante cuánto tiempo?')
+    expect(html).toContain('Sin preferencias registradas.')
   })
 
   it('reúne interés, comparación y oferta, y conserva la restricción de una ficha archivada', async () => {
