@@ -16,6 +16,7 @@ async function main() {
       usage: 'tests/ui/buyer-usage-fixture.tsx',
       stock: 'tests/ui/buyer-stock-fixture.tsx',
       offers: 'tests/ui/buyer-offers-fixture.tsx',
+      postventa: 'tests/ui/buyer-postventa-fixture.tsx',
       documents: 'tests/ui/buyer-documents-fixture.tsx',
       searchRequest: 'tests/ui/search-request-fixture.tsx',
     },

@@ -398,7 +398,7 @@ describe('navegación de la ficha integral', () => {
     expect(await render()).toContain('?tab=postventa')
     const html = await render({ tab: 'postventa' })
     expect(html).toContain('Marca de prueba')
-    expect(html).toContain('Sin garantía activa')
+    expect(html).toContain('Sin garantía registrada')
   })
 
   it('muestra garantía e incidencias aun con una ficha sin entregas enlazadas', async () => {
@@ -406,10 +406,20 @@ describe('navegación de la ficha integral', () => {
       ...base,
       warranty: {
         id: 'w-qa',
+        _count: { tickets: 1, followups: 0 },
+        vehicle: { id: 'v', brand: 'Marca de prueba', model: 'Camper' },
+        delivery: { completedAt: null },
+        followups: [],
         startDate: new Date('2025-01-01'),
         endDate: new Date('2025-09-01'),
         tickets: [
-          { id: 'ticket', title: 'Incidencia de prueba', status: 'ABIERTO', priority: 'ALTA' },
+          {
+            id: 'ticket',
+            title: 'Incidencia de prueba',
+            status: 'ABIERTO',
+            priority: 'ALTA',
+            dueAt: null,
+          },
         ],
       },
     })

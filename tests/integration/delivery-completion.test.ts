@@ -21,6 +21,11 @@ import {
   DeliveryConflictError,
   type CompleteDeliveryHooks,
 } from '@/lib/delivery-completion'
+import {
+  buyerPostventaDetail,
+  buyerPostventaSummary,
+  postventaHistory,
+} from '@/lib/buyer-postventa'
 import { createGuardedTestPrisma, uniqueSuffix } from './db'
 
 let prisma: PrismaClient
@@ -177,6 +182,43 @@ afterAll(async () => {
 })
 
 describe('integración · finalización atómica de entrega (camino feliz)', () => {
+  it('cuenta las incidencias por cerrar y los envíos fallidos del comprador y recupera el historial', async () => {
+    const seeded = await seed()
+    const { warrantyId } = await runCompletion(seeded, new Date('2026-06-10T12:00:00Z'))
+    const rows = (['ABIERTO', 'EN_PROGRESO', 'RESUELTO', 'CERRADO', 'ANULADO'] as const).map(
+      (status) => ({
+        warrantyId,
+        status,
+        title: status,
+        description: 'Prueba de lectura',
+      })
+    )
+    await prisma.postventaTicket.createMany({ data: rows })
+    await prisma.postventaFollowup.update({
+      where: { warrantyId_type: { warrantyId, type: 'DIA_7' } },
+      data: { status: 'FALLIDO' },
+    })
+    const where = { id: seeded.buyerId }
+    const summary = (
+      await prisma.buyerLead.findUniqueOrThrow({
+        where,
+        select: { warranty: { select: buyerPostventaSummary } },
+      })
+    ).warranty!
+    const full = (
+      await prisma.buyerLead.findUniqueOrThrow({
+        where,
+        select: { warranty: { select: buyerPostventaDetail } },
+      })
+    ).warranty!
+    expect(summary._count).toEqual({ tickets: 3, followups: 1 })
+    expect(summary.tickets).toHaveLength(2)
+    expect(full._count).toEqual(summary._count)
+    expect(full.tickets).toHaveLength(5)
+    expect(full.followups.map((f) => f.status)).toEqual(['FALLIDO', 'PENDIENTE'])
+    expect(postventaHistory(full)).toHaveLength(2)
+  })
+
   it('completa entrega + vehículo + comprador + garantía + 2 seguimientos + 3 trazas', async () => {
     const seeded = await seed({ vehicleStatus: 'RESERVADO' })
     const now = new Date('2026-06-10T12:00:00Z')
