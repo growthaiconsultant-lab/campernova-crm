@@ -304,7 +304,8 @@ describe('navegación de la ficha integral', () => {
     const offer = {
       vehicleId: vehicle.id,
       vehicle,
-      amount: 42750,
+      amount: 42750.75,
+      createdAt: new Date('2026-10-09T10:10:00Z'),
       notes: 'Condiciones originales',
       reservedUntil: null,
     }
@@ -352,8 +353,10 @@ describe('navegación de la ficha integral', () => {
       'Fuera del stock disponible',
       'Añadido por el equipo',
       'id="interes-van-4"',
-      'Señal:',
-      'reserva hasta',
+      'Señal',
+      'Reservado hasta',
+      '42.750,75',
+      'Historial de operaciones',
       'Condiciones originales',
     ])
       expect(html).toContain(value)

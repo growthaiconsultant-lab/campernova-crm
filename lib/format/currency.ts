@@ -17,6 +17,11 @@
  */
 const NBSP = String.fromCharCode(0xa0)
 
-export function formatEur(value: number): string {
-  return `${value.toLocaleString('es-ES', { maximumFractionDigits: 0 })}${NBSP}€`
+export function formatEur(value: number, precision: 'whole' | 'cents' = 'whole'): string {
+  const decimals = precision === 'cents' && !Number.isInteger(value) ? 2 : 0
+  const amount = value.toLocaleString('es-ES', {
+    minimumFractionDigits: decimals,
+    maximumFractionDigits: decimals,
+  })
+  return `${amount}${NBSP}€`
 }

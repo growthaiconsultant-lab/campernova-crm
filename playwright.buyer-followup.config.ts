@@ -8,6 +8,7 @@ export default defineConfig({
     'buyer-autosave.spec.ts',
     'buyer-usage.spec.ts',
     'buyer-stock.spec.ts',
+    'buyer-offers.spec.ts',
     'search-request.spec.ts',
   ],
   fullyParallel: true,

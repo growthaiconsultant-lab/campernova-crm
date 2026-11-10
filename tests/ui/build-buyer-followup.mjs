@@ -15,6 +15,7 @@ async function main() {
       autosave: 'tests/ui/buyer-autosave-fixture.tsx',
       usage: 'tests/ui/buyer-usage-fixture.tsx',
       stock: 'tests/ui/buyer-stock-fixture.tsx',
+      offers: 'tests/ui/buyer-offers-fixture.tsx',
       searchRequest: 'tests/ui/search-request-fixture.tsx',
     },
     bundle: true,
@@ -28,7 +29,7 @@ async function main() {
         setup(plugin) {
           const stockStubs = {
             '@/app/(backoffice)/ofertas/actions':
-              'export const createOffer = () => ({}); export const updateOfferStatus = () => ({})',
+              'export const createOffer = (...args) => window.offerFixture.create(...args); export const updateOfferStatus = (...args) => window.offerFixture.update(...args)',
             '@/lib/db': 'export const db = {}',
             '@/lib/matching/prisma-deps':
               'export const prismaMatchingDeps = () => window.stockFixture',
