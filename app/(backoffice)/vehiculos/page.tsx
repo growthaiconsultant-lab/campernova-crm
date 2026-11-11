@@ -143,7 +143,7 @@ export default async function VehiculosPage({ searchParams }: { searchParams: In
                       {v.type ? (inventoryTypes[v.type] ?? v.type) : 'Sin tipo'}
                       {v.km != null ? ` · ${v.km.toLocaleString('es-ES')} km` : ''}
                     </div>
-                    <div className="mt-1.5">
+                    <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
                       <span
                         className={`inline-flex rounded-[6px] px-2 py-[3px] font-hanken text-[10.5px] font-semibold ${
                           v.sellerLead.canal === 'PRO'
@@ -153,6 +153,11 @@ export default async function VehiculosPage({ searchParams }: { searchParams: In
                       >
                         {VEHICLE_ORIGIN_LABELS[v.sellerLead.canal]}
                       </span>
+                      {v.sellerLead.status === 'DESCARTADO' && (
+                        <span className="rounded-[6px] bg-muted px-2 py-[3px] text-xs font-medium text-muted-foreground">
+                          Vendedor descartado
+                        </span>
+                      )}
                     </div>
                     <div className="mt-2 flex items-center justify-between gap-2">
                       <span className="font-hanken text-[15px] font-bold text-ink">

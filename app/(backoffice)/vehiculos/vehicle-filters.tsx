@@ -5,7 +5,6 @@ import { useRouter } from 'next/navigation'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { VEHICLE_ORIGIN_LABELS } from '@/lib/seller-intake'
-import { VEHICLE_STATUS_LABELS } from '@/lib/state-machine'
 import {
   criteriaKeys,
   criterionLabel,
@@ -14,6 +13,7 @@ import {
   inventoryOrders,
   inventoryPriceStates,
   inventoryTypes,
+  inventoryStatuses,
   inventoryUrl,
   type InventoryCriteria,
   type InventoryOrder,
@@ -121,7 +121,7 @@ export function VehicleFilters({
               />
             </label>
             {select('type', 'Tipo', 'Todos los tipos', inventoryTypes)}
-            {select('status', 'Estado del vehículo', 'Todos los estados', VEHICLE_STATUS_LABELS)}
+            {select('status', 'Estado del vehículo', 'Todos los estados', inventoryStatuses)}
             {select('priceState', 'Precio de venta', 'Todos', inventoryPriceStates)}
             {numeric('priceMax', 'Precio de venta máx. (€)')}
           </div>

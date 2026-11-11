@@ -94,11 +94,9 @@ export function SellerTopbarActions({ leadId, isTerminal }: Props) {
           <DialogHeader>
             <DialogTitle>Descartar vendedor</DialogTitle>
             <DialogDescription>
-              Es una <strong>decisión comercial</strong>: el vendedor pasará al estado{' '}
-              <strong>Descartado</strong>. El motivo es opcional. No se elimina ningún dato y el
-              registro <strong>seguirá visible</strong> en la bandeja y en la búsqueda (no se
-              archiva ni se oculta). Esta clasificación podrá corregirse después desde el selector
-              de estado.
+              El contacto pasará a <strong>Descartado</strong>. Si tiene un vehículo, podrás
+              encontrarlo en Vehículos con el filtro «Descartados (vehículo o vendedor)». El motivo
+              es opcional. Puedes corregir el estado del contacto después.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-3">
