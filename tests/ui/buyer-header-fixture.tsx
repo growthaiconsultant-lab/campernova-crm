@@ -5,8 +5,13 @@ import { BuyerTopbarActions } from '../../app/(backoffice)/compradores/[id]/buye
 
 function Fixture() {
   const [detail, setDetail] = useState(false)
+  const seller = location.pathname.startsWith('/vendedores')
   function openDetail() {
-    history.pushState(null, '', '/compradores/buyer-qa?tab=documentos')
+    history.pushState(
+      null,
+      '',
+      seller ? '/vendedores/seller-qa?tab=vendedor' : '/compradores/buyer-qa?tab=documentos'
+    )
     setDetail(true)
   }
   return (
@@ -18,11 +23,17 @@ function Fixture() {
         leading={<button aria-label="Abrir menú">Menú</button>}
       />
       {detail ? (
-        <BuyerTopbarActions leadId="buyer-qa" isTerminal={false}>
-          <p>Origen · Formulario web</p>
-        </BuyerTopbarActions>
+        seller ? (
+          <div>Ficha del vendedor</div>
+        ) : (
+          <BuyerTopbarActions leadId="buyer-qa" isTerminal={false}>
+            <p>Origen · Formulario web</p>
+          </BuyerTopbarActions>
+        )
       ) : (
-        <button onClick={openDetail}>Abrir comprador de prueba</button>
+        <button onClick={openDetail}>
+          {seller ? 'Abrir vendedor de prueba' : 'Abrir comprador de prueba'}
+        </button>
       )}
     </div>
   )

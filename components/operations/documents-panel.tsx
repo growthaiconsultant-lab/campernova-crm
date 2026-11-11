@@ -2,7 +2,7 @@
 import { useId, useRef, useState } from 'react'
 import type { OperationalTarget } from '@/lib/operations-input'
 import { MAX_OPERATIONAL_DOCUMENT_BYTES } from '@/lib/operations-limits'
-import { BuyerDocumentList, OperationalDocumentList } from './document-list'
+import { LeadDocumentList, OperationalDocumentList } from './document-list'
 import { Upload } from 'lucide-react'
 import { TargetPicker } from './target-picker'
 import {
@@ -17,7 +17,8 @@ export function DocumentsPanel({
   initialTarget?: OperationalTarget
   fixedTarget?: boolean
 }) {
-  const buyerView = fixedTarget && initialTarget?.type === 'buyerLead'
+  const leadView =
+    fixedTarget && (initialTarget?.type === 'buyerLead' || initialTarget?.type === 'sellerLead')
   const formId = useId()
   const trigger = useRef<HTMLButtonElement>(null)
   const [uploadOpen, setUploadOpen] = useState(false)
@@ -57,7 +58,7 @@ export function DocumentsPanel({
         setName('')
         operationId.current = undefined
         if (fileInput.current) fileInput.current.value = ''
-        if (buyerView) {
+        if (leadView) {
           setUploadOpen(false)
           requestAnimationFrame(() => trigger.current?.focus())
         }
@@ -84,18 +85,22 @@ export function DocumentsPanel({
   }
   return (
     <section
-      data-sentry-mask={buyerView || undefined}
+      data-sentry-mask={leadView || undefined}
       className={
-        buyerView
+        leadView
           ? 'ph-no-capture ph-mask mx-auto max-w-4xl space-y-4 rounded-xl border border-border bg-card p-4 sm:p-5'
           : 'space-y-4 rounded-xl border bg-card p-5'
       }
     >
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h2 className="text-lg font-semibold">
-          {buyerView ? 'Documentos del comprador' : 'Presupuestos y documentos operativos'}
+          {leadView
+            ? type === 'sellerLead'
+              ? 'Documentos del vendedor'
+              : 'Documentos del comprador'
+            : 'Presupuestos y documentos operativos'}
         </h2>
-        {buyerView && (
+        {leadView && (
           <button
             ref={trigger}
             type="button"
@@ -112,10 +117,10 @@ export function DocumentsPanel({
       </div>
       <form
         id={formId}
-        hidden={buyerView && !uploadOpen}
+        hidden={leadView && !uploadOpen}
         onSubmit={upload}
         className={
-          buyerView ? 'space-y-3 rounded-lg border border-border bg-muted/20 p-4' : 'space-y-3'
+          leadView ? 'space-y-3 rounded-lg border border-border bg-muted/20 p-4' : 'space-y-3'
         }
       >
         <p className="text-sm text-muted-foreground">
@@ -229,8 +234,8 @@ export function DocumentsPanel({
       )}
       {!id ? (
         <p>Selecciona el destino para ver sus documentos.</p>
-      ) : buyerView ? (
-        <BuyerDocumentList
+      ) : leadView ? (
+        <LeadDocumentList
           key={id + ':' + revision}
           target={{ type, id }}
           busy={busy}

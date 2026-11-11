@@ -1,3 +1,4 @@
+import { pendingSellerCalendarEvents, sellerSteps } from '@/lib/seller-agenda'
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
 import { randomUUID } from 'node:crypto'
 import type { User } from '@prisma/client'
@@ -61,6 +62,18 @@ describe('seguimiento del vendedor', () => {
     ])
     expect(result[0]).toMatchObject({ ok: true })
     expect(result[0]).toEqual(result[1])
+    const row = await db.sellerLead.findUniqueOrThrow({
+      where: { id: seller.id },
+      include: { calendarEvents: { ...pendingSellerCalendarEvents, take: 1 }, agent: true },
+    })
+    expect(
+      sellerSteps(
+        row.calendarEvents,
+        row.nextActionType,
+        row.nextActionDueAt,
+        row.agent?.name ?? null
+      )[0]
+    ).toMatchObject({ title: data.next.title, owner: owner.name })
     const items = await getCalendarItems(
       prismaCalendarDeps(db),
       { from: new Date(), to: new Date(Date.now() + 2 * 86400000) },

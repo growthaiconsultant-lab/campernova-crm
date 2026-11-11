@@ -2,11 +2,10 @@ import Link from 'next/link'
 import type { NextActionType, OfferStatus, VehicleStatus } from '@prisma/client'
 import { SellerFollowupForm } from './seller-followup-form'
 import { NextActionEditor } from './next-action-editor'
-import { NEXT_ACTION_LABELS } from '@/lib/next-action'
+import { sellerSteps, type SellerCalendarEvent, type SellerStep } from '@/lib/seller-agenda'
 import { groupBuyerOffers, offerDateLabel } from '@/lib/buyer-offers'
 import { saveSellerFollowup } from '@/app/(backoffice)/vendedores/[id]/followup-action'
 
-type Step = { id: string | null; title: string; due: Date | null; owner: string | null }
 type Props = {
   id: string
   archived: boolean
@@ -14,7 +13,7 @@ type Props = {
   actor: string
   reminderType: NextActionType | null
   reminderDue: Date | null
-  events: { id: string; title: string; startAt: Date; assignedTo: { name: string } | null }[]
+  events: SellerCalendarEvent[]
   vehicle: { status: VehicleStatus; salePrice: number | null; publishedAt: Date | null } | null
   offers: {
     id: string
@@ -46,26 +45,13 @@ export function SellerFollowupPanel({
   vehicle,
   offers,
 }: Props) {
-  const steps: Step[] = events.map((e) => ({
-    id: e.id,
-    title: e.title,
-    due: e.startAt,
-    owner: e.assignedTo?.name ?? null,
-  }))
-  if (reminderType)
-    steps.push({
-      id: null,
-      title: NEXT_ACTION_LABELS[reminderType],
-      due: reminderDue,
-      owner: agent,
-    })
-  steps.sort((a, b) => (a.due?.getTime() ?? Infinity) - (b.due?.getTime() ?? Infinity))
+  const steps = sellerSteps(events, reminderType, reminderDue, agent)
   const [first, ...others] = steps
   const groups = groupBuyerOffers(offers),
     reservation = groups.reservations[0],
     offer = groups.open[0]
   const path = '/vendedores/' + id
-  function stepInfo(step: Step) {
+  function stepInfo(step: SellerStep) {
     return (
       <div className="min-w-0 space-y-1">
         <p className="break-words text-base font-semibold">

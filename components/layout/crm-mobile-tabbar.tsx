@@ -3,6 +3,7 @@
 import {
   LayoutDashboard,
   ShoppingCart,
+  UserRound,
   Package,
   Calendar,
   Wrench,
@@ -12,11 +13,7 @@ import {
 import { MobileTabBar, type MobileTab } from '@/components/redesign'
 import type { UserRole } from '@prisma/client'
 
-/**
- * Tab bar inferior móvil del rediseño (mockups M1/MC1/MV1…): Inicio ·
- * Compradores · Vehículos · Agenda. Se filtra por rol (mismas reglas que el
- * sidebar) y se completa con los módulos del rol si alguno no aplica.
- */
+/** Accesos móviles disponibles para cada rol del CRM. */
 const TABS: (MobileTab & { roles: UserRole[] })[] = [
   {
     href: '/dashboard',
@@ -25,6 +22,7 @@ const TABS: (MobileTab & { roles: UserRole[] })[] = [
     roles: ['ADMIN', 'AGENTE', 'TALLER', 'ENTREGAS', 'MARKETING'],
   },
   { href: '/compradores', label: 'Compradores', icon: ShoppingCart, roles: ['ADMIN', 'AGENTE'] },
+  { href: '/vendedores', label: 'Vendedores', icon: UserRound, roles: ['ADMIN', 'AGENTE'] },
   {
     href: '/vehiculos',
     label: 'Vehículos',
@@ -43,7 +41,7 @@ const TABS: (MobileTab & { roles: UserRole[] })[] = [
 ]
 
 export function CrmMobileTabBar({ userRole }: { userRole: UserRole }) {
-  const tabs = TABS.filter((t) => t.roles.includes(userRole)).slice(0, 4)
+  const tabs = TABS.filter((t) => t.roles.includes(userRole))
   if (tabs.length < 2) return null
   return <MobileTabBar tabs={tabs} />
 }

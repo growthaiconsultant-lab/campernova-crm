@@ -115,7 +115,8 @@ it.each([
   ['economia', 'Tasación oficial'],
   ['compradores', 'Ofertas'],
   ['actividad', 'Actividad del lead'],
-  ['preparacion', 'Documentos vinculados al vendedor'],
+  ['preparacion', 'Datos y documentos del vendedor'],
+  ['vendedor', 'Documentos del vendedor'],
 ])('conserva el acceso directo a %s', async (tab, title) => {
   find.mockResolvedValue({ ...seller, vehicle })
   const html = await render(tab)
@@ -213,7 +214,7 @@ it('enlaza al taller y conserva la distinción entre fecha de ITV vencida e info
 it('sin vehículo mantiene accesibles los documentos del vendedor', async () => {
   const html = await render('preparacion')
   expect(html).toContain('Sin vehículo vinculado. Puedes consultar')
-  expect(html).toContain('Documentos vinculados al vendedor')
+  expect(html).toContain('Datos y documentos del vendedor')
   expect(html).not.toContain('Listo para publicar')
 })
 
@@ -223,4 +224,48 @@ it('un vendedor archivado no recibe una invitación de publicación aunque el ex
   expect(html).toContain('Ficha del vendedor archivada')
   expect(html).not.toContain('Listo para publicar')
   expect(html).not.toContain('>Publicar<')
+})
+
+it('la pestaña Vendedor muestra los datos y sus documentos aunque no haya vehículo', async () => {
+  const html = await render('vendedor')
+  for (const text of [
+    'Datos del vendedor',
+    'Editar datos del vendedor',
+    'Documentos del vendedor',
+    'Subir documento',
+    'Contactar',
+    'Gestionar ficha',
+  ])
+    expect(html).toContain(text)
+  expect(html).not.toContain('Galería del vehículo')
+})
+it('una solicitud pendiente que intenta abrir Vendedor vuelve a revisión', async () => {
+  find.mockResolvedValue({ ...seller, intakeStatus: 'PENDIENTE' })
+  const html = await render('vendedor')
+  expect(html).toContain('Datos de la solicitud')
+  expect(html).not.toContain('Editar datos del vendedor')
+})
+
+it('la cabecera de Vehículo y documentos permite consultar la siguiente acción y volver a seguimiento', async () => {
+  find.mockResolvedValue({
+    ...seller,
+    vehicle,
+    calendarEvents: [
+      {
+        id: 'e',
+        title: 'Revisar documentación',
+        startAt: new Date('2028-02-14T11:30:00Z'),
+        assignedTo: { name: 'Comercial' },
+      },
+    ],
+  })
+  const html = await render('preparacion')
+  const header = html.slice(html.indexOf('<header'), html.indexOf('</header>'))
+  for (const item of [
+    'Contactar',
+    'Gestionar ficha',
+    'Revisar documentación',
+    '?tab=resumen#seller-next',
+  ])
+    expect(header).toContain(item)
 })

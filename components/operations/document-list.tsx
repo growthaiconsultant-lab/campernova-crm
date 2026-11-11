@@ -157,7 +157,7 @@ export function OperationalDocumentList(props: ListProps) {
   return <DocumentRows {...props} view={view} />
 }
 
-export function BuyerDocumentList({ target, busy, download }: ListProps) {
+export function LeadDocumentList({ target, busy, download }: ListProps) {
   const budgets = useDocumentPage(target, 'PRESUPUESTO')
   const other = useDocumentPage(target, 'OPERATIVO')
   const empty =
@@ -169,7 +169,9 @@ export function BuyerDocumentList({ target, busy, download }: ListProps) {
     <div className="space-y-4">
       {empty ? (
         <p className="rounded-lg bg-muted/40 p-4 text-sm text-muted-foreground">
-          Aún no hay documentos para este comprador.
+          {target.type === 'sellerLead'
+            ? 'Aún no hay documentos para este vendedor.'
+            : 'Aún no hay documentos para este comprador.'}
         </p>
       ) : (
         (

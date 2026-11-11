@@ -69,3 +69,18 @@ test('una lectura fallida se recupera sin ocultar los presupuestos', async ({ pa
   await page.getByRole('button', { name: 'Reintentar' }).click()
   await expect(page.getByText('Plano anterior.pdf')).toBeVisible()
 })
+
+test('el apartado Vendedor carga sus propios documentos con la subida recogida', async ({
+  page,
+}) => {
+  await load(page, 'seller')
+  await expect(page.getByRole('heading', { name: 'Documentos del vendedor' })).toBeVisible()
+  await expect(
+    page
+      .getByRole('region', { name: 'Presupuestos' })
+      .getByRole('button', { name: 'Descargar Presupuesto 22.pdf', exact: true })
+  ).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Guardar documento' })).toBeHidden()
+  await page.getByRole('button', { name: 'Subir documento' }).click()
+  await expect(page.getByRole('button', { name: 'Guardar documento' })).toBeVisible()
+})

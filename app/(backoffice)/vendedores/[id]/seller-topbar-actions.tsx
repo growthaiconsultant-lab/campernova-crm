@@ -54,19 +54,15 @@ export function SellerTopbarActions({ leadId, isTerminal }: Props) {
 
   return (
     <>
-      <button
-        onClick={() => !isTerminal && setDiscardOpen(true)}
-        disabled={isTerminal}
-        className="flex h-8 w-8 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:cursor-not-allowed disabled:opacity-40"
-        title={isTerminal ? 'Lead en estado final' : 'Descartar vendedor'}
-      >
-        <Ban className="h-4 w-4" />
-      </button>
-
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
-          <button className="flex h-8 w-8 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-muted hover:text-foreground">
-            <MoreHorizontal className="h-4 w-4" />
+          <button
+            type="button"
+            aria-label="Gestionar ficha"
+            className="inline-flex min-h-11 items-center gap-2 rounded-lg border px-3 text-sm font-semibold hover:bg-muted"
+          >
+            <MoreHorizontal aria-hidden className="h-4 w-4" />
+            Gestionar ficha
           </button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" className="w-52">

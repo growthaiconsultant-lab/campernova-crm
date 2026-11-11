@@ -1,3 +1,4 @@
+import { pendingSellerCalendarEvents, sellerSteps } from '@/lib/seller-agenda'
 import { notFound } from 'next/navigation'
 import { Suspense } from 'react'
 import Link from 'next/link'
@@ -77,7 +78,7 @@ import {
   SELLER_RISK_COLORS,
 } from '@/lib/deal-terms'
 import { StatusPill } from '@/components/status-pill'
-import { AlertTriangle, Info, CheckCircle2, Phone, Mail, ChevronLeft } from 'lucide-react'
+import { AlertTriangle, Info, CheckCircle2, Phone, Mail, UserRound } from 'lucide-react'
 import { QuickAdvanceButton } from './quick-advance-button'
 import { InfoTooltip } from '@/components/info-tooltip'
 import { SellerIntakePanel } from './seller-intake-panel'
@@ -167,11 +168,7 @@ export default async function FichaVendedorPage({
           },
         },
         agent: true,
-        calendarEvents: {
-          where: { status: { in: ['PROGRAMADO', 'CONFIRMADO', 'EN_CURSO'] } },
-          orderBy: [{ startAt: 'asc' }, { id: 'asc' }],
-          select: { id: true, title: true, startAt: true, assignedTo: { select: { name: true } } },
-        },
+        calendarEvents: pendingSellerCalendarEvents,
       },
     }),
     db.user.findMany({ select: { id: true, name: true }, orderBy: { name: 'asc' } }),
@@ -199,6 +196,7 @@ export default async function FichaVendedorPage({
         'resumen',
         'actividad',
         'preparacion',
+        'vendedor',
         ...(v ? ['compradores', 'economia', 'publicacion'] : []),
       ]
     : ['resumen', 'actividad']
@@ -209,6 +207,16 @@ export default async function FichaVendedorPage({
     : activeTab === 'actividad' && isAdmitted
       ? 'resumen'
       : activeTab
+
+  const showHeaderStep = isAdmitted && activeTab !== 'resumen'
+  const nextStep = showHeaderStep
+    ? sellerSteps(
+        lead.calendarEvents,
+        lead.nextActionType,
+        lead.nextActionDueAt,
+        lead.agent?.name ?? null
+      )[0]
+    : undefined
 
   // A3 — gate de la tasación oficial: entrada activa + inspección de entrada COMPLETADA + estado
   // elegible. Determina si el panel de tasación oficial se habilita (la barrera dura vive en el
@@ -461,6 +469,7 @@ export default async function FichaVendedorPage({
   const tabs: LeadTab[] = isAdmitted
     ? [
         { key: 'resumen', label: 'Seguimiento' },
+        { key: 'vendedor', label: 'Vendedor' },
         { key: 'preparacion', label: 'Vehículo y documentos' },
         ...(v ? [{ key: 'compradores', label: 'Venta' }] : []),
       ]
@@ -530,93 +539,106 @@ export default async function FichaVendedorPage({
   // ── Layout ─────────────────────────────────────────────────────────────────
   return (
     <div className="-mx-6 -mt-6 flex min-h-[calc(100%_+_1.5rem)] flex-col lg:-mb-6 lg:min-h-[calc(100%_+_3rem)]">
-      {/* ── Topbar sticky ── */}
-      <header className="z-20 flex min-h-[56px] shrink-0 flex-wrap items-center justify-between gap-2 border-b border-border bg-card px-4 py-2 md:px-8 lg:sticky lg:top-0 lg:h-[60px] lg:py-0">
-        <nav className="flex items-center gap-2 font-mono text-[11px] uppercase tracking-[0.12em] text-muted-foreground">
-          <Link
-            href="/vendedores"
-            className="flex items-center gap-1 transition-colors hover:text-foreground"
-          >
-            <ChevronLeft className="h-3.5 w-3.5" />
-            Vendedores
-          </Link>
-          <span className="text-muted-foreground/40">/</span>
-          <span className="font-semibold text-foreground">
-            {personLabel(lead.name, { role: 'Vendedor sin identificar' })}
-          </span>
-        </nav>
-        <div className="flex items-center gap-2">
-          {isAdmitted && (
-            <SellerTopbarActions leadId={lead.id} isTerminal={!nextLeadStatuses.length} />
-          )}
-          {lead.phone && (
-            <WhatsAppButton
-              phone={lead.phone}
-              message={sellerWhatsAppMessage(
-                lead.name,
-                v ? { type: v.type, brand: v.brand, model: v.model } : undefined
-              )}
-              leadId={lead.id}
-              leadType="seller"
-            />
-          )}
-          {isAdmitted && primaryNextStatus && (
-            <div className="hidden sm:block">
-              <QuickAdvanceButton
-                leadId={lead.id}
-                nextStatus={primaryNextStatus}
-                label={`Mover a ${SELLER_LEAD_STATUS_LABELS[primaryNextStatus as SellerLeadStatus]}`}
-                variant="outline"
-              />
-            </div>
-          )}
-        </div>
-      </header>
-
       <SellerIntakePanel leadId={lead.id} status={lead.intakeStatus} />
-
-      <section className="border-b bg-card px-4 pt-5 md:px-10">
-        <div className="flex flex-wrap items-start justify-between gap-4">
-          <div className="min-w-0">
-            <h1 className="break-words text-2xl font-semibold">
-              {personLabel(lead.name, { role: 'Vendedor sin identificar' })}
-            </h1>
-            <p className="mt-1 text-sm">
-              {v
-                ? [vehicleLabel(v), v.km != null ? v.km.toLocaleString('es-ES') + ' km' : null]
-                    .filter(Boolean)
-                    .join(' · ')
-                : 'Sin vehículo vinculado'}
-            </p>
+      <header className="border-b border-border bg-card px-4 pt-4 sm:px-7 sm:pt-5">
+        <div className="mb-3 flex flex-wrap items-start justify-between gap-3">
+          <div className="flex min-w-0 flex-1 items-center gap-3 sm:min-w-64">
+            <span
+              aria-hidden="true"
+              className="hidden h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-brand-tint text-lg font-bold text-brand sm:flex"
+            >
+              {lead.name
+                ?.trim()
+                .split(/\s+/)
+                .slice(0, 2)
+                .map((part) => part.charAt(0))
+                .join('')
+                .toUpperCase() || <UserRound size={18} />}
+            </span>
+            <div className="min-w-0">
+              <div className="flex flex-wrap items-center gap-2">
+                <h1 className="break-words text-2xl font-bold tracking-tight sm:text-3xl">
+                  {personLabel(lead.name, { role: 'Vendedor sin identificar' })}
+                </h1>
+                <span className="sr-only">Estado del contacto</span>
+                <StatusPill status={lead.status} entity="seller" />
+                {lead.archivedAt && <strong>Archivado</strong>}
+              </div>
+              <p className="mt-1 text-sm">
+                {v
+                  ? [vehicleLabel(v), v.km != null ? v.km.toLocaleString('es-ES') + ' km' : null]
+                      .filter(Boolean)
+                      .join(' · ')
+                  : 'Sin vehículo vinculado'}
+              </p>
+              <p className="mt-1 flex items-center gap-1.5 text-xs text-muted-foreground">
+                <UserRound size={14} aria-hidden /> Responsable ·{' '}
+                {lead.agent?.name ?? 'Sin asignar'}
+              </p>
+            </div>
           </div>
-          <p className="text-sm">
-            <span className="block text-xs text-muted-foreground">Responsable</span>
-            {lead.agent?.name ?? 'Sin asignar'}
-          </p>
+          <div className="flex w-full min-w-0 flex-wrap items-start gap-2 sm:w-auto">
+            <details className="min-w-0 max-w-full">
+              <summary className="flex min-h-11 w-fit cursor-pointer list-none items-center gap-2 rounded-lg border bg-card px-3 text-sm font-semibold hover:bg-muted">
+                <Phone size={16} aria-hidden /> Contactar
+              </summary>
+              <div className="mt-2 grid max-w-64 gap-2 rounded-lg border bg-card p-3 text-sm">
+                {' '}
+                {lead.phone && (
+                  <a
+                    href={`tel:${lead.phone}`}
+                    className="inline-flex items-center gap-1 rounded-md border border-border px-2 py-1 text-xs text-muted-foreground transition-colors hover:border-green-500 hover:text-green-600"
+                  >
+                    <Phone className="h-3 w-3" />
+                    {lead.phone}
+                  </a>
+                )}
+                {lead.email && (
+                  <a
+                    href={`mailto:${lead.email}`}
+                    className="inline-flex items-center gap-1 rounded-md border border-border px-2 py-1 text-xs text-muted-foreground transition-colors hover:border-foreground hover:text-foreground"
+                  >
+                    <Mail className="h-3 w-3" />
+                    {lead.email}
+                  </a>
+                )}
+                {lead.phone && (
+                  <WhatsAppButton
+                    phone={lead.phone}
+                    message={sellerWhatsAppMessage(
+                      lead.name,
+                      v ? { type: v.type, brand: v.brand, model: v.model } : undefined
+                    )}
+                    leadId={lead.id}
+                    leadType="seller"
+                  />
+                )}
+                {!lead.phone && !lead.email && <p>Contacto pendiente de completar.</p>}
+                {isAdmitted && (
+                  <Link
+                    className="text-brand underline"
+                    href={'/vendedores/' + lead.id + '?tab=vendedor'}
+                  >
+                    Ver datos del vendedor
+                  </Link>
+                )}
+              </div>
+            </details>
+            {isAdmitted && (
+              <SellerTopbarActions leadId={lead.id} isTerminal={!nextLeadStatuses.length} />
+            )}
+          </div>
         </div>
-        <div className="my-3 flex flex-wrap items-center gap-2 text-sm">
-          <span>Contacto</span>
-          <StatusPill status={lead.status} entity="seller" />
-          {lead.archivedAt && <strong>Archivado</strong>}
-          {lead.phone && (
-            <a
-              href={`tel:${lead.phone}`}
-              className="inline-flex items-center gap-1 rounded-md border border-border px-2 py-1 text-xs text-muted-foreground transition-colors hover:border-green-500 hover:text-green-600"
-            >
-              <Phone className="h-3 w-3" />
-              {lead.phone}
-            </a>
-          )}
-          {lead.email && (
-            <a
-              href={`mailto:${lead.email}`}
-              className="inline-flex items-center gap-1 rounded-md border border-border px-2 py-1 text-xs text-muted-foreground transition-colors hover:border-foreground hover:text-foreground"
-            >
-              <Mail className="h-3 w-3" />
-              {lead.email}
-            </a>
-          )}
-        </div>
+        {isAdmitted && primaryNextStatus && (
+          <div className="mb-2">
+            <QuickAdvanceButton
+              leadId={lead.id}
+              nextStatus={primaryNextStatus}
+              label={`Mover a ${SELLER_LEAD_STATUS_LABELS[primaryNextStatus as SellerLeadStatus]}`}
+              variant="outline"
+            />
+          </div>
+        )}
         {v && (
           <div className="mb-2 flex flex-wrap items-center gap-2 rounded-lg bg-sidebar-primary/5 px-3 py-2 text-sm">
             {isAdmitted && (
@@ -634,13 +656,41 @@ export default async function FichaVendedorPage({
             {v.desiredPrice != null && <span>Precio deseado · {EUR(Number(v.desiredPrice))}</span>}
           </div>
         )}
+        {showHeaderStep && (
+          <div className="mb-3 flex flex-wrap items-center justify-between gap-2 rounded-lg border px-3 py-2 text-sm">
+            <div className="min-w-0">
+              <span className="text-muted-foreground">Próxima acción</span>
+              <p className="break-words font-semibold">
+                {nextStep?.title ?? 'Sin próxima acción programada'}
+              </p>
+              {nextStep && (
+                <p className="text-xs text-muted-foreground">
+                  {nextStep.due
+                    ? nextStep.due.toLocaleString('es-ES', {
+                        timeZone: 'Europe/Madrid',
+                        dateStyle: 'short',
+                        timeStyle: 'short',
+                      }) + ' · Madrid'
+                    : 'Sin fecha'}{' '}
+                  · {nextStep.owner ?? 'Sin responsable'}
+                </p>
+              )}
+            </div>
+            <Link
+              className="inline-flex min-h-10 items-center font-semibold text-brand underline"
+              href={'/vendedores/' + lead.id + '?tab=resumen#seller-next'}
+            >
+              Ir a seguimiento →
+            </Link>
+          </div>
+        )}
         {/* Tabs */}
-        <div className="-mx-4 md:-mx-10">
+        <div className="-mx-4 sm:-mx-7">
           <Suspense fallback={<div className="h-12 border-b border-border" />}>
             <LeadTabNav tabs={tabs} activeKey={groupTab} />
           </Suspense>
         </div>
-      </section>
+      </header>
 
       {/* ── Contenido principal ── */}
       <div className="mx-auto w-full max-w-5xl flex-1">
@@ -918,7 +968,7 @@ export default async function FichaVendedorPage({
                   )}
                   {isAdmin && (
                     <Button asChild variant="outline" size="sm" className="mt-3 w-full text-xs">
-                      <Link href={`/vendedores/${lead.id}?tab=preparacion`}>
+                      <Link href={`/vendedores/${lead.id}?tab=vendedor`}>
                         {lead.agent ? 'Reasignar agente' : 'Asignar agente'}
                       </Link>
                     </Button>
@@ -1081,6 +1131,60 @@ export default async function FichaVendedorPage({
               </section>
             </>
           )}
+          {activeTab === 'vendedor' && (
+            <section aria-label="Vendedor" className="space-y-4">
+              <div className="rounded-xl border bg-card p-4 sm:p-5">
+                <h2 className="text-lg font-semibold">Datos del vendedor</h2>
+                <dl className="my-4 grid gap-3 text-sm sm:grid-cols-2">
+                  {[
+                    ['Nombre', lead.name],
+                    ['Teléfono', lead.phone],
+                    ['Correo electrónico', lead.email],
+                    ['Responsable', lead.agent?.name],
+                  ].map(([label, value]) => (
+                    <div key={label}>
+                      <dt className="text-muted-foreground">{label}</dt>
+                      <dd className="break-words font-medium">{value || 'Sin registrar'}</dd>
+                    </div>
+                  ))}
+                </dl>
+                <details>
+                  <summary className="cursor-pointer py-2 text-sm font-semibold text-brand">
+                    Editar datos del vendedor
+                  </summary>
+                  <div className="mt-3">
+                    <SellerLeadEditForm
+                      leadId={lead.id}
+                      defaultValues={leadDefaultValues}
+                      agents={agents}
+                      isAdmin={isAdmin}
+                    />
+                  </div>
+                </details>
+              </div>
+              {v && (
+                <Link
+                  href={'/vendedores/' + lead.id + '?tab=preparacion#prep-received'}
+                  className="inline-flex py-2 font-medium text-brand underline"
+                >
+                  Consultar DNI y contratos en el expediente del vehículo →
+                </Link>
+              )}
+              <DocumentsPanel
+                key={lead.id}
+                initialTarget={{ type: 'sellerLead', id: lead.id }}
+                fixedTarget
+              />
+            </section>
+          )}
+          {activeTab === 'preparacion' && (
+            <Link
+              href={'/vendedores/' + lead.id + '?tab=vendedor'}
+              className="inline-flex min-h-11 items-center text-sm font-semibold text-brand underline"
+            >
+              Datos y documentos del vendedor →
+            </Link>
+          )}
           {activeTab === 'preparacion' && !v && (
             <p className="rounded-xl border bg-card p-4">
               Sin vehículo vinculado. Puedes consultar los datos y los documentos del vendedor.
@@ -1091,70 +1195,33 @@ export default async function FichaVendedorPage({
               <summary className="cursor-pointer py-1 font-semibold">Más del expediente</summary>
               <div className="mt-2 space-y-3">
                 {/* ─────────────── PREPARACIÓN · datos ─────────────── */}
-                <details className="rounded-xl border bg-card p-4">
-                  <summary className="cursor-pointer py-1 font-semibold">
-                    Datos del vendedor y del vehículo
-                  </summary>
-                  <div className="mt-3">
-                    <div className="grid gap-6 lg:grid-cols-2">
-                      <Card>
-                        <CardHeader>
-                          <CardTitle className="text-base">Datos del vendedor</CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                          <SellerLeadEditForm
-                            leadId={lead.id}
-                            defaultValues={leadDefaultValues}
-                            agents={agents}
-                            isAdmin={isAdmin}
-                          />
-                        </CardContent>
-                      </Card>
-                      {v && vehicleDefaultValues && (
-                        <Card>
-                          <CardHeader>
-                            <CardTitle className="text-base">Datos del vehículo</CardTitle>
-                          </CardHeader>
-                          <CardContent>
-                            <VehicleEditForm
-                              key={v.updatedAt.toISOString()}
-                              version={v.updatedAt.toISOString()}
-                              vehicleId={v.id}
-                              defaultValues={vehicleDefaultValues}
-                              catalog={readCatalog(v.matchCatalog)}
-                            />
-                          </CardContent>
-                        </Card>
-                      )}
-                    </div>
-                  </div>
-                </details>
-
-                {/* ─────────────── PREPARACIÓN · expediente ─────────────── */}
-                {isAgente && (
+                {v && vehicleDefaultValues && (
                   <details className="rounded-xl border bg-card p-4">
                     <summary className="cursor-pointer py-1 font-semibold">
-                      Documentos del vendedor y del vehículo
+                      Datos del vehículo
                     </summary>
                     <div className="mt-3">
-                      <div className="space-y-5 pb-5">
-                        {v && (
-                          <>
-                            <h3 className="font-medium">Documentos vinculados al vehículo</h3>
-                            <DocumentsPanel
-                              key={v.id}
-                              initialTarget={{ type: 'vehicle', id: v.id }}
-                              fixedTarget
-                            />
-                          </>
-                        )}
-                        <h3 className="font-medium">Documentos vinculados al vendedor</h3>
-                        <DocumentsPanel
-                          key={params.id}
-                          initialTarget={{ type: 'sellerLead', id: params.id }}
-                          fixedTarget
-                        />
-                      </div>
+                      <VehicleEditForm
+                        key={v.updatedAt.toISOString()}
+                        version={v.updatedAt.toISOString()}
+                        vehicleId={v.id}
+                        defaultValues={vehicleDefaultValues}
+                        catalog={readCatalog(v.matchCatalog)}
+                      />
+                    </div>
+                  </details>
+                )}
+                {v && isAgente && (
+                  <details className="rounded-xl border bg-card p-4">
+                    <summary className="cursor-pointer py-1 font-semibold">
+                      Documentos operativos del vehículo
+                    </summary>
+                    <div className="mt-3">
+                      <DocumentsPanel
+                        key={v.id}
+                        initialTarget={{ type: 'vehicle', id: v.id }}
+                        fixedTarget
+                      />
                     </div>
                   </details>
                 )}
