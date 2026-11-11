@@ -35,6 +35,7 @@ type Ok = { ok: true }
 function refreshPhotos(sellerId: string) {
   revalidatePath('/vendedores/' + sellerId)
   revalidatePath('/vehiculos')
+  revalidatePath('/vendedores')
   revalidatePublicCatalog()
 }
 

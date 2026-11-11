@@ -82,6 +82,42 @@ describe('seller list', () => {
     )
   })
 
+  it('muestra la portada y una galería independiente por vehículo en tabla y móvil', async () => {
+    const vehicle = {
+      id: 'unit-a',
+      brand: 'Ford',
+      model: 'Nugget',
+      year: 2020,
+      type: 'CAMPER',
+      status: 'NUEVO',
+      photos: [{ url: '/ford.jpg', altText: 'Portada Ford' }],
+      _count: { photos: 3 },
+    }
+    mocks.findMany.mockResolvedValue([
+      { ...lead('seller-a'), vehicle },
+      {
+        ...lead('seller-b'),
+        vehicle: { ...vehicle, id: 'unit-b', brand: 'Fiat', photos: [], _count: { photos: 0 } },
+      },
+      lead('seller-c'),
+    ])
+    const html = renderToStaticMarkup(await VendedoresPage({ searchParams: {} }))
+    expect(mocks.findMany.mock.calls[0][0].include.vehicle.select).toMatchObject({
+      id: true,
+      photos: { take: 1, orderBy: [{ order: 'asc' }, { id: 'asc' }] },
+      _count: { select: { photos: true } },
+    })
+    for (const view of html.split('<table')) {
+      expect(view.match(/aria-label="Abrir galería de [^"]+"/g)).toHaveLength(2)
+      expect(view).toMatch(/Abrir galería de Ford [^"]+3 fotos/)
+      expect(view).toMatch(/Abrir galería de Fiat [^"]+0 fotos/)
+      expect(view).toContain('alt="Portada Ford"')
+      expect(view).toContain('href="/vendedores/seller-c"')
+      for (const link of view.match(/<a\b[^>]*>[\s\S]*?<\/a>/g) ?? [])
+        expect(link).not.toContain('Abrir galería')
+    }
+  })
+
   it('muestra la acción de calendario anterior al recordatorio tanto en tarjetas como en tabla', async () => {
     mocks.findMany.mockResolvedValue([
       {

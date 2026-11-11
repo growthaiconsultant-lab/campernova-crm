@@ -2,6 +2,7 @@ import { pendingSellerCalendarEvents, sellerSteps } from '@/lib/seller-agenda'
 import { SELLER_LEAD_STATUS_LABELS, VEHICLE_STATUS_LABELS } from '@/lib/state-machine'
 import { personLabel, vehicleLabel } from '@/lib/display'
 import Link from 'next/link'
+import { VehicleGalleryButton } from '@/components/vehicle-gallery-button'
 import { Plus } from 'lucide-react'
 import { db } from '@/lib/db'
 import { landingCaptureSelection } from '@/lib/landing/attribution'
@@ -181,6 +182,13 @@ export default async function VendedoresPage({ searchParams }: { searchParams: S
       agent: { select: { id: true, name: true } },
       vehicle: {
         select: {
+          id: true,
+          photos: {
+            take: 1,
+            orderBy: [{ order: 'asc' }, { id: 'asc' }],
+            select: { url: true, altText: true },
+          },
+          _count: { select: { photos: true } },
           brand: true,
           model: true,
           year: true,
@@ -235,7 +243,30 @@ export default async function VendedoresPage({ searchParams }: { searchParams: S
       </span>
     )
   }
+  function vehicleGallery({ vehicle }: Lead) {
+    if (!vehicle) return null
+    const cover = vehicle.photos[0]
+    return (
+      <VehicleGalleryButton
+        compact
+        vehicleId={vehicle.id}
+        title={vehicleLabel(vehicle)}
+        cover={cover?.url ?? null}
+        coverAlt={cover?.altText}
+        count={vehicle._count.photos}
+      />
+    )
+  }
+
   const columns: Column<Lead>[] = [
+    {
+      key: 'gallery',
+      header: <span className="sr-only">Fotos del vehículo</span>,
+      className: 'w-px !pl-3 !pr-0',
+      headerClassName: '!px-0',
+      rowLink: false,
+      cell: vehicleGallery,
+    },
     {
       key: 'seller',
       header: 'Vendedor',
@@ -370,6 +401,7 @@ export default async function VendedoresPage({ searchParams }: { searchParams: S
           rows={leads}
           rowKey={(l) => l.id}
           rowHref={(l) => `/vendedores/${l.id}`}
+          mobileCardLeading={vehicleGallery}
           mobileCard={(l) => (
             <>
               <div className="flex items-center justify-between gap-2">
