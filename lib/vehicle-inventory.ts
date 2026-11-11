@@ -1,4 +1,11 @@
 import { Prisma, type PrismaClient } from '@prisma/client'
+import { ACTIVE_DELIVERY_STATUSES, ACTIVE_OFFER_STATUSES } from './lead-archiving/domain'
+import { isReadyForStatus } from './vehicle-legal/validate'
+import { publicationBlockingWorkOrders } from './vehicle-legal/prisma-deps'
+import {
+  PUBLICACION_REQUIERE_FOTOS_CATEGORIZADAS,
+  countPhotosByCategory,
+} from './vehicle-legal/config'
 import { admittedSellerWhere, admittedVehicleWhere } from './seller-intake'
 import { eligibleBuyerCounterpartMatchWhere } from './matching'
 import {
@@ -95,13 +102,64 @@ export function readVehicleInventory(
                 select: { id: true, name: true, archivedAt: true, canal: true, status: true },
               },
               photos: { take: 1, orderBy: [{ order: 'asc' }, { id: 'asc' }] },
-              _count: { select: { matches: { where: eligibleBuyerCounterpartMatchWhere } } },
+              documents: { select: { category: true }, distinct: ['vehicleId', 'category'] },
+              deliveries: {
+                where: { status: { in: ACTIVE_DELIVERY_STATUSES } },
+                select: { id: true },
+                take: 1,
+              },
+              offers: {
+                where: { status: { in: ACTIVE_OFFER_STATUSES } },
+                select: {
+                  id: true,
+                  amount: true,
+                  status: true,
+                  buyerLead: { select: { name: true, archivedAt: true } },
+                },
+                orderBy: [{ createdAt: 'desc' }, { id: 'asc' }],
+              },
+              _count: {
+                select: {
+                  photos: true,
+                  workOrders: { where: { status: { in: publicationBlockingWorkOrders } } },
+                  matches: { where: eligibleBuyerCounterpartMatchWhere },
+                },
+              },
             },
           })
         : []
+      const photoCounts = new Map<string, ReturnType<typeof countPhotosByCategory>>()
+      if (PUBLICACION_REQUIERE_FOTOS_CATEGORIZADAS && ids.length) {
+        const groups = await tx.vehiclePhoto.groupBy({
+          by: ['vehicleId', 'category'],
+          where: { vehicleId: { in: ids.map((v) => v.id) } },
+          _count: true,
+        })
+        for (const group of groups) {
+          if (!group.category) continue
+          const counts = photoCounts.get(group.vehicleId) ?? countPhotosByCategory([])
+          counts[group.category] = group._count
+          photoCounts.set(group.vehicleId, counts)
+        }
+      }
       const byId = new Map(rows.map((row) => [row.id, row]))
       return {
-        vehicles: ids.map(({ id }) => byId.get(id)!),
+        vehicles: ids.map(({ id }) => {
+          const v = byId.get(id)!
+          const readyToPublish =
+            (v.status === 'NUEVO' || v.status === 'TASADO') &&
+            isReadyForStatus(
+              {
+                ...v,
+                photoCount: v._count.photos,
+                photosByCategory: photoCounts.get(id),
+                workOrdersBlockingCount: v._count.workOrders,
+              },
+              'PUBLICADO',
+              v.documents.map((d) => ({ category: d.category, exists: true }))
+            )
+          return { ...v, readyToPublish }
+        }),
         total,
         inventoryTotal,
         page,

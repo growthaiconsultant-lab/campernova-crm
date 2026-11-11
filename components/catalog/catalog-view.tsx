@@ -21,6 +21,7 @@ export type CatalogViewProps = {
   title: string
   intro: string
   vehicles: PublicVehicle[]
+  reserved?: PublicVehicle[]
   related?: { heading: string; links: RelatedLink[] }
 }
 
@@ -57,6 +58,7 @@ export function CatalogView({
   title,
   intro,
   vehicles,
+  reserved = [],
   related,
 }: CatalogViewProps) {
   return (
@@ -180,6 +182,16 @@ export function CatalogView({
                 </Link>
               </div>
             </div>
+          )}
+          {reserved.length > 0 && (
+            <section className="mt-12" aria-label="Vehículos reservados">
+              <h2 className="mb-4 text-2xl font-semibold">Vehículos reservados</h2>
+              <div className="grid grid-cols-3 gap-6 max-[1000px]:grid-cols-2 max-[640px]:grid-cols-1">
+                {reserved.map((v) => (
+                  <VehicleCatalogCard key={v.slug} vehicle={v} reserved />
+                ))}
+              </div>
+            </section>
           )}
         </div>
       </main>

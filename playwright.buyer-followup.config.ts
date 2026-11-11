@@ -14,6 +14,7 @@ export default defineConfig({
     'seller-followup.spec.ts',
     'seller-preparation.spec.ts',
     'vehicle-inventory.spec.ts',
+    'inventory-operations.spec.ts',
     'seller-sale.spec.ts',
     'search-request.spec.ts',
   ],

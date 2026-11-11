@@ -8,6 +8,12 @@ import { vehicleLabel } from '@/lib/display'
 import { isVehicleEligible } from '@/lib/matching'
 import { VEHICLE_STATUS_LABELS } from '@/lib/state-machine'
 import { setMissingSalePrice } from '../vendedores/[id]/cost-actions'
+import { InventorySaleActions } from './inventory-sale-actions'
+import { PublishVehicleButton } from '@/components/vehicle-legal/publish-vehicle-button'
+import { UnpublishButton } from '../vendedores/[id]/unpublish-button'
+import { webAvailability } from '@/lib/web-listing'
+import { vehicleSlug } from '@/lib/public-catalog'
+import { isValidOfferTransition } from '@/lib/offers'
 import { InventoryPriceEditor } from './inventory-price-editor'
 import { VehicleFilters } from './vehicle-filters'
 import { Eyebrow, EmptyState } from '@/components/redesign'
@@ -96,6 +102,13 @@ export default async function VehiculosPage({ searchParams }: { searchParams: In
             })
               ? v._count.matches
               : 0
+            const saleHref = `/vendedores/${v.sellerLeadId}?tab=compradores#venta-ofertas`
+            const status = v.status
+            const preparing = status === 'NUEVO' || status === 'TASADO'
+            const published = status === 'PUBLICADO'
+            const holds = v.offers.length > 0 || v.deliveries.length > 0
+            const active = !v.sellerLead.archivedAt
+            const availability = webAvailability(v.status, v.publishedAt)
             const reference = v.valuationRecommended ?? v.desiredPrice
             return (
               <article
@@ -187,6 +200,82 @@ export default async function VehiculosPage({ searchParams }: { searchParams: In
                     savePrice={setMissingSalePrice.bind(null, v.id)}
                   />
                 )}
+                <div className="flex flex-col items-start gap-2 border-t border-line p-3">
+                  {availability && (
+                    <Link
+                      href={'/comprar/' + vehicleSlug(v)}
+                      className="text-sm text-brand underline"
+                    >
+                      Ver anuncio en la web
+                    </Link>
+                  )}
+                  {active &&
+                    preparing &&
+                    (v.readyToPublish ? (
+                      <PublishVehicleButton vehicleId={v.id} label="Publicar en la web" />
+                    ) : (
+                      <Link
+                        href={`/vendedores/${v.sellerLeadId}?tab=preparacion`}
+                        className="inline-block text-sm font-medium text-brand underline"
+                      >
+                        Ver qué falta para publicar
+                      </Link>
+                    ))}
+                  {active && published && !holds && (
+                    <UnpublishButton vehicleId={v.id} label="Retirar de la web" />
+                  )}
+                  {active && (published || preparing) && (
+                    <InventorySaleActions
+                      status={status}
+                      vehicleId={v.id}
+                      title={vehicleLabel(v)}
+                      saleHref={saleHref}
+                      published={published && !v.deliveries.length}
+                      canDiscard={!holds}
+                      offers={v.offers
+                        .filter(
+                          (o) =>
+                            !o.buyerLead.archivedAt && isValidOfferTransition(o.status, 'ACEPTADA')
+                        )
+                        .map((o) => ({
+                          id: o.id,
+                          buyer: o.buyerLead.name,
+                          amount: Number(o.amount),
+                        }))}
+                    />
+                  )}
+                  {status === 'DESCARTADO' && (
+                    <Link
+                      className="text-sm text-brand underline"
+                      href={`/vendedores/${v.sellerLeadId}?tab=actividad`}
+                    >
+                      Ver historial del vehículo
+                    </Link>
+                  )}
+                  {holds && (published || preparing) && (
+                    <p className="text-xs text-muted-foreground">
+                      {v.deliveries.length ? 'Hay una entrega activa.' : 'Hay ofertas activas.'}{' '}
+                      Resuelve la operación antes de retirar o descartar el vehículo.
+                    </p>
+                  )}
+                  {v.deliveries[0] && (
+                    <Link
+                      className="block text-sm text-brand underline"
+                      href={`/entregas/${v.deliveries[0].id}`}
+                    >
+                      Ver entrega activa
+                    </Link>
+                  )}
+                  {(v.offers.length > 0 || status === 'RESERVADO' || status === 'VENDIDO') && (
+                    <Link className="block text-sm text-brand underline" href={saleHref}>
+                      {status === 'RESERVADO'
+                        ? 'Ver reserva en Venta'
+                        : status === 'VENDIDO'
+                          ? 'Ver venta'
+                          : 'Ver ofertas activas'}
+                    </Link>
+                  )}
+                </div>
               </article>
             )
           })}

@@ -1,5 +1,6 @@
 'use server'
 
+import { revalidatePublicCatalog } from '@/lib/revalidate-public-catalog'
 import { revalidatePath } from 'next/cache'
 import { catalogSchema } from '@/lib/matching/catalog'
 import { legacyProjection } from '@/lib/matching/vehicle-characteristics'
@@ -340,6 +341,7 @@ export async function updateVehicle(vehicleId: string, data: unknown, characteri
   await recalculateMatchesForVehicle(vehicleId, db)
 
   revalidatePath(`/vendedores/${vehicle.sellerLeadId}`)
+  revalidatePath('/vehiculos')
   // PUB-1: publicar (o editar un vehículo publicado) debe refrescar el catálogo público (ISR).
   revalidatePublicCatalog()
   return { ok: true }
@@ -457,6 +459,7 @@ async function publishVehicleInternal(
   // Se ejecuta tras el commit: no forma parte de la transición ni puede dejarla a medias.
   await recalculateMatchesForVehicle(vehicleId, db)
   revalidatePath(`/vendedores/${vehicle.sellerLeadId}`)
+  revalidatePath('/vehiculos')
   revalidatePublicCatalog()
   return { ok: true }
 }
@@ -835,15 +838,4 @@ export async function unpublishVehicle(
   revalidatePath('/vehiculos')
   revalidatePublicCatalog()
   return { ok: true }
-}
-
-/**
- * PUB-1: invalida el catálogo público (ISR) tras publicar/despublicar. La ficha pública vive en
- * `/comprar/[id]` con el SLUG como parámetro, así que se revalida el patrón de página completo en vez
- * de una URL concreta.
- */
-function revalidatePublicCatalog() {
-  revalidatePath('/comprar')
-  revalidatePath('/comprar/vehiculos')
-  revalidatePath('/comprar/[id]', 'page')
 }

@@ -26,6 +26,7 @@
  * `DELIVERY, VEHICLE AND VALUATION WRITERS REMAIN UNCOORDINATED UNTIL I3`
  */
 import type { LostReason, OfferStatus, Prisma, VehicleStatus } from '@prisma/client'
+import { ACTIVE_DELIVERY_STATUSES } from '@/lib/lead-archiving/domain'
 import type { LockRoot } from '@/lib/locking'
 import { OFFER_STATUS_LABELS, isValidOfferTransition } from '@/lib/offers'
 import {
@@ -43,6 +44,7 @@ export type OfferTransitionErrorCode =
   | 'OFFER_ROOT_CHANGED'
   | 'INVALID_TRANSITION'
   | 'VEHICLE_NOT_AVAILABLE'
+  | 'ACTIVE_DELIVERY'
   | 'RESERVATION_ALREADY_OWNED'
   | 'RESERVATION_OWNERSHIP_CONFLICT'
   | 'VEHICLE_RESERVATION_STATE_CONFLICT'
@@ -59,6 +61,7 @@ export const OFFER_TRANSITION_ERROR_MESSAGES: Record<OfferTransitionErrorCode, s
     'Los datos de la oferta han cambiado mientras se procesaba. Inténtalo de nuevo.',
   INVALID_TRANSITION: 'La oferta ya no está en el estado esperado. Recarga e inténtalo de nuevo.',
   VEHICLE_NOT_AVAILABLE: 'El vehículo debe estar publicado para aceptar la oferta.',
+  ACTIVE_DELIVERY: 'El vehículo ya tiene una entrega activa.',
   RESERVATION_ALREADY_OWNED:
     'El vehículo ya tiene otra oferta aceptada y no puede reservarse de nuevo.',
   RESERVATION_OWNERSHIP_CONFLICT:
@@ -232,7 +235,14 @@ export async function applyOfferTransitionTx(
 
   const vehicle = await tx.vehicle.findUnique({
     where: { id: offer.vehicleId },
-    select: { id: true, status: true, sellerLeadId: true, brand: true, model: true },
+    select: {
+      id: true,
+      status: true,
+      publishedAt: true,
+      sellerLeadId: true,
+      brand: true,
+      model: true,
+    },
   })
   if (!vehicle) throw new OfferTransitionError('VEHICLE_NOT_FOUND')
   if (vehicle.sellerLeadId !== p.resolvedSellerLeadId) {
@@ -268,6 +278,12 @@ export async function applyOfferTransitionTx(
       // Cubre TASADO (hay que publicar antes) y RESERVADO (la oferta es de respaldo).
       throw new OfferTransitionError('VEHICLE_NOT_AVAILABLE')
     }
+    if (
+      await tx.delivery.count({
+        where: { vehicleId: vehicle.id, status: { in: ACTIVE_DELIVERY_STATUSES } },
+      })
+    )
+      throw new OfferTransitionError('ACTIVE_DELIVERY')
     if ((await countOtherAcceptedOffers(tx, vehicle.id, offer.id)) > 0) {
       throw new OfferTransitionError('RESERVATION_ALREADY_OWNED')
     }
@@ -304,6 +320,9 @@ export async function applyOfferTransitionTx(
   const { reserved, released } = await applyOfferStatusChangeTx(
     tx,
     {
+      // Primera evidencia fechada para anuncios históricos que ya eran públicos al reservarse.
+      firstObservedPublication:
+        vehicle.status === 'PUBLICADO' && vehicle.publishedAt === null ? new Date() : undefined,
       offerId: offer.id,
       fromStatus,
       toStatus: p.toStatus,

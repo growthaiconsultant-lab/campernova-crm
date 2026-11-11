@@ -5,6 +5,7 @@
  * ⚠️ Regla de oro: NUNCA exponer datos internos (purchasePrice, margin,
  * valuaciones, sellerLead, costes…). El precio público es SIEMPRE `salePrice`.
  */
+import { webAvailability, type PublicAvailability } from './web-listing'
 import { db } from '@/lib/db'
 import type { Vehicle, VehiclePhoto, VehicleType } from '@prisma/client'
 
@@ -217,19 +218,45 @@ export async function getPublishedVehiclesByBrandSlug(
   return { brand: matching[0]!.brand ?? '', vehicles: matching }
 }
 
-/**
- * Un vehículo publicado por su slug (o null si no existe / no está publicado).
- * Resiliente: si la DB falla, devuelve null (la página hará 404) en vez de un 500.
- */
-export async function getPublishedVehicleBySlug(slug: string): Promise<PublicVehicle | null> {
+export async function getCatalogInventory(): Promise<{
+  available: PublicVehicle[]
+  reserved: PublicVehicle[]
+}> {
+  try {
+    const rows = await db.vehicle.findMany({
+      where: { OR: [{ status: 'PUBLICADO' }, { status: 'RESERVADO', publishedAt: { not: null } }] },
+      include: { photos: true },
+      orderBy: [{ publishedAt: 'desc' }, { id: 'asc' }],
+    })
+    return {
+      available: rows.filter((v) => v.status === 'PUBLICADO').map(mapToPublicVehicle),
+      reserved: rows.filter((v) => v.status === 'RESERVADO').map(mapToPublicVehicle),
+    }
+  } catch (error) {
+    console.error('[public-catalog] error al consultar la disponibilidad:', error)
+    return { available: [], reserved: [] }
+  }
+}
+
+export type PublicVehicleDetail = PublicVehicle & { availability: PublicAvailability }
+
+/** El enlace sigue vigente tras la reserva o venta de un anuncio previamente público. */
+export async function getPublishedVehicleBySlug(slug: string): Promise<PublicVehicleDetail | null> {
   const id = idFromSlug(slug)
   if (!id) return null
   try {
     const v = await db.vehicle.findFirst({
-      where: { id, status: 'PUBLICADO' },
+      where: {
+        id,
+        OR: [
+          { status: 'PUBLICADO' },
+          { status: { in: ['RESERVADO', 'VENDIDO'] }, publishedAt: { not: null } },
+        ],
+      },
       include: { photos: true },
     })
-    return v ? mapToPublicVehicle(v) : null
+    const availability = v && webAvailability(v.status, v.publishedAt)
+    return v && availability ? { ...mapToPublicVehicle(v), availability } : null
   } catch (err) {
     console.error('[public-catalog] error al cargar vehículo por slug:', err)
     return null

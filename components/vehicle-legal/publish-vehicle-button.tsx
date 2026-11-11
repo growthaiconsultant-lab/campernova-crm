@@ -10,9 +10,10 @@ import { forcePublishVehicle, publishVehicle } from '@/app/(backoffice)/vendedor
 interface Props {
   vehicleId: string
   force?: boolean
+  label?: string
 }
 
-export function PublishVehicleButton({ vehicleId, force = false }: Props) {
+export function PublishVehicleButton({ vehicleId, force = false, label = 'Publicar' }: Props) {
   const router = useRouter()
   const [pending, startTransition] = useTransition()
 
@@ -62,7 +63,7 @@ export function PublishVehicleButton({ vehicleId, force = false }: Props) {
           : 'Publicando…'
         : force
           ? 'Publicar de todas formas'
-          : 'Publicar'}
+          : label}
     </Button>
   )
 }

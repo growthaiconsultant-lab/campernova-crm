@@ -54,12 +54,8 @@ export const SELLER_LEAD_TRANSITIONS: Record<SellerLeadStatus, SellerLeadStatus[
  * o completando la entrega. `isValidTransition` admite `from === to`, de modo que los campos de un
  * vehículo reservado siguen siendo editables.
  *
- * `TEMPORARY MANUAL DISCARD REMOVAL IS A SAFETY MEASURE UNTIL I3D` — I3B retira todas las
- * transiciones manuales a `DESCARTADO`. Descartar un vehículo debe bloquear ofertas y entregas
- * activas, pero `createDelivery` sigue sin coordinar y puede crear una entrega **después** del
- * descarte; coordinar el descarte ahora daría una garantía falsa. Se reintroducirá en I3D, ya
- * coordinado, cuando I3C haya puesto Delivery bajo el protocolo.
- * `FINAL DISCARD COORDINATION REMAINS PENDING UNTIL DELIVERY IS COORDINATED`.
+ * El descarte de la tarjeta usa discardInventoryVehicle y comprueba ofertas y entregas bajo
+ * el lock del vehículo. La edición genérica sigue sin permitir esa transición.
  *
  * `A3 REMOVES THE MANUAL NUEVO → TASADO TRANSITION` — `NUEVO` ya no tiene salidas manuales. La
  * primera transición `NUEVO → TASADO` es consecuencia EXCLUSIVA de una tasación OFICIAL completada

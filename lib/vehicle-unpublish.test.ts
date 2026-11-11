@@ -8,6 +8,7 @@ function makeTx() {
     vehicle: { findUnique: vi.fn(), updateMany: vi.fn() },
     sellerLead: { findUnique: vi.fn() },
     offer: { count: vi.fn() },
+    delivery: { count: vi.fn().mockResolvedValue(0) },
     activity: { create: vi.fn() },
   }
 }

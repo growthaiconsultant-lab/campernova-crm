@@ -1,7 +1,14 @@
-import type { PrismaClient } from '@prisma/client'
+import type { PrismaClient, WorkOrderStatus } from '@prisma/client'
 import type { VehicleLegalInput, DocumentSummary } from './types'
 
 import { countPhotosByCategory } from './config'
+
+export const publicationBlockingWorkOrders: WorkOrderStatus[] = [
+  'PENDIENTE',
+  'EN_DIAGNOSTICO',
+  'PRESUPUESTADA',
+  'EN_CURSO',
+]
 
 export async function getVehicleLegalInput(
   db: PrismaClient,
@@ -20,7 +27,7 @@ export async function getVehicleLegalInput(
       salePrice: true,
       photos: { select: { category: true } },
       workOrders: {
-        where: { status: { in: ['PENDIENTE', 'EN_DIAGNOSTICO', 'PRESUPUESTADA', 'EN_CURSO'] } },
+        where: { status: { in: publicationBlockingWorkOrders } },
         select: { id: true },
       },
     },

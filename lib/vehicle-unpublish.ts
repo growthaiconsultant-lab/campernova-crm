@@ -16,7 +16,7 @@
  *   5. traza `Activity` `PUBLICACION_RETIRADA` (motivo/actor). NO es fuente de verdad.
  */
 import type { Prisma } from '@prisma/client'
-import { ACTIVE_OFFER_STATUSES } from '@/lib/lead-archiving/domain'
+import { ACTIVE_OFFER_STATUSES, ACTIVE_DELIVERY_STATUSES } from '@/lib/lead-archiving/domain'
 import { VehicleStatusConflictError } from '@/lib/vehicle-status'
 
 export type UnpublishErrorCode =
@@ -24,6 +24,7 @@ export type UnpublishErrorCode =
   | 'VEHICLE_ROOT_CHANGED'
   | 'LEAD_ARCHIVED'
   | 'NOT_PUBLISHED'
+  | 'ACTIVE_DELIVERY'
   | 'ACTIVE_OFFERS'
 
 /** Mensajes visibles: sin ids, estado interno, SQL, Prisma, stack ni PII. */
@@ -33,6 +34,7 @@ export const UNPUBLISH_ERROR_MESSAGES: Record<UnpublishErrorCode, string> = {
     'Los datos del vehículo han cambiado mientras se procesaba. Inténtalo de nuevo.',
   LEAD_ARCHIVED: 'No se puede retirar el anuncio de un vendedor archivado. Reactívalo primero.',
   NOT_PUBLISHED: 'El vehículo no está publicado.',
+  ACTIVE_DELIVERY: 'Resuelve la entrega activa antes de retirar el anuncio.',
   ACTIVE_OFFERS: 'No se puede retirar el anuncio: hay ofertas activas sobre este vehículo.',
 }
 
@@ -94,6 +96,12 @@ export async function unpublishVehicleTx(
   })
   if (activeOffers > 0) throw new UnpublishError('ACTIVE_OFFERS')
 
+  if (
+    await tx.delivery.count({
+      where: { vehicleId: p.vehicleId, status: { in: ACTIVE_DELIVERY_STATUSES } },
+    })
+  )
+    throw new UnpublishError('ACTIVE_DELIVERY')
   await hooks.beforeWrite?.()
 
   // (4) CAS: PUBLICADO → TASADO. `publishedAt` NO se toca (se conserva).
