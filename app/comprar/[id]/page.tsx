@@ -1,5 +1,5 @@
 import type { Metadata } from 'next'
-import Image from 'next/image'
+import { PublicVehicleGallery } from '@/components/catalog/public-vehicle-gallery'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { Shield, Eye, Handshake, Sparkles, Check, MapPin, Phone, BadgeCheck } from 'lucide-react'
@@ -109,9 +109,6 @@ export default async function VehicleDetailPage({ params }: Props) {
     ...(v.location ? [{ lab: 'Ubicación', val: v.location }] : []),
   ]
 
-  const mainPhoto = v.photos[0]
-  const sidePhotos = v.photos.slice(1, 3)
-
   return (
     <>
       <JsonLd data={vehicleJsonLd(v)} />
@@ -147,60 +144,7 @@ export default async function VehicleDetailPage({ params }: Props) {
             <span style={{ color: 'var(--cn-teal-900)' }}>{titleYear(v)}</span>
           </nav>
 
-          {/* Gallery */}
-          <div
-            className="mb-10 overflow-hidden rounded-cn-lg"
-            style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 8, aspectRatio: '16/9' }}
-          >
-            <div className="relative" style={{ background: 'var(--cn-cream-200)' }}>
-              {mainPhoto ? (
-                <Image
-                  src={mainPhoto.url}
-                  alt={mainPhoto.alt}
-                  fill
-                  sizes="(max-width: 1000px) 100vw, 66vw"
-                  className="object-cover"
-                  priority
-                />
-              ) : (
-                <div
-                  className="flex h-full items-center justify-center font-mono text-xs tracking-widest"
-                  style={{ color: 'var(--cn-ink-500)' }}
-                >
-                  Fotos próximamente
-                </div>
-              )}
-            </div>
-
-            <div style={{ display: 'grid', gridTemplateRows: '1fr 1fr', gap: 8 }}>
-              {[0, 1].map((i) => {
-                const photo = sidePhotos[i]
-                return (
-                  <div key={i} className="relative" style={{ background: 'var(--cn-cream-200)' }}>
-                    {photo ? (
-                      <Image
-                        src={photo.url}
-                        alt={photo.alt}
-                        fill
-                        sizes="33vw"
-                        className="object-cover"
-                      />
-                    ) : (
-                      i === 1 &&
-                      v.photos.length > 3 && (
-                        <span
-                          className="absolute bottom-2 right-2 rounded-full px-3 py-1.5 font-mono text-[11px] tracking-[0.08em] text-white"
-                          style={{ background: 'rgba(10,10,10,0.82)' }}
-                        >
-                          + {v.photos.length - 3} fotos
-                        </span>
-                      )
-                    )}
-                  </div>
-                )
-              })}
-            </div>
-          </div>
+          <PublicVehicleGallery photos={v.photos} />
 
           {/* Detail layout */}
           <div

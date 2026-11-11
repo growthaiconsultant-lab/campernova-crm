@@ -81,7 +81,7 @@ export function InventorySaleActions({
         {canDiscard && (
           <button
             type="button"
-            className="rounded px-2 py-2 text-sm text-muted-foreground hover:text-destructive"
+            className="rounded py-1.5 text-xs text-muted-foreground hover:text-destructive"
             onClick={() => open('discard')}
           >
             Descartar vehículo

@@ -59,11 +59,12 @@ export function InventoryPublication({
 
   const priceForm = missingPrice && savePrice && editing
   return (
-    <div className="w-full space-y-2">
+    <div className={review || priceForm ? 'w-full space-y-2' : 'max-w-full'}>
       <div className="flex flex-wrap gap-2">
         <Button
           type="button"
           size="sm"
+          className="h-8 px-2.5 text-xs"
           disabled={busy || Boolean(priceForm)}
           aria-controls={panelId}
           aria-expanded={review}

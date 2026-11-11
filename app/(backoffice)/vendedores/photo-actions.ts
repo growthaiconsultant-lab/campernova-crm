@@ -2,6 +2,8 @@
 
 import { revalidatePath } from 'next/cache'
 import { randomUUID } from 'node:crypto'
+import { withLockedRoots } from '@/lib/locking/with-locked-roots'
+import { revalidatePublicCatalog } from '@/lib/revalidate-public-catalog'
 import { db } from '@/lib/db'
 import { requireCanGenerateAds } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
@@ -30,6 +32,21 @@ type UploadOk = {
 }
 type Ok = { ok: true }
 
+function refreshPhotos(sellerId: string) {
+  revalidatePath('/vendedores/' + sellerId)
+  revalidatePath('/vehiculos')
+  revalidatePublicCatalog()
+}
+
+export async function listVehiclePhotos(vehicleId: string) {
+  await requireCanGenerateAds()
+  return db.vehiclePhoto.findMany({
+    where: { vehicleId },
+    orderBy: [{ order: 'asc' }, { id: 'asc' }],
+    select: { id: true, url: true, order: true, category: true, altText: true },
+  })
+}
+
 export async function uploadVehiclePhoto(formData: FormData): Promise<UploadOk | ActionError> {
   await requireCanGenerateAds()
 
@@ -50,12 +67,16 @@ export async function uploadVehiclePhoto(formData: FormData): Promise<UploadOk |
     return { error: 'El archivo supera 2 MB. Comprime la imagen.' }
   }
 
-  const vehicle = await db.vehicle.findUnique({ where: { id: vehicleId }, select: { id: true } })
+  const vehicle = await db.vehicle.findUnique({
+    where: { id: vehicleId },
+    select: { sellerLeadId: true },
+  })
   if (!vehicle) return { error: 'Vehículo no encontrado' }
 
   const ext = file.type === 'image/png' ? 'png' : file.type === 'image/webp' ? 'webp' : 'jpg'
   const filename = `${randomUUID()}.${ext}`
   const path = vehiclePhotoPath(vehicleId, filename)
+  const url = vehiclePhotoPublicUrl(path)
 
   const supabase = createClient()
   const { error: uploadError } = await supabase.storage
@@ -66,27 +87,34 @@ export async function uploadVehiclePhoto(formData: FormData): Promise<UploadOk |
     return { error: `Error al subir: ${uploadError.message}` }
   }
 
-  const url = vehiclePhotoPublicUrl(path)
-
-  const last = await db.vehiclePhoto.findFirst({
-    where: { vehicleId },
-    orderBy: { order: 'desc' },
-    select: { order: true },
-  })
-  const nextOrder = (last?.order ?? -1) + 1
-
-  const photo = await db.vehiclePhoto.create({
-    data: { vehicleId, url, order: nextOrder, category },
-    select: { id: true, url: true, order: true, category: true },
-  })
-
-  const v = await db.vehicle.findUnique({
-    where: { id: vehicleId },
-    select: { sellerLeadId: true },
-  })
-  if (v) revalidatePath(`/vendedores/${v.sellerLeadId}`)
-
-  return { photo }
+  try {
+    const photo = await withLockedRoots([{ type: 'vehicle', id: vehicleId }], async (tx) => {
+      if ((await tx.vehiclePhoto.count({ where: { vehicleId } })) >= 30) return null
+      const last = await tx.vehiclePhoto.aggregate({ where: { vehicleId }, _max: { order: true } })
+      return tx.vehiclePhoto.create({
+        data: { vehicleId, url, order: (last._max.order ?? -1) + 1, category },
+        select: { id: true, url: true, order: true, category: true, altText: true },
+      })
+    })
+    if (photo) {
+      refreshPhotos(vehicle.sellerLeadId)
+      return { photo }
+    }
+  } catch (error) {
+    // Una escritura con resultado incierto puede haberse confirmado.
+    const saved = await db.vehiclePhoto.findFirst({
+      where: { vehicleId, url },
+      select: { id: true, url: true, order: true, category: true, altText: true },
+    })
+    if (saved) {
+      refreshPhotos(vehicle.sellerLeadId)
+      return { photo: saved }
+    }
+    await supabase.storage.from(VEHICLE_PHOTOS_BUCKET).remove([path])
+    throw error
+  }
+  await supabase.storage.from(VEHICLE_PHOTOS_BUCKET).remove([path])
+  return { error: 'Has alcanzado el máximo de 30 fotos.' }
 }
 
 export async function deleteVehiclePhoto(photoId: string): Promise<Ok | ActionError> {
@@ -107,13 +135,15 @@ export async function deleteVehiclePhoto(photoId: string): Promise<Ok | ActionEr
     }
   }
 
-  await db.vehiclePhoto.delete({ where: { id: photoId } })
+  await withLockedRoots([{ type: 'vehicle', id: photo.vehicleId }], (tx) =>
+    tx.vehiclePhoto.deleteMany({ where: { id: photoId, vehicleId: photo.vehicleId } })
+  )
 
   const v = await db.vehicle.findUnique({
     where: { id: photo.vehicleId },
     select: { sellerLeadId: true },
   })
-  if (v) revalidatePath(`/vendedores/${v.sellerLeadId}`)
+  if (v) refreshPhotos(v.sellerLeadId)
 
   return { ok: true }
 }
@@ -139,13 +169,14 @@ export async function setVehiclePhotoCategory(
 
   await db.vehiclePhoto.update({ where: { id: photoId }, data: { category: parsed } })
 
-  if (photo.vehicle?.sellerLeadId) revalidatePath(`/vendedores/${photo.vehicle.sellerLeadId}`)
+  if (photo.vehicle?.sellerLeadId) refreshPhotos(photo.vehicle.sellerLeadId)
   return { ok: true }
 }
 
 export async function reorderVehiclePhotos(
   vehicleId: string,
-  orderedIds: string[]
+  orderedIds: string[],
+  previousIds?: string[]
 ): Promise<Ok | ActionError> {
   await requireCanGenerateAds()
 
@@ -153,24 +184,35 @@ export async function reorderVehiclePhotos(
     return { error: 'Orden inválido' }
   }
 
-  const photos = await db.vehiclePhoto.findMany({
-    where: { vehicleId },
-    select: { id: true },
+  const changed = await withLockedRoots([{ type: 'vehicle', id: vehicleId }], async (tx) => {
+    const photos = await tx.vehiclePhoto.findMany({
+      where: { vehicleId },
+      orderBy: [{ order: 'asc' }, { id: 'asc' }],
+      select: { id: true },
+    })
+    const ids = new Set(orderedIds)
+    if (
+      ids.size !== orderedIds.length ||
+      photos.length !== ids.size ||
+      photos.some((p) => !ids.has(p.id))
+    )
+      return false
+    if (photos.every((p, i) => p.id === orderedIds[i])) return true
+    if (
+      previousIds &&
+      (previousIds.length !== photos.length || photos.some((p, i) => previousIds[i] !== p.id))
+    )
+      return false
+    for (let index = 0; index < orderedIds.length; index++)
+      await tx.vehiclePhoto.update({ where: { id: orderedIds[index] }, data: { order: index } })
+    return true
   })
-  const existingIds = new Set(photos.map((p) => p.id))
-  if (orderedIds.length !== photos.length || !orderedIds.every((id) => existingIds.has(id))) {
-    return { error: 'IDs no coinciden con las fotos del vehículo' }
-  }
-
-  await db.$transaction(
-    orderedIds.map((id, index) => db.vehiclePhoto.update({ where: { id }, data: { order: index } }))
-  )
-
+  if (!changed) return { error: 'La galería ha cambiado. Revisa las fotos y vuelve a ordenarlas.' }
   const v = await db.vehicle.findUnique({
     where: { id: vehicleId },
     select: { sellerLeadId: true },
   })
-  if (v) revalidatePath(`/vendedores/${v.sellerLeadId}`)
+  if (v) refreshPhotos(v.sellerLeadId)
 
   return { ok: true }
 }

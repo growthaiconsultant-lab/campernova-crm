@@ -65,7 +65,7 @@ async function main() {
             contents: path.endsWith('/legal-actions')
               ? 'export const uploadVehicleDocument=(id,body)=>window.preparationFixture.document(id,body); export const deleteVehicleDocument=()=>{}; export const getVehicleDocumentSignedUrl=()=>({ok:false});'
               : path.endsWith('/photo-actions')
-                ? 'export const uploadVehiclePhoto=body=>window.preparationFixture.photo(body); export const deleteVehiclePhoto=()=>{}; export const reorderVehiclePhotos=()=>{}; export const setVehiclePhotoCategory=()=>{};'
+                ? 'export const uploadVehiclePhoto=body=>window.preparationFixture.photo(body); export const listVehiclePhotos=()=>window.preparationFixture.list(); export const deleteVehiclePhoto=id=>window.preparationFixture.remove(id); export const reorderVehiclePhotos=(id,order)=>window.preparationFixture.reorder(order); export const setVehiclePhotoCategory=()=>{};'
                 : 'export const publishVehicle=()=>({ok:true}); export const forcePublishVehicle=()=>({ok:true})',
           }))
           plugin.onResolve({ filter: /^next\/image$/ }, () => ({

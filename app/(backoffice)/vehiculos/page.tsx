@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import Image from 'next/image'
+import { VehicleGalleryButton } from '@/components/vehicle-gallery-button'
 import { Package } from 'lucide-react'
 import { db } from '@/lib/db'
 import { requireCanViewVehiculos } from '@/lib/auth'
@@ -116,83 +116,56 @@ export default async function VehiculosPage({ searchParams }: { searchParams: In
                 key={v.id}
                 className="hover:border-ink3/40 group overflow-hidden rounded-[14px] border border-line bg-card transition-colors"
               >
+                <VehicleGalleryButton
+                  vehicleId={v.id}
+                  title={vehicleLabel(v)}
+                  cover={photo?.url ?? null}
+                  coverAlt={photo?.altText}
+                  count={v._count.photos}
+                />
                 <Link
                   href={`/vendedores/${v.sellerLead.id}`}
-                  className="block focus-visible:outline-offset-[-3px]"
+                  className="block space-y-1 px-3 py-2 focus-visible:outline-offset-[-3px]"
                 >
-                  {/* Foto */}
-                  <div className="relative h-[140px] w-full overflow-hidden bg-track">
-                    {photo ? (
-                      <Image
-                        src={photo.url}
-                        alt={photo.altText ?? `${v.brand} ${v.model}`}
-                        fill
-                        className="object-cover"
-                        sizes="(max-width:640px) 100vw, (max-width:1024px) 50vw, 25vw"
-                      />
-                    ) : (
-                      <div className="flex h-full items-center justify-center text-ink3">
-                        <Package size={28} strokeWidth={1.5} />
-                      </div>
-                    )}
-                    <span
-                      className="absolute left-2.5 top-2.5 rounded-[6px] px-2 py-[3px] font-hanken text-[10.5px] font-semibold text-white"
-                      style={{ backgroundColor: STATUS_HEX[v.status] }}
-                    >
-                      {VEHICLE_STATUS_LABELS[v.status]}
-                    </span>
-                    {v.plate && (
-                      <span className="absolute right-2.5 top-2.5 rounded-[6px] bg-white/90 px-2 py-[3px] font-mono text-[10px] font-semibold text-ink2">
-                        {v.plate}
-                      </span>
-                    )}
-                  </div>
-
-                  {/* Cuerpo */}
-                  <div className="p-3">
-                    <div className="truncate font-hanken text-[13.5px] font-semibold text-ink">
+                  <div className="flex items-baseline justify-between gap-2">
+                    <span className="min-w-0 font-hanken text-sm font-semibold leading-tight text-ink">
                       {vehicleLabel(v)}
-                    </div>
-                    <div className="mt-0.5 font-mono text-[11px] text-ink3">
+                    </span>
+                    <span className="shrink-0 text-right text-sm font-semibold text-ink">
+                      {v.salePrice != null
+                        ? formatEur(Number(v.salePrice), 'cents')
+                        : 'Sin precio de venta'}
+                    </span>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-ink2">
+                    <span>
                       {v.type ? (inventoryTypes[v.type] ?? v.type) : 'Sin tipo'}
                       {v.km != null ? ` · ${v.km.toLocaleString('es-ES')} km` : ''}
-                    </div>
-                    <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+                    </span>
+                    {v.plate && <span className="font-mono">{v.plate}</span>}
+                  </div>
+                  <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[11px] text-ink2">
+                    <span className="inline-flex items-center gap-1 font-medium">
                       <span
-                        className={`inline-flex rounded-[6px] px-2 py-[3px] font-hanken text-[10.5px] font-semibold ${
-                          v.sellerLead.canal === 'PRO'
-                            ? 'bg-brand-tint text-brand'
-                            : 'bg-track text-ink2'
-                        }`}
-                      >
-                        {VEHICLE_ORIGIN_LABELS[v.sellerLead.canal]}
+                        aria-hidden
+                        className="h-2 w-2 rounded-full"
+                        style={{ backgroundColor: STATUS_HEX[v.status] }}
+                      />
+                      {VEHICLE_STATUS_LABELS[v.status]}
+                    </span>
+                    <span>{VEHICLE_ORIGIN_LABELS[v.sellerLead.canal]}</span>
+                    {v.sellerLead.status === 'DESCARTADO' && <span>Vendedor descartado</span>}
+                    {compatibleCount > 0 && (
+                      <span className="font-medium text-brand">
+                        {compatibleCount} compatible{compatibleCount === 1 ? '' : 's'}
                       </span>
-                      {v.sellerLead.status === 'DESCARTADO' && (
-                        <span className="rounded-[6px] bg-muted px-2 py-[3px] text-xs font-medium text-muted-foreground">
-                          Vendedor descartado
-                        </span>
-                      )}
-                    </div>
-                    <div className="mt-2 flex items-center justify-between gap-2">
-                      <span className="font-hanken text-[15px] font-bold text-ink">
-                        <span className="block">
-                          {v.salePrice != null
-                            ? formatEur(Number(v.salePrice), 'cents')
-                            : 'Sin precio de venta'}
-                        </span>
-                        {v.salePrice == null && reference != null && (
-                          <span className="block text-xs font-normal text-ink2">
-                            {v.valuationRecommended != null ? 'Tasación' : 'Precio deseado'} ·{' '}
-                            {formatEur(Number(reference), 'cents')}
-                          </span>
-                        )}
+                    )}
+                    {v.salePrice == null && reference != null && (
+                      <span>
+                        {v.valuationRecommended != null ? 'Tasación' : 'Precio deseado'} ·{' '}
+                        {formatEur(Number(reference), 'cents')}
                       </span>
-                      {compatibleCount > 0 && (
-                        <span className="rounded-[6px] bg-brand-tint px-2 py-[3px] font-hanken text-[11px] font-semibold text-brand">
-                          {compatibleCount} compatible{compatibleCount === 1 ? '' : 's'}
-                        </span>
-                      )}
-                    </div>
+                    )}
                   </div>
                 </Link>
                 {!(active && preparing) && viewer.role === 'ADMIN' && v.salePrice == null && (
@@ -201,13 +174,7 @@ export default async function VehiculosPage({ searchParams }: { searchParams: In
                     savePrice={setMissingSalePrice.bind(null, v.id)}
                   />
                 )}
-                <div className="flex flex-col items-start gap-2 border-t border-line p-3">
-                  <Link
-                    href={`/vendedores/${v.sellerLeadId}?tab=preparacion#checklist-match`}
-                    className="text-sm font-medium text-brand underline"
-                  >
-                    Checklist para el match
-                  </Link>
+                <div className="flex flex-wrap items-center gap-x-3 gap-y-1 border-t border-line px-3 py-1.5">
                   {availability && (
                     <Link
                       href={'/comprar/' + vehicleSlug(v)}
@@ -236,6 +203,12 @@ export default async function VehiculosPage({ searchParams }: { searchParams: In
                       }
                     />
                   )}
+                  <Link
+                    href={`/vendedores/${v.sellerLeadId}?tab=preparacion#checklist-match`}
+                    className="py-1 text-xs font-medium text-brand underline"
+                  >
+                    Checklist para el match
+                  </Link>
                   {active && published && !holds && (
                     <UnpublishButton vehicleId={v.id} label="Retirar de la web" />
                   )}
