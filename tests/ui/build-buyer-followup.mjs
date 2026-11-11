@@ -16,6 +16,7 @@ async function main() {
       usage: 'tests/ui/buyer-usage-fixture.tsx',
       stock: 'tests/ui/buyer-stock-fixture.tsx',
       offers: 'tests/ui/buyer-offers-fixture.tsx',
+      vehicleInventory: 'tests/ui/vehicle-inventory-fixture.tsx',
       sellerSale: 'tests/ui/seller-sale-fixture.tsx',
       sellerPreparation: 'tests/ui/seller-preparation-fixture.tsx',
       sellerFollowup: 'tests/ui/seller-followup-fixture.tsx',
@@ -135,7 +136,7 @@ async function main() {
                   : path === 'buyer-actions'
                     ? 'export function updateBuyerLead(id, data, fields) { return window.autosaveHarness.save(data, fields) }'
                     : path.endsWith('navigation')
-                      ? 'const router = { refresh() {}, replace() {}, push(url) { window.autosaveHarness.destination = url } }; export function useRouter() { return router } export const usePathname = () => location.pathname; export const useParams = () => ({id: location.pathname.split("/")[2]}); export const useSearchParams = () => new URLSearchParams(location.search);'
+                      ? 'const router = { refresh() {}, replace() {}, push(url) { if (window.inventoryNavigate) window.inventoryNavigate(url); else window.autosaveHarness.destination = url } }; export function useRouter() { return router } export const usePathname = () => location.pathname; export const useParams = () => ({id: location.pathname.split("/")[2]}); export const useSearchParams = () => new URLSearchParams(location.search);'
                       : 'import React from "react"; export default function Link(props) { return React.createElement("a", props) }',
             resolveDir: process.cwd(),
           }))
