@@ -46,5 +46,6 @@ export async function advanceLeadStatus(leadId: string, nextStatus: string) {
 
   revalidatePath(`/vendedores/${leadId}`)
   revalidatePath('/vendedores')
+  if (lead.status === 'DESCARTADO' || nextStatus === 'DESCARTADO') revalidatePath('/vehiculos')
   return { error: null }
 }

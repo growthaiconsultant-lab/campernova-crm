@@ -3,6 +3,10 @@ import { VEHICLE_ORIGIN_LABELS } from './seller-intake'
 import { VEHICLE_STATUS_LABELS } from './state-machine'
 import { formatEur } from './format/currency'
 
+export const inventoryStatuses = {
+  ...VEHICLE_STATUS_LABELS,
+  DESCARTADO: 'Descartados (vehículo o vendedor)',
+}
 export const inventoryTypes = { CAMPER: 'Camper', AUTOCARAVANA: 'Autocaravana' }
 export const inventoryPriceStates = {
   missing: 'Sin precio de venta',
@@ -114,7 +118,7 @@ export function criterionLabel(key: Criterion, value: string) {
     case 'type':
       return inventoryTypes[value as keyof typeof inventoryTypes] ?? value
     case 'status':
-      return VEHICLE_STATUS_LABELS[value as keyof typeof VEHICLE_STATUS_LABELS] ?? value
+      return inventoryStatuses[value as keyof typeof inventoryStatuses] ?? value
     case 'origin':
       return VEHICLE_ORIGIN_LABELS[value as keyof typeof VEHICLE_ORIGIN_LABELS] ?? value
     case 'yearMin':

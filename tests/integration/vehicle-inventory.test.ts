@@ -11,12 +11,15 @@ import { readVehicleInventory } from '@/lib/vehicle-inventory'
 const actor = vi.hoisted(() => ({ role: 'AGENTE', id: '' }))
 vi.mock('@/lib/auth', () => ({
   requireCanViewVehiculos: async () => actor,
+  requireAgente: async () => actor,
   requireAdmin: async () => {
     if (actor.role !== 'ADMIN') throw Error('Se requiere administración')
     return actor
   },
 }))
 vi.mock('next/cache', () => ({ revalidatePath: vi.fn() }))
+import { discardSellerLead } from '@/app/(backoffice)/vendedores/[id]/actions'
+import { advanceLeadStatus } from '@/app/(backoffice)/vendedores/[id]/quick-advance-actions'
 import { setMissingSalePrice } from '@/app/(backoffice)/vendedores/[id]/cost-actions'
 vi.mock('@/lib/db', async () => ({ db: (await import('./db')).createGuardedTestPrisma() }))
 vi.mock('next/navigation', async (original) => ({
@@ -245,6 +248,46 @@ it('solo administración asigna el primer precio desde una tarjeta, con una sola
     ).toBe(1)
   } finally {
     actor.role = 'AGENTE'
+    actor.id = ''
+    await db.activity.deleteMany({ where: { agentId: user.id } })
+    await db.user.delete({ where: { id: user.id } })
+  }
+})
+
+it('encuentra descartes del vehículo o de su vendedor desde las acciones de ficha, sin duplicados', async () => {
+  const group = 'Descarte' + marker
+  const bySeller = await create({ brand: group, status: 'NUEVO', salePrice: null })
+  const byVehicle = await create({ brand: group, status: 'DESCARTADO' })
+  const both = await create({ brand: group, status: 'DESCARTADO' })
+  const ordinary = await create({ brand: group, status: 'NUEVO' })
+  const pending = await create({ brand: group, status: 'DESCARTADO' }, 'PRO', 'PENDIENTE')
+  const params = { brand: group, status: 'DESCARTADO' }
+  const ids = async () => (await query(params)).vehicles.map((v) => v.id).sort()
+  const user = await db.user.create({
+    data: { name: 'Agente de prueba', role: 'AGENTE', email: uniqueSuffix() + '@example.test' },
+  })
+  actor.id = user.id
+  try {
+    expect(await ids()).toEqual([byVehicle.id, both.id].sort())
+    for (const v of [bySeller, both, pending])
+      expect(await discardSellerLead(v.sellerLeadId)).toEqual({ error: null })
+    expect(await ids()).toEqual([bySeller.id, byVehicle.id, both.id].sort())
+    const filtered = await query({ ...params, priceState: 'missing' })
+    expect(filtered.total).toBe(1)
+    expect(filtered.vehicles[0]).toMatchObject({
+      id: bySeller.id,
+      status: 'NUEVO',
+      sellerLead: { status: 'DESCARTADO' },
+    })
+    const html = renderToStaticMarkup(
+      await Page({ searchParams: { ...params, priceState: 'missing' } })
+    )
+    expect(html).toContain('Vendedor descartado')
+    expect(html).toContain(bySeller.sellerLeadId)
+    expect(html).not.toContain(ordinary.sellerLeadId)
+    expect(await advanceLeadStatus(bySeller.sellerLeadId, 'CONTACTADO')).toEqual({ error: null })
+    expect(await ids()).toEqual([byVehicle.id, both.id].sort())
+  } finally {
     actor.id = ''
     await db.activity.deleteMany({ where: { agentId: user.id } })
     await db.user.delete({ where: { id: user.id } })

@@ -150,6 +150,8 @@ export async function updateSellerLead(leadId: string, data: unknown) {
 
   revalidatePath(`/vendedores/${leadId}`)
   revalidatePath('/vendedores')
+  if (statusChanging && (status === 'DESCARTADO' || currentLead.status === 'DESCARTADO'))
+    revalidatePath('/vehiculos')
   return { ok: true }
 }
 
@@ -522,6 +524,7 @@ export async function discardSellerLead(
 
   revalidatePath(`/vendedores/${leadId}`)
   revalidatePath('/vendedores')
+  revalidatePath('/vehiculos')
   return { error: null }
 }
 

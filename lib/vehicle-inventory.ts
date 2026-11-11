@@ -15,7 +15,9 @@ function filteredInventory(c: InventoryCriteria) {
     Prisma.sql`s.intake_status = ${admittedSellerWhere.intakeStatus}::"SellerIntakeStatus"`,
   ]
   if (c.type) conditions.push(Prisma.sql`v.type = ${c.type}::"VehicleType"`)
-  if (c.status) conditions.push(Prisma.sql`v.status = ${c.status}::"VehicleStatus"`)
+  if (c.status === 'DESCARTADO') {
+    conditions.push(Prisma.sql`(v.status = 'DESCARTADO' OR s.status = 'DESCARTADO')`)
+  } else if (c.status) conditions.push(Prisma.sql`v.status = ${c.status}::"VehicleStatus"`)
   if (c.origin) conditions.push(Prisma.sql`s.canal = ${c.origin}::"LeadCanal"`)
   if (c.yearMin) conditions.push(Prisma.sql`v.year >= ${Number(c.yearMin)}`)
   if (c.yearMax) conditions.push(Prisma.sql`v.year <= ${Number(c.yearMax)}`)
@@ -89,7 +91,9 @@ export function readVehicleInventory(
         ? await tx.vehicle.findMany({
             where: { id: { in: ids.map((v) => v.id) } },
             include: {
-              sellerLead: { select: { id: true, name: true, archivedAt: true, canal: true } },
+              sellerLead: {
+                select: { id: true, name: true, archivedAt: true, canal: true, status: true },
+              },
               photos: { take: 1, orderBy: [{ order: 'asc' }, { id: 'asc' }] },
               _count: { select: { matches: { where: eligibleBuyerCounterpartMatchWhere } } },
             },
