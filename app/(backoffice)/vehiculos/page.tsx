@@ -202,6 +202,12 @@ export default async function VehiculosPage({ searchParams }: { searchParams: In
                   />
                 )}
                 <div className="flex flex-col items-start gap-2 border-t border-line p-3">
+                  <Link
+                    href={`/vendedores/${v.sellerLeadId}?tab=preparacion#checklist-match`}
+                    className="text-sm font-medium text-brand underline"
+                  >
+                    Checklist para el match
+                  </Link>
                   {availability && (
                     <Link
                       href={'/comprar/' + vehicleSlug(v)}

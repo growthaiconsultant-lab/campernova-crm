@@ -1,7 +1,7 @@
 import { fieldById, buyerCatalogPreferences, familyLabel } from './catalog'
 import type { MatchingBuyerInput, MatchingVehicleInput } from './types'
 
-import { vehicleFacts, legacyProjection } from './vehicle-characteristics'
+import { vehicleFacts } from './vehicle-characteristics'
 
 export function assessPair(v: MatchingVehicleInput, b: MatchingBuyerInput) {
   const missing: string[] = [],
@@ -36,12 +36,8 @@ export function assessPair(v: MatchingVehicleInput, b: MatchingBuyerInput) {
   limit('Altura (m)', v.heightM, b.maxHeightM, true)
   if (b.licenseType === 'B') limit('MMA (kg)', v.maxMassKg, 3500, true)
   const facts = vehicleFacts(v.catalog ?? {}, v)
-  const bathType = legacyProjection(facts, v).bathroomType
-  const bathroom = bathType
-    ? bathType !== 'NINGUNO'
-    : facts.fullBath?.values.includes('Sí') || v.equipment.bathroom === true
-      ? true
-      : null
+  const interior = facts.interiorBath?.values[0]
+  const bathroom = interior ? interior === 'Sí' : null
   if (b.bathroomRequired) check('Baño interior', true, bathroom)
   if (b.useZone)
     check(
@@ -67,6 +63,10 @@ export function assessPair(v: MatchingVehicleInput, b: MatchingBuyerInput) {
   )
     fact('beds', 'Cama en techo elevable')
   if (b.criticalEquipment.bathroom && !b.bathroomRequired) check('Baño', true, bathroom)
+  if (facts.shower?.values.includes('No')) fact('showerOptions', 'No tiene')
+  if (facts.kitchen?.values.includes('No')) {
+    for (const id of ['kitchenPlace', 'kitchenShape', 'kitchenMount']) fact(id, 'No tiene')
+  }
   if (facts.garage?.values.includes('No')) {
     fact('garageSize', 'No tiene')
     fact('garageBikes', '0')

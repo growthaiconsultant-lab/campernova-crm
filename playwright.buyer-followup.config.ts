@@ -13,6 +13,7 @@ export default defineConfig({
     'buyer-postventa.spec.ts',
     'seller-followup.spec.ts',
     'seller-preparation.spec.ts',
+    'seller-checklist.spec.ts',
     'vehicle-inventory.spec.ts',
     'inventory-operations.spec.ts',
     'seller-sale.spec.ts',

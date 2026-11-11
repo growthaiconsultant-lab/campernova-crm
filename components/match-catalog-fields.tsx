@@ -9,10 +9,12 @@ export function CatalogFields({
   unifiedVehicle = false,
   publicForm = false,
   fieldId,
+  excludedFields,
   value,
   onChange,
 }: {
   unifiedVehicle?: boolean
+  excludedFields?: readonly string[]
   fieldId?: string
   publicForm?: boolean
   buyer: boolean
@@ -24,6 +26,7 @@ export function CatalogFields({
   const [query, setQuery] = useState('')
   const visible = catalogFields.filter(
     (f) =>
+      !excludedFields?.includes(f.id) &&
       (!unifiedVehicle || f.id !== 'heating') &&
       (!publicForm || !/^use[1-5]$/.test(f.id)) &&
       (!f.family || !family || f.family === family || value[f.id]) &&
@@ -41,7 +44,7 @@ export function CatalogFields({
       next[f.id] = buyer ? { values, required, all: all && values.length > 1 } : { values }
     else delete next[f.id]
     if (unifiedVehicle) {
-      for (const id of ['garage', 'shower', 'kitchen']) {
+      for (const id of ['garage', 'shower', 'kitchen', 'interiorBath']) {
         const inferred = inferredPresence(next, id)
         const previous = inferredPresence(value, id)
         if (id !== f.id && inferred !== previous && (inferred || next[id]?.values[0] === previous))
@@ -54,28 +57,36 @@ export function CatalogFields({
     const e = value[f.id],
       id = prefix + f.id,
       isFlag = f.options?.join('|') === 'Sí|No'
+    const inferred = unifiedVehicle ? inferredPresence(value, f.id) : undefined
+    const fromDetails = !!inferred && (!e || e.values[0] === inferred)
     return (
       <fieldset key={f.id} className="rounded border p-2">
         <legend>{f.label}</legend>
         {isFlag ? (
-          <select
-            disabled={
-              unifiedVehicle &&
-              !!inferredPresence(value, f.id) &&
-              (!e || e.values[0] === inferredPresence(value, f.id))
-            }
-            aria-label={f.label}
-            value={
-              e?.values[0] ?? (unifiedVehicle ? inferredPresence(value, f.id) : undefined) ?? ''
-            }
-            onChange={(ev) => change(f, ev.target.value ? [ev.target.value] : [])}
-          >
-            <option value="">{buyer ? 'Indiferente' : 'Por confirmar'}</option>
-            <option>Sí</option>
-            <option>No</option>
-          </select>
+          <>
+            <select
+              disabled={fromDetails}
+              aria-label={f.label}
+              value={e?.values[0] ?? inferred ?? ''}
+              onChange={(ev) => change(f, ev.target.value ? [ev.target.value] : [])}
+            >
+              <option value="">{buyer ? 'Indiferente' : 'Por comprobar'}</option>
+              <option>Sí</option>
+              <option value="No">{buyer ? 'No' : 'No tiene'}</option>
+            </select>
+            {fromDetails && (
+              <p className="mt-1 text-xs text-muted-foreground">
+                Según los detalles registrados en el checklist.
+              </p>
+            )}
+          </>
         ) : f.options ? (
           <div className="flex flex-wrap gap-x-3 gap-y-1">
+            {!buyer && (
+              <label>
+                <input type="checkbox" checked={!e} onChange={() => change(f, [])} /> Por comprobar
+              </label>
+            )}
             {(buyer
               ? Array.from(
                   new Set([
@@ -127,6 +138,7 @@ export function CatalogFields({
               type={f.kind === 'text' ? 'text' : 'number'}
               min={0}
               step="any"
+              placeholder={buyer ? undefined : 'Por comprobar'}
               maxLength={300}
               value={e?.values[0] ?? ''}
               onChange={(ev) => change(f, ev.target.value ? [ev.target.value] : [])}

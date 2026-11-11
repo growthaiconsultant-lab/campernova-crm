@@ -87,6 +87,7 @@ group('Cocina', [
   ['kitchenOther', 'Tipo de cocina y otros equipos', 'text'],
 ])
 group('Baño', [
+  ['interiorBath', 'Baño interior'],
   ['fullBath', 'Baño completo'],
   ['shower', 'Ducha'],
   [

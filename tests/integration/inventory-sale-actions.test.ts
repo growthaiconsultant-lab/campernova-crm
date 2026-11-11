@@ -18,6 +18,7 @@ vi.mock('next/navigation', async (original) => ({
 }))
 import { db } from '@/lib/db'
 import {
+  updateVehicle,
   forcePublishVehicle,
   publishVehicle,
   unpublishVehicle,
@@ -261,4 +262,42 @@ it('la tarjeta exige revisar un precio que acaba de faltar y permite publicar si
   expect(renderToStaticMarkup(await PublicPage({ params: { id: slug } }))).toContain(
     'Precio a consultar'
   )
+})
+
+it('guarda el checklist parcial desde una unidad nueva sin cambiar su entrada ni sobreescribir un guardado posterior', async () => {
+  const { v, brand, seller } = await fixture('NUEVO')
+  const card = renderToStaticMarkup(await Page({ searchParams: { brand } }))
+  expect(card).toContain('/vendedores/' + seller.id + '?tab=preparacion#checklist-match')
+  const input = {
+    brand,
+    model: v.model,
+    status: v.status,
+    equipment: { solar: false },
+    sleepingPlaces: 2,
+    winterized: null,
+  }
+  const snapshot = {
+    version: v.updatedAt.toISOString(),
+    catalog: { solar: { values: ['No'] }, beds: { values: ['Literas'] } },
+  }
+  expect(await updateVehicle(v.id, input, snapshot)).not.toHaveProperty('error')
+  const row = await db.vehicle.findUniqueOrThrow({ where: { id: v.id } })
+  expect(row).toMatchObject({
+    status: 'NUEVO',
+    winterized: null,
+    sleepingPlaces: 2,
+    entryValidatedAt: null,
+    matchCatalog: snapshot.catalog,
+  })
+  expect(row.salePrice?.toNumber()).toBe(46500)
+  expect(await updateVehicle(v.id, input, { ...snapshot, catalog: {} })).toHaveProperty('error')
+  expect(
+    await updateVehicle(v.id, input, {
+      version: row.updatedAt.toISOString(),
+      catalog: { beds: snapshot.catalog.beds },
+    })
+  ).not.toHaveProperty('error')
+  expect((await db.vehicle.findUniqueOrThrow({ where: { id: v.id } })).matchCatalog).toEqual({
+    beds: snapshot.catalog.beds,
+  })
 })
