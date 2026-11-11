@@ -1,233 +1,199 @@
 'use client'
 
-import { useCallback } from 'react'
-import { useRouter, useSearchParams } from 'next/navigation'
+import { useState, useTransition } from 'react'
+import { useRouter } from 'next/navigation'
 import { Input } from '@/components/ui/input'
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select'
 import { Button } from '@/components/ui/button'
+import { VEHICLE_ORIGIN_LABELS } from '@/lib/seller-intake'
+import { VEHICLE_STATUS_LABELS } from '@/lib/state-machine'
+import {
+  criteriaKeys,
+  criterionLabel,
+  emptyCriteria,
+  inventoryError,
+  inventoryOrders,
+  inventoryTypes,
+  inventoryUrl,
+  type InventoryCriteria,
+  type InventoryOrder,
+  type Criterion,
+} from '@/lib/vehicle-inventory-filters'
 
-const STATUS_OPTIONS = [
-  { value: 'NUEVO', label: 'Nuevo' },
-  { value: 'TASADO', label: 'Tasado' },
-  { value: 'PUBLICADO', label: 'Publicado' },
-  { value: 'RESERVADO', label: 'Reservado' },
-  { value: 'VENDIDO', label: 'Vendido' },
-  { value: 'DESCARTADO', label: 'Descartado' },
-]
+const selectClass =
+  'h-10 w-full rounded-md border border-input bg-background px-3 text-sm text-foreground'
+const labelClass = 'grid min-w-0 gap-1 text-sm font-medium'
 
-const TYPE_OPTIONS = [
-  { value: 'CAMPER', label: 'Camper' },
-  { value: 'AUTOCARAVANA', label: 'Autocaravana' },
-]
-
-const ORIGIN_OPTIONS = [
-  { value: 'CN', label: 'Alta interna' },
-  { value: 'PRO', label: 'Web admitida' },
-]
-
-const SORT_OPTIONS = [
-  { value: 'createdAt', label: 'Fecha entrada' },
-  { value: 'year', label: 'Año' },
-  { value: 'km', label: 'Kilómetros' },
-  { value: 'valuationRecommended', label: 'Precio tasado' },
-]
-
-export function VehicleFilters() {
+export function VehicleFilters({
+  applied,
+  order,
+}: {
+  applied: InventoryCriteria
+  order: InventoryOrder
+}) {
   const router = useRouter()
-  const params = useSearchParams()
-
-  const push = useCallback(
-    (key: string, value: string) => {
-      const next = new URLSearchParams(params.toString())
-      if (value) {
-        next.set(key, value)
-      } else {
-        next.delete(key)
-      }
-      next.delete('page')
-      router.push(`/vehiculos?${next.toString()}`)
-    },
-    [params, router]
+  const [draft, setDraft] = useState(applied)
+  const [advanced, setAdvanced] = useState(
+    Boolean(applied.origin || applied.yearMin || applied.yearMax || applied.kmMax)
   )
+  const [error, setError] = useState('')
+  const [pending, startTransition] = useTransition()
+  const keys = criteriaKeys.filter((k) => applied[k])
+  const dirty = criteriaKeys.some((k) => draft[k] !== applied[k])
 
-  const handleBrandSubmit = (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault()
-    const brand = new FormData(e.currentTarget).get('brand') as string
-    push('brand', brand.trim())
+  function field(key: Criterion, value: string) {
+    setDraft((previous) => ({ ...previous, [key]: value }))
+    setError('')
   }
-
-  const hasFilters =
-    params.has('brand') ||
-    params.has('status') ||
-    params.has('type') ||
-    params.has('yearMin') ||
-    params.has('yearMax') ||
-    params.has('kmMax') ||
-    params.has('priceMax') ||
-    params.has('origin')
-
+  function navigate(next: InventoryCriteria, nextOrder: InventoryOrder) {
+    setDraft(next)
+    setError('')
+    startTransition(() => router.push(inventoryUrl(next, nextOrder), { scroll: false }))
+  }
+  function select(
+    key: 'type' | 'status' | 'origin',
+    label: string,
+    all: string,
+    options: Record<string, string>
+  ) {
+    return (
+      <label className={labelClass}>
+        {label}
+        <select
+          className={selectClass}
+          value={draft[key]}
+          onChange={(e) => field(key, e.target.value)}
+        >
+          <option value="">{all}</option>
+          {Object.entries(options).map(([value, name]) => (
+            <option key={value} value={value}>
+              {name}
+            </option>
+          ))}
+        </select>
+      </label>
+    )
+  }
+  function numeric(key: 'priceMax' | 'yearMin' | 'yearMax' | 'kmMax', label: string) {
+    return (
+      <label className={labelClass}>
+        {label}
+        <Input
+          type="number"
+          min="0"
+          step={key === 'priceMax' ? '0.01' : '1'}
+          value={draft[key]}
+          onChange={(e) => field(key, e.target.value)}
+        />
+      </label>
+    )
+  }
   return (
-    <div className="flex flex-wrap items-end gap-3">
-      {/* Marca */}
-      <form onSubmit={handleBrandSubmit} className="flex gap-2">
-        <Input
-          name="brand"
-          defaultValue={params.get('brand') ?? ''}
-          placeholder="Marca o modelo…"
-          className="w-44"
-        />
-        <Button type="submit" variant="secondary" size="sm">
-          Buscar
-        </Button>
+    <section aria-label="Filtros de vehículos" className="space-y-3 rounded-xl border bg-card p-4">
+      <form
+        aria-label="Buscar en el inventario"
+        onSubmit={(e) => {
+          e.preventDefault()
+          const next = { ...draft, brand: draft.brand.trim() }
+          const message = inventoryError(next)
+          if (message) {
+            setError(message)
+            return
+          }
+          navigate(next, order)
+        }}
+      >
+        <fieldset disabled={pending} className="space-y-3">
+          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+            <label className={labelClass}>
+              Buscar vehículo
+              <Input
+                type="search"
+                maxLength={200}
+                placeholder="Marca, modelo o matrícula"
+                value={draft.brand}
+                onChange={(e) => field('brand', e.target.value)}
+              />
+            </label>
+            {select('type', 'Tipo', 'Todos los tipos', inventoryTypes)}
+            {select('status', 'Estado', 'Todos los estados', VEHICLE_STATUS_LABELS)}
+            {numeric('priceMax', 'Precio de venta máx. (€)')}
+          </div>
+          <details open={advanced} onToggle={(e) => setAdvanced(e.currentTarget.open)}>
+            <summary className="cursor-pointer text-sm font-medium text-brand">Más filtros</summary>
+            <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+              {numeric('yearMin', 'Año desde')}
+              {numeric('yearMax', 'Año hasta')}
+              {numeric('kmMax', 'Kilómetros máx.')}
+              {select('origin', 'Origen', 'Todos los orígenes', VEHICLE_ORIGIN_LABELS)}
+            </div>
+          </details>
+          <div className="flex flex-wrap items-end gap-2">
+            <Button type="submit" size="sm">
+              Aplicar filtros
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              onClick={() => navigate({ ...emptyCriteria }, 'createdAt:desc')}
+            >
+              Limpiar todo
+            </Button>
+            <label className={labelClass + ' sm:ml-auto'}>
+              Ordenar por
+              <select
+                className={selectClass}
+                value={order}
+                onChange={(e) => {
+                  const nextOrder = e.target.value as InventoryOrder
+                  startTransition(() =>
+                    router.push(inventoryUrl(applied, nextOrder), { scroll: false })
+                  )
+                }}
+              >
+                {Object.entries(inventoryOrders).map(([value, label]) => (
+                  <option key={value} value={value}>
+                    {label}
+                  </option>
+                ))}
+              </select>
+            </label>
+          </div>
+        </fieldset>
+        {error && (
+          <p role="alert" className="mt-2 text-sm text-destructive">
+            {error}
+          </p>
+        )}
+        {(dirty || pending) && (
+          <p role="status" className="mt-2 text-sm text-muted-foreground">
+            {pending ? 'Actualizando resultados…' : 'Cambios pendientes de aplicar'}
+          </p>
+        )}
       </form>
-
-      {/* Estado */}
-      <Select
-        value={params.get('status') ?? ''}
-        onValueChange={(v) => push('status', v === '__all__' ? '' : v)}
-      >
-        <SelectTrigger className="w-36">
-          <SelectValue placeholder="Estado" />
-        </SelectTrigger>
-        <SelectContent>
-          <SelectItem value="__all__">Todos</SelectItem>
-          {STATUS_OPTIONS.map((o) => (
-            <SelectItem key={o.value} value={o.value}>
-              {o.label}
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
-
-      {/* Tipo */}
-      <Select
-        value={params.get('type') ?? ''}
-        onValueChange={(v) => push('type', v === '__all__' ? '' : v)}
-      >
-        <SelectTrigger className="w-36">
-          <SelectValue placeholder="Tipo" />
-        </SelectTrigger>
-        <SelectContent>
-          <SelectItem value="__all__">Todos los tipos</SelectItem>
-          {TYPE_OPTIONS.map((o) => (
-            <SelectItem key={o.value} value={o.value}>
-              {o.label}
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
-
-      {/* Origen */}
-      <Select
-        value={params.get('origin') ?? ''}
-        onValueChange={(v) => push('origin', v === '__all__' ? '' : v)}
-      >
-        <SelectTrigger className="w-40">
-          <SelectValue placeholder="Origen" />
-        </SelectTrigger>
-        <SelectContent>
-          <SelectItem value="__all__">Todos los orígenes</SelectItem>
-          {ORIGIN_OPTIONS.map((o) => (
-            <SelectItem key={o.value} value={o.value}>
-              {o.label}
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
-
-      {/* Año desde */}
-      <div className="flex flex-col gap-1">
-        <label className="text-xs text-muted-foreground">Año desde</label>
-        <Input
-          type="number"
-          value={params.get('yearMin') ?? ''}
-          onChange={(e) => push('yearMin', e.target.value)}
-          placeholder="2010"
-          className="w-24"
-          min={1990}
-          max={new Date().getFullYear()}
-        />
-      </div>
-
-      {/* Año hasta */}
-      <div className="flex flex-col gap-1">
-        <label className="text-xs text-muted-foreground">Año hasta</label>
-        <Input
-          type="number"
-          value={params.get('yearMax') ?? ''}
-          onChange={(e) => push('yearMax', e.target.value)}
-          placeholder={String(new Date().getFullYear())}
-          className="w-24"
-          min={1990}
-          max={new Date().getFullYear()}
-        />
-      </div>
-
-      {/* Km máx */}
-      <div className="flex flex-col gap-1">
-        <label className="text-xs text-muted-foreground">Km máx</label>
-        <Input
-          type="number"
-          value={params.get('kmMax') ?? ''}
-          onChange={(e) => push('kmMax', e.target.value)}
-          placeholder="150000"
-          className="w-28"
-          min={0}
-          step={5000}
-        />
-      </div>
-
-      {/* Precio máx */}
-      <div className="flex flex-col gap-1">
-        <label className="text-xs text-muted-foreground">Precio máx</label>
-        <Input
-          type="number"
-          value={params.get('priceMax') ?? ''}
-          onChange={(e) => push('priceMax', e.target.value)}
-          placeholder="80000"
-          className="w-28"
-          min={0}
-          step={1000}
-        />
-      </div>
-
-      {/* Ordenar */}
-      <Select value={params.get('sort') ?? 'createdAt'} onValueChange={(v) => push('sort', v)}>
-        <SelectTrigger className="w-44">
-          <SelectValue />
-        </SelectTrigger>
-        <SelectContent>
-          {SORT_OPTIONS.map((o) => (
-            <SelectItem key={o.value} value={o.value}>
-              {o.label}
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
-
-      {/* Dir */}
-      <Select value={params.get('dir') ?? 'desc'} onValueChange={(v) => push('dir', v)}>
-        <SelectTrigger className="w-28">
-          <SelectValue />
-        </SelectTrigger>
-        <SelectContent>
-          <SelectItem value="desc">↓ Reciente</SelectItem>
-          <SelectItem value="asc">↑ Antiguo</SelectItem>
-        </SelectContent>
-      </Select>
-
-      {/* Limpiar */}
-      {hasFilters && (
-        <Button variant="ghost" size="sm" onClick={() => router.push('/vehiculos')}>
-          Limpiar filtros
-        </Button>
+      {keys.length > 0 && (
+        <div
+          aria-label="Filtros aplicados"
+          className="flex flex-wrap items-center gap-2 border-t pt-3"
+        >
+          <span className="text-sm text-muted-foreground">Filtros aplicados</span>
+          {keys.map((key) => {
+            const label = criterionLabel(key, applied[key])
+            return (
+              <button
+                type="button"
+                key={key}
+                disabled={pending}
+                aria-label={'Quitar ' + label}
+                className="max-w-full break-words rounded-md bg-brand-tint px-2 py-1 text-sm text-brand"
+                onClick={() => navigate({ ...applied, [key]: '' }, order)}
+              >
+                {label} <span aria-hidden="true">×</span>
+              </button>
+            )
+          })}
+        </div>
       )}
-    </div>
+    </section>
   )
 }

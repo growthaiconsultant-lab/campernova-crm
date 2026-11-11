@@ -1,23 +1,24 @@
 import Link from 'next/link'
 import Image from 'next/image'
-import { Suspense } from 'react'
 import { Package } from 'lucide-react'
 import { db } from '@/lib/db'
 import { requireCanViewVehiculos } from '@/lib/auth'
-import { buildAdmittedVehicleWhere, VEHICLE_ORIGIN_LABELS } from '@/lib/seller-intake'
+import { VEHICLE_ORIGIN_LABELS } from '@/lib/seller-intake'
 import { vehicleLabel } from '@/lib/display'
-import { eligibleBuyerCounterpartMatchWhere, isVehicleEligible } from '@/lib/matching'
+import { isVehicleEligible } from '@/lib/matching'
 import { VEHICLE_STATUS_LABELS } from '@/lib/state-machine'
 import { VehicleFilters } from './vehicle-filters'
 import { Eyebrow, EmptyState } from '@/components/redesign'
-import type { Prisma, VehicleStatus } from '@prisma/client'
+import type { VehicleStatus } from '@prisma/client'
 
-const PAGE_SIZE = 48
-
-const TYPE_LABELS: Record<string, string> = {
-  CAMPER: 'Camper',
-  AUTOCARAVANA: 'Autocaravana',
-}
+import { readVehicleInventory } from '@/lib/vehicle-inventory'
+import {
+  readInventoryParams,
+  inventoryTypes,
+  inventoryUrl,
+  type InventoryParams,
+} from '@/lib/vehicle-inventory-filters'
+import { formatEur } from '@/lib/format/currency'
 
 // Color de estado del vehículo (semáforo del handoff)
 const STATUS_HEX: Record<VehicleStatus, string> = {
@@ -29,138 +30,55 @@ const STATUS_HEX: Record<VehicleStatus, string> = {
   DESCARTADO: '#8b94a3',
 }
 
-const EUR = (n: number) =>
-  n.toLocaleString('es-ES', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 })
-
-type SearchParams = {
-  brand?: string
-  status?: string
-  type?: string
-  yearMin?: string
-  yearMax?: string
-  kmMax?: string
-  priceMax?: string
-  origin?: string
-  sort?: string
-  dir?: string
-  page?: string
-}
-
-function buildWhere(sp: SearchParams): Prisma.VehicleWhereInput {
-  const conditions: Prisma.VehicleWhereInput[] = [buildAdmittedVehicleWhere(sp.origin)]
-
-  if (sp.brand) {
-    const q = sp.brand.trim()
-    conditions.push({
-      OR: [
-        { brand: { contains: q, mode: 'insensitive' } },
-        { model: { contains: q, mode: 'insensitive' } },
-      ],
-    })
-  }
-
-  if (sp.status) {
-    const valid = ['NUEVO', 'TASADO', 'PUBLICADO', 'RESERVADO', 'VENDIDO', 'DESCARTADO']
-    if (valid.includes(sp.status)) {
-      conditions.push({ status: sp.status as Prisma.EnumVehicleStatusFilter['equals'] })
-    }
-  }
-
-  if (sp.type) {
-    const valid = ['CAMPER', 'AUTOCARAVANA']
-    if (valid.includes(sp.type)) {
-      conditions.push({ type: sp.type as Prisma.EnumVehicleTypeFilter['equals'] })
-    }
-  }
-
-  if (sp.yearMin) {
-    const y = parseInt(sp.yearMin, 10)
-    if (!isNaN(y)) conditions.push({ year: { gte: y } })
-  }
-  if (sp.yearMax) {
-    const y = parseInt(sp.yearMax, 10)
-    if (!isNaN(y)) conditions.push({ year: { lte: y } })
-  }
-  if (sp.kmMax) {
-    const k = parseInt(sp.kmMax, 10)
-    if (!isNaN(k)) conditions.push({ km: { lte: k } })
-  }
-  if (sp.priceMax) {
-    const p = parseFloat(sp.priceMax)
-    if (!isNaN(p)) {
-      conditions.push({ OR: [{ valuationRecommended: { lte: p } }, { desiredPrice: { lte: p } }] })
-    }
-  }
-
-  return conditions.length > 0 ? { AND: conditions } : {}
-}
-
-function buildOrderBy(sp: SearchParams): Prisma.VehicleOrderByWithRelationInput {
-  const dir = sp.dir === 'asc' ? 'asc' : 'desc'
-  if (sp.sort === 'year') return { year: dir }
-  if (sp.sort === 'km') return { km: dir }
-  if (sp.sort === 'valuationRecommended') return { valuationRecommended: dir }
-  return { createdAt: dir }
-}
-
-export default async function VehiculosPage({ searchParams }: { searchParams: SearchParams }) {
-  // Guard server-side: el listado comercial expone matrícula, precio de venta y valoración
-  // → solo ADMIN + AGENTE. No se confía en el ocultamiento del sidebar.
+export default async function VehiculosPage({ searchParams }: { searchParams: InventoryParams }) {
   await requireCanViewVehiculos()
-
-  const page = Math.max(1, parseInt(searchParams.page ?? '1', 10) || 1)
-  const where = buildWhere(searchParams)
-  const orderBy = buildOrderBy(searchParams)
-
-  const [total, vehicles] = await Promise.all([
-    db.vehicle.count({ where }),
-    db.vehicle.findMany({
-      where,
-      orderBy,
-      skip: (page - 1) * PAGE_SIZE,
-      take: PAGE_SIZE,
-      include: {
-        sellerLead: { select: { id: true, name: true, archivedAt: true, canal: true } },
-        photos: { take: 1, orderBy: { order: 'asc' } },
-        // M1: solo cuenta matches cuya contraparte comprador es elegible.
-        _count: { select: { matches: { where: eligibleBuyerCounterpartMatchWhere } } },
-      },
-    }),
-  ])
-
-  const totalPages = Math.ceil(total / PAGE_SIZE)
-
-  function pageUrl(p: number) {
-    const sp = new URLSearchParams(searchParams as Record<string, string>)
-    if (p > 1) sp.set('page', String(p))
-    else sp.delete('page')
-    const qs = sp.toString()
-    return `/vehiculos${qs ? `?${qs}` : ''}`
-  }
-
+  const { criteria, order, page: requestedPage } = readInventoryParams(searchParams)
+  const {
+    vehicles,
+    total,
+    inventoryTotal,
+    page,
+    pages: totalPages,
+    filtered,
+    error,
+  } = await readVehicleInventory(db, criteria, order, requestedPage)
   return (
     <div>
       <div className="mb-4">
         <Eyebrow>CRM · Inventario</Eyebrow>
         <h1 className="mt-1 font-hanken text-[23px] font-bold tracking-[-0.02em] text-ink">
-          Inventario
+          Vehículos
         </h1>
         <p className="mt-1 font-hanken text-[13.5px] text-ink2">
-          <b className="text-ink">{total}</b> vehículo{total === 1 ? '' : 's'} en stock
+          <b className="text-ink">{total}</b> {total === 1 ? 'vehículo' : 'vehículos'}
+          {filtered && ` de ${inventoryTotal} en el inventario`}
         </p>
       </div>
 
       <div className="mb-4">
-        <Suspense>
-          <VehicleFilters />
-        </Suspense>
+        <VehicleFilters
+          key={inventoryUrl(criteria, 'createdAt:desc')}
+          applied={criteria}
+          order={order}
+        />
       </div>
 
       {vehicles.length === 0 ? (
         <EmptyState
           icon={<Package size={20} strokeWidth={1.9} />}
-          title="Sin vehículos en el inventario"
-          description="Los vehículos que custodiamos aparecerán aquí con su estado operativo, motivo de bloqueo para publicar y la demanda compatible."
+          title={
+            error
+              ? 'Revisa los filtros'
+              : filtered
+                ? 'Ningún vehículo cumple estos filtros'
+                : 'Sin vehículos en el inventario'
+          }
+          description={
+            error ??
+            (filtered
+              ? 'Quita un filtro o amplía los límites para buscar de nuevo.'
+              : 'Aquí aparecerán los vehículos de los vendedores admitidos.')
+          }
         />
       ) : (
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
@@ -176,10 +94,7 @@ export default async function VehiculosPage({ searchParams }: { searchParams: Se
             })
               ? v._count.matches
               : 0
-            const priceN =
-              (v.salePrice ? Number(v.salePrice) : null) ??
-              (v.valuationRecommended ? Number(v.valuationRecommended) : null) ??
-              (v.desiredPrice ? Number(v.desiredPrice) : null)
+            const reference = v.valuationRecommended ?? v.desiredPrice
             return (
               <Link
                 key={v.id}
@@ -220,7 +135,7 @@ export default async function VehiculosPage({ searchParams }: { searchParams: Se
                     {vehicleLabel(v)}
                   </div>
                   <div className="mt-0.5 font-mono text-[11px] text-ink3">
-                    {v.type ? (TYPE_LABELS[v.type] ?? v.type) : 'Sin tipo'}
+                    {v.type ? (inventoryTypes[v.type] ?? v.type) : 'Sin tipo'}
                     {v.km != null ? ` · ${v.km.toLocaleString('es-ES')} km` : ''}
                   </div>
                   <div className="mt-1.5">
@@ -236,7 +151,17 @@ export default async function VehiculosPage({ searchParams }: { searchParams: Se
                   </div>
                   <div className="mt-2 flex items-center justify-between gap-2">
                     <span className="font-hanken text-[15px] font-bold text-ink">
-                      {priceN != null ? EUR(priceN) : <span className="text-ink3">Sin tasar</span>}
+                      <span className="block">
+                        {v.salePrice != null
+                          ? formatEur(Number(v.salePrice), 'cents')
+                          : 'Sin precio de venta'}
+                      </span>
+                      {v.salePrice == null && reference != null && (
+                        <span className="block text-xs font-normal text-ink2">
+                          {v.valuationRecommended != null ? 'Tasación' : 'Precio deseado'} ·{' '}
+                          {formatEur(Number(reference), 'cents')}
+                        </span>
+                      )}
                     </span>
                     {compatibleCount > 0 && (
                       <span className="rounded-[6px] bg-brand-tint px-2 py-[3px] font-hanken text-[11px] font-semibold text-brand">
@@ -251,7 +176,7 @@ export default async function VehiculosPage({ searchParams }: { searchParams: Se
         </div>
       )}
 
-      {total > PAGE_SIZE && (
+      {totalPages > 1 && (
         <div className="mt-5 flex items-center justify-between">
           <span className="font-hanken text-[12.5px] text-ink2">
             Página {page} de {totalPages}
@@ -259,7 +184,7 @@ export default async function VehiculosPage({ searchParams }: { searchParams: Se
           <div className="flex gap-2">
             {page > 1 && (
               <Link
-                href={pageUrl(page - 1)}
+                href={inventoryUrl(criteria, order, page - 1)}
                 className="rounded-[9px] border border-line bg-card px-3 py-1.5 font-hanken text-[12.5px] font-semibold text-ink2 hover:bg-canvas"
               >
                 Anterior
@@ -267,7 +192,7 @@ export default async function VehiculosPage({ searchParams }: { searchParams: Se
             )}
             {page < totalPages && (
               <Link
-                href={pageUrl(page + 1)}
+                href={inventoryUrl(criteria, order, page + 1)}
                 className="rounded-[9px] border border-line bg-card px-3 py-1.5 font-hanken text-[12.5px] font-semibold text-ink2 hover:bg-canvas"
               >
                 Siguiente
