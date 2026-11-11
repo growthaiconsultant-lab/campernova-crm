@@ -9,7 +9,8 @@ import { isVehicleEligible } from '@/lib/matching'
 import { VEHICLE_STATUS_LABELS } from '@/lib/state-machine'
 import { setMissingSalePrice } from '../vendedores/[id]/cost-actions'
 import { InventorySaleActions } from './inventory-sale-actions'
-import { PublishVehicleButton } from '@/components/vehicle-legal/publish-vehicle-button'
+import { InventoryPublication } from './inventory-publication'
+import { publishVehicle, forcePublishVehicle } from '../vendedores/[id]/actions'
 import { UnpublishButton } from '../vendedores/[id]/unpublish-button'
 import { webAvailability } from '@/lib/web-listing'
 import { vehicleSlug } from '@/lib/public-catalog'
@@ -194,7 +195,7 @@ export default async function VehiculosPage({ searchParams }: { searchParams: In
                     </div>
                   </div>
                 </Link>
-                {viewer.role === 'ADMIN' && v.salePrice == null && (
+                {!(active && preparing) && viewer.role === 'ADMIN' && v.salePrice == null && (
                   <InventoryPriceEditor
                     label={vehicleLabel(v)}
                     savePrice={setMissingSalePrice.bind(null, v.id)}
@@ -209,18 +210,26 @@ export default async function VehiculosPage({ searchParams }: { searchParams: In
                       Ver anuncio en la web
                     </Link>
                   )}
-                  {active &&
-                    preparing &&
-                    (v.readyToPublish ? (
-                      <PublishVehicleButton vehicleId={v.id} label="Publicar en la web" />
-                    ) : (
-                      <Link
-                        href={`/vendedores/${v.sellerLeadId}?tab=preparacion`}
-                        className="inline-block text-sm font-medium text-brand underline"
-                      >
-                        Ver qué falta para publicar
-                      </Link>
-                    ))}
+                  {active && preparing && (
+                    <InventoryPublication
+                      title={vehicleLabel(v)}
+                      pending={v.publicationPending}
+                      missingPrice={v.salePrice == null}
+                      preparationHref={`/vendedores/${v.sellerLeadId}?tab=preparacion`}
+                      savePrice={
+                        viewer.role === 'ADMIN' ? setMissingSalePrice.bind(null, v.id) : undefined
+                      }
+                      publish={
+                        v.readyToPublish
+                          ? publishVehicle.bind(null, v.id)
+                          : forcePublishVehicle.bind(
+                              null,
+                              v.id,
+                              v.publicationPending.map((item) => item.field)
+                            )
+                      }
+                    />
+                  )}
                   {active && published && !holds && (
                     <UnpublishButton vehicleId={v.id} label="Retirar de la web" />
                   )}

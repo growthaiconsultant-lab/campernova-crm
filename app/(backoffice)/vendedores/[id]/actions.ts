@@ -358,7 +358,8 @@ type PublishVehicleResult =
  */
 async function publishVehicleInternal(
   vehicleId: string,
-  force: boolean
+  force: boolean,
+  reviewedFields?: string[]
 ): Promise<PublishVehicleResult> {
   const actor = await requireAgente()
 
@@ -415,6 +416,16 @@ async function publishVehicleInternal(
                 ]
             missingLines = missing.map((requirement) => `- ${requirement.message}`)
 
+            if (
+              reviewedFields &&
+              missing.some(
+                (item) => item.severity === 'error' && !reviewedFields.includes(item.field)
+              )
+            ) {
+              throw new VehiclePublicationBlockedError('PUBLICADO', [
+                'Han cambiado los pendientes. Revisa la tarjeta antes de confirmar.',
+              ])
+            }
             if (!force && (!legalInput || !isReadyForStatus(legalInput, 'PUBLICADO', docs))) {
               throw new VehiclePublicationBlockedError(
                 'PUBLICADO',
@@ -474,8 +485,11 @@ export async function publishVehicle(vehicleId: string): Promise<PublishVehicleR
  * locks, relectura, transición NUEVO/TASADO → PUBLICADO, CAS, primera fecha de publicación y
  * auditoría.
  */
-export async function forcePublishVehicle(vehicleId: string): Promise<PublishVehicleResult> {
-  return publishVehicleInternal(vehicleId, true)
+export async function forcePublishVehicle(
+  vehicleId: string,
+  reviewedFields?: string[]
+): Promise<PublishVehicleResult> {
+  return publishVehicleInternal(vehicleId, true, reviewedFields)
 }
 
 /**

@@ -17,12 +17,18 @@ vi.mock('next/navigation', async (original) => ({
   usePathname: () => '/comprar/vehiculos',
 }))
 import { db } from '@/lib/db'
-import { publishVehicle, unpublishVehicle } from '@/app/(backoffice)/vendedores/[id]/actions'
+import {
+  forcePublishVehicle,
+  publishVehicle,
+  unpublishVehicle,
+} from '@/app/(backoffice)/vendedores/[id]/actions'
 import { discardInventoryVehicle } from '@/app/(backoffice)/vehiculos/discard-action'
 import { createOffer, updateOfferStatus } from '@/app/(backoffice)/ofertas/actions'
 import { updateDeliveryStatus } from '@/app/(backoffice)/entregas/actions'
 import { getPublishedVehicleBySlug, getCatalogInventory, vehicleSlug } from '@/lib/public-catalog'
 import { PUBLICADO_REQUIRED_DOCS, PUBLICADO_MIN_PHOTOS } from '@/lib/vehicle-legal/requirements'
+import { readVehicleInventory } from '@/lib/vehicle-inventory'
+import { emptyCriteria } from '@/lib/vehicle-inventory-filters'
 import Page from '@/app/(backoffice)/vehiculos/page'
 import PublicPage from '@/app/comprar/[id]/page'
 
@@ -86,7 +92,7 @@ async function delivery(vehicleId: string, offerId: string) {
 it('publica sólo tras completar el expediente, retira, republica, reserva y vende conservando el enlace público', async () => {
   const { v, slug, brand } = await fixture('TASADO')
   const card = async () => renderToStaticMarkup(await Page({ searchParams: { brand } }))
-  expect(await card()).toContain('Ver qué falta para publicar')
+  expect(await card()).toContain('Publicar en la web')
   expect(await publishVehicle(v.id)).toHaveProperty('error')
   expect(await getPublishedVehicleBySlug(slug)).toBeNull()
   await db.vehicle.update({
@@ -225,4 +231,34 @@ it('serializa oferta y descarte, y bloquea el descarte ante una entrega activa',
   expect(
     (await updateOfferStatus(backup.id, 'ACEPTADA', { expectedVehicleId: second.v.id })).error
   ).toMatch(/entrega activa/)
+})
+
+it('la tarjeta exige revisar un precio que acaba de faltar y permite publicar sin él tras revisión', async () => {
+  const { v, brand, slug } = await fixture('NUEVO')
+  const read = async () => {
+    const inventory = await readVehicleInventory(
+      db,
+      { ...emptyCriteria, brand },
+      'createdAt:desc',
+      1
+    )
+    return inventory.vehicles
+      .find((vehicle) => vehicle.id === v.id)!
+      .publicationPending.map((item) => item.field)
+  }
+  const reviewed = await read()
+  expect(reviewed).not.toContain('salePrice')
+  await db.vehicle.update({ where: { id: v.id }, data: { salePrice: null } })
+  expect(await forcePublishVehicle(v.id, reviewed)).toHaveProperty('error')
+  expect(await getPublishedVehicleBySlug(slug)).toBeNull()
+  const refreshed = await read()
+  expect(refreshed).toContain('salePrice')
+  expect(await forcePublishVehicle(v.id, refreshed)).toEqual({ ok: true })
+  expect(await getPublishedVehicleBySlug(slug)).toMatchObject({
+    availability: 'Disponible',
+    price: null,
+  })
+  expect(renderToStaticMarkup(await PublicPage({ params: { id: slug } }))).toContain(
+    'Precio a consultar'
+  )
 })
