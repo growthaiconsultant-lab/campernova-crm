@@ -1,7 +1,39 @@
 import { createRoot } from 'react-dom/client'
 import { InventorySaleActions } from '@/app/(backoffice)/vehiculos/inventory-sale-actions'
+import { InventoryPublication } from '@/app/(backoffice)/vehiculos/inventory-publication'
 import { Toaster } from 'sonner'
 let result = ''
+let price = ''
+function publication(admin: boolean) {
+  const pending = price
+    ? []
+    : [
+        { field: 'salePrice', message: 'Precio de venta al público' },
+        ...(admin ? [] : [{ field: 'vin', message: 'Número de bastidor' }]),
+      ]
+  return (
+    <InventoryPublication
+      title="Fiat de prueba"
+      missingPrice={!price}
+      pending={pending}
+      preparationHref="/vendedores/demo?tab=preparacion"
+      savePrice={
+        admin
+          ? async (value) => {
+              price = value
+              render()
+              return { ok: true }
+            }
+          : undefined
+      }
+      publish={async () => {
+        result = 'Publicado ' + (price || 'sin precio')
+        render()
+        return { ok: true }
+      }}
+    />
+  )
+}
 const root = createRoot(document.getElementById('root')!)
 async function discard(id: string, status: string, reason: string) {
   result = [id, status, reason].join(' / ')
@@ -27,6 +59,8 @@ function render() {
         <p>{result}</p>
       ) : (
         <>
+          <article aria-label="Administración">{publication(true)}</article>
+          <article aria-label="Agente">{publication(false)}</article>
           <article aria-label="En venta">
             <InventorySaleActions
               vehicleId="v1"

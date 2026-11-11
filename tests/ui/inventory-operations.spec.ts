@@ -37,3 +37,35 @@ test('sin oferta permite ir a Venta y cancelar; descartar pide confirmación y c
   await card.getByRole('button', { name: 'Confirmar descarte' }).click()
   await expect(page.getByText('v2 / PUBLICADO / Coste de preparación')).toBeVisible()
 })
+
+test('administración puede consultar los pendientes, guardar el precio y decidir después si publica', async ({
+  page,
+}) => {
+  const card = page.getByRole('article', { name: 'Administración' })
+  await card.getByRole('button', { name: 'Publicar en la web' }).click()
+  await expect(card.getByText('El anuncio saldrá sin precio de venta.')).toBeVisible()
+  await card.getByText('Ver 1 pendiente').click()
+  await expect(card.getByText('Precio de venta al público')).toBeVisible()
+  await card.getByRole('button', { name: 'Añadir precio' }).click()
+  await card.getByLabel('Precio de venta (€)').fill('42000')
+  await card.getByRole('button', { name: 'Guardar precio' }).click()
+  await expect(card.getByText('El vehículo está listo para publicar.')).toBeVisible()
+  await expect(card.getByText('Publicar de todas formas')).toHaveCount(0)
+  await card.getByRole('button', { name: 'Confirmar publicación' }).click()
+  await expect(page.getByText('Publicado 42000')).toBeVisible()
+})
+test('el agente puede cancelar o confirmar expresamente la publicación con pendientes', async ({
+  page,
+}) => {
+  const card = page.getByRole('article', { name: 'Agente' })
+  const open = card.getByRole('button', { name: 'Publicar en la web' })
+  await open.click()
+  await expect(card.getByText(/En la web aparecerá «Precio a consultar»/)).toBeVisible()
+  await card.getByText('Ver 2 pendientes').click()
+  await expect(card.getByText('Número de bastidor')).toBeVisible()
+  await expect(card.getByRole('button', { name: 'Añadir precio' })).toHaveCount(0)
+  await card.getByRole('button', { name: 'Cancelar' }).click()
+  await open.click()
+  await card.getByRole('button', { name: 'Publicar de todas formas' }).click()
+  await expect(page.getByText('Publicado sin precio')).toBeVisible()
+})

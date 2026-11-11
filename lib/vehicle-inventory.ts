@@ -1,6 +1,6 @@
 import { Prisma, type PrismaClient } from '@prisma/client'
 import { ACTIVE_DELIVERY_STATUSES, ACTIVE_OFFER_STATUSES } from './lead-archiving/domain'
-import { isReadyForStatus } from './vehicle-legal/validate'
+import { listMissingRequirements } from './vehicle-legal/validate'
 import { publicationBlockingWorkOrders } from './vehicle-legal/prisma-deps'
 import {
   PUBLICACION_REQUIERE_FOTOS_CATEGORIZADAS,
@@ -146,19 +146,24 @@ export function readVehicleInventory(
       return {
         vehicles: ids.map(({ id }) => {
           const v = byId.get(id)!
-          const readyToPublish =
-            (v.status === 'NUEVO' || v.status === 'TASADO') &&
-            isReadyForStatus(
-              {
-                ...v,
-                photoCount: v._count.photos,
-                photosByCategory: photoCounts.get(id),
-                workOrdersBlockingCount: v._count.workOrders,
-              },
-              'PUBLICADO',
-              v.documents.map((d) => ({ category: d.category, exists: true }))
-            )
-          return { ...v, readyToPublish }
+          const preparing = v.status === 'NUEVO' || v.status === 'TASADO'
+          const publicationPending = preparing
+            ? listMissingRequirements(
+                {
+                  ...v,
+                  photoCount: v._count.photos,
+                  photosByCategory: photoCounts.get(id),
+                  workOrdersBlockingCount: v._count.workOrders,
+                },
+                'PUBLICADO',
+                v.documents.map((d) => ({ category: d.category, exists: true }))
+              ).filter((item) => item.severity === 'error')
+            : []
+          return {
+            ...v,
+            publicationPending,
+            readyToPublish: preparing && publicationPending.length === 0,
+          }
         }),
         total,
         inventoryTotal,
