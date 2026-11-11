@@ -16,7 +16,7 @@ type Props = { agents: Agent[] }
 const STATUS_OPTIONS = [
   { value: 'NUEVO', label: 'Nuevo' },
   { value: 'CONTACTADO', label: 'Contactado' },
-  { value: 'CUALIFICADO', label: 'Tasado' },
+  { value: 'CUALIFICADO', label: 'Cualificado' },
   { value: 'EN_NEGOCIACION', label: 'En negociación' },
   { value: 'CERRADO', label: 'Cerrado' },
   { value: 'DESCARTADO', label: 'Descartado' },

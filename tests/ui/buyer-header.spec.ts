@@ -41,3 +41,29 @@ test('desde el listado filtrado conserva volver, buscar, crear y confirmar una p
   await page.keyboard.press('Escape')
   await expect(manage).toHaveCount(0)
 })
+
+test('Vendedores usa la cabecera compacta en listado y ficha y recuerda la vista y la página', async ({
+  page,
+}) => {
+  const list = '/vendedores?view=stock&brand=Ford&page=2'
+  await page.route('http://localhost/vendedores?**', (r) =>
+    r.fulfill({
+      contentType: 'text/html',
+      body: '<meta name="viewport" content="width=device-width,initial-scale=1"><div id="root"></div>',
+    })
+  )
+  await page.goto('http://localhost' + list)
+  await page.addStyleTag({ path: path.resolve('.artifacts/buyer-followup/style.css') })
+  await page.addScriptTag({ path: path.resolve('.artifacts/buyer-followup/header.js') })
+  await expect(page.getByRole('button', { name: 'Buscar en el CRM' })).toBeVisible()
+  await page.getByRole('button', { name: 'Abrir vendedor de prueba' }).click()
+  await expect(page.getByRole('link', { name: 'Vendedores', exact: true })).toHaveAttribute(
+    'href',
+    list
+  )
+  await page.getByRole('button', { name: 'Crear un registro' }).click()
+  await expect(page.getByRole('dialog').getByRole('link', { name: /Vendedor/ })).toHaveAttribute(
+    'href',
+    '/vendedores/nuevo'
+  )
+})

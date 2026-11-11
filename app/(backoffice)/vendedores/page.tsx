@@ -1,5 +1,8 @@
+import { pendingSellerCalendarEvents, sellerSteps } from '@/lib/seller-agenda'
+import { SELLER_LEAD_STATUS_LABELS, VEHICLE_STATUS_LABELS } from '@/lib/state-machine'
+import { personLabel, vehicleLabel } from '@/lib/display'
 import Link from 'next/link'
-import { Plus, Clock } from 'lucide-react'
+import { Plus } from 'lucide-react'
 import { db } from '@/lib/db'
 import { landingCaptureSelection } from '@/lib/landing/attribution'
 import { LandingAttribution } from '@/components/landing-attribution'
@@ -7,9 +10,8 @@ import { requireAgente } from '@/lib/auth'
 import { leadListView } from '@/lib/lead-list-view'
 import { LeadsFilters } from './leads-filters'
 import { SELLER_DEAL_TYPE_LABELS } from '@/lib/deal-terms'
-import { NEXT_ACTION_LABELS, isNextActionOverdue } from '@/lib/next-action'
+import { isNextActionOverdue } from '@/lib/next-action'
 import {
-  Eyebrow,
   Card,
   ActionableTable,
   HexPill,
@@ -22,15 +24,6 @@ import { buildSellerIntakeViewConditions } from '@/lib/seller-intake'
 import { SELLERS_PAGE_SIZE, sellerPagination } from '@/lib/seller-pagination'
 import { SellerPagination } from './seller-pagination'
 import type { Prisma, SellerLeadStatus, LeadCanal } from '@prisma/client'
-
-const STATUS_LABELS: Record<string, string> = {
-  NUEVO: 'Nuevo',
-  CONTACTADO: 'Contactado',
-  CUALIFICADO: 'Tasado',
-  EN_NEGOCIACION: 'En negociación',
-  CERRADO: 'Cerrado',
-  DESCARTADO: 'Descartado',
-}
 
 // Color de estado (semáforo del handoff)
 const STATUS_HEX: Record<string, string> = {
@@ -184,6 +177,7 @@ export default async function VendedoresPage({ searchParams }: { searchParams: S
     take: SELLERS_PAGE_SIZE,
     include: {
       activities: landingCaptureSelection,
+      calendarEvents: { ...pendingSellerCalendarEvents, take: 1 },
       agent: { select: { id: true, name: true } },
       vehicle: {
         select: {
@@ -212,13 +206,44 @@ export default async function VendedoresPage({ searchParams }: { searchParams: S
 
   type Lead = (typeof leads)[number]
 
+  function nextStep(l: Lead) {
+    const step = sellerSteps(
+      l.calendarEvents,
+      l.nextActionType,
+      l.nextActionDueAt,
+      l.agent?.name ?? null
+    )[0]
+    if (!step) return <span className="text-sm text-ink3">Sin próxima acción</span>
+    return (
+      <span className="inline-grid text-sm">
+        <strong className="font-medium">{step.title}</strong>
+        <span
+          className={cn(
+            'text-xs',
+            step.due && isNextActionOverdue(step.due) ? 'text-bad' : 'text-ink2'
+          )}
+        >
+          {step.due
+            ? (isNextActionOverdue(step.due) ? 'Vencida · ' : '') +
+              step.due.toLocaleString('es-ES', {
+                timeZone: 'Europe/Madrid',
+                dateStyle: 'short',
+                timeStyle: 'short',
+              })
+            : 'Sin fecha'}
+        </span>
+      </span>
+    )
+  }
   const columns: Column<Lead>[] = [
     {
       key: 'seller',
       header: 'Vendedor',
       cell: (l) => (
         <div>
-          <div className="text-ink">{l.name}</div>
+          <div className="text-ink">
+            {personLabel(l.name, { role: 'Vendedor sin identificar', id: l.id })}
+          </div>
           <div className="mt-0.5 text-[11px] font-medium text-ink3">
             {CANAL_LABELS[l.canal]} · {relativeDays(l.createdAt)}
           </div>
@@ -232,11 +257,18 @@ export default async function VendedoresPage({ searchParams }: { searchParams: S
       cell: (l) =>
         l.vehicle ? (
           <div>
-            <div className="text-[12.5px] text-ink">
-              {l.vehicle.brand} {l.vehicle.model}
-            </div>
+            <div className="text-[12.5px] text-ink">{vehicleLabel(l.vehicle)}</div>
             <div className="mt-0.5 text-[11px] font-medium text-ink3">
-              {l.vehicle.year} · {l.vehicle.type === 'CAMPER' ? 'Camper' : 'Autocaravana'}
+              {[
+                l.vehicle.type === 'CAMPER'
+                  ? 'Camper'
+                  : l.vehicle.type === 'AUTOCARAVANA'
+                    ? 'Autocaravana'
+                    : null,
+                VEHICLE_STATUS_LABELS[l.vehicle.status],
+              ]
+                .filter(Boolean)
+                .join(' · ')}
             </div>
           </div>
         ) : (
@@ -245,8 +277,10 @@ export default async function VendedoresPage({ searchParams }: { searchParams: S
     },
     {
       key: 'status',
-      header: 'Estado',
-      cell: (l) => <HexPill hex={STATUS_HEX[l.status]}>{STATUS_LABELS[l.status]}</HexPill>,
+      header: 'Estado del contacto',
+      cell: (l) => (
+        <HexPill hex={STATUS_HEX[l.status]}>{SELLER_LEAD_STATUS_LABELS[l.status]}</HexPill>
+      ),
     },
     {
       key: 'valuation',
@@ -280,37 +314,20 @@ export default async function VendedoresPage({ searchParams }: { searchParams: S
     {
       key: 'next',
       header: 'Próxima acción',
-      cell: (l) => {
-        if (!l.nextActionType || !l.nextActionDueAt) return <span className="text-ink3">—</span>
-        const overdue = isNextActionOverdue(l.nextActionDueAt)
-        return (
-          <span
-            className={cn(
-              'inline-flex items-center gap-1.5 font-medium',
-              overdue ? 'text-bad' : 'text-ink2'
-            )}
-          >
-            <Clock size={13} strokeWidth={2} className="shrink-0" />
-            {NEXT_ACTION_LABELS[l.nextActionType]}
-          </span>
-        )
-      },
+      cell: nextStep,
     },
     {
       key: 'agent',
-      header: 'Resp.',
+      header: 'Responsable',
       cell: (l) => <span className="font-medium text-ink2">{l.agent?.name ?? 'Sin asignar'}</span>,
     },
   ]
 
   return (
     <div>
-      <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
+      <header className="mb-5 flex flex-wrap items-center justify-between gap-3">
         <div>
-          <Eyebrow>CRM · Oferta</Eyebrow>
-          <h1 className="mt-1 font-hanken text-[23px] font-bold tracking-[-0.02em] text-ink">
-            Vendedores
-          </h1>
+          <h1 className="text-3xl font-bold tracking-tight text-ink">Vendedores</h1>
           <p className="mt-1 font-hanken text-[13.5px] text-ink2">
             <b className="text-ink">{total}</b> vendedor{total === 1 ? '' : 'es'}
           </p>
@@ -319,15 +336,16 @@ export default async function VendedoresPage({ searchParams }: { searchParams: S
           <Plus size={15} strokeWidth={2.2} className="mr-1.5" />
           Nuevo vendedor
         </ButtonLink>
-      </div>
+      </header>
 
-      <div className="mb-3 flex flex-wrap items-center gap-1.5">
+      <nav aria-label="Vistas de vendedores" className="mb-3 flex flex-wrap items-center gap-1.5">
         {VIEWS.map((v) => {
           const active = view === v.key
           return (
             <Link
               key={v.key}
               href={viewUrl(v.key)}
+              aria-current={active ? 'page' : undefined}
               className={cn(
                 'inline-flex items-center rounded-[9px] border px-3 py-1.5 font-hanken text-[12.5px] font-semibold transition-colors',
                 active
@@ -339,7 +357,7 @@ export default async function VendedoresPage({ searchParams }: { searchParams: S
             </Link>
           )
         })}
-      </div>
+      </nav>
 
       <div className="mb-4">
         <LeadsFilters agents={agents} />
@@ -356,39 +374,30 @@ export default async function VendedoresPage({ searchParams }: { searchParams: S
             <>
               <div className="flex items-center justify-between gap-2">
                 <span className="truncate font-hanken text-[13.5px] font-semibold text-ink">
-                  {l.name}
+                  {personLabel(l.name, { role: 'Vendedor sin identificar', id: l.id })}
                 </span>
                 <HexPill hex={STATUS_HEX[l.status]} className="shrink-0">
-                  {STATUS_LABELS[l.status]}
+                  {SELLER_LEAD_STATUS_LABELS[l.status]}
                 </HexPill>
               </div>
               <div className="mt-0.5 font-hanken text-[11.5px] font-medium text-ink3">
                 {l.vehicle
-                  ? `${l.vehicle.brand} ${l.vehicle.model} · ${l.vehicle.year}`
+                  ? [vehicleLabel(l.vehicle), VEHICLE_STATUS_LABELS[l.vehicle.status]].join(' · ')
                   : 'Sin vehículo'}{' '}
                 · {CANAL_LABELS[l.canal]}
               </div>
               <LandingAttribution activities={l.activities} compact />
               <div className="mt-2 flex items-center justify-between gap-2">
-                {l.nextActionType && l.nextActionDueAt ? (
-                  <span
-                    className={cn(
-                      'inline-flex items-center gap-1.5 font-hanken text-[12px] font-medium',
-                      isNextActionOverdue(l.nextActionDueAt) ? 'text-bad' : 'text-ink2'
-                    )}
-                  >
-                    <Clock size={12} strokeWidth={2} className="shrink-0" />
-                    {NEXT_ACTION_LABELS[l.nextActionType]}
-                  </span>
-                ) : (
-                  <span className="font-hanken text-[12px] text-ink3">Sin próxima acción</span>
-                )}
+                {nextStep(l)}
                 <span className="shrink-0 font-mono text-[12px] font-semibold text-ink">
                   {l.vehicle?.valuationRecommended
                     ? EUR(Number(l.vehicle.valuationRecommended))
                     : 'Sin tasar'}
                 </span>
               </div>
+              <p className="mt-2 text-xs text-ink2">
+                Responsable · {l.agent?.name ?? 'Sin asignar'}
+              </p>
             </>
           )}
           empty={

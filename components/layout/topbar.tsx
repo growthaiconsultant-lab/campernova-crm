@@ -26,26 +26,34 @@ export function Topbar({ leading }: TopbarProps) {
   const params = useParams<{ id?: string }>()
   const searchParams = useSearchParams()
   const [buyersHref, setBuyersHref] = useState('/compradores')
+  const [sellersHref, setSellersHref] = useState('/vendedores')
+  const sellerList = pathname === '/vendedores'
+  const sellerSection = sellerList || pathname.startsWith('/vendedores/')
   const buyerDetail = Boolean(params.id && pathname === `/compradores/${params.id}`)
   useEffect(() => {
-    if (pathname === '/compradores') {
-      const query = searchParams.toString()
-      setBuyersHref(query ? `/compradores?${query}` : '/compradores')
-    }
+    const query = searchParams.toString()
+    const href = query ? pathname + '?' + query : pathname
+    if (pathname === '/compradores') setBuyersHref(href)
+    if (pathname === '/vendedores') setSellersHref(href)
   }, [pathname, searchParams])
 
-  if (buyerDetail) {
+  if (buyerDetail || sellerSection) {
     return (
       <header className="flex min-h-12 shrink-0 items-center gap-1 bg-[#173a2f] px-3 py-1 sm:gap-3 sm:px-6">
         <div className="lg:hidden [&>button:hover]:bg-white/10 [&>button]:text-white">
           {leading}
         </div>
-        <Link
-          className="inline-flex min-h-11 items-center gap-1.5 rounded-md px-1.5 text-sm font-semibold text-white hover:bg-white/10"
-          href={buyersHref}
-        >
-          <ArrowLeft size={16} aria-hidden="true" /> Compradores
-        </Link>
+        {sellerList ? (
+          <span className="px-1.5 text-sm font-semibold text-white">Vendedores</span>
+        ) : (
+          <Link
+            className="inline-flex min-h-11 items-center gap-1.5 rounded-md px-1.5 text-sm font-semibold text-white hover:bg-white/10"
+            href={sellerSection ? sellersHref : buyersHref}
+          >
+            <ArrowLeft size={16} aria-hidden="true" />{' '}
+            {sellerSection ? 'Vendedores' : 'Compradores'}
+          </Link>
+        )}
         <div className="flex-1" />
         <GlobalSearch compact />
         <NewLeadButton compact />

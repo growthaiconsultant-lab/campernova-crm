@@ -29,6 +29,7 @@ function lead(id: string) {
     agent: null,
     vehicle: null,
     dealType: null,
+    calendarEvents: [],
     nextActionType: null,
     nextActionDueAt: null,
     activities: [
@@ -81,6 +82,26 @@ describe('seller list', () => {
     )
   })
 
+  it('muestra la acción de calendario anterior al recordatorio tanto en tarjetas como en tabla', async () => {
+    mocks.findMany.mockResolvedValue([
+      {
+        ...lead('qa'),
+        nextActionType: 'LLAMAR',
+        nextActionDueAt: new Date('2030-03-04'),
+        calendarEvents: [
+          {
+            id: 'e',
+            startAt: new Date('2030-03-01'),
+            title: 'Revisar la oferta',
+            assignedTo: null,
+          },
+        ],
+      },
+    ])
+    const html = renderToStaticMarkup(await VendedoresPage({ searchParams: { view: 'todos' } }))
+    expect(html.match(/Revisar la oferta/g)).toHaveLength(2)
+    expect(html).toContain('Estado del contacto')
+  })
   it('clamps a stale page and preserves filters on the previous link', async () => {
     const html = renderToStaticMarkup(
       await VendedoresPage({ searchParams: { page: '99', brand: 'Ford', sort: 'updatedAt' } })
