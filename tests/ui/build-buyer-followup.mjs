@@ -16,6 +16,7 @@ async function main() {
       usage: 'tests/ui/buyer-usage-fixture.tsx',
       stock: 'tests/ui/buyer-stock-fixture.tsx',
       offers: 'tests/ui/buyer-offers-fixture.tsx',
+      sellerPreparation: 'tests/ui/seller-preparation-fixture.tsx',
       sellerFollowup: 'tests/ui/seller-followup-fixture.tsx',
       postventa: 'tests/ui/buyer-postventa-fixture.tsx',
       documents: 'tests/ui/buyer-documents-fixture.tsx',
@@ -38,6 +39,29 @@ async function main() {
             contents: path.endsWith('/documentos/actions')
               ? 'export const listOperationalDocuments=(...args)=>window.docsFixture.list(...args); export const openOperationalDocument=(...args)=>window.docsFixture.open(...args); export const uploadOperationalDocument=(...args)=>window.docsFixture.upload(...args);'
               : 'export const searchOperationalTargets=async()=>({ok:true,items:[]})',
+          }))
+          plugin.onResolve(
+            {
+              filter:
+                /^@\/app\/\(backoffice\)\/vendedores\/(\[id\]\/(actions|legal-actions)|photo-actions)$/,
+            },
+            ({ path }) => ({ path, namespace: 'seller-preparation-stub' })
+          )
+          plugin.onLoad({ filter: /.*/, namespace: 'seller-preparation-stub' }, ({ path }) => ({
+            contents: path.endsWith('/legal-actions')
+              ? 'export const uploadVehicleDocument=(id,body)=>window.preparationFixture.document(id,body); export const deleteVehicleDocument=()=>{}; export const getVehicleDocumentSignedUrl=()=>({ok:false});'
+              : path.endsWith('/photo-actions')
+                ? 'export const uploadVehiclePhoto=body=>window.preparationFixture.photo(body); export const deleteVehiclePhoto=()=>{}; export const reorderVehiclePhotos=()=>{}; export const setVehiclePhotoCategory=()=>{};'
+                : 'export const publishVehicle=()=>({ok:true}); export const forcePublishVehicle=()=>({ok:true})',
+          }))
+          plugin.onResolve({ filter: /^next\/image$/ }, () => ({
+            path: 'next-image',
+            namespace: 'fixture-image',
+          }))
+          plugin.onLoad({ filter: /.*/, namespace: 'fixture-image' }, () => ({
+            contents:
+              'import React from "react"; export default function Image({src,alt}) { return React.createElement("img",{src,alt}) }',
+            resolveDir: process.cwd(),
           }))
           const stockStubs = {
             '@/app/(backoffice)/ofertas/actions':

@@ -337,7 +337,7 @@ export function VehicleEditForm({ vehicleId, defaultValues, catalog, version }: 
             control={form.control}
             name="desiredPrice"
             render={({ field }) => (
-              <FormItem>
+              <FormItem id="prep-desired-price" tabIndex={-1}>
                 <FormLabel>Precio deseado (€)</FormLabel>
                 <FormControl>
                   <Input

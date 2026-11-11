@@ -13,6 +13,8 @@ import {
 } from '@/app/(backoffice)/vendedores/photo-actions'
 import type { PhotoCategory } from '@prisma/client'
 
+import { PUBLICADO_MIN_PHOTOS as MIN_PHOTOS } from '@/lib/vehicle-legal/requirements'
+
 export type VehiclePhoto = {
   id: string
   url: string
@@ -20,7 +22,6 @@ export type VehiclePhoto = {
   category?: PhotoCategory | null
 }
 
-const MIN_PHOTOS = 6
 const MAX_PHOTOS = 30
 const ACCEPTED_MIME = ['image/jpeg', 'image/png', 'image/webp']
 // PUB-1: categorías de foto para el anuncio. Opcional (Sin categoría) mientras el gate esté relajado.
@@ -221,7 +222,7 @@ export function VehiclePhotoUploader({ vehicleId, initialPhotos, className }: Pr
       {error && <p className="text-sm text-destructive">{error}</p>}
       {belowMin && !error && (
         <p className="text-sm text-amber-600 dark:text-amber-400">
-          Faltan {MIN_PHOTOS - photos.length} fotos para alcanzar el mínimo recomendado de{' '}
+          Faltan {MIN_PHOTOS - photos.length} fotos para alcanzar el mínimo de publicación de{' '}
           {MIN_PHOTOS}.
         </p>
       )}

@@ -184,7 +184,7 @@ export function VehicleLegalFieldsForm({
       </div>
 
       {/* Cargas DGT */}
-      <div className="rounded-lg border p-3">
+      <div tabIndex={-1} id="prep-charges" className="rounded-lg border p-3">
         <div className="flex items-center justify-between gap-3">
           <div className="flex items-center gap-2">
             <Shield className="h-4 w-4 text-muted-foreground" />
