@@ -141,7 +141,7 @@ export async function completeDeliveryTx(
   }
   const vehicle = await tx.vehicle.findUnique({
     where: { id: p.vehicleId },
-    select: { status: true, sellerLeadId: true },
+    select: { status: true, sellerLeadId: true, publishedAt: true },
   })
   if (!vehicle || vehicle.sellerLeadId !== p.resolvedSellerLeadId) {
     throw new DeliveryCompletionError('DELIVERY_ROOT_CHANGED')
@@ -202,7 +202,13 @@ export async function completeDeliveryTx(
   // (9) CAS del vehículo: PUBLICADO|RESERVADO → VENDIDO. count 0 → estado incompatible → revierte.
   const vehicleRes = await tx.vehicle.updateMany({
     where: { id: p.vehicleId, status: { in: DELIVERABLE_VEHICLE_STATUSES } },
-    data: { status: 'VENDIDO', soldAt: p.now },
+    data: {
+      status: 'VENDIDO',
+      soldAt: p.now,
+      ...(vehicle.status === 'PUBLICADO' && vehicle.publishedAt === null
+        ? { publishedAt: p.now }
+        : {}),
+    },
   })
   if (vehicleRes.count === 0) throw new DeliveryConflictError('vehicle')
 

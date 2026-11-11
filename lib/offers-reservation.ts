@@ -44,6 +44,8 @@ export type ApplyOfferStatusParams = {
     amount?: number
   }
   vehicleId: string
+  /** Fecha observada en anuncios antiguos que ya estaban publicados al reservar. */
+  firstObservedPublication?: Date
   /** true al ACEPTAR: exige PUBLICADO → RESERVADO de forma atómica. */
   reserve: boolean
   /** true al liberar una reserva (cancelar/retirar/expirar): RESERVADO → PUBLICADO. */
@@ -97,7 +99,10 @@ export async function applyOfferStatusChangeTx(
     // reservó/vendió/retiró entre medias → conflicto (revierte la aceptación de la oferta).
     const vehRes = await tx.vehicle.updateMany({
       where: { id: p.vehicleId, status: 'PUBLICADO' },
-      data: { status: 'RESERVADO' },
+      data: {
+        status: 'RESERVADO',
+        ...(p.firstObservedPublication && { publishedAt: p.firstObservedPublication }),
+      },
     })
     if (vehRes.count === 0) throw new OfferConflictError('vehicle')
     reserved = true

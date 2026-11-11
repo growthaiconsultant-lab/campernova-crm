@@ -321,7 +321,7 @@ it('Venta recupera una reserva aunque el vehículo reservado ya no sea elegible 
   const html = await render('compradores')
   for (const text of [
     'Reserva con señal',
-    'Fuera del catálogo público',
+    'Ver anuncio',
     'Texto preparado',
     'Publicado según el equipo',
     'https://www.coches.net/anuncio-qa',

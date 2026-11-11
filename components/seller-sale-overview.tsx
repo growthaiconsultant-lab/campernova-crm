@@ -1,3 +1,4 @@
+import { webAvailability } from '@/lib/web-listing'
 import Link from 'next/link'
 import type { Vehicle } from '@prisma/client'
 import { formatEur } from '@/lib/format/currency'
@@ -51,8 +52,9 @@ export function SellerSaleChannels({
         : null,
     }
   })
+  const availability = webAvailability(vehicle.status, vehicle.publishedAt)
   const publishedCount =
-    Number(vehicle.status === 'PUBLICADO') +
+    Number(availability !== null) +
     channels.filter(({ listing }) => listing && !listing.withdrawn).length
   return (
     <section aria-labelledby="sale-channels" className="rounded-xl border bg-card p-4 sm:p-5">
@@ -71,9 +73,9 @@ export function SellerSaleChannels({
           <div>
             <div className="flex flex-wrap items-center gap-2">
               <strong>Web CampersNova</strong>
-              {!showToolsLink && vehicle.status === 'PUBLICADO' && (
+              {!showToolsLink && availability && (
                 <span className="rounded bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-900">
-                  Publicado
+                  {availability === 'Disponible' ? 'Publicado' : availability}
                 </span>
               )}
             </div>
@@ -82,14 +84,18 @@ export function SellerSaleChannels({
                 ? showToolsLink
                   ? 'Publicado'
                   : 'En el catálogo web'
-                : 'Fuera del catálogo público'}
+                : availability
+                  ? showToolsLink
+                    ? availability
+                    : 'Ficha visible en la web'
+                  : 'Fuera del catálogo público'}
               {vehicle.status === 'PUBLICADO' &&
                 vehicle.publishedAt &&
                 ' · Primera publicación el ' + offerDateLabel(vehicle.publishedAt.toISOString())}
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-3">
-            {vehicle.status === 'PUBLICADO' && (
+            {availability && (
               <Link
                 className="text-sm text-brand underline"
                 href={'/comprar/' + vehicleSlug(vehicle)}

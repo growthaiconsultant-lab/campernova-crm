@@ -11,7 +11,13 @@ import { unpublishVehicle } from './actions'
  * PUB-1 — Retirar anuncio (PUBLICADO → TASADO). Motivo opcional. No se puede si hay ofertas activas
  * (el servidor lo rechaza). Conserva la fecha de primera publicación.
  */
-export function UnpublishButton({ vehicleId }: { vehicleId: string }) {
+export function UnpublishButton({
+  vehicleId,
+  label = 'Retirar anuncio',
+}: {
+  vehicleId: string
+  label?: string
+}) {
   const router = useRouter()
   const [open, setOpen] = useState(false)
   const [reason, setReason] = useState('')
@@ -33,7 +39,7 @@ export function UnpublishButton({ vehicleId }: { vehicleId: string }) {
   if (!open) {
     return (
       <Button variant="outline" size="sm" onClick={() => setOpen(true)}>
-        Retirar anuncio
+        {label}
       </Button>
     )
   }
@@ -43,7 +49,8 @@ export function UnpublishButton({ vehicleId }: { vehicleId: string }) {
       <p className="text-sm font-medium">Retirar anuncio del catálogo</p>
       <p className="text-xs text-muted-foreground">
         El vehículo volverá al estado «Tasado» y dejará de aparecer en el catálogo público. Se
-        conserva la fecha de primera publicación. No se puede retirar si hay ofertas activas.
+        conserva la fecha de primera publicación. La retirada requiere resolver antes las ofertas o
+        entregas activas.
       </p>
       <Textarea
         value={reason}

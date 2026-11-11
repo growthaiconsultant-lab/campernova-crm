@@ -33,6 +33,7 @@ type Over = {
 function fakeTx(o: Over = {}) {
   const calls = { offerUpdate: 0, vehicleUpdate: 0, activity: 0 }
   const tx = {
+    delivery: { count: vi.fn().mockResolvedValue(0) },
     offer: {
       findUnique: vi.fn(async () =>
         o.offer === undefined

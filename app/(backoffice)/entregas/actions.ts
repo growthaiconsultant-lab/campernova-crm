@@ -1,6 +1,7 @@
 'use server'
 
 import { randomUUID } from 'node:crypto'
+import { revalidatePublicCatalog } from '@/lib/revalidate-public-catalog'
 import { revalidatePath } from 'next/cache'
 import { z } from 'zod'
 import { db } from '@/lib/db'
@@ -308,6 +309,8 @@ export async function updateDeliveryStatus(
     throw err
   }
 
+  revalidatePath('/vehiculos')
+  revalidatePublicCatalog()
   revalidatePath('/entregas')
   revalidatePath(`/entregas/${deliveryId}`)
   revalidatePath(`/vendedores/${prelim.vehicle.sellerLeadId}`)

@@ -20,7 +20,13 @@ function fmtKm(n: number | null) {
   return new Intl.NumberFormat('es-ES').format(n) + ' km'
 }
 
-export function VehicleCatalogCard({ vehicle: v }: { vehicle: PublicVehicle }) {
+export function VehicleCatalogCard({
+  vehicle: v,
+  reserved = false,
+}: {
+  vehicle: PublicVehicle
+  reserved?: boolean
+}) {
   const photo = v.photos[0]
   return (
     <Link
@@ -49,7 +55,7 @@ export function VehicleCatalogCard({ vehicle: v }: { vehicle: PublicVehicle }) {
           className="absolute left-3 top-3 rounded-full px-2.5 py-1 font-mono text-[10px] uppercase tracking-[0.08em] text-white"
           style={{ background: 'rgba(10,10,10,0.78)' }}
         >
-          {v.typeLabel}
+          {reserved ? 'Reservado' : v.typeLabel}
         </span>
         {v.verified && (
           <span

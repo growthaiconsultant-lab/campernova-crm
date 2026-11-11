@@ -12,6 +12,7 @@ import {
   equipmentLabels,
   categoryForType,
   type PublicVehicle,
+  type PublicVehicleDetail,
 } from '@/lib/public-catalog'
 
 // ISR on-demand: la ficha se renderiza en la primera petición y se cachea 10 min.
@@ -62,7 +63,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   }
 }
 
-function vehicleJsonLd(v: PublicVehicle) {
+function vehicleJsonLd(v: PublicVehicleDetail) {
   return {
     '@context': 'https://schema.org',
     '@type': 'Vehicle',
@@ -80,7 +81,12 @@ function vehicleJsonLd(v: PublicVehicle) {
         '@type': 'Offer',
         price: v.price,
         priceCurrency: 'EUR',
-        availability: 'https://schema.org/InStock',
+        availability:
+          v.availability === 'Disponible'
+            ? 'https://schema.org/InStock'
+            : v.availability === 'Vendido'
+              ? 'https://schema.org/SoldOut'
+              : 'https://schema.org/OutOfStock',
         itemCondition: 'https://schema.org/UsedCondition',
         url: `${SITE_URL}/comprar/${v.slug}`,
         seller: { '@type': 'AutoDealer', name: 'CampersNova' },
@@ -230,6 +236,9 @@ export default async function VehicleDetailPage({ params }: Props) {
                 </div>
               )}
 
+              <p className="mb-2 inline-block rounded-full bg-stone-100 px-3 py-1 text-sm font-semibold text-stone-900">
+                {v.availability}
+              </p>
               <h1
                 className="text-[clamp(2rem,4vw,3rem)] leading-[1.05] tracking-[-0.02em]"
                 style={{ fontFamily: 'var(--font-fraunces)', color: 'var(--cn-teal-900)' }}
@@ -375,20 +384,24 @@ export default async function VehicleDetailPage({ params }: Props) {
 
               <div className="mt-6 flex flex-col gap-2.5">
                 <Link
-                  href="/comprar"
+                  href={v.availability === 'Disponible' ? '/comprar' : '/comprar/vehiculos'}
                   className="w-full rounded-cn-sm py-3 text-center text-[14px] font-semibold text-white transition hover:opacity-90"
                   style={{ background: 'var(--cn-teal-900)' }}
                 >
-                  Solicitar información
+                  {v.availability === 'Disponible'
+                    ? 'Solicitar información'
+                    : 'Ver vehículos disponibles'}
                 </Link>
-                <a
-                  href="tel:+34645639185"
-                  className="mx-auto mt-2 flex items-center gap-2 text-[13px] hover:underline"
-                  style={{ color: 'var(--cn-teal-700)' }}
-                >
-                  <Phone size={14} />
-                  645 63 91 85
-                </a>
+                {v.availability === 'Disponible' && (
+                  <a
+                    href="tel:+34645639185"
+                    className="mx-auto mt-2 flex items-center gap-2 text-[13px] hover:underline"
+                    style={{ color: 'var(--cn-teal-700)' }}
+                  >
+                    <Phone size={14} />
+                    645 63 91 85
+                  </a>
+                )}
               </div>
 
               {/* Trust icons */}
@@ -398,7 +411,9 @@ export default async function VehicleDetailPage({ params }: Props) {
               >
                 {[
                   { Icon: Shield, text: 'Vehículo revisado y documentado' },
-                  { Icon: Eye, text: 'Visita presencial sin compromiso' },
+                  ...(v.availability === 'Disponible'
+                    ? [{ Icon: Eye, text: 'Visita presencial sin compromiso' }]
+                    : []),
                   { Icon: Handshake, text: 'Trámites de transferencia incluidos' },
                 ].map(({ Icon, text }) => (
                   <div

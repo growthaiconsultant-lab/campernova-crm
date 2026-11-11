@@ -17,6 +17,7 @@ async function main() {
       stock: 'tests/ui/buyer-stock-fixture.tsx',
       offers: 'tests/ui/buyer-offers-fixture.tsx',
       vehicleInventory: 'tests/ui/vehicle-inventory-fixture.tsx',
+      inventoryOperations: 'tests/ui/inventory-operations-fixture.tsx',
       sellerSale: 'tests/ui/seller-sale-fixture.tsx',
       sellerPreparation: 'tests/ui/seller-preparation-fixture.tsx',
       sellerFollowup: 'tests/ui/seller-followup-fixture.tsx',
@@ -80,6 +81,16 @@ async function main() {
           plugin.onLoad({ filter: /.*/, namespace: 'ad-text-fixture' }, () => ({
             contents:
               'export const generateVehicleAd=()=>{throw Error("Generación inesperada")};export const saveVehicleAdText=(input)=>window.portalFixture.saveText(input);',
+          }))
+          plugin.onResolve({ filter: /^(\.\.\/ofertas\/actions|\.\/discard-action)$/ }, (args) =>
+            args.importer.endsWith('inventory-sale-actions.tsx')
+              ? { path: args.path, namespace: 'inventory-operations' }
+              : undefined
+          )
+          plugin.onLoad({ filter: /.*/, namespace: 'inventory-operations' }, ({ path }) => ({
+            contents: path.endsWith('discard-action')
+              ? 'export const discardInventoryVehicle=(...args)=>window.operations.discard(...args)'
+              : 'export const updateOfferStatus=(...args)=>window.operations.reserve(...args)',
           }))
           const stockStubs = {
             '@/app/(backoffice)/ofertas/actions':

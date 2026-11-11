@@ -1,5 +1,6 @@
 'use server'
 
+import { revalidatePublicCatalog } from '@/lib/revalidate-public-catalog'
 import { revalidatePath } from 'next/cache'
 import { db } from '@/lib/db'
 import { requireAgente } from '@/lib/auth'
@@ -42,6 +43,7 @@ type CreateOfferInput = {
 
 /** Revalida las fichas de ambos lados + el listado de ofertas. */
 function revalidateOffer(buyerLeadId: string, sellerLeadId: string | null) {
+  revalidatePath('/vehiculos')
   revalidatePath('/ofertas')
   revalidatePath(`/compradores/${buyerLeadId}`)
   if (sellerLeadId) revalidatePath(`/vendedores/${sellerLeadId}`)
@@ -117,6 +119,7 @@ export async function createOffer(
 }
 
 type StatusExtra = {
+  expectedVehicleId?: string
   depositAmount?: number | null // señal (al ACEPTAR = reserva)
   reservedUntil?: string | null // ISO, reserva válida hasta
   rejectionReason?: string | null // al RECHAZAR
@@ -148,7 +151,11 @@ export async function updateOfferStatus(
       vehicle: { select: { id: true, sellerLeadId: true } },
     },
   })
-  if (!offer) return { error: OFFER_TRANSITION_ERROR_MESSAGES.OFFER_NOT_FOUND }
+  if (
+    !offer ||
+    (extra.expectedVehicleId !== undefined && offer.vehicle.id !== extra.expectedVehicleId)
+  )
+    return { error: OFFER_TRANSITION_ERROR_MESSAGES.OFFER_NOT_FOUND }
 
   const next = status as OfferStatus
   if (!isValidOfferTransition(offer.status, next)) {
@@ -233,6 +240,7 @@ export async function updateOfferStatus(
   }
 
   // Se revalida con los datos que vio la transacción, no con los de la lectura preliminar.
+  if (next === 'ACEPTADA' || wasReservation) revalidatePublicCatalog()
   revalidateOffer(result.buyerLeadId, result.sellerLeadId)
   revalidatePath('/vendedores')
   return {}

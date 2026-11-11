@@ -357,12 +357,14 @@ export default async function FichaVendedorPage({
           (v.status === 'PUBLICADO' ? (
             <UnpublishButton vehicleId={v.id} />
           ) : (
-            <Link
-              className="text-sm text-brand underline"
-              href={`/vendedores/${lead.id}?tab=preparacion`}
-            >
-              Ver qué falta para publicar
-            </Link>
+            (v.status === 'NUEVO' || v.status === 'TASADO') && (
+              <Link
+                className="text-sm text-brand underline"
+                href={`/vendedores/${lead.id}?tab=preparacion`}
+              >
+                Ver qué falta para publicar
+              </Link>
+            )
           ))
         }
       >
