@@ -8,7 +8,7 @@ import { requireAgente } from '@/lib/auth'
 import { completedSalesQuery } from '@/lib/completed-sales'
 import { CompletedSaleCard } from '@/components/completed-sale-card'
 import { ManualAssociationsCard } from '@/components/manual-associations-card'
-import { initialOf, personLabel, vehicleLabel } from '@/lib/display'
+import { personLabel, vehicleLabel } from '@/lib/display'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { VehiclePhotoUploader } from '@/components/vehicle-photo-uploader'
@@ -62,11 +62,11 @@ import { ScoreInfo } from '@/components/score-info'
 import { buildTrustPassport } from '@/lib/trust-passport'
 import { getTrustPassportInput } from '@/lib/trust-passport/prisma-deps'
 import { TrustPassportPanel } from '@/components/trust-passport-panel'
-import { generateLeadInsights, getNextAction } from '@/lib/lead-insights'
+import { generateLeadInsights } from '@/lib/lead-insights'
 import { LeadTabNav } from './lead-tab-nav'
 import type { LeadTab } from './lead-tab-nav'
 import { SellerTopbarActions } from './seller-topbar-actions'
-import { ProximaAccionCard } from './proxima-accion-card'
+import { SellerFollowupPanel } from '@/components/seller-followup-panel'
 import {
   SELLER_DEAL_TYPE_LABELS,
   SELLER_URGENCY_LABELS,
@@ -165,6 +165,11 @@ export default async function FichaVendedorPage({
           },
         },
         agent: true,
+        calendarEvents: {
+          where: { status: { in: ['PROGRAMADO', 'CONFIRMADO', 'EN_CURSO'] } },
+          orderBy: [{ startAt: 'asc' }, { id: 'asc' }],
+          select: { id: true, title: true, startAt: true, assignedTo: { select: { name: true } } },
+        },
       },
     }),
     db.user.findMany({ select: { id: true, name: true }, orderBy: { name: 'asc' } }),
@@ -182,14 +187,36 @@ export default async function FichaVendedorPage({
   const isAdmin = currentUser.role === 'ADMIN'
   const isAgente = ['ADMIN', 'AGENTE'].includes(currentUser.role)
 
+  const isAdmitted = lead.intakeStatus === 'ADMITIDO'
+
+  // Una solicitud todavía no admitida puede revisarse y conservar su actividad, pero no entra
+  // en las superficies operativas (preparación, publicación, matching o economía).
+  const requestedTab = searchParams.tab ?? 'resumen'
+  const validTabs = isAdmitted
+    ? [
+        'resumen',
+        'actividad',
+        'preparacion',
+        ...(v ? ['compradores', 'economia', 'publicacion'] : []),
+      ]
+    : ['resumen', 'actividad']
+  const activeTab = validTabs.includes(requestedTab) ? requestedTab : 'resumen'
+  const saleTab = ['compradores', 'economia', 'publicacion'].includes(activeTab)
+  const groupTab = saleTab
+    ? 'compradores'
+    : activeTab === 'actividad' && isAdmitted
+      ? 'resumen'
+      : activeTab
+
   // A3 — gate de la tasación oficial: entrada activa + inspección de entrada COMPLETADA + estado
   // elegible. Determina si el panel de tasación oficial se habilita (la barrera dura vive en el
   // núcleo transaccional; esto es solo la señal de UI).
-  const completedInspectionCount = v
-    ? await db.workOrder.count({
-        where: { vehicleId: v.id, kind: 'INSPECCION_ENTRADA', status: 'COMPLETADA' },
-      })
-    : 0
+  const completedInspectionCount =
+    v && activeTab === 'economia'
+      ? await db.workOrder.count({
+          where: { vehicleId: v.id, kind: 'INSPECCION_ENTRADA', status: 'COMPLETADA' },
+        })
+      : 0
   const entryActive = !!(v && v.entryValidatedAt && !v.entryAnnulledAt)
   const officialGateReady =
     !!v &&
@@ -263,6 +290,7 @@ export default async function FichaVendedorPage({
   const offerRows = (v?.offers ?? []).map((o) => ({
     id: o.id,
     amount: Number(o.amount),
+    createdAt: o.createdAt.toISOString(),
     depositAmount: o.depositAmount ? Number(o.depositAmount) : null,
     status: o.status,
     reservedUntil: o.reservedUntil ? o.reservedUntil.toISOString() : null,
@@ -339,12 +367,15 @@ export default async function FichaVendedorPage({
   })
 
   // Block 20 — Trust Passport (agregación legal + taller)
-  const trustInput = v ? await getTrustPassportInput(db, v.id) : null
+  const trustInput = v && activeTab === 'preparacion' ? await getTrustPassportInput(db, v.id) : null
   const trustPassport = trustInput ? buildTrustPassport(trustInput) : null
 
   // PR-A2 (corrección 7.5) — datos del panel de entrada oficial (checklist documental derivado +
   // orden de inspección activa para el enlace a Taller).
-  const entrySignals = v ? await getEntryChecklistSignals(db, v.id, ENTRY_SIGNAL_CATEGORIES) : []
+  const entrySignals =
+    v && activeTab === 'preparacion'
+      ? await getEntryChecklistSignals(db, v.id, ENTRY_SIGNAL_CATEGORIES)
+      : []
   const entryChecklist = deriveDocumentChecklist({ signals: entrySignals }).map((row) => ({
     category: row.category as string,
     label: DOC_LABELS[row.category],
@@ -368,7 +399,6 @@ export default async function FichaVendedorPage({
   }
 
   const insights = generateLeadInsights(insightInput)
-  const nextAction = getNextAction(insightInput)
 
   const closureProb = calculateClosureProbability({
     leadStatus: lead.status,
@@ -399,39 +429,20 @@ export default async function FichaVendedorPage({
       })
     : null
 
-  const isAdmitted = lead.intakeStatus === 'ADMITIDO'
-
-  // Una solicitud todavía no admitida puede revisarse y conservar su actividad, pero no entra
-  // en las superficies operativas (preparación, publicación, matching o economía).
-  const requestedTab = searchParams.tab ?? 'resumen'
-  const activeTab = isAdmitted || requestedTab === 'actividad' ? requestedTab : 'resumen'
-
   // Próxima transición de estado lead
   const nextLeadStatuses = SELLER_LEAD_TRANSITIONS[lead.status as SellerLeadStatus] ?? []
   const primaryNextStatus = nextLeadStatuses.find((s) => s !== 'DESCARTADO') ?? null
 
   // ── Tabs definición ────────────────────────────────────────────────────────
-  const admittedTabs: LeadTab[] = [
-    { key: 'resumen', label: 'Resumen' },
-    ...(v
-      ? [
-          {
-            key: 'preparacion',
-            label: 'Preparación',
-            ...(legalInput ? { badge: `${completionPct}%` } : {}),
-          },
-        ]
-      : []),
-    ...(v ? [{ key: 'publicacion', label: 'Publicación' }] : []),
-    ...(v ? [{ key: 'compradores', label: 'Compradores', badge: vehicleMatches.length }] : []),
-    { key: 'actividad', label: 'Actividad', badge: activities.length },
-    ...(v ? [{ key: 'economia', label: isAdmin ? 'Economía' : 'Tasación' }] : []),
-  ]
   const tabs: LeadTab[] = isAdmitted
-    ? admittedTabs
+    ? [
+        { key: 'resumen', label: 'Seguimiento' },
+        { key: 'preparacion', label: 'Vehículo y documentos' },
+        ...(v ? [{ key: 'compradores', label: 'Venta' }] : []),
+      ]
     : [
-        { key: 'resumen', label: 'Resumen' },
-        { key: 'actividad', label: 'Actividad', badge: activities.length },
+        { key: 'resumen', label: 'Solicitud' },
+        { key: 'actividad', label: 'Actividad' },
       ]
 
   // ── Form default values ────────────────────────────────────────────────────
@@ -496,7 +507,7 @@ export default async function FichaVendedorPage({
   return (
     <div className="-mx-6 -mt-6 flex min-h-[calc(100%_+_1.5rem)] flex-col lg:-mb-6 lg:min-h-[calc(100%_+_3rem)]">
       {/* ── Topbar sticky ── */}
-      <header className="z-20 flex min-h-[56px] shrink-0 items-center justify-between gap-2 border-b border-border bg-card px-4 py-2 md:px-8 lg:sticky lg:top-0 lg:h-[60px] lg:py-0">
+      <header className="z-20 flex min-h-[56px] shrink-0 flex-wrap items-center justify-between gap-2 border-b border-border bg-card px-4 py-2 md:px-8 lg:sticky lg:top-0 lg:h-[60px] lg:py-0">
         <nav className="flex items-center gap-2 font-mono text-[11px] uppercase tracking-[0.12em] text-muted-foreground">
           <Link
             href="/vendedores"
@@ -507,7 +518,7 @@ export default async function FichaVendedorPage({
           </Link>
           <span className="text-muted-foreground/40">/</span>
           <span className="font-semibold text-foreground">
-            {v ? vehicleLabel(v) : personLabel(lead.name, { role: 'Vendedor sin identificar' })}
+            {personLabel(lead.name, { role: 'Vendedor sin identificar' })}
           </span>
         </nav>
         <div className="flex items-center gap-2">
@@ -540,564 +551,535 @@ export default async function FichaVendedorPage({
 
       <SellerIntakePanel leadId={lead.id} status={lead.intakeStatus} />
 
-      {/* ── Hero ── */}
-      <section className="border-b border-border bg-background px-4 pb-0 pt-7 md:px-10">
-        {/* Identity row — centrado en el vehículo */}
-        <div className="mb-6 flex flex-col gap-5 sm:flex-row sm:items-center">
-          {/* Miniatura del vehículo */}
-          <div className="h-[76px] w-[110px] shrink-0 overflow-hidden rounded-xl border border-border bg-muted">
-            {v?.photos[0] ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img
-                src={v.photos[0].url}
-                alt={v ? `${v.brand} ${v.model}` : ''}
-                className="h-full w-full object-cover"
-              />
-            ) : (
-              <div className="flex h-full w-full items-center justify-center text-lg font-bold text-muted-foreground/40">
-                {v ? initialOf(v.brand) : '—'}
-              </div>
-            )}
-          </div>
-
-          {/* Vehículo + vendedor */}
-          <div className="min-w-0 flex-1">
-            <div className="flex flex-wrap items-center gap-3">
-              <h1 className="text-[26px] font-bold leading-tight tracking-[-0.02em]">
-                {v ? vehicleLabel(v) : personLabel(lead.name, { role: 'Vendedor sin identificar' })}
-              </h1>
-              {v ? (
-                <StatusPill status={v.status} entity="vehicle" />
-              ) : (
-                <StatusPill status={lead.status} entity="seller" />
-              )}
-              {v && (
-                <span
-                  className={`rounded-md px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${
-                    lead.canal === 'PRO'
-                      ? 'bg-amber-100 text-amber-700'
-                      : 'bg-slate-100 text-slate-600'
-                  }`}
-                >
-                  {lead.canal === 'PRO' ? 'Formulario web' : 'Backoffice'}
-                </span>
-              )}
-            </div>
-            {v && (
-              <p className="mt-1 text-sm text-muted-foreground">
-                {[
-                  v.year,
-                  v.km != null ? `${v.km.toLocaleString('es-ES')} km` : null,
-                  v.length ? `${v.length} m` : null,
-                  v.plate,
-                  v.location,
-                ]
-                  .filter(Boolean)
-                  .join(' · ')}
-              </p>
-            )}
-            {/* Vendedor + contacto */}
-            <LandingAttribution activities={activities} />
-            <div className="mt-2.5 flex flex-wrap items-center gap-2 text-sm">
-              <span className="text-muted-foreground">
-                Vendedor ·{' '}
-                <span className="font-medium text-foreground">
-                  {personLabel(lead.name, { role: 'Vendedor sin identificar' })}
-                </span>
-              </span>
-              {lead.phone && (
-                <a
-                  href={`tel:${lead.phone}`}
-                  className="inline-flex items-center gap-1 rounded-md border border-border px-2 py-1 text-xs text-muted-foreground transition-colors hover:border-green-500 hover:text-green-600"
-                >
-                  <Phone className="h-3 w-3" />
-                  {lead.phone}
-                </a>
-              )}
-              {lead.email && (
-                <a
-                  href={`mailto:${lead.email}`}
-                  className="inline-flex items-center gap-1 rounded-md border border-border px-2 py-1 text-xs text-muted-foreground transition-colors hover:border-foreground hover:text-foreground"
-                >
-                  <Mail className="h-3 w-3" />
-                  {lead.email}
-                </a>
-              )}
-            </div>
-          </div>
-
-          {/* Días en pipeline */}
-          <div className="shrink-0 sm:text-right">
-            <p
-              className={`text-[26px] font-bold leading-none ${daysPipeline > 60 ? 'text-red-500' : daysPipeline > 30 ? 'text-amber-500' : 'text-foreground'}`}
-            >
-              {daysPipeline}
-            </p>
-            <p className="mt-1 font-mono text-[10px] uppercase tracking-[0.12em] text-muted-foreground">
-              días en pipeline
+      <section className="border-b bg-card px-4 pt-5 md:px-10">
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div className="min-w-0">
+            <h1 className="break-words text-2xl font-semibold">
+              {personLabel(lead.name, { role: 'Vendedor sin identificar' })}
+            </h1>
+            <p className="mt-1 text-sm">
+              {v
+                ? [vehicleLabel(v), v.km != null ? v.km.toLocaleString('es-ES') + ' km' : null]
+                    .filter(Boolean)
+                    .join(' · ')
+                : 'Sin vehículo vinculado'}
             </p>
           </div>
+          <p className="text-sm">
+            <span className="block text-xs text-muted-foreground">Responsable</span>
+            {lead.agent?.name ?? 'Sin asignar'}
+          </p>
         </div>
-
-        {/* Tira de métricas clave */}
+        <div className="my-3 flex flex-wrap items-center gap-2 text-sm">
+          <span>Contacto</span>
+          <StatusPill status={lead.status} entity="seller" />
+          {lead.archivedAt && <strong>Archivado</strong>}
+          {lead.phone && (
+            <a
+              href={`tel:${lead.phone}`}
+              className="inline-flex items-center gap-1 rounded-md border border-border px-2 py-1 text-xs text-muted-foreground transition-colors hover:border-green-500 hover:text-green-600"
+            >
+              <Phone className="h-3 w-3" />
+              {lead.phone}
+            </a>
+          )}
+          {lead.email && (
+            <a
+              href={`mailto:${lead.email}`}
+              className="inline-flex items-center gap-1 rounded-md border border-border px-2 py-1 text-xs text-muted-foreground transition-colors hover:border-foreground hover:text-foreground"
+            >
+              <Mail className="h-3 w-3" />
+              {lead.email}
+            </a>
+          )}
+        </div>
         {v && (
-          <div className="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-5">
-            {/* Precio salida */}
-            <div className="rounded-xl border border-border bg-card px-4 py-3">
-              <div className="mb-1 flex items-center gap-1">
-                <p className="font-mono text-[10px] uppercase tracking-[0.12em] text-muted-foreground">
-                  Precio salida
-                </p>
-                <InfoTooltip
-                  text="Precio de venta al público fijado. Si aún no hay precio de venta, muestra el precio deseado por el vendedor."
-                  side="bottom"
-                />
-              </div>
-              <p className="text-xl font-bold tracking-[-0.02em] text-sidebar-primary">
-                {(v.salePrice ?? v.desiredPrice) ? EUR(Number(v.salePrice ?? v.desiredPrice)) : '—'}
-              </p>
-            </div>
-
-            {/* Tasación */}
-            <div className="rounded-xl border border-border bg-card px-4 py-3">
-              <p className="mb-1 font-mono text-[10px] uppercase tracking-[0.12em] text-muted-foreground">
-                Tasación
-              </p>
-              <p className="text-xl font-bold tracking-[-0.02em]">
-                {v.valuationRecommended
-                  ? `${Math.round(Number(v.valuationMin ?? v.valuationRecommended) / 1000)}–${Math.round(Number(v.valuationMax ?? v.valuationRecommended) / 1000)}k €`
-                  : '—'}
-              </p>
-            </div>
-
-            {/* Margen (solo admin) */}
-            {isAdmin && (
-              <div className="rounded-xl border border-border bg-card px-4 py-3">
-                <div className="mb-1 flex items-center gap-1">
-                  <p className="font-mono text-[10px] uppercase tracking-[0.12em] text-muted-foreground">
-                    Margen
-                  </p>
-                  <InfoTooltip
-                    text="Beneficio neto estimado: precio venta − compra − todos los costes imputados. Solo administradores."
-                    side="bottom"
-                  />
-                </div>
-                <p
-                  className={`text-xl font-bold tracking-[-0.02em] ${margin && (margin.netMargin ?? 0) >= 0 ? 'text-green-600' : 'text-red-500'}`}
-                >
-                  {margin && margin.netMargin !== null ? EUR(margin.netMargin) : '—'}
-                </p>
-              </div>
+          <div className="mb-2 flex flex-wrap items-center gap-2 rounded-lg bg-sidebar-primary/5 px-3 py-2 text-sm">
+            {isAdmitted && (
+              <>
+                <span>Vehículo</span>
+                <StatusPill status={v.status} entity="vehicle" />
+              </>
             )}
-
-            {/* Calidad del lead */}
-            <div className="rounded-xl border border-border bg-card px-4 py-3">
-              <div className="mb-1 flex items-center gap-1">
-                <p className="font-mono text-[10px] uppercase tracking-[0.12em] text-muted-foreground">
-                  Calidad lead
-                </p>
-                <InfoTooltip
-                  text="Puntuación 0-100: completud del vehículo, fotos, matches activos, actividad reciente y canal."
-                  side="bottom"
-                />
-              </div>
-              <p className={`text-xl font-bold tracking-[-0.02em] ${leadScoreColor(leadScore)}`}>
-                {leadScore}
-                <span className="text-sm font-normal text-muted-foreground">/100</span>
-              </p>
-            </div>
-
-            {/* Score de captación (Block 19) */}
-            {v && (
-              <div className="rounded-xl border border-border bg-card px-4 py-3">
-                <div className="mb-1 flex items-center gap-1">
-                  <p className="font-mono text-[10px] uppercase tracking-[0.12em] text-muted-foreground">
-                    Score captación
-                  </p>
-                  <ScoreInfo breakdown={acquisition.breakdown} side="bottom" />
-                </div>
-                <p
-                  className={`text-xl font-bold tracking-[-0.02em] ${acquisition.score >= 70 ? 'text-green-600' : acquisition.score >= 40 ? 'text-amber-600' : 'text-muted-foreground'}`}
-                >
-                  {acquisition.score}
-                  <span className="text-sm font-normal text-muted-foreground">/100</span>
-                </p>
-              </div>
+            {isAdmitted && v.salePrice != null && (
+              <span>
+                {v.status === 'PUBLICADO' ? 'Precio anunciado' : 'Precio de venta'} ·{' '}
+                <strong>{EUR(Number(v.salePrice))}</strong>
+              </span>
             )}
-
-            {/* Listo para publicar */}
-            <div className="rounded-xl border border-border bg-card px-4 py-3">
-              <p className="mb-1 font-mono text-[10px] uppercase tracking-[0.12em] text-muted-foreground">
-                Listo p/ publicar
-              </p>
-              <p
-                className={`text-xl font-bold tracking-[-0.02em] ${completionPct >= 90 ? 'text-green-600' : completionPct >= 60 ? 'text-amber-500' : 'text-muted-foreground'}`}
-              >
-                {completionPct}%
-              </p>
-            </div>
+            {v.desiredPrice != null && <span>Precio deseado · {EUR(Number(v.desiredPrice))}</span>}
           </div>
         )}
-
         {/* Tabs */}
         <div className="-mx-4 md:-mx-10">
           <Suspense fallback={<div className="h-12 border-b border-border" />}>
-            <LeadTabNav tabs={tabs} />
+            <LeadTabNav tabs={tabs} activeKey={groupTab} />
           </Suspense>
         </div>
       </section>
 
       {/* ── Contenido principal ── */}
-      <div className="grid flex-1 grid-cols-1 lg:grid-cols-[1fr_320px]">
+      <div className="mx-auto w-full max-w-5xl flex-1">
         {/* Main content */}
-        <div className="min-w-0 p-4 pb-10 md:p-8 md:pb-16">
-          {/* ─────────────── RESUMEN ─────────────── */}
+        <div className="ph-mask min-w-0 space-y-4 p-4 pb-10 md:p-6 md:pb-16" data-sentry-mask>
+          {activeTab === 'resumen' && isAdmitted && (
+            <SellerFollowupPanel
+              id={lead.id}
+              archived={!!lead.archivedAt}
+              agent={lead.agent?.name ?? null}
+              actor={currentUser.name}
+              reminderType={lead.nextActionType}
+              reminderDue={lead.nextActionDueAt}
+              events={lead.calendarEvents}
+              vehicle={
+                v
+                  ? {
+                      status: v.status,
+                      publishedAt: v.publishedAt,
+                      salePrice: v.salePrice != null ? Number(v.salePrice) : null,
+                    }
+                  : null
+              }
+              offers={offerRows}
+            />
+          )}
+          {!isAdmitted && activeTab === 'resumen' && (
+            <section className="space-y-3 rounded-xl border bg-card p-4">
+              <h2 className="font-semibold">Datos de la solicitud</h2>
+              <p>
+                {lead.email ?? 'Sin correo registrado'} · {lead.phone ?? 'Sin teléfono registrado'}
+              </p>
+              {v && <p>{[vehicleLabel(v), v.location, v.plate].filter(Boolean).join(' · ')}</p>}
+              {v?.photos.length ? (
+                <div className="flex flex-wrap gap-2">
+                  {v.photos.map((photo) => (
+                    <a
+                      key={photo.id}
+                      href={photo.url}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="text-sm underline"
+                    >
+                      Foto {photo.order + 1}
+                    </a>
+                  ))}
+                </div>
+              ) : null}
+              <LandingAttribution activities={activities} />
+            </section>
+          )}
           {activeTab === 'resumen' && (
-            <div className="space-y-6">
-              {/* Sugerencias del asistente */}
-              {insights.length > 0 && (
-                <div className="rounded-xl border bg-muted/30 p-4">
-                  <p className="mb-3 text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
-                    Sugerencias del asistente
-                  </p>
-                  <div className="space-y-2.5">
-                    {insights.map((ins, i) => {
-                      const Icon =
-                        ins.severity === 'warning'
-                          ? AlertTriangle
-                          : ins.severity === 'success'
-                            ? CheckCircle2
-                            : Info
-                      const iconClass =
-                        ins.severity === 'warning'
-                          ? 'text-amber-500'
-                          : ins.severity === 'success'
-                            ? 'text-green-500'
-                            : 'text-blue-500'
-                      return (
-                        <div key={i} className="flex gap-2.5">
-                          <Icon className={`mt-0.5 h-4 w-4 shrink-0 ${iconClass}`} />
-                          <div>
-                            <p className="text-sm font-medium leading-snug">{ins.text}</p>
-                            <p className="mt-0.5 text-xs text-muted-foreground">{ins.detail}</p>
-                          </div>
-                        </div>
-                      )
-                    })}
-                  </div>
-                </div>
-              )}
-
-              {/* Vehículo — resumen */}
-              {v && (
-                <div>
-                  <div className="mb-2 flex items-center justify-between">
-                    <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
-                      Vehículo
-                    </p>
-                    <Link
-                      href={`/vendedores/${lead.id}?tab=preparacion`}
-                      className="text-xs text-sidebar-primary hover:underline"
-                    >
-                      Editar datos
-                    </Link>
-                  </div>
-                  <div className="rounded-xl border bg-card p-4">
-                    <p className="font-semibold">
-                      {v.brand} {v.model} {v.year} · {v.km?.toLocaleString('es-ES')} km
-                    </p>
-                    <div className="mt-3 grid grid-cols-2 gap-x-6 gap-y-2 text-sm sm:grid-cols-3">
-                      <div>
-                        <p className="text-[10px] uppercase tracking-wide text-muted-foreground">
-                          Matrícula
-                        </p>
-                        <p className="font-medium">{v.plate ?? '—'}</p>
-                      </div>
-                      <div>
-                        <p className="text-[10px] uppercase tracking-wide text-muted-foreground">
-                          Bastidor (VIN)
-                        </p>
-                        <p className="break-all font-medium">{v.vin ?? '—'}</p>
-                      </div>
-                      <div>
-                        <p className="text-[10px] uppercase tracking-wide text-muted-foreground">
-                          Año / 1ª Matric.
-                        </p>
-                        <p className="font-medium">{v.year ?? '—'}</p>
-                      </div>
-                      <div>
-                        <p className="text-[10px] uppercase tracking-wide text-muted-foreground">
-                          Kilometraje
-                        </p>
-                        <p className="font-medium">
-                          {v.km ? `${v.km.toLocaleString('es-ES')} km` : '—'}
-                        </p>
-                      </div>
-                      <div>
-                        <p className="text-[10px] uppercase tracking-wide text-muted-foreground">
-                          Campería
-                        </p>
-                        <p className="font-medium">
-                          {v.length ? `${v.length} m` : '—'}
-                          {v.seats ? ` · ${v.seats} plazas` : ''}
-                        </p>
-                      </div>
-                      <div>
-                        <p className="text-[10px] uppercase tracking-wide text-muted-foreground">
-                          Estado ITV
-                        </p>
-                        <p className="font-medium">
-                          {v.itvValidUntil
-                            ? `Vigente hasta ${new Date(v.itvValidUntil).toLocaleDateString('es-ES')}`
-                            : '—'}
-                        </p>
-                      </div>
+            <details className="rounded-xl border bg-card p-4">
+              <summary className="cursor-pointer font-semibold">Historial de actividad</summary>
+              <div className="mt-3 space-y-3">
+                <Link
+                  className="text-sm text-sidebar-primary underline"
+                  href={`/vendedores/${lead.id}?tab=actividad`}
+                >
+                  Ver actividad y añadir nota →
+                </Link>
+                {activities.length ? (
+                  <ActivityTimeline
+                    activities={activities.slice(0, 5) as ActivityItem[]}
+                    currentUserId={currentUser.id}
+                  />
+                ) : (
+                  <p className="text-sm">Todavía no hay actividad.</p>
+                )}
+              </div>
+            </details>
+          )}
+          {activeTab === 'resumen' && isAdmitted && (
+            <details className="rounded-xl border bg-card p-4">
+              <summary className="cursor-pointer font-semibold">Información comercial</summary>
+              <div className="mt-4 space-y-3">
+                <LandingAttribution activities={activities} />
+                {v && (
+                  <div className="grid gap-2 sm:grid-cols-2">
+                    {' '}
+                    {/* Tasación */}
+                    <div className="rounded-xl border border-border bg-card px-4 py-3">
+                      <p className="mb-1 font-mono text-[10px] uppercase tracking-[0.12em] text-muted-foreground">
+                        Tasación
+                      </p>
+                      <p className="text-xl font-bold tracking-[-0.02em]">
+                        {v.valuationRecommended
+                          ? `${Math.round(Number(v.valuationMin ?? v.valuationRecommended) / 1000)}–${Math.round(Number(v.valuationMax ?? v.valuationRecommended) / 1000)}k €`
+                          : '—'}
+                      </p>
                     </div>
-                  </div>
-                </div>
-              )}
-
-              {/* Fotos resumen */}
-              {v && v.photos.length > 0 && (
-                <div>
-                  <div className="mb-2 flex items-center justify-between">
-                    <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
-                      Fotos · {v.photos.length} de 12 recomendadas
-                    </p>
-                    <Link
-                      href={`/vendedores/${lead.id}?tab=preparacion`}
-                      className="text-xs text-sidebar-primary hover:underline"
-                    >
-                      Gestionar →
-                    </Link>
-                  </div>
-                  <p className="mb-2 font-medium">Material visual</p>
-                  <div className="grid grid-cols-4 gap-2 sm:grid-cols-6">
-                    {v.photos.slice(0, 6).map((p, idx) => (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img
-                        key={p.id}
-                        src={p.url}
-                        alt={`Foto ${idx + 1}`}
-                        className="aspect-[4/3] w-full rounded-lg object-cover"
-                      />
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* Matches resumen */}
-              {vehicleMatches.length > 0 && (
-                <div>
-                  <div className="mb-2 flex items-center justify-between">
-                    <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
-                      {vehicleMatches.length} compradores idóneos · Match automático
-                    </p>
-                    <Link
-                      href={`/vendedores/${lead.id}?tab=compradores`}
-                      className="text-xs text-sidebar-primary hover:underline"
-                    >
-                      Ver todos los matches →
-                    </Link>
-                  </div>
-                  <p className="mb-3 font-medium">Posibles compradores</p>
-                  <div className="space-y-2">
-                    {vehicleMatches.slice(0, 3).map((m) => (
-                      <div
-                        key={m.id}
-                        className="flex items-center justify-between gap-3 rounded-lg border bg-card px-4 py-3"
+                    {/* Margen (solo admin) */}
+                    {isAdmin && (
+                      <div className="rounded-xl border border-border bg-card px-4 py-3">
+                        <div className="mb-1 flex items-center gap-1">
+                          <p className="font-mono text-[10px] uppercase tracking-[0.12em] text-muted-foreground">
+                            Margen
+                          </p>
+                          <InfoTooltip
+                            text="Beneficio neto estimado: precio venta − compra − todos los costes imputados. Solo administradores."
+                            side="bottom"
+                          />
+                        </div>
+                        <p
+                          className={`text-xl font-bold tracking-[-0.02em] ${margin && (margin.netMargin ?? 0) >= 0 ? 'text-green-600' : 'text-red-500'}`}
+                        >
+                          {margin && margin.netMargin !== null ? EUR(margin.netMargin) : '—'}
+                        </p>
+                      </div>
+                    )}
+                    {/* Calidad del lead */}
+                    <div className="rounded-xl border border-border bg-card px-4 py-3">
+                      <div className="mb-1 flex items-center gap-1">
+                        <p className="font-mono text-[10px] uppercase tracking-[0.12em] text-muted-foreground">
+                          Calidad lead
+                        </p>
+                        <InfoTooltip
+                          text="Puntuación 0-100: completud del vehículo, fotos, matches activos, actividad reciente y canal."
+                          side="bottom"
+                        />
+                      </div>
+                      <p
+                        className={`text-xl font-bold tracking-[-0.02em] ${leadScoreColor(leadScore)}`}
                       >
-                        <div className="flex items-center gap-3">
-                          <div className="flex h-8 w-8 items-center justify-center rounded-full bg-muted text-sm font-semibold">
-                            {initialOf(m.buyerLead.name)}
-                          </div>
-                          <div>
-                            <p className="text-sm font-medium">
-                              {personLabel(m.buyerLead.name, {
-                                role: 'Comprador sin identificar',
-                                id: m.buyerLead.id,
-                              })}
-                            </p>
-                            <p className="text-xs text-muted-foreground">
-                              {m.buyerLead.vehicleType === 'CAMPER' ? 'Camper' : 'Autocaravana'}
-                              {m.buyerLead.maxBudget
-                                ? ` · Hasta ${EUR(m.buyerLead.maxBudget)}`
-                                : ''}
-                            </p>
-                          </div>
+                        {leadScore}
+                        <span className="text-sm font-normal text-muted-foreground">/100</span>
+                      </p>
+                    </div>
+                    {/* Score de captación (Block 19) */}
+                    {v && (
+                      <div className="rounded-xl border border-border bg-card px-4 py-3">
+                        <div className="mb-1 flex items-center gap-1">
+                          <p className="font-mono text-[10px] uppercase tracking-[0.12em] text-muted-foreground">
+                            Score captación
+                          </p>
+                          <ScoreInfo breakdown={acquisition.breakdown} side="bottom" />
                         </div>
-                        <div className="flex items-center gap-2">
-                          <span
-                            className={`rounded-full px-2.5 py-1 text-xs font-bold ${m.score >= 80 ? 'bg-green-100 text-green-700' : m.score >= 60 ? 'bg-teal-100 text-teal-700' : 'bg-yellow-100 text-yellow-700'}`}
-                          >
-                            {m.score}%
-                          </span>
-                          <Button asChild size="sm" variant="outline" className="h-7 text-xs">
-                            <Link href={`/compradores/${m.buyerLead.id}`}>Ver perfil</Link>
-                          </Button>
-                        </div>
+                        <p
+                          className={`text-xl font-bold tracking-[-0.02em] ${acquisition.score >= 70 ? 'text-green-600' : acquisition.score >= 40 ? 'text-amber-600' : 'text-muted-foreground'}`}
+                        >
+                          {acquisition.score}
+                          <span className="text-sm font-normal text-muted-foreground">/100</span>
+                        </p>
                       </div>
-                    ))}
+                    )}
+                    {/* Listo para publicar */}
+                    <div className="rounded-xl border border-border bg-card px-4 py-3">
+                      <p className="mb-1 font-mono text-[10px] uppercase tracking-[0.12em] text-muted-foreground">
+                        Listo p/ publicar
+                      </p>
+                      <p
+                        className={`text-xl font-bold tracking-[-0.02em] ${completionPct >= 90 ? 'text-green-600' : completionPct >= 60 ? 'text-amber-500' : 'text-muted-foreground'}`}
+                      >
+                        {completionPct}%
+                      </p>
+                    </div>
                   </div>
-                </div>
-              )}
-
-              {/* Expediente resumen */}
-              {legalInput && isAgente && (
-                <div>
-                  <div className="mb-2 flex items-center justify-between">
-                    <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
-                      Expediente legal · Documentación de venta
+                )}
+                {/* Sugerencias del asistente */}
+                {insights.length > 0 && (
+                  <div className="rounded-xl border bg-muted/30 p-4">
+                    <p className="mb-3 text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+                      Sugerencias del asistente
                     </p>
-                    <Link
-                      href={`/vendedores/${lead.id}?tab=preparacion`}
-                      className="text-xs text-sidebar-primary hover:underline"
-                    >
-                      Plantilla completa →
-                    </Link>
-                  </div>
-                  <p className="mb-3 font-medium">Estado del expediente</p>
-                  <div className="rounded-xl border bg-card p-4">
-                    <div className="mb-3 flex items-center justify-between text-sm">
-                      <span>Completado</span>
-                      <span className="font-semibold">
-                        {docSummary.filter((d) => d.exists).length} de 7 · {completionPct}%
-                      </span>
-                    </div>
-                    <div className="mb-4 h-2 w-full overflow-hidden rounded-full bg-muted">
-                      <div
-                        className={`h-full rounded-full transition-all ${completionPct >= 90 ? 'bg-green-500' : completionPct >= 60 ? 'bg-amber-400' : 'bg-red-400'}`}
-                        style={{ width: `${completionPct}%` }}
-                      />
-                    </div>
-                    <div className="space-y-1.5">
-                      {[
-                        'PERMISO_CIRCULACION',
-                        'FICHA_TECNICA',
-                        'DNI_VENDEDOR',
-                        'ITV_VIGENTE',
-                        'JUSTIFICANTE_PAGO',
-                        'INFORME_CARGAS_DGT',
-                        'CONTRATO_COMPRAVENTA',
-                      ].map((cat) => {
-                        const exists = (v?.documents ?? []).some((d) => d.category === cat)
-                        const labels: Record<string, string> = {
-                          PERMISO_CIRCULACION: 'Permiso de circulación',
-                          FICHA_TECNICA: 'Ficha técnica',
-                          DNI_VENDEDOR: 'DNI del vendedor',
-                          ITV_VIGENTE: 'Última ITV pasada',
-                          JUSTIFICANTE_PAGO: 'Justificante pago impuesto circulación',
-                          INFORME_CARGAS_DGT: 'Informe cargas DGT',
-                          CONTRATO_COMPRAVENTA: 'Contrato de compraventa firmado',
-                        }
+                    <div className="space-y-2.5">
+                      {insights.map((ins, i) => {
+                        const Icon =
+                          ins.severity === 'warning'
+                            ? AlertTriangle
+                            : ins.severity === 'success'
+                              ? CheckCircle2
+                              : Info
+                        const iconClass =
+                          ins.severity === 'warning'
+                            ? 'text-amber-500'
+                            : ins.severity === 'success'
+                              ? 'text-green-500'
+                              : 'text-blue-500'
                         return (
-                          <div key={cat} className="flex items-center gap-2 text-sm">
-                            <div
-                              className={`h-4 w-4 shrink-0 rounded ${exists ? 'bg-green-500' : 'border-2 border-muted-foreground/30'} flex items-center justify-center`}
-                            >
-                              {exists && (
-                                <svg viewBox="0 0 10 8" className="h-2.5 w-2.5 fill-white">
-                                  <path
-                                    d="M1 4l3 3 5-6"
-                                    stroke="white"
-                                    strokeWidth="1.5"
-                                    fill="none"
-                                  />
-                                </svg>
-                              )}
+                          <div key={i} className="flex gap-2.5">
+                            <Icon className={`mt-0.5 h-4 w-4 shrink-0 ${iconClass}`} />
+                            <div>
+                              <p className="text-sm font-medium leading-snug">{ins.text}</p>
+                              <p className="mt-0.5 text-xs text-muted-foreground">{ins.detail}</p>
                             </div>
-                            <span className={exists ? 'text-foreground' : 'text-muted-foreground'}>
-                              {labels[cat] ?? cat}
-                            </span>
                           </div>
                         )
                       })}
                     </div>
                   </div>
-                </div>
-              )}
+                )}
 
-              {/* Actividad reciente */}
-              <div>
-                <div className="mb-2 flex items-center justify-between">
-                  <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
-                    Historial · {activities.length} eventos
+                {/* Condiciones de la operación (Seller Supply Graph, Block 17) */}
+                {(lead.minPrice != null || lead.dealType || lead.urgency || lead.riskLevel) && (
+                  <div className="p-5">
+                    <p className="mb-3 font-mono text-[10px] uppercase tracking-[0.12em] text-muted-foreground">
+                      Operación
+                    </p>
+                    <div className="space-y-2">
+                      {lead.minPrice != null && (
+                        <div className="flex items-center justify-between">
+                          <span className="text-[11px] text-muted-foreground">Precio mínimo</span>
+                          <span className="text-[12px] font-medium text-foreground">
+                            {EUR(Number(lead.minPrice))}
+                          </span>
+                        </div>
+                      )}
+                      {lead.dealType && (
+                        <div className="flex items-center justify-between">
+                          <span className="text-[11px] text-muted-foreground">Modalidad</span>
+                          <span className="text-[12px] font-medium text-foreground">
+                            {SELLER_DEAL_TYPE_LABELS[lead.dealType]}
+                          </span>
+                        </div>
+                      )}
+                      {lead.urgency && (
+                        <div className="flex items-center justify-between">
+                          <span className="text-[11px] text-muted-foreground">Urgencia</span>
+                          <span
+                            className="inline-flex items-center gap-1.5 text-[12px] font-medium"
+                            style={{ color: SELLER_URGENCY_COLORS[lead.urgency] }}
+                          >
+                            <span
+                              className="h-1.5 w-1.5 rounded-full"
+                              style={{ background: SELLER_URGENCY_COLORS[lead.urgency] }}
+                            />
+                            {SELLER_URGENCY_LABELS[lead.urgency]}
+                          </span>
+                        </div>
+                      )}
+                      {lead.riskLevel && (
+                        <div className="flex items-center justify-between">
+                          <span className="text-[11px] text-muted-foreground">Riesgo</span>
+                          <span
+                            className="inline-flex items-center gap-1.5 text-[12px] font-medium"
+                            style={{ color: SELLER_RISK_COLORS[lead.riskLevel] }}
+                          >
+                            <span
+                              className="h-1.5 w-1.5 rounded-full"
+                              style={{ background: SELLER_RISK_COLORS[lead.riskLevel] }}
+                            />
+                            {SELLER_RISK_LABELS[lead.riskLevel]}
+                          </span>
+                        </div>
+                      )}
+                      {lead.riskNotes && (
+                        <p className="pt-1 text-[11px] text-muted-foreground">{lead.riskNotes}</p>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {/* Agente asignado */}
+                <div className="p-5">
+                  <p className="mb-3 font-mono text-[10px] uppercase tracking-[0.12em] text-muted-foreground">
+                    Agente asignado
                   </p>
-                  <Link
-                    href={`/vendedores/${lead.id}?tab=actividad`}
-                    className="text-xs text-sidebar-primary hover:underline"
-                  >
-                    Ver todo →
-                  </Link>
+                  {lead.agent ? (
+                    <div className="flex items-center gap-3">
+                      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-sidebar-primary text-sm font-bold text-sidebar-primary-foreground">
+                        {lead.agent.name.charAt(0)}
+                      </div>
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-semibold">{lead.agent.name}</p>
+                        <p className="text-xs text-muted-foreground">Responsable del lead</p>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-3">
+                      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border-2 border-dashed border-border text-xl font-light text-muted-foreground">
+                        +
+                      </div>
+                      <p className="text-sm text-muted-foreground">Sin agente asignado</p>
+                    </div>
+                  )}
+                  {isAdmin && (
+                    <Button asChild variant="outline" size="sm" className="mt-3 w-full text-xs">
+                      <Link href={`/vendedores/${lead.id}?tab=preparacion`}>
+                        {lead.agent ? 'Reasignar agente' : 'Asignar agente'}
+                      </Link>
+                    </Button>
+                  )}
                 </div>
-                <p className="mb-3 font-medium">Actividad del lead</p>
-                <div className="rounded-xl border bg-card p-4">
-                  <ActivityTimeline
-                    activities={activities.slice(0, 5) as ActivityItem[]}
-                    currentUserId={currentUser.id}
-                  />
+
+                {/* Resumen */}
+                <div className="p-5">
+                  <p className="mb-3 font-mono text-[10px] uppercase tracking-[0.12em] text-muted-foreground">
+                    Resumen
+                  </p>
+                  <div className="space-y-2 text-xs">
+                    <div className="flex justify-between gap-2">
+                      <span className="text-muted-foreground">Origen</span>
+                      <span className="font-medium">
+                        {lead.canal === 'PRO' ? 'Web · Formulario' : 'Backoffice'}
+                      </span>
+                    </div>
+                    <div className="flex justify-between gap-2">
+                      <span className="text-muted-foreground">Días en pipeline</span>
+                      <span className="font-medium">{daysPipeline} días</span>
+                    </div>
+                    <div className="flex justify-between gap-2">
+                      <span className="text-muted-foreground">Estado del contacto</span>
+                      <span className="font-medium">
+                        {SELLER_LEAD_STATUS_LABELS[lead.status as SellerLeadStatus] ?? lead.status}
+                      </span>
+                    </div>
+                    <div className="flex justify-between gap-2">
+                      <span className="text-muted-foreground">Última actividad</span>
+                      <span className="font-medium">
+                        {lastActivity ? `hace ${daysSinceActivity}d` : 'Sin actividad'}
+                      </span>
+                    </div>
+                    <div className="flex justify-between gap-2">
+                      <span className="text-muted-foreground">Probabilidad cierre</span>
+                      <span
+                        className={`font-bold ${closureProb >= 60 ? 'text-green-600' : closureProb >= 30 ? 'text-amber-600' : 'text-red-500'}`}
+                      >
+                        {closureProb}%
+                      </span>
+                    </div>
+                  </div>
                 </div>
               </div>
-            </div>
+            </details>
           )}
-
+          {saleTab && (
+            <nav aria-label="Apartados de venta" className="flex flex-wrap gap-2">
+              {[
+                { key: 'compradores', label: 'Ofertas y compradores' },
+                { key: 'publicacion', label: 'Publicación y anuncios' },
+                { key: 'economia', label: isAdmin ? 'Tasación y economía' : 'Tasación' },
+              ].map((tab) => (
+                <Link
+                  key={tab.key}
+                  aria-current={activeTab === tab.key ? 'page' : undefined}
+                  className="rounded-md border px-3 py-2 text-sm aria-[current=page]:bg-muted aria-[current=page]:font-semibold"
+                  href={`/vendedores/${lead.id}?tab=${tab.key}`}
+                >
+                  {tab.label}
+                </Link>
+              ))}
+            </nav>
+          )}
           {/* ─────────────── PREPARACIÓN · datos ─────────────── */}
           {activeTab === 'preparacion' && (
-            <div className="grid gap-6 lg:grid-cols-2">
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-base">Datos del vendedor</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <SellerLeadEditForm
-                    leadId={lead.id}
-                    defaultValues={leadDefaultValues}
-                    agents={agents}
-                    isAdmin={isAdmin}
-                  />
-                </CardContent>
-              </Card>
-              {v && vehicleDefaultValues && (
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="text-base">Datos del vehículo</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <VehicleEditForm
-                      key={v.updatedAt.toISOString()}
-                      version={v.updatedAt.toISOString()}
-                      vehicleId={v.id}
-                      defaultValues={vehicleDefaultValues}
-                      catalog={readCatalog(v.matchCatalog)}
-                    />
-                  </CardContent>
-                </Card>
-              )}
-            </div>
+            <details className="rounded-xl border bg-card p-4">
+              <summary className="cursor-pointer py-1 font-semibold">
+                Datos del vendedor y del vehículo
+              </summary>
+              <div className="mt-3">
+                {' '}
+                <div className="grid gap-6 lg:grid-cols-2">
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="text-base">Datos del vendedor</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <SellerLeadEditForm
+                        leadId={lead.id}
+                        defaultValues={leadDefaultValues}
+                        agents={agents}
+                        isAdmin={isAdmin}
+                      />
+                    </CardContent>
+                  </Card>
+                  {v && vehicleDefaultValues && (
+                    <Card>
+                      <CardHeader>
+                        <CardTitle className="text-base">Datos del vehículo</CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <VehicleEditForm
+                          key={v.updatedAt.toISOString()}
+                          version={v.updatedAt.toISOString()}
+                          vehicleId={v.id}
+                          defaultValues={vehicleDefaultValues}
+                          catalog={readCatalog(v.matchCatalog)}
+                        />
+                      </CardContent>
+                    </Card>
+                  )}
+                </div>
+              </div>
+            </details>
           )}
 
           {/* ─────────────── PREPARACIÓN · fotos ─────────────── */}
           {activeTab === 'preparacion' && v && (
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-base">Fotos del vehículo</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <VehiclePhotoUploader vehicleId={v.id} initialPhotos={v.photos} />
-              </CardContent>
-            </Card>
+            <details className="rounded-xl border bg-card p-4">
+              <summary className="cursor-pointer py-1 font-semibold">Fotos del vehículo</summary>
+              <div className="mt-3">
+                {' '}
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-base">Fotos del vehículo</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <VehiclePhotoUploader vehicleId={v.id} initialPhotos={v.photos} />
+                  </CardContent>
+                </Card>
+              </div>
+            </details>
           )}
 
           {/* ─────────────── COMPRADORES ─────────────── */}
           {activeTab === 'compradores' && v && (
             <div className="space-y-5">
-              <MatchesSection side="vehicle" matches={vehicleMatches} defaultOpen />
               <OffersSection
                 side="vehicle"
                 fixedId={v.id}
                 candidates={offerCandidates}
                 offers={offerRows}
               />
+              <MatchesSection side="vehicle" matches={vehicleMatches} defaultOpen />
+              {v && (
+                <ManualAssociationsCard
+                  side="vehicle"
+                  fixedId={v.id}
+                  entries={vehicleMatches
+                    .filter((m) => m.generatedBy === 'manual')
+                    .map((m) => ({
+                      id: m.id,
+                      label: personLabel(m.buyerLead.name, {
+                        role: 'Comprador sin identificar',
+                        id: m.buyerLead.id,
+                      }),
+                      href: `/compradores/${m.buyerLead.id}`,
+                      detail: `Manual${m.status === 'RECHAZADO' ? ' · Rechazado' : ''}`,
+                    }))}
+                  listHref={`/vendedores/${lead.id}?tab=compradores`}
+                  disabledReason={
+                    subjectVehicleEligible
+                      ? undefined
+                      : 'Disponible para vehículos tasados o publicados, con entrada validada y vendedor activo.'
+                  }
+                />
+              )}
+              {/* Demanda activa (Block 19) — el argumento de captación */}
+              {v && activeDemandCount > 0 && (
+                <div className="p-5">
+                  <p className="mb-2 font-mono text-[10px] uppercase tracking-[0.12em] text-muted-foreground">
+                    Demanda activa
+                  </p>
+                  <Link
+                    href={`/vendedores/${lead.id}?tab=compradores`}
+                    className="flex items-center gap-3 rounded-lg border border-emerald-200 bg-emerald-50 p-3 transition-colors hover:bg-emerald-100 dark:border-emerald-900/40 dark:bg-emerald-950/30"
+                  >
+                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-emerald-600 text-sm font-bold text-white">
+                      {activeDemandCount}
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-sm font-semibold text-emerald-800 dark:text-emerald-300">
+                        {activeDemandCount} comprador{activeDemandCount === 1 ? '' : 'es'} esperando
+                      </p>
+                      <p className="text-xs text-emerald-700/80 dark:text-emerald-400/70">
+                        Compatibles y activos · ver compradores →
+                      </p>
+                    </div>
+                  </Link>
+                </div>
+              )}
+
+              <CompletedSaleCard side="seller" sales={v.deliveries} />
             </div>
           )}
 
@@ -1123,138 +1105,168 @@ export default async function FichaVendedorPage({
 
           {/* ─────────────── PREPARACIÓN · expediente ─────────────── */}
           {activeTab === 'preparacion' && isAgente && (
-            <div className="space-y-5 pb-5">
-              {v && (
-                <>
-                  <h3 className="font-medium">Documentos vinculados al vehículo</h3>
+            <details className="rounded-xl border bg-card p-4">
+              <summary className="cursor-pointer py-1 font-semibold">
+                Documentos del vendedor y del vehículo
+              </summary>
+              <div className="mt-3">
+                {' '}
+                <div className="space-y-5 pb-5">
+                  {v && (
+                    <>
+                      <h3 className="font-medium">Documentos vinculados al vehículo</h3>
+                      <DocumentsPanel
+                        key={v.id}
+                        initialTarget={{ type: 'vehicle', id: v.id }}
+                        fixedTarget
+                      />
+                    </>
+                  )}
+                  <h3 className="font-medium">Documentos vinculados al vendedor</h3>
                   <DocumentsPanel
-                    key={v.id}
-                    initialTarget={{ type: 'vehicle', id: v.id }}
+                    key={params.id}
+                    initialTarget={{ type: 'sellerLead', id: params.id }}
                     fixedTarget
                   />
-                </>
-              )}
-              <h3 className="font-medium">Documentos vinculados al vendedor</h3>
-              <DocumentsPanel
-                key={params.id}
-                initialTarget={{ type: 'sellerLead', id: params.id }}
-                fixedTarget
-              />
-            </div>
+                </div>
+              </div>
+            </details>
           )}
           {activeTab === 'preparacion' && v && legalInput && isAgente && (
-            <Card>
-              <CardHeader>
-                <div className="flex items-center justify-between">
-                  <div>
-                    <CardTitle className="text-base">Expediente legal</CardTitle>
-                    <CardDescription>
-                      Documentación obligatoria para publicar y vender el vehículo legalmente.
-                    </CardDescription>
-                  </div>
-                  <CompletionBadge percent={completionPct} />
-                </div>
-              </CardHeader>
-              <CardContent className="space-y-6">
-                <div>
-                  <p className="mb-3 text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                    Datos legales del vehículo
-                  </p>
-                  <VehicleLegalFieldsForm
-                    vehicleId={v.id}
-                    isAdmin={isAdmin}
-                    plate={v.plate ?? null}
-                    vin={v.vin ?? null}
-                    itvValidUntil={v.itvValidUntil ?? null}
-                    titleTransferredAt={v.titleTransferredAt ?? null}
-                    chargeCheckedAt={v.chargeCheckedAt ?? null}
-                    chargeCheckedByName={v.chargeCheckedBy?.name ?? null}
-                  />
-                </div>
-                <div>
-                  <p className="mb-3 text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                    Documentos del expediente
-                  </p>
-                  <VehicleDocumentsList
-                    vehicleId={v.id}
-                    documents={docsForList}
-                    isAdmin={isAdmin}
-                    canUpload={isAgente}
-                  />
-                </div>
-                {isAgente && (
-                  <MissingForPublishCard
-                    vehicle={legalInput}
-                    docs={docSummary}
-                    vehicleStatus={v.status}
-                    canPublish={isAgente}
-                  />
-                )}
-                <div className="rounded-xl border border-cn-line p-4">
-                  <p className="text-sm font-medium text-cn-ink-700">Taller</p>
-                  <p className="text-cn-ink-400 mt-0.5 text-xs">
-                    Crea una orden de trabajo para preparar este vehículo. Luego podrás planificarla
-                    y bloquearla en la agenda del taller.
-                  </p>
-                  <a
-                    href={`/taller/nueva?vehicleId=${v.id}`}
-                    className="mt-3 inline-flex h-9 items-center rounded-lg bg-primary px-4 text-sm font-medium text-white hover:opacity-90"
-                  >
-                    Crear orden de taller
-                  </a>
-                </div>
-              </CardContent>
-            </Card>
+            <details className="rounded-xl border bg-card p-4">
+              <summary className="cursor-pointer py-1 font-semibold">
+                Expediente legal y taller
+              </summary>
+              <div className="mt-3">
+                {' '}
+                <Card>
+                  <CardHeader>
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <CardTitle className="text-base">Expediente legal</CardTitle>
+                        <CardDescription>
+                          Documentación obligatoria para publicar y vender el vehículo legalmente.
+                        </CardDescription>
+                      </div>
+                      <CompletionBadge percent={completionPct} />
+                    </div>
+                  </CardHeader>
+                  <CardContent className="space-y-6">
+                    <div>
+                      <p className="mb-3 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                        Datos legales del vehículo
+                      </p>
+                      <VehicleLegalFieldsForm
+                        vehicleId={v.id}
+                        isAdmin={isAdmin}
+                        plate={v.plate ?? null}
+                        vin={v.vin ?? null}
+                        itvValidUntil={v.itvValidUntil ?? null}
+                        titleTransferredAt={v.titleTransferredAt ?? null}
+                        chargeCheckedAt={v.chargeCheckedAt ?? null}
+                        chargeCheckedByName={v.chargeCheckedBy?.name ?? null}
+                      />
+                    </div>
+                    <div>
+                      <p className="mb-3 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                        Documentos del expediente
+                      </p>
+                      <VehicleDocumentsList
+                        vehicleId={v.id}
+                        documents={docsForList}
+                        isAdmin={isAdmin}
+                        canUpload={isAgente}
+                      />
+                    </div>
+                    {isAgente && (
+                      <MissingForPublishCard
+                        vehicle={legalInput}
+                        docs={docSummary}
+                        vehicleStatus={v.status}
+                        canPublish={isAgente}
+                      />
+                    )}
+                    <div className="rounded-xl border border-cn-line p-4">
+                      <p className="text-sm font-medium text-cn-ink-700">Taller</p>
+                      <p className="text-cn-ink-400 mt-0.5 text-xs">
+                        Crea una orden de trabajo para preparar este vehículo. Luego podrás
+                        planificarla y bloquearla en la agenda del taller.
+                      </p>
+                      <a
+                        href={`/taller/nueva?vehicleId=${v.id}`}
+                        className="mt-3 inline-flex h-9 items-center rounded-lg bg-primary px-4 text-sm font-medium text-white hover:opacity-90"
+                      >
+                        Crear orden de taller
+                      </a>
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+            </details>
           )}
 
           {/* ─────────────── ENTRADA OFICIAL (PR-A2, corrección 7.5) ─────────────── */}
           {activeTab === 'preparacion' && v && isAgente && (
-            <Card className="mt-6">
-              <CardHeader>
-                <CardTitle className="text-base">Entrada oficial</CardTitle>
-                <CardDescription>
-                  Registra la llegada física, clasifica los documentos, valida la entrada en
-                  custodia (crea la orden de inspección) y, si procede, anúlala.
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <EntryPanel
-                  vehicleId={v.id}
-                  isAdmin={isAdmin}
-                  responsibleName={lead.agent?.name ?? null}
-                  arrivalAt={v.physicalArrivalAt ? v.physicalArrivalAt.toISOString() : null}
-                  arrivalByName={v.physicalArrivalBy?.name ?? null}
-                  validatedAt={v.entryValidatedAt ? v.entryValidatedAt.toISOString() : null}
-                  validatedByName={v.entryValidatedBy?.name ?? null}
-                  annulledAt={v.entryAnnulledAt ? v.entryAnnulledAt.toISOString() : null}
-                  annulledByName={v.entryAnnulledBy?.name ?? null}
-                  annulmentReason={v.entryAnnulmentReason ?? null}
-                  annulmentNotes={v.entryAnnulmentNotes ?? null}
-                  keysCount={v.keysCount ?? null}
-                  keysLocation={v.keysLocation ?? null}
-                  keysNotes={v.keysNotes ?? null}
-                  parkingLocation={v.naveLocation ?? null}
-                  checklist={entryChecklist}
-                  inspectionOrderId={inspectionOrderId}
-                />
-              </CardContent>
-            </Card>
+            <details className="rounded-xl border bg-card p-4">
+              <summary className="cursor-pointer py-1 font-semibold">Entrada oficial</summary>
+              <div className="mt-3">
+                {' '}
+                <Card className="mt-6">
+                  <CardHeader>
+                    <CardTitle className="text-base">Entrada oficial</CardTitle>
+                    <CardDescription>
+                      Registra la llegada física, clasifica los documentos, valida la entrada en
+                      custodia (crea la orden de inspección) y, si procede, anúlala.
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <EntryPanel
+                      vehicleId={v.id}
+                      isAdmin={isAdmin}
+                      responsibleName={lead.agent?.name ?? null}
+                      arrivalAt={v.physicalArrivalAt ? v.physicalArrivalAt.toISOString() : null}
+                      arrivalByName={v.physicalArrivalBy?.name ?? null}
+                      validatedAt={v.entryValidatedAt ? v.entryValidatedAt.toISOString() : null}
+                      validatedByName={v.entryValidatedBy?.name ?? null}
+                      annulledAt={v.entryAnnulledAt ? v.entryAnnulledAt.toISOString() : null}
+                      annulledByName={v.entryAnnulledBy?.name ?? null}
+                      annulmentReason={v.entryAnnulmentReason ?? null}
+                      annulmentNotes={v.entryAnnulmentNotes ?? null}
+                      keysCount={v.keysCount ?? null}
+                      keysLocation={v.keysLocation ?? null}
+                      keysNotes={v.keysNotes ?? null}
+                      parkingLocation={v.naveLocation ?? null}
+                      checklist={entryChecklist}
+                      inspectionOrderId={inspectionOrderId}
+                    />
+                  </CardContent>
+                </Card>
+              </div>
+            </details>
           )}
 
           {/* ─────────────── TRUST PASSPORT (Block 20) ─────────────── */}
           {activeTab === 'preparacion' && v && trustPassport && (
-            <div className="mt-6">
-              <TrustPassportPanel
-                vehicleId={v.id}
-                sections={trustPassport.sections}
-                score={trustPassport.score}
-                level={trustPassport.level}
-                eligibleForSeal={trustPassport.eligibleForSeal}
-                blockers={trustPassport.blockers}
-                sealedAt={v.trustVerifiedAt ? v.trustVerifiedAt.toISOString() : null}
-                sealedByName={v.trustVerifiedBy?.name ?? null}
-              />
-            </div>
+            <details className="rounded-xl border bg-card p-4">
+              <summary className="cursor-pointer py-1 font-semibold">
+                Pasaporte de confianza
+              </summary>
+              <div className="mt-3">
+                {' '}
+                <div className="mt-6">
+                  <TrustPassportPanel
+                    vehicleId={v.id}
+                    sections={trustPassport.sections}
+                    score={trustPassport.score}
+                    level={trustPassport.level}
+                    eligibleForSeal={trustPassport.eligibleForSeal}
+                    blockers={trustPassport.blockers}
+                    sealedAt={v.trustVerifiedAt ? v.trustVerifiedAt.toISOString() : null}
+                    sealedByName={v.trustVerifiedBy?.name ?? null}
+                  />
+                </div>
+              </div>
+            </details>
           )}
 
           {/* ─────────────── PUBLICACIÓN ─────────────── */}
@@ -1461,210 +1473,6 @@ export default async function FichaVendedorPage({
             </Card>
           )}
         </div>
-
-        {/* ── Rail derecho persistente (320px) — orientación a la tarea ── */}
-        <aside className="border-t border-border lg:border-l lg:border-t-0">
-          <div className="divide-y divide-border lg:sticky lg:top-[118px]">
-            <div className="p-5">
-              {v && (
-                <ManualAssociationsCard
-                  side="vehicle"
-                  fixedId={v.id}
-                  entries={vehicleMatches
-                    .filter((m) => m.generatedBy === 'manual')
-                    .map((m) => ({
-                      id: m.id,
-                      label: personLabel(m.buyerLead.name, {
-                        role: 'Comprador sin identificar',
-                        id: m.buyerLead.id,
-                      }),
-                      href: `/compradores/${m.buyerLead.id}`,
-                      detail: `Manual${m.status === 'RECHAZADO' ? ' · Rechazado' : ''}`,
-                    }))}
-                  listHref={`/vendedores/${lead.id}?tab=compradores`}
-                  disabledReason={
-                    subjectVehicleEligible
-                      ? undefined
-                      : 'Disponible para vehículos tasados o publicados, con entrada validada y vendedor activo.'
-                  }
-                />
-              )}
-            </div>
-
-            {/* Próxima acción — persistente en todas las pestañas */}
-            <div className="p-5">
-              <ProximaAccionCard
-                phone={lead.phone}
-                leadId={lead.id}
-                leadName={lead.name}
-                vehicleInfo={v ? { type: v.type, brand: v.brand, model: v.model } : undefined}
-                nextAction={nextAction}
-                nextActionType={lead.nextActionType}
-                nextActionDueAt={lead.nextActionDueAt ? lead.nextActionDueAt.toISOString() : null}
-              />
-            </div>
-
-            <div className="p-5">
-              <CompletedSaleCard side="seller" sales={v?.deliveries ?? []} />
-            </div>
-
-            {/* Demanda activa (Block 19) — el argumento de captación */}
-            {v && activeDemandCount > 0 && (
-              <div className="p-5">
-                <p className="mb-2 font-mono text-[10px] uppercase tracking-[0.12em] text-muted-foreground">
-                  Demanda activa
-                </p>
-                <Link
-                  href={`/vendedores/${lead.id}?tab=compradores`}
-                  className="flex items-center gap-3 rounded-lg border border-emerald-200 bg-emerald-50 p-3 transition-colors hover:bg-emerald-100 dark:border-emerald-900/40 dark:bg-emerald-950/30"
-                >
-                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-emerald-600 text-sm font-bold text-white">
-                    {activeDemandCount}
-                  </div>
-                  <div className="min-w-0">
-                    <p className="text-sm font-semibold text-emerald-800 dark:text-emerald-300">
-                      {activeDemandCount} comprador{activeDemandCount === 1 ? '' : 'es'} esperando
-                    </p>
-                    <p className="text-xs text-emerald-700/80 dark:text-emerald-400/70">
-                      Compatibles y activos · ver compradores →
-                    </p>
-                  </div>
-                </Link>
-              </div>
-            )}
-
-            {/* Condiciones de la operación (Seller Supply Graph, Block 17) */}
-            {(lead.minPrice != null || lead.dealType || lead.urgency || lead.riskLevel) && (
-              <div className="p-5">
-                <p className="mb-3 font-mono text-[10px] uppercase tracking-[0.12em] text-muted-foreground">
-                  Operación
-                </p>
-                <div className="space-y-2">
-                  {lead.minPrice != null && (
-                    <div className="flex items-center justify-between">
-                      <span className="text-[11px] text-muted-foreground">Precio mínimo</span>
-                      <span className="text-[12px] font-medium text-foreground">
-                        {EUR(Number(lead.minPrice))}
-                      </span>
-                    </div>
-                  )}
-                  {lead.dealType && (
-                    <div className="flex items-center justify-between">
-                      <span className="text-[11px] text-muted-foreground">Modalidad</span>
-                      <span className="text-[12px] font-medium text-foreground">
-                        {SELLER_DEAL_TYPE_LABELS[lead.dealType]}
-                      </span>
-                    </div>
-                  )}
-                  {lead.urgency && (
-                    <div className="flex items-center justify-between">
-                      <span className="text-[11px] text-muted-foreground">Urgencia</span>
-                      <span
-                        className="inline-flex items-center gap-1.5 text-[12px] font-medium"
-                        style={{ color: SELLER_URGENCY_COLORS[lead.urgency] }}
-                      >
-                        <span
-                          className="h-1.5 w-1.5 rounded-full"
-                          style={{ background: SELLER_URGENCY_COLORS[lead.urgency] }}
-                        />
-                        {SELLER_URGENCY_LABELS[lead.urgency]}
-                      </span>
-                    </div>
-                  )}
-                  {lead.riskLevel && (
-                    <div className="flex items-center justify-between">
-                      <span className="text-[11px] text-muted-foreground">Riesgo</span>
-                      <span
-                        className="inline-flex items-center gap-1.5 text-[12px] font-medium"
-                        style={{ color: SELLER_RISK_COLORS[lead.riskLevel] }}
-                      >
-                        <span
-                          className="h-1.5 w-1.5 rounded-full"
-                          style={{ background: SELLER_RISK_COLORS[lead.riskLevel] }}
-                        />
-                        {SELLER_RISK_LABELS[lead.riskLevel]}
-                      </span>
-                    </div>
-                  )}
-                  {lead.riskNotes && (
-                    <p className="pt-1 text-[11px] text-muted-foreground">{lead.riskNotes}</p>
-                  )}
-                </div>
-              </div>
-            )}
-
-            {/* Agente asignado */}
-            <div className="p-5">
-              <p className="mb-3 font-mono text-[10px] uppercase tracking-[0.12em] text-muted-foreground">
-                Agente asignado
-              </p>
-              {lead.agent ? (
-                <div className="flex items-center gap-3">
-                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-sidebar-primary text-sm font-bold text-sidebar-primary-foreground">
-                    {lead.agent.name.charAt(0)}
-                  </div>
-                  <div className="min-w-0">
-                    <p className="truncate text-sm font-semibold">{lead.agent.name}</p>
-                    <p className="text-xs text-muted-foreground">Responsable del lead</p>
-                  </div>
-                </div>
-              ) : (
-                <div className="flex items-center gap-3">
-                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border-2 border-dashed border-border text-xl font-light text-muted-foreground">
-                    +
-                  </div>
-                  <p className="text-sm text-muted-foreground">Sin agente asignado</p>
-                </div>
-              )}
-              {isAdmin && (
-                <Button asChild variant="outline" size="sm" className="mt-3 w-full text-xs">
-                  <Link href={`/vendedores/${lead.id}?tab=preparacion`}>
-                    {lead.agent ? 'Reasignar agente' : 'Asignar agente'}
-                  </Link>
-                </Button>
-              )}
-            </div>
-
-            {/* Resumen */}
-            <div className="p-5">
-              <p className="mb-3 font-mono text-[10px] uppercase tracking-[0.12em] text-muted-foreground">
-                Resumen
-              </p>
-              <div className="space-y-2 text-xs">
-                <div className="flex justify-between gap-2">
-                  <span className="text-muted-foreground">Origen</span>
-                  <span className="font-medium">
-                    {lead.canal === 'PRO' ? 'Web · Formulario' : 'Backoffice'}
-                  </span>
-                </div>
-                <div className="flex justify-between gap-2">
-                  <span className="text-muted-foreground">Días en pipeline</span>
-                  <span className="font-medium">{daysPipeline} días</span>
-                </div>
-                <div className="flex justify-between gap-2">
-                  <span className="text-muted-foreground">Estado del contacto</span>
-                  <span className="font-medium">
-                    {SELLER_LEAD_STATUS_LABELS[lead.status as SellerLeadStatus] ?? lead.status}
-                  </span>
-                </div>
-                <div className="flex justify-between gap-2">
-                  <span className="text-muted-foreground">Última actividad</span>
-                  <span className="font-medium">
-                    {lastActivity ? `hace ${daysSinceActivity}d` : 'Sin actividad'}
-                  </span>
-                </div>
-                <div className="flex justify-between gap-2">
-                  <span className="text-muted-foreground">Probabilidad cierre</span>
-                  <span
-                    className={`font-bold ${closureProb >= 60 ? 'text-green-600' : closureProb >= 30 ? 'text-amber-600' : 'text-red-500'}`}
-                  >
-                    {closureProb}%
-                  </span>
-                </div>
-              </div>
-            </div>
-          </div>
-        </aside>
       </div>
 
       {/* Barra de acción móvil (mockup MVEN2): Llamar / WhatsApp fijos abajo */}

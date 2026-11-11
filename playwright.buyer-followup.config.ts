@@ -11,6 +11,7 @@ export default defineConfig({
     'buyer-offers.spec.ts',
     'buyer-documents.spec.ts',
     'buyer-postventa.spec.ts',
+    'seller-followup.spec.ts',
     'search-request.spec.ts',
   ],
   fullyParallel: true,
