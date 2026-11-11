@@ -54,7 +54,7 @@ jobs:
         run: pnpm test
 
       - name: Install table navigation browsers
-        run: pnpm exec playwright install --with-deps chromium webkit
+        run: bash scripts/ci-install-browsers.sh
 
       - name: Table navigation (Chromium and WebKit, no backend)
         run: pnpm test:table-navigation
@@ -126,7 +126,7 @@ jobs:
         run: pnpm test:integration
 
       - name: Install search questionnaire browsers
-        run: pnpm exec playwright install --with-deps chromium webkit
+        run: bash scripts/ci-install-browsers.sh
 
       - name: Public search form to CRM (desktop, Android and iPhone)
         run: pnpm test:search-request
