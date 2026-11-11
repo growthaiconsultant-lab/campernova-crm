@@ -1,7 +1,7 @@
 'use client'
 
 import { useRef } from 'react'
-import { useSearchParams, useRouter, usePathname } from 'next/navigation'
+import { useRouter, usePathname } from 'next/navigation'
 import { cn } from '@/lib/utils'
 
 export type LeadTab = {
@@ -12,14 +12,12 @@ export type LeadTab = {
 
 type Props = {
   tabs: LeadTab[]
-  defaultTab?: string
+  activeKey: string
 }
 
-export function LeadTabNav({ tabs, defaultTab = 'resumen' }: Props) {
-  const sp = useSearchParams()
+export function LeadTabNav({ tabs, activeKey }: Props) {
   const router = useRouter()
   const pathname = usePathname()
-  const active = sp.get('tab') ?? defaultTab
   const refs = useRef<(HTMLButtonElement | null)[]>([])
 
   const go = (key: string) => router.push(`${pathname}?tab=${key}`)
@@ -41,10 +39,10 @@ export function LeadTabNav({ tabs, defaultTab = 'resumen' }: Props) {
     <div
       role="tablist"
       aria-label="Secciones de la ficha"
-      className="flex overflow-x-auto border-b border-border bg-background"
+      className="flex flex-wrap border-b border-border bg-background"
     >
       {tabs.map((tab, idx) => {
-        const selected = active === tab.key
+        const selected = activeKey === tab.key
         return (
           <button
             key={tab.key}
