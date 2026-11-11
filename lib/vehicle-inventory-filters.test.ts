@@ -45,3 +45,14 @@ it('valida intervalos, enums y números completos, incluido un límite cero', ()
     expect(inventoryError({ ...emptyCriteria, ...input })).toBeTruthy()
   }
 })
+
+it('sin precio limpia el máximo y conserva los filtros compatibles al reabrir el enlace', () => {
+  const { criteria, order } = readInventoryParams({
+    priceState: 'missing',
+    priceMax: '50000',
+    status: 'DESCARTADO',
+  })
+  expect(criteria).toMatchObject({ priceState: 'missing', priceMax: '', status: 'DESCARTADO' })
+  expect(inventoryUrl(criteria, order)).toBe('/vehiculos?status=DESCARTADO&priceState=missing')
+  expect(inventoryError({ ...criteria, priceState: 'otro' })).toBeTruthy()
+})

@@ -4,6 +4,8 @@ import { revalidatePath } from 'next/cache'
 import { z } from 'zod'
 import { db } from '@/lib/db'
 import { requireAdmin } from '@/lib/auth'
+import { admittedVehicleWhere } from '@/lib/seller-intake'
+import { formatEur } from '@/lib/format/currency'
 
 type ActionResult =
   | { ok: true }
@@ -153,6 +155,68 @@ export async function deleteVehicleCost(costId: string): Promise<ActionResult> {
 
   await db.vehicleCost.delete({ where: { id: costId } })
   revalidateVehiclePage(cost.vehicle.sellerLeadId)
+  return { ok: true }
+}
+
+const firstSalePriceSchema = z
+  .string()
+  .trim()
+  .transform((value) => value.replace(',', '.'))
+  .pipe(
+    z
+      .string()
+      .regex(/^\d{1,8}(?:\.\d{1,2})?$/)
+      .refine((value) => Number(value) > 0)
+  )
+
+export async function setMissingSalePrice(
+  vehicleId: string,
+  input: unknown
+): Promise<ActionResult> {
+  const actor = await requireAdmin()
+  if (typeof vehicleId !== 'string' || !vehicleId.trim())
+    return { ok: false, error: 'Vehículo no válido.' }
+  const parsed = firstSalePriceSchema.safeParse(input)
+  if (!parsed.success)
+    return {
+      ok: false,
+      error:
+        'Introduce un precio positivo, con hasta dos decimales y un máximo de 99.999.999,99 €.',
+    }
+  const price = parsed.data
+  const target = { id: vehicleId, ...admittedVehicleWhere }
+  const result = await db.$transaction(async (tx) => {
+    const [changed] = await tx.vehicle.updateManyAndReturn({
+      where: { ...target, salePrice: null },
+      data: { salePrice: price },
+      select: { sellerLeadId: true, status: true },
+    })
+    if (!changed) {
+      const current = await tx.vehicle.findFirst({
+        where: target,
+        select: { sellerLeadId: true, status: true, salePrice: true },
+      })
+      if (!current) return { error: 'Este vehículo ya no está en el inventario.' }
+      if (!current.salePrice?.equals(price))
+        return {
+          error: 'Este vehículo ya tiene otro precio de venta. Actualiza el listado para verlo.',
+        }
+      return current
+    }
+    await tx.activity.create({
+      data: {
+        type: 'PRECIO_VENTA_AJUSTADO',
+        content: 'Precio venta: ' + formatEur(Number(price), 'cents'),
+        agentId: actor.id,
+        sellerLeadId: changed.sellerLeadId,
+      },
+    })
+    return changed
+  })
+  if ('error' in result) return { ok: false, error: result.error }
+  revalidateVehiclePage(result.sellerLeadId)
+  revalidatePath('/vehiculos')
+  if (result.status === 'PUBLICADO') revalidatePath('/comprar', 'layout')
   return { ok: true }
 }
 

@@ -8,7 +8,16 @@ import {
   type InventoryOrder,
 } from '@/lib/vehicle-inventory-filters'
 import { readVehicleInventory } from '@/lib/vehicle-inventory'
-vi.mock('@/lib/auth', () => ({ requireCanViewVehiculos: vi.fn() }))
+const actor = vi.hoisted(() => ({ role: 'AGENTE', id: '' }))
+vi.mock('@/lib/auth', () => ({
+  requireCanViewVehiculos: async () => actor,
+  requireAdmin: async () => {
+    if (actor.role !== 'ADMIN') throw Error('Se requiere administración')
+    return actor
+  },
+}))
+vi.mock('next/cache', () => ({ revalidatePath: vi.fn() }))
+import { setMissingSalePrice } from '@/app/(backoffice)/vendedores/[id]/cost-actions'
 vi.mock('@/lib/db', async () => ({ db: (await import('./db')).createGuardedTestPrisma() }))
 vi.mock('next/navigation', async (original) => ({
   ...(await original<typeof import('next/navigation')>()),
@@ -168,4 +177,76 @@ it('pagina de forma estable cuando coinciden los precios y corrige páginas anti
   const all = [...first.vehicles, ...last.vehicles].map((v) => v.id)
   expect(new Set(all).size).toBe(50)
   expect(all).toEqual([...all].sort())
+})
+
+it('distingue el precio ausente del cero y de las referencias de tasación o del vendedor', async () => {
+  const missing = await query({ brand: marker, priceState: 'missing' })
+  expect(missing.vehicles.map((v) => v.plate)).toEqual(['REFERENCIA'])
+  const priced = await query({ brand: marker, priceState: 'priced', priceMax: '0' })
+  expect(priced.vehicles.map((v) => v.plate)).toEqual(['0002 DEM'])
+})
+
+it('solo administración asigna el primer precio desde una tarjeta, con una sola actividad ante carreras y reintentos', async () => {
+  const target = await create({
+    brand: 'Editor' + marker,
+    salePrice: null,
+    desiredPrice: 44000,
+    valuationRecommended: 48000,
+    purchasePrice: 42000,
+  })
+  const pending = await create({ brand: 'Captación' + marker, salePrice: null }, 'PRO', 'PENDIENTE')
+  const search = { brand: 'Editor' + marker, priceState: 'missing' }
+  const user = await db.user.create({
+    data: {
+      name: 'Administración de prueba',
+      role: 'ADMIN',
+      email: uniqueSuffix() + '@example.test',
+    },
+  })
+  try {
+    expect(renderToStaticMarkup(await Page({ searchParams: search }))).not.toContain(
+      'Añadir precio'
+    )
+    await expect(setMissingSalePrice(target.id, '45500')).rejects.toThrow('administración')
+    actor.id = user.id
+    actor.role = 'ADMIN'
+    expect(renderToStaticMarkup(await Page({ searchParams: search }))).toContain('Añadir precio')
+    for (const amount of ['0', '-1', '1.999', '1e4', '100000000', '', null])
+      expect((await setMissingSalePrice(target.id, amount)).ok).toBe(false)
+    expect((await setMissingSalePrice(undefined as unknown as string, '1')).ok).toBe(false)
+    expect((await setMissingSalePrice(pending.id, '1')).ok).toBe(false)
+    const values = ['46500,25', '47500.30']
+    const writes = await Promise.all(values.map((price) => setMissingSalePrice(target.id, price)))
+    const index = writes.findIndex((x) => x.ok)
+    expect(writes.filter((x) => x.ok)).toHaveLength(1)
+    expect(await setMissingSalePrice(target.id, values[index])).toEqual({ ok: true })
+    expect((await query(search)).total).toBe(0)
+    const priced = await query({ ...search, priceState: 'priced' })
+    expect(
+      priced.vehicles.map((v) => [
+        v.id,
+        Number(v.salePrice),
+        Number(v.desiredPrice),
+        Number(v.valuationRecommended),
+        Number(v.purchasePrice),
+      ])
+    ).toEqual([[target.id, Number(values[index].replace(',', '.')), 44000, 48000, 42000]])
+    expect(
+      renderToStaticMarkup(await Page({ searchParams: { ...search, priceState: 'priced' } }))
+    ).not.toContain('Añadir precio')
+    expect(
+      await db.activity.count({
+        where: {
+          sellerLeadId: target.sellerLeadId,
+          agentId: user.id,
+          type: 'PRECIO_VENTA_AJUSTADO',
+        },
+      })
+    ).toBe(1)
+  } finally {
+    actor.role = 'AGENTE'
+    actor.id = ''
+    await db.activity.deleteMany({ where: { agentId: user.id } })
+    await db.user.delete({ where: { id: user.id } })
+  }
 })
