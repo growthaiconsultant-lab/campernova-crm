@@ -19,6 +19,7 @@ type Props = {
   listing: PortalListingView | null
   draft: boolean
   editable: boolean
+  children?: React.ReactNode
 }
 export function SellerPortalListing({
   sellerId,
@@ -27,6 +28,7 @@ export function SellerPortalListing({
   listing,
   draft,
   editable,
+  children,
 }: Props) {
   const router = useRouter()
   const [open, setOpen] = useState(false),
@@ -69,19 +71,42 @@ export function SellerPortalListing({
     }
   }
   return (
-    <div className="py-3">
+    <section aria-label={label} className="py-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div>
-          <strong>{label}</strong>
-          <p className="text-sm">
-            {active
-              ? 'Publicado según el equipo'
-              : listing?.withdrawn
-                ? 'Retirado según el equipo'
-                : draft
-                  ? 'Texto preparado · Publicación sin confirmar'
-                  : 'Sin publicación confirmada'}
-          </p>
+          <div className="flex flex-wrap items-center gap-2">
+            <strong>{label}</strong>
+            {children && (
+              <span
+                className={
+                  active
+                    ? 'rounded bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-900'
+                    : 'rounded bg-muted px-2 py-0.5 text-xs font-medium'
+                }
+              >
+                {active
+                  ? 'Publicado'
+                  : listing?.withdrawn
+                    ? 'Retirado según el equipo'
+                    : 'Sin confirmar'}
+              </span>
+            )}
+          </div>
+          {children ? (
+            <p className="mt-1 text-sm text-muted-foreground">
+              {draft ? 'Texto preparado' : 'Falta preparar el texto del anuncio.'}
+            </p>
+          ) : (
+            <p className="text-sm">
+              {active
+                ? 'Publicado según el equipo'
+                : listing?.withdrawn
+                  ? 'Retirado según el equipo'
+                  : draft
+                    ? 'Texto preparado · Publicación sin confirmar'
+                    : 'Sin publicación confirmada'}
+            </p>
+          )}
           {active && (
             <p className="text-xs text-muted-foreground">
               Publicado el {offerDateLabel(listing.publishedOn)}
@@ -89,6 +114,7 @@ export function SellerPortalListing({
           )}
         </div>
         <div className="flex flex-wrap items-center gap-3">
+          {children}
           {active && (
             <a
               href={listing.url}
@@ -103,7 +129,7 @@ export function SellerPortalListing({
             <Button
               type="button"
               size="sm"
-              variant="outline"
+              variant={children && draft && !active ? 'default' : 'outline'}
               onClick={() => {
                 setError('')
                 setOpen(true)
@@ -191,6 +217,6 @@ export function SellerPortalListing({
           )}
         </p>
       )}
-    </div>
+    </section>
   )
 }

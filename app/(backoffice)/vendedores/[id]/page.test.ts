@@ -116,7 +116,7 @@ it('distingue precios y muestra primero la cita anterior al recordatorio', async
   expect(html.indexOf('Comentar la oferta')).toBeLessThan(html.indexOf('Editar recordatorio'))
 })
 it.each([
-  ['publicacion', 'Anuncios y publicación'],
+  ['publicacion', 'Publicación y anuncios'],
   ['economia', 'Tasación oficial'],
   ['compradores', 'Ofertas'],
   ['actividad', 'Actividad del lead'],
@@ -315,7 +315,7 @@ it('Venta recupera una reserva aunque el vehículo reservado ya no sea elegible 
           revision: 1,
         },
       ],
-      ads: [{ channel: 'WALLAPOP' }],
+      ads: [{ channel: 'WALLAPOP', content: 'Texto guardado' }],
     },
   })
   const html = await render('compradores')
@@ -399,4 +399,35 @@ it('da prioridad a la reserva y mantiene los costes dentro de administración', 
   expect(html).toContain('Costes y margen')
   expect(html).toContain('Pendiente del precio de compra')
   expect(html).toContain('id="precios-vehiculo"')
+})
+
+it('reúne los materiales en su portal y cuenta sólo publicaciones vigentes', async () => {
+  const date = new Date('2026-10-10')
+  find.mockResolvedValue({
+    ...seller,
+    vehicle: {
+      ...vehicle,
+      photos,
+      ads: [{ id: 'a1', channel: 'WALLAPOP', content: 'Borrador existente', createdAt: date }],
+      portalListings: [
+        {
+          channel: 'COCHESNET',
+          url: 'https://www.coches.net/qa',
+          publishedOn: date,
+          withdrawnAt: date,
+          revision: 2,
+        },
+      ],
+    },
+  })
+  const html = await render('publicacion')
+  expect(html).toContain('Publicado en 1 de 3')
+  expect(html).toContain('Sin confirmar')
+  expect(html).toContain('Texto preparado')
+  expect(html).toContain('Retirado según el equipo')
+  expect(html).toContain('Preparar texto')
+  expect(html).toContain('Falta preparar el texto del anuncio.')
+  expect(html.match(/Descargar fotos/g)).toHaveLength(1)
+  expect(html).toContain('Notas para preparar los anuncios')
+  expect(html).toContain('Retirar anuncio')
 })

@@ -1,3 +1,4 @@
+import { GenerateAdButton } from '@/components/vehicle-ads/generate-ad-button'
 import { createRoot } from 'react-dom/client'
 import { SellerSaleChannels, SellerSaleOverview } from '@/components/seller-sale-overview'
 import type { SalePortal } from '@/lib/portal-listings'
@@ -26,6 +27,12 @@ const sale = sellerSale(
   ],
   []
 )
+let publication = false
+const drafts: Partial<
+  Record<SalePortal, { id: string; content: string; author: null; canEdit: boolean }>
+> = {
+  WALLAPOP: { id: 'draft-w', content: 'Texto original de Wallapop', author: null, canEdit: true },
+}
 function render() {
   root.render(
     <main className="crm-theme space-y-4 p-3">
@@ -40,10 +47,25 @@ function render() {
             publishedAt: null,
           }}
           listings={listings}
-          ads={[{ channel: 'WALLAPOP' }]}
+          ads={Object.keys(drafts).map((channel) => ({ channel: channel as SalePortal }))}
           sellerId="s"
           editable
-          showToolsLink
+          showToolsLink={!publication}
+          renderTextTool={
+            publication
+              ? (channel) => (
+                  <GenerateAdButton
+                    vehicleId="v"
+                    channel={channel}
+                    lastAd={
+                      drafts[channel]
+                        ? { ...drafts[channel]!, createdAt: new Date('2026-01-01T12:00Z') }
+                        : null
+                    }
+                  />
+                )
+              : undefined
+          }
         />
       </SellerSaleOverview>
     </main>
@@ -51,6 +73,20 @@ function render() {
 }
 Object.assign(window, {
   portalFixture: {
+    openPublication() {
+      publication = true
+      render()
+    },
+    saveText(input: { channel: SalePortal; content: string }) {
+      drafts[input.channel] = {
+        id: 'draft-' + input.channel,
+        content: input.content,
+        author: null,
+        canEdit: true,
+      }
+      render()
+      return { id: drafts[input.channel]!.id }
+    },
     save: (
       seller: string,
       vehicle: string,
