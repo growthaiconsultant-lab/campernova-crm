@@ -40,3 +40,35 @@ test('adjunta el permiso y la foto a sus destinos y conserva el inventario anter
   await expect(page.getByText(/La ITV vence el/)).toBeVisible()
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
 })
+
+test('gestiona portada, orden y borrado desde la foto y muestra toda la galería pública', async ({
+  page,
+}, testInfo) => {
+  await page.setContent(
+    '<meta name="viewport" content="width=device-width,initial-scale=1"><div id="root"></div>'
+  )
+  await page.addStyleTag({ path: path.resolve('.artifacts/buyer-followup/style.css') })
+  await page.addScriptTag({ path: path.resolve('.artifacts/buyer-followup/sellerPreparation.js') })
+  const gallery = page.getByRole('region', { name: 'Fotos del vehículo' })
+  await gallery.getByRole('button', { name: 'Ver foto 4 de 4' }).click()
+  await expect(gallery.getByRole('img', { name: 'f3', exact: true })).toBeVisible()
+  await page.getByRole('button', { name: /Abrir galería de Fiat/ }).click()
+  const editor = page.getByRole('dialog')
+  const items = editor.getByRole('listitem')
+  await expect(items).toHaveCount(4)
+  if (testInfo.project.name === 'chrome') await items.nth(1).dragTo(items.first())
+  else await editor.getByRole('button', { name: 'Adelantar foto 2' }).click()
+  await expect(items.first().getByRole('img')).toHaveAttribute('src', /muestra-1/)
+  await expect(items.first()).toContainText('Portada')
+  page.once('dialog', (d) => d.dismiss())
+  await editor.getByRole('button', { name: 'Eliminar foto 1' }).click()
+  await expect(items).toHaveCount(4)
+  page.once('dialog', (d) => d.accept())
+  await editor.getByRole('button', { name: 'Eliminar foto 1' }).click()
+  await expect(items).toHaveCount(3)
+  await page.keyboard.press('Escape')
+  await expect(editor).toHaveCount(0)
+  await expect(page.getByRole('button', { name: /Abrir galería de Fiat.*3 fotos/ })).toBeVisible()
+  await gallery.getByRole('button', { name: 'Ver foto 1 de 3' }).click()
+  await expect(gallery.getByRole('img', { name: 'f0', exact: true })).toBeVisible()
+})

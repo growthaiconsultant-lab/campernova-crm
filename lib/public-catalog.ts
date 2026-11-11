@@ -120,7 +120,7 @@ export function mapToPublicVehicle(v: VehicleWithPhotos): PublicVehicle {
     equipment,
     photos: v.photos
       .slice()
-      .sort((a, b) => a.order - b.order)
+      .sort((a, b) => a.order - b.order || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0))
       .map((p) => ({ url: p.url, alt: p.altText ?? altBase })),
     verified: v.trustVerifiedAt != null,
   }

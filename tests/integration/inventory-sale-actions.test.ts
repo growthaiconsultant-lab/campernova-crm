@@ -6,8 +6,26 @@ vi.mock('@/lib/db', async () => ({ db: (await import('./db')).createGuardedTestP
 const actor = vi.hoisted(() => ({ role: 'ADMIN', id: '' }))
 vi.mock('@/lib/auth', () => ({
   requireAgente: async () => actor,
+  requireCanGenerateAds: async () => actor,
   requireCanViewVehiculos: async () => actor,
   requireCanEditEntregas: async () => actor,
+}))
+const storedPhotos = vi.hoisted(() => new Set<string>())
+vi.mock('@/lib/supabase/server', () => ({
+  createClient: () => ({
+    storage: {
+      from: () => ({
+        upload: async (path: string) => {
+          storedPhotos.add(path)
+          return { error: null }
+        },
+        remove: async (paths: string[]) => {
+          for (const path of paths) storedPhotos.delete(path)
+          return { error: null }
+        },
+      }),
+    },
+  }),
 }))
 vi.mock('next/cache', () => ({ revalidatePath: vi.fn() }))
 vi.mock('@/lib/kpi/emit', () => ({ emitKpiEvent: vi.fn() }))
@@ -30,6 +48,12 @@ import { getPublishedVehicleBySlug, getCatalogInventory, vehicleSlug } from '@/l
 import { PUBLICADO_REQUIRED_DOCS, PUBLICADO_MIN_PHOTOS } from '@/lib/vehicle-legal/requirements'
 import { readVehicleInventory } from '@/lib/vehicle-inventory'
 import { emptyCriteria } from '@/lib/vehicle-inventory-filters'
+import {
+  uploadVehiclePhoto,
+  listVehiclePhotos,
+  reorderVehiclePhotos,
+  deleteVehiclePhoto,
+} from '@/app/(backoffice)/vendedores/photo-actions'
 import Page from '@/app/(backoffice)/vehiculos/page'
 import PublicPage from '@/app/comprar/[id]/page'
 
@@ -300,4 +324,55 @@ it('guarda el checklist parcial desde una unidad nueva sin cambiar su entrada ni
   expect((await db.vehicle.findUniqueOrThrow({ where: { id: v.id } })).matchCatalog).toEqual({
     beds: snapshot.catalog.beds,
   })
+})
+
+it('la portada pública sigue el orden guardado y se rechazan órdenes obsoletas o duplicadas', async () => {
+  const { v, slug } = await fixture('PUBLICADO', new Date())
+  await db.vehiclePhoto.createMany({
+    data: [0, 1, 2].map((order) => ({ vehicleId: v.id, order, url: '/foto-' + order + '.jpg' })),
+  })
+  const original = (await listVehiclePhotos(v.id)).map((p) => p.id)
+  const [a, b, c] = original
+  expect(await reorderVehiclePhotos(v.id, [c, a, b], original)).toEqual({ ok: true })
+  expect(await reorderVehiclePhotos(v.id, [a, c, b], original)).toHaveProperty('error')
+  expect(await reorderVehiclePhotos(v.id, [a, a, c])).toHaveProperty('error')
+  expect((await getPublishedVehicleBySlug(slug))?.photos.map((p) => p.url)).toEqual([
+    '/foto-2.jpg',
+    '/foto-0.jpg',
+    '/foto-1.jpg',
+  ])
+  expect(await deleteVehiclePhoto(c)).toEqual({ ok: true })
+  expect((await getPublishedVehicleBySlug(slug))?.photos[0].url).toBe('/foto-0.jpg')
+})
+
+it('dos subidas simultáneas respetan la última plaza y la portada previa', async () => {
+  const { v } = await fixture('NUEVO')
+  await db.vehiclePhoto.createMany({
+    data: Array.from({ length: 29 }, (_, order) => ({
+      vehicleId: v.id,
+      order,
+      url: '/previa-' + order + '.jpg',
+    })),
+  })
+  vi.stubEnv('NEXT_PUBLIC_SUPABASE_URL', 'http://localhost:54321')
+  try {
+    const upload = () => {
+      const form = new FormData()
+      form.set('vehicleId', v.id)
+      form.set('file', new File(['foto'], 'foto.jpg', { type: 'image/jpeg' }))
+      return uploadVehiclePhoto(form)
+    }
+    const res = await Promise.all([upload(), upload()])
+    expect(res.filter((r) => 'photo' in r)).toHaveLength(1)
+    expect(res.filter((r) => 'error' in r)).toHaveLength(1)
+    const photos = await listVehiclePhotos(v.id)
+    expect(photos).toHaveLength(30)
+    expect(photos[0].url).toBe('/previa-0.jpg')
+    expect(photos[29].order).toBe(29)
+    expect(storedPhotos.size).toBe(1)
+    expect(await deleteVehiclePhoto(photos[29].id)).toEqual({ ok: true })
+    expect(storedPhotos.size).toBe(0)
+  } finally {
+    vi.unstubAllEnvs()
+  }
 })

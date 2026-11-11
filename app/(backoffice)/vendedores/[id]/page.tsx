@@ -16,6 +16,7 @@ import { ManualAssociationsCard } from '@/components/manual-associations-card'
 import { personLabel, vehicleLabel } from '@/lib/display'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
+import { VehicleGalleryButton } from '@/components/vehicle-gallery-button'
 import { VehiclePhotoUploader } from '@/components/vehicle-photo-uploader'
 import { ValuationTimeline } from '@/components/valuation-timeline'
 import { ValuationAttempts } from '@/components/valuation-attempts'
@@ -113,7 +114,7 @@ export default async function FichaVendedorPage({
         vehicle: {
           include: {
             deliveries: completedSalesQuery,
-            photos: { orderBy: { order: 'asc' } },
+            photos: { orderBy: [{ order: 'asc' }, { id: 'asc' }] },
             valuations: {
               include: { createdBy: { select: { name: true } } },
               orderBy: { createdAt: 'desc' },
@@ -647,18 +648,18 @@ export default async function FichaVendedorPage({
       <header className="border-b border-border bg-card px-4 pt-4 sm:px-7 sm:pt-5">
         <div className="mb-3 flex flex-wrap items-start justify-between gap-3">
           <div className="flex min-w-0 flex-1 items-center gap-3 sm:min-w-64">
-            <span
-              aria-hidden="true"
-              className="hidden h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-brand-tint text-lg font-bold text-brand sm:flex"
-            >
-              {lead.name
-                ?.trim()
-                .split(/\s+/)
-                .slice(0, 2)
-                .map((part) => part.charAt(0))
-                .join('')
-                .toUpperCase() || <UserRound size={18} />}
-            </span>
+            {v ? (
+              <VehicleGalleryButton
+                compact
+                vehicleId={v.id}
+                title={vehicleLabel(v)}
+                cover={v.photos[0]?.url ?? null}
+                coverAlt={v.photos[0]?.altText}
+                count={v.photos.length}
+              />
+            ) : (
+              <UserRound size={24} className="shrink-0 text-muted-foreground" aria-hidden />
+            )}
             <div className="min-w-0">
               <div className="flex flex-wrap items-center gap-2">
                 <h1 className="break-words text-2xl font-bold tracking-tight sm:text-3xl">
