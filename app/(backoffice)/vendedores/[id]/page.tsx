@@ -1138,6 +1138,26 @@ export default async function FichaVendedorPage({
               ))}
             </nav>
           )}
+          {activeTab === 'preparacion' && v && vehicleDefaultValues && (
+            <section
+              id="checklist-match"
+              aria-labelledby="checklist-match-title"
+              tabIndex={-1}
+              className="scroll-mt-4 space-y-3 rounded-xl border bg-card p-4 sm:p-5"
+            >
+              <h2 id="checklist-match-title" className="text-lg font-semibold">
+                Checklist de entrada para el match
+              </h2>
+              <VehicleEditForm
+                key={v.updatedAt.toISOString()}
+                vehicleId={v.id}
+                version={v.updatedAt.toISOString()}
+                catalog={readCatalog(v.matchCatalog)}
+                defaultValues={vehicleDefaultValues}
+                salePrice={v.salePrice == null ? null : Number(v.salePrice)}
+              />
+            </section>
+          )}
           {activeTab === 'preparacion' && v && legalInput && (
             <>
               <MissingForPublishCard
@@ -1298,37 +1318,6 @@ export default async function FichaVendedorPage({
             <details className="rounded-xl border bg-card p-4" open={!v}>
               <summary className="cursor-pointer py-1 font-semibold">Más del expediente</summary>
               <div className="mt-2 space-y-3">
-                {/* ─────────────── PREPARACIÓN · datos ─────────────── */}
-                {v && vehicleDefaultValues && (
-                  <details className="rounded-xl border bg-card p-4">
-                    <summary className="cursor-pointer py-1 font-semibold">
-                      Datos del vehículo
-                    </summary>
-                    <div className="mt-3">
-                      <VehicleEditForm
-                        key={v.updatedAt.toISOString()}
-                        version={v.updatedAt.toISOString()}
-                        vehicleId={v.id}
-                        defaultValues={vehicleDefaultValues}
-                        catalog={readCatalog(v.matchCatalog)}
-                      />
-                    </div>
-                  </details>
-                )}
-                {v && isAgente && (
-                  <details className="rounded-xl border bg-card p-4">
-                    <summary className="cursor-pointer py-1 font-semibold">
-                      Documentos operativos del vehículo
-                    </summary>
-                    <div className="mt-3">
-                      <DocumentsPanel
-                        key={v.id}
-                        initialTarget={{ type: 'vehicle', id: v.id }}
-                        fixedTarget
-                      />
-                    </div>
-                  </details>
-                )}
                 {/* ─────────────── ENTRADA OFICIAL (PR-A2, corrección 7.5) ─────────────── */}
                 {v && isAgente && (
                   <details className="rounded-xl border bg-card p-4">

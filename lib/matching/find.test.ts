@@ -60,6 +60,30 @@ function makeDeps(vehicles: MatchingVehicleInput[], buyers: MatchingBuyerInput[]
 }
 
 describe('catálogo de las comerciales', () => {
+  it('distingue una ducha sin revisar de una ausencia confirmada al pedir ducha independiente', () => {
+    const buyer = makeBuyer({
+      criticalEquipment: {},
+      catalog: { showerOptions: { values: ['Independiente del inodoro'], required: true } },
+    })
+    const vehicle = makeVehicle({ equipment: { shower: false }, bathroomType: null })
+    expect(assessPair(vehicle, buyer).state).toBe('pendiente')
+    expect(assessPair({ ...vehicle, catalog: { shower: { values: ['No'] } } }, buyer).state).toBe(
+      'descartado'
+    )
+    expect(assessPair({ ...vehicle, bathroomType: 'HUMEDO' }, buyer).state).toBe('descartado')
+    expect(assessPair({ ...vehicle, bathroomType: 'SEPARADO' }, buyer).state).toBe('apto')
+  })
+  it('respeta un baño antiguo confirmado y un baño explícitamente ausente', () => {
+    const buyer = makeBuyer({ criticalEquipment: {}, bathroomRequired: true })
+    const vehicle = makeVehicle({ equipment: { bathroom: true }, bathroomType: null })
+    expect(assessPair(vehicle, buyer).state).toBe('apto')
+    expect(
+      assessPair({ ...vehicle, catalog: { interiorBath: { values: ['No'] } } }, buyer).state
+    ).toBe('descartado')
+    expect(assessPair({ ...vehicle, equipment: { bathroom: false } }, buyer).state).toBe(
+      'pendiente'
+    )
+  })
   it('acepta camas alternativas y diferencia una combinación imprescindible', () => {
     const v = makeVehicle({ catalog: { beds: { values: ['Literas'] } } })
     const alternatives = { values: ['Cama isla', 'Literas'], required: true }

@@ -29,6 +29,8 @@ export function editableCharacteristics(raw: Catalog, v: Legacy): Catalog {
   inherit('format', RV_CATEGORY_OPTIONS.find((o) => o.value === v.category)?.label, true)
   inherit('beds', RV_BED_OPTIONS.find((o) => o.value === v.bedLayout)?.label, true)
   inherit('showerOptions', v.bathroomType ? bathLabels[v.bathroomType] : undefined, true)
+  if (v.equipment?.bathroom && !inferredPresence(result, 'interiorBath'))
+    inherit('interiorBath', 'Sí')
   inherit('heating', v.heatingType ? (v.heatingType === 'NINGUNA' ? 'No' : 'Sí') : undefined)
   for (const { id } of EQUIPMENT_OPTIONS)
     if (v.equipment?.[id] && inferredPresence(result, id) !== 'Sí') inherit(id, 'Sí')
@@ -38,6 +40,16 @@ export function editableCharacteristics(raw: Catalog, v: Legacy): Catalog {
 }
 
 export function inferredPresence(c: Catalog, id: string) {
+  if (id === 'interiorBath') {
+    const shower = c.showerOptions?.values ?? []
+    if (shower.includes('Sin baño interior')) return 'No'
+    if (
+      shower.some((item) => ['Integrada', 'Independiente del inodoro'].includes(item)) ||
+      c.fullBath?.values.includes('Sí')
+    )
+      return 'Sí'
+  }
+  if (id === 'shower' && c.showerOptions?.values.includes('No tiene')) return 'No'
   if (
     id === 'shower' &&
     c.showerOptions?.values.some((v) =>
@@ -62,7 +74,7 @@ export function inferredPresence(c: Catalog, id: string) {
 
 export function vehicleFacts(raw: Catalog, legacy: Legacy) {
   const facts = editableCharacteristics(raw, legacy)
-  for (const id of ['shower', 'garage', 'kitchen']) {
+  for (const id of ['shower', 'garage', 'kitchen', 'interiorBath']) {
     const inferred = inferredPresence(facts, id)
     if (!facts[id] && inferred) facts[id] = { values: [inferred] }
   }
@@ -87,6 +99,8 @@ export function legacyProjection(c: Catalog, old: Legacy) {
   for (const { id } of EQUIPMENT_OPTIONS)
     equipment[id] = (c[id]?.values[0] ?? inferredPresence(c, id)) === 'Sí'
   if (bathroomType) equipment.bathroom = bathroomType !== 'NINGUNO'
+  else if (c.interiorBath || inferredPresence(c, 'interiorBath'))
+    equipment.bathroom = (c.interiorBath?.values[0] ?? inferredPresence(c, 'interiorBath')) === 'Sí'
   else if (old.bathroomType) equipment.bathroom = false
   const garage = c.garage?.values[0] ?? inferredPresence(c, 'garage')
   return {

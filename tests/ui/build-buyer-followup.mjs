@@ -19,6 +19,7 @@ async function main() {
       vehicleInventory: 'tests/ui/vehicle-inventory-fixture.tsx',
       inventoryOperations: 'tests/ui/inventory-operations-fixture.tsx',
       sellerSale: 'tests/ui/seller-sale-fixture.tsx',
+      checklist: 'tests/ui/seller-checklist-fixture.tsx',
       sellerPreparation: 'tests/ui/seller-preparation-fixture.tsx',
       sellerFollowup: 'tests/ui/seller-followup-fixture.tsx',
       postventa: 'tests/ui/buyer-postventa-fixture.tsx',
@@ -34,6 +35,16 @@ async function main() {
       {
         name: 'next-browser-fixture',
         setup(plugin) {
+          plugin.onResolve({ filter: /^\.\/(actions|rv-suggest-actions)$/ }, (args) =>
+            args.importer.endsWith('vehicle-edit-form.tsx')
+              ? { path: args.path, namespace: 'checklist' }
+              : undefined
+          )
+          plugin.onLoad({ filter: /.*/, namespace: 'checklist' }, ({ path }) => ({
+            contents: path.endsWith('/actions')
+              ? 'export const updateVehicle=(...args)=>window.checklist.save(...args)'
+              : 'export const suggestVehicleRvTaxonomy=()=>({error:"Sin sugerencias"})',
+          }))
           plugin.onResolve(
             { filter: /^@\/app\/\(backoffice\)\/operaciones\/(documentos\/)?actions$/ },
             ({ path }) => ({ path, namespace: 'document-stub' })
