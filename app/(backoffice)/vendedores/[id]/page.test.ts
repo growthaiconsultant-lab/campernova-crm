@@ -3,8 +3,9 @@ import { renderToStaticMarkup } from 'react-dom/server'
 import Page from './page'
 import { PUBLICADO_REQUIRED_DOCS } from '@/lib/vehicle-legal'
 const find = vi.hoisted(() => vi.fn())
+const user = vi.hoisted(() => ({ id: 'a', role: 'AGENTE', name: 'Comercial' }))
 vi.mock('@/lib/auth', () => ({
-  requireAgente: async () => ({ id: 'a', role: 'AGENTE', name: 'Comercial' }),
+  requireAgente: async () => user,
 }))
 vi.mock('@/lib/db', () => ({
   db: {
@@ -60,7 +61,10 @@ const vehicle = {
 }
 const render = async (tab?: string) =>
   renderToStaticMarkup(await Page({ params: { id: 'qa' }, searchParams: { tab } }))
-beforeEach(() => find.mockResolvedValue(seller))
+beforeEach(() => {
+  user.role = 'AGENTE'
+  find.mockResolvedValue(seller)
+})
 it('abre en Seguimiento y conserva el acceso al expediente sin vehículo', async () => {
   const html = await render()
   for (const text of [
@@ -328,4 +332,71 @@ it('Venta recupera una reserva aunque el vehículo reservado ya no sea elegible 
     '15 ene 2027',
   ])
     expect(html).toContain(text)
+})
+
+const priceOffer = {
+  id: 'precio-qa',
+  status: 'PROPUESTA',
+  buyerLeadId: 'comprador-qa',
+  buyerLead: { id: 'comprador-qa', name: 'Comprador de prueba' },
+  amount: 63500,
+  createdAt: new Date('2026-01-10'),
+  depositAmount: null,
+  reservedUntil: null,
+}
+it.each([
+  [63500, 'por debajo', true],
+  [65000, 'coincide con', false],
+  [65000.01, '0,01', false],
+])('compara la oferta de %s con el mínimo del vendedor', async (amount, message, consult) => {
+  find.mockResolvedValue({
+    ...seller,
+    minPrice: 65000,
+    vehicle: {
+      ...vehicle,
+      salePrice: 68000,
+      valuationMin: 64000,
+      valuationRecommended: 66500,
+      offers: [{ ...priceOffer, amount }],
+    },
+  })
+  const html = await render('economia')
+  expect(html).toContain(message)
+  expect(html.includes('Preparar consulta al vendedor')).toBe(consult)
+  expect(html).toContain('?tab=compradores#oferta-precio-qa')
+  expect(html.indexOf('Mínimo del vendedor')).toBeLessThan(html.indexOf('Tasación oficial'))
+  expect(html).not.toContain('Costes y margen')
+})
+it('distingue la ausencia de mínimo, las ofertas cerradas y el precio deseado', async () => {
+  find.mockResolvedValue({ ...seller, vehicle: { ...vehicle, offers: [priceOffer] } })
+  expect(await render('economia')).toContain('Falta indicar el mínimo del vendedor')
+  find.mockResolvedValue({
+    ...seller,
+    minPrice: 65000,
+    vehicle: { ...vehicle, offers: [{ ...priceOffer, status: 'RETIRADA' }] },
+  })
+  const html = await render('economia')
+  expect(html).toContain('Sin oferta abierta')
+  expect(html).not.toContain('Preparar consulta al vendedor')
+  expect(html).not.toContain('#oferta-precio-qa')
+})
+it('da prioridad a la reserva y mantiene los costes dentro de administración', async () => {
+  find.mockResolvedValue({
+    ...seller,
+    minPrice: 65000,
+    vehicle: {
+      ...vehicle,
+      offers: [
+        priceOffer,
+        { ...priceOffer, id: 'reserva-qa', status: 'ACEPTADA', depositAmount: 1000 },
+      ],
+    },
+  })
+  user.role = 'ADMIN'
+  const html = await render('economia')
+  expect(html).toContain('?tab=compradores#oferta-reserva-qa')
+  expect(html).not.toContain('Preparar consulta al vendedor')
+  expect(html).toContain('Costes y margen')
+  expect(html).toContain('Pendiente del precio de compra')
+  expect(html).toContain('id="precios-vehiculo"')
 })

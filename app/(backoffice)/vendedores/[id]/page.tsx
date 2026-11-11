@@ -1,3 +1,5 @@
+import { SellerPriceComparison } from '@/components/seller-price-comparison'
+import { formatEur } from '@/lib/format/currency'
 import { sellerSale } from '@/lib/seller-sale'
 import { SellerSaleOverview, SellerSaleChannels } from '@/components/seller-sale-overview'
 import { pendingSellerCalendarEvents, sellerSteps } from '@/lib/seller-agenda'
@@ -1051,7 +1053,7 @@ export default async function FichaVendedorPage({
               {[
                 { key: 'compradores', label: 'Resumen de venta' },
                 { key: 'publicacion', label: 'Publicación y anuncios' },
-                { key: 'economia', label: isAdmin ? 'Tasación y economía' : 'Tasación' },
+                { key: 'economia', label: 'Tasación y economía' },
               ].map((tab) => (
                 <Link
                   key={tab.key}
@@ -1506,61 +1508,16 @@ export default async function FichaVendedorPage({
             </Card>
           )}
 
-          {/* ─────────────── ECONOMÍA · costes ─────────────── */}
-          {activeTab === 'economia' && v && isAdmin && (
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-base">Costes y margen</CardTitle>
-                <CardDescription>
-                  Precios, costes imputados y rentabilidad neta. Solo visible para administradores.
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-6">
-                <div id="precios-vehiculo" className="scroll-mt-24">
-                  <p className="mb-3 text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                    Precios y objetivo
-                  </p>
-                  <VehicleEconomicsForm
-                    vehicleId={v.id}
-                    desiredPrice={v.desiredPrice ? Number(v.desiredPrice) : null}
-                    purchasePrice={v.purchasePrice ? Number(v.purchasePrice) : null}
-                    salePrice={v.salePrice ? Number(v.salePrice) : null}
-                    marginPercent={v.marginPercent ? Number(v.marginPercent) : 4}
-                  />
-                </div>
-                {margin && (
-                  <div>
-                    <p className="mb-3 text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                      Resumen de margen
-                    </p>
-                    <VehicleMarginSummary margin={margin} />
-                  </div>
-                )}
-                <div>
-                  <p className="mb-3 text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                    Costes imputados
-                  </p>
-                  <VehicleCostsTable
-                    vehicleId={v.id}
-                    costs={costs}
-                    currentUserId={currentUser.id}
-                    isAdmin={true}
-                  />
-                </div>
-                <div>
-                  <p className="mb-3 text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                    Ubicación en nave
-                  </p>
-                  <NaveLocationField
-                    vehicleId={v.id}
-                    entryDate={v.entryDate}
-                    naveLocation={v.naveLocation}
-                  />
-                </div>
-              </CardContent>
-            </Card>
+          {activeTab === 'economia' && v && (
+            <SellerPriceComparison
+              sellerId={lead.id}
+              minimum={lead.minPrice == null ? null : Number(lead.minPrice)}
+              salePrice={v.salePrice == null ? null : Number(v.salePrice)}
+              offers={offerRows}
+              published={v.status === 'PUBLICADO'}
+              archived={!!lead.archivedAt}
+            />
           )}
-
           {/* ─────────────── ECONOMÍA · tasación (A3) ─────────────── */}
           {activeTab === 'economia' && v && (
             <Card>
@@ -1573,67 +1530,164 @@ export default async function FichaVendedorPage({
                 />
               </CardHeader>
               <CardContent className="space-y-5">
-                {/* Precio OFICIAL = campos denormalizados (solo la tasación oficial los escribe). */}
-                {v.valuationRecommended ? (
-                  <div className="flex flex-wrap gap-6">
-                    <div>
-                      <p className="text-xs text-muted-foreground">Mínimo</p>
-                      <p className="text-lg font-semibold">{EUR(Number(v.valuationMin))}</p>
-                    </div>
-                    <div>
-                      <p className="text-xs text-muted-foreground">Recomendado (oficial)</p>
-                      <p className="text-xl font-bold text-sidebar-primary">
-                        {EUR(Number(v.valuationRecommended))}
-                      </p>
-                    </div>
-                    <div>
-                      <p className="text-xs text-muted-foreground">Máximo</p>
-                      <p className="text-lg font-semibold">{EUR(Number(v.valuationMax))}</p>
-                    </div>
+                {v.valuationRecommended != null ? (
+                  <div className="flex flex-wrap items-baseline justify-between gap-2">
+                    <span>Precio recomendado</span>
+                    <strong className="text-xl text-sidebar-primary">
+                      {formatEur(Number(v.valuationRecommended), 'cents')}
+                    </strong>
                   </div>
                 ) : (
                   <p className="text-sm text-muted-foreground">
-                    Sin tasación oficial todavía. La tasación oficial requiere entrada activa +
-                    inspección de entrada completada.
+                    {officialGateReady
+                      ? 'Pendiente de registrar la tasación oficial.'
+                      : 'Tasación oficial pendiente.'}
                   </p>
                 )}
+                <details className="space-y-3 border-t pt-3">
+                  <summary className="cursor-pointer text-sm font-medium">
+                    Ver rango e historial de tasación
+                  </summary>
+                  {v.valuationMin != null || v.valuationMax != null ? (
+                    <dl className="flex flex-wrap gap-6 text-sm">
+                      {v.valuationMin != null && (
+                        <div>
+                          <dt>Mínimo de tasación</dt>
+                          <dd>{formatEur(Number(v.valuationMin), 'cents')}</dd>
+                        </div>
+                      )}
+                      {v.valuationMax != null && (
+                        <div>
+                          <dt>Máximo de tasación</dt>
+                          <dd>{formatEur(Number(v.valuationMax), 'cents')}</dd>
+                        </div>
+                      )}
+                    </dl>
+                  ) : (
+                    <p className="text-sm text-muted-foreground">Sin rango oficial registrado.</p>
+                  )}
+                  {/* Valoración PRELIMINAR (orientativa) — NUNCA es el precio oficial. */}
+                  {latestPreliminary && (
+                    <div className="rounded-md border border-dashed border-border bg-muted/30 p-3">
+                      <p className="mb-1 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                        Valoración preliminar (orientativa)
+                      </p>
+                      <p className="text-sm">
+                        {EUR(Number(latestPreliminary.recommended))}{' '}
+                        <span className="text-muted-foreground">
+                          ({EUR(Number(latestPreliminary.min))} –{' '}
+                          {EUR(Number(latestPreliminary.max))})
+                        </span>
+                      </p>
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        No es un precio de venta ni habilita publicación/matching.
+                      </p>
+                    </div>
+                  )}
 
-                {/* Valoración PRELIMINAR (orientativa) — NUNCA es el precio oficial. */}
-                {latestPreliminary && (
-                  <div className="rounded-md border border-dashed border-border bg-muted/30 p-3">
-                    <p className="mb-1 text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                      Valoración preliminar (orientativa)
-                    </p>
-                    <p className="text-sm">
-                      {EUR(Number(latestPreliminary.recommended))}{' '}
-                      <span className="text-muted-foreground">
-                        ({EUR(Number(latestPreliminary.min))} – {EUR(Number(latestPreliminary.max))}
-                        )
-                      </span>
-                    </p>
-                    <p className="mt-1 text-xs text-muted-foreground">
-                      No es un precio de venta ni habilita publicación/matching.
-                    </p>
-                  </div>
+                  {v.valuations.length > 0 && (
+                    <div className="border-t pt-4">
+                      <p className="mb-3 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                        Historial de valoraciones
+                      </p>
+                      <ValuationTimeline valuations={v.valuations} />
+                    </div>
+                  )}
+
+                  {v.valuationAttempts.length > 0 && (
+                    <div className="border-t pt-4">
+                      <p className="mb-3 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                        Intentos (incluye sin referencia / fallos)
+                      </p>
+                      <ValuationAttempts attempts={v.valuationAttempts} />
+                    </div>
+                  )}
+                </details>
+              </CardContent>
+            </Card>
+          )}
+          {/* ─────────────── ECONOMÍA · costes ─────────────── */}
+          {activeTab === 'economia' && v && isAdmin && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base">Costes y margen</CardTitle>
+                <CardDescription>
+                  Precios, costes imputados y rentabilidad neta. Solo visible para administradores.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                {margin && (
+                  <dl className="grid gap-3 sm:grid-cols-3">
+                    <div>
+                      <dt className="text-sm text-muted-foreground">Costes registrados</dt>
+                      <dd>{formatEur(margin.totalCosts, 'cents')}</dd>
+                    </div>
+                    <div>
+                      <dt className="text-sm text-muted-foreground">Precio de compra</dt>
+                      <dd>
+                        {margin.purchasePrice == null
+                          ? 'Pendiente'
+                          : formatEur(margin.purchasePrice, 'cents')}
+                      </dd>
+                    </div>
+                    <div>
+                      <dt className="text-sm text-muted-foreground">Margen neto estimado</dt>
+                      <dd>
+                        {margin.netMargin != null
+                          ? formatEur(margin.netMargin, 'cents')
+                          : margin.purchasePrice == null
+                            ? 'Pendiente del precio de compra'
+                            : 'Pendiente del precio de venta'}
+                      </dd>
+                    </div>
+                  </dl>
                 )}
-
-                {v.valuations.length > 0 && (
-                  <div className="border-t pt-4">
+                <div id="precios-vehiculo" className="scroll-mt-24">
+                  <p className="mb-3 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                    Precios y objetivo
+                  </p>
+                  <VehicleEconomicsForm
+                    vehicleId={v.id}
+                    desiredPrice={v.desiredPrice ? Number(v.desiredPrice) : null}
+                    purchasePrice={v.purchasePrice ? Number(v.purchasePrice) : null}
+                    salePrice={v.salePrice ? Number(v.salePrice) : null}
+                    marginPercent={v.marginPercent ? Number(v.marginPercent) : 4}
+                  />
+                </div>
+                <details className="space-y-4 border-t pt-3">
+                  <summary className="cursor-pointer text-sm font-medium">
+                    Ver costes y desglose del margen
+                  </summary>
+                  {margin && (
+                    <div>
+                      <p className="mb-3 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                        Resumen de margen
+                      </p>
+                      <VehicleMarginSummary margin={margin} />
+                    </div>
+                  )}
+                  <div>
                     <p className="mb-3 text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                      Historial de valoraciones
+                      Costes imputados
                     </p>
-                    <ValuationTimeline valuations={v.valuations} />
+                    <VehicleCostsTable
+                      vehicleId={v.id}
+                      costs={costs}
+                      currentUserId={currentUser.id}
+                      isAdmin={true}
+                    />
                   </div>
-                )}
-
-                {v.valuationAttempts.length > 0 && (
-                  <div className="border-t pt-4">
-                    <p className="mb-3 text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                      Intentos (incluye sin referencia / fallos)
-                    </p>
-                    <ValuationAttempts attempts={v.valuationAttempts} />
-                  </div>
-                )}
+                </details>
+                <div>
+                  <p className="mb-3 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                    Ubicación en nave
+                  </p>
+                  <NaveLocationField
+                    vehicleId={v.id}
+                    entryDate={v.entryDate}
+                    naveLocation={v.naveLocation}
+                  />
+                </div>
               </CardContent>
             </Card>
           )}
