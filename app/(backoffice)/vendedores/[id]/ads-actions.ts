@@ -1,5 +1,7 @@
 'use server'
 
+import { z } from 'zod'
+import { salePortals } from '@/lib/portal-listings'
 import { revalidatePath } from 'next/cache'
 import { db } from '@/lib/db'
 import { requireCanGenerateAds } from '@/lib/auth'
@@ -55,23 +57,64 @@ export async function generateVehicleAd(vehicleId: string, channel: 'WALLAPOP' |
   return { content: result.content, adId: ad.id, tokensUsed: result.tokensUsed }
 }
 
-export async function updateVehicleAdContent(adId: string, content: string) {
+const draftInput = z.object({
+  vehicleId: z.string().min(1),
+  channel: z.enum(salePortals),
+  original: z.object({ id: z.string().min(1), content: z.string() }).nullable(),
+  content: z.string().trim().min(1, 'Escribe el texto del anuncio.'),
+})
+
+export async function saveVehicleAdText(input: unknown) {
   const actor = await requireCanGenerateAds()
-
-  const ad = await db.vehicleAd.findUnique({
-    where: { id: adId },
-    include: { vehicle: { select: { sellerLead: { select: { id: true } } } } },
+  const parsed = draftInput.safeParse(input)
+  if (!parsed.success) return { error: 'Revisa el texto y el portal del anuncio.' }
+  const { vehicleId, channel, original, content } = parsed.data
+  const result = await db.$transaction(async (tx) => {
+    const [vehicle] = await tx.$queryRaw<
+      { seller_lead_id: string }[]
+    >`SELECT seller_lead_id FROM vehicles WHERE id = ${vehicleId} FOR UPDATE`
+    if (!vehicle) return { error: 'Vehículo no encontrado.' }
+    const current = await tx.vehicleAd.findFirst({
+      where: { vehicleId, channel },
+      orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+      select: { id: true, content: true, createdById: true },
+    })
+    const conflict = {
+      error:
+        'El texto de este portal ha cambiado. Copia tu versión y vuelve a abrir el texto actualizado.',
+    }
+    if (current && current.createdById !== actor.id && actor.role !== 'ADMIN')
+      return { error: 'Sin permiso para editar este anuncio.' }
+    if (
+      current &&
+      current.content === content &&
+      (original?.id === current.id || (!original && current.createdById === actor.id))
+    )
+      return { sellerId: vehicle.seller_lead_id, id: current.id }
+    if ((current?.id ?? null) !== (original?.id ?? null) || current?.content !== original?.content)
+      return conflict
+    const ad = current
+      ? await tx.vehicleAd.update({
+          where: { id: current.id },
+          data: { content },
+          select: { id: true },
+        })
+      : await tx.vehicleAd.create({
+          data: {
+            vehicleId,
+            channel,
+            content,
+            modelUsed: 'manual',
+            tokensUsed: 0,
+            createdById: actor.id,
+          },
+          select: { id: true },
+        })
+    return { sellerId: vehicle.seller_lead_id, id: ad.id }
   })
-  if (!ad) return { error: 'Anuncio no encontrado' }
-
-  if (ad.createdById !== actor.id && actor.role !== 'ADMIN') {
-    return { error: 'Sin permiso para editar este anuncio' }
-  }
-
-  await db.vehicleAd.update({ where: { id: adId }, data: { content } })
-
-  revalidatePath(`/vendedores/${ad.vehicle.sellerLead?.id}`)
-  return { ok: true }
+  if ('error' in result) return { error: result.error }
+  revalidatePath(`/vendedores/${result.sellerId}`)
+  return { id: result.id }
 }
 
 export async function updateVehiclePublicNotes(vehicleId: string, publicNotes: string) {

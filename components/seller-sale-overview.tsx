@@ -20,6 +20,9 @@ type ChannelProps = {
     revision: number
   }[]
   ads: { channel: SalePortal }[]
+  renderTextTool?: (channel: SalePortal) => React.ReactNode
+  webAction?: React.ReactNode
+  children?: React.ReactNode
   showToolsLink: boolean
 }
 export function SellerSaleChannels({
@@ -29,6 +32,9 @@ export function SellerSaleChannels({
   listings,
   ads,
   showToolsLink,
+  renderTextTool,
+  webAction,
+  children,
 }: ChannelProps) {
   const channels = salePortals.map((channel) => {
     const saved = listings.find((row) => row.channel === channel)
@@ -45,30 +51,54 @@ export function SellerSaleChannels({
         : null,
     }
   })
+  const publishedCount =
+    Number(vehicle.status === 'PUBLICADO') +
+    channels.filter(({ listing }) => listing && !listing.withdrawn).length
   return (
     <section aria-labelledby="sale-channels" className="rounded-xl border bg-card p-4 sm:p-5">
-      <h2 id="sale-channels" className="mb-2 text-lg font-semibold">
-        Dónde está anunciado
-      </h2>
+      <div className="flex flex-wrap items-baseline justify-between gap-2">
+        <h2 id="sale-channels" className="mb-2 text-lg font-semibold">
+          {showToolsLink ? 'Dónde está anunciado' : 'Publicación y anuncios'}
+        </h2>
+        {!showToolsLink && (
+          <p aria-live="polite" className="text-sm text-muted-foreground">
+            Publicado en {publishedCount} de {1 + channels.length}
+          </p>
+        )}
+      </div>
       <div className="divide-y">
         <div className="flex flex-wrap items-center justify-between gap-2 py-3">
           <div>
-            <strong>Web CampersNova</strong>
+            <div className="flex flex-wrap items-center gap-2">
+              <strong>Web CampersNova</strong>
+              {!showToolsLink && vehicle.status === 'PUBLICADO' && (
+                <span className="rounded bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-900">
+                  Publicado
+                </span>
+              )}
+            </div>
             <p className="text-sm">
-              {vehicle.status === 'PUBLICADO' ? 'Publicado' : 'Fuera del catálogo público'}
+              {vehicle.status === 'PUBLICADO'
+                ? showToolsLink
+                  ? 'Publicado'
+                  : 'En el catálogo web'
+                : 'Fuera del catálogo público'}
               {vehicle.status === 'PUBLICADO' &&
                 vehicle.publishedAt &&
                 ' · Primera publicación el ' + offerDateLabel(vehicle.publishedAt.toISOString())}
             </p>
           </div>
-          {vehicle.status === 'PUBLICADO' && (
-            <Link
-              className="text-sm text-brand underline"
-              href={'/comprar/' + vehicleSlug(vehicle)}
-            >
-              Ver anuncio
-            </Link>
-          )}
+          <div className="flex flex-wrap items-center gap-3">
+            {vehicle.status === 'PUBLICADO' && (
+              <Link
+                className="text-sm text-brand underline"
+                href={'/comprar/' + vehicleSlug(vehicle)}
+              >
+                Ver anuncio
+              </Link>
+            )}
+            {webAction}
+          </div>
         </div>
         {channels.map(({ channel, listing, draft }) => (
           <SellerPortalListing
@@ -79,9 +109,12 @@ export function SellerSaleChannels({
             listing={listing}
             draft={draft}
             editable={editable}
-          />
+          >
+            {renderTextTool?.(channel)}
+          </SellerPortalListing>
         ))}
       </div>
+      {children}
       {showToolsLink && (
         <Link
           className="inline-flex py-2 text-sm text-brand underline"

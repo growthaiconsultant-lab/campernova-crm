@@ -72,6 +72,14 @@ async function main() {
             contents:
               'export const savePortalListing=(...args)=>window.portalFixture.save(...args)',
           }))
+          plugin.onResolve({ filter: /vendedores\/\[id\]\/ads-actions$/ }, () => ({
+            path: 'ad-text',
+            namespace: 'ad-text-fixture',
+          }))
+          plugin.onLoad({ filter: /.*/, namespace: 'ad-text-fixture' }, () => ({
+            contents:
+              'export const generateVehicleAd=()=>{throw Error("Generación inesperada")};export const saveVehicleAdText=(input)=>window.portalFixture.saveText(input);',
+          }))
           const stockStubs = {
             '@/app/(backoffice)/ofertas/actions':
               'export const createOffer = (...args) => window.offerFixture.create(...args); export const updateOfferStatus = (...args) => window.offerFixture.update(...args)',

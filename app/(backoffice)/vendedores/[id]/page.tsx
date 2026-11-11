@@ -326,9 +326,79 @@ export default async function FichaVendedorPage({
         sellerId={lead.id}
         editable={!lead.archivedAt}
         listings={v.portalListings}
-        ads={v.ads}
+        ads={v.ads.filter((ad) => ad.content?.trim())}
         showToolsLink={activeTab === 'compradores'}
-      />
+        renderTextTool={
+          activeTab === 'publicacion'
+            ? (channel) => {
+                const ad = v.ads.find((row) => row.channel === channel)
+                return (
+                  <GenerateAdButton
+                    vehicleId={v.id}
+                    channel={channel}
+                    lastAd={
+                      ad
+                        ? {
+                            id: ad.id,
+                            content: ad.content,
+                            createdAt: ad.createdAt,
+                            author: ad.createdBy?.name ?? null,
+                            canEdit: isAdmin || ad.createdById === currentUser.id,
+                          }
+                        : null
+                    }
+                  />
+                )
+              }
+            : undefined
+        }
+        webAction={
+          activeTab === 'publicacion' &&
+          (v.status === 'PUBLICADO' ? (
+            <UnpublishButton vehicleId={v.id} />
+          ) : (
+            <Link
+              className="text-sm text-brand underline"
+              href={`/vendedores/${lead.id}?tab=preparacion`}
+            >
+              Ver qué falta para publicar
+            </Link>
+          ))
+        }
+      >
+        {activeTab === 'publicacion' && (
+          <footer className="space-y-4 border-t pt-4">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div>
+                <h3 className="font-semibold">Fotos del vehículo</h3>
+                <p className="text-sm text-muted-foreground">
+                  {v.photos.length
+                    ? 'Las mismas fotos para todos los portales.'
+                    : 'Añade fotos en Vehículo y documentos.'}
+                </p>
+              </div>
+              {v.photos.length ? (
+                <DownloadPhotosButton sellerLeadId={lead.id} photoCount={v.photos.length} />
+              ) : (
+                <Link
+                  className="text-sm text-brand underline"
+                  href={`/vendedores/${lead.id}?tab=preparacion`}
+                >
+                  Añadir fotos
+                </Link>
+              )}
+            </div>
+            <details className="border-t pt-3">
+              <summary className="cursor-pointer text-sm font-medium">
+                Notas para preparar los anuncios
+              </summary>
+              <div className="mt-3">
+                <PublicNotesEditor vehicleId={v.id} initialValue={v.publicNotes} />
+              </div>
+            </details>
+          </footer>
+        )}
+      </SellerSaleChannels>
     ) : null
   const saleOverview = activeTab === 'compradores' && v ? sellerSale(offerRows, v.matches) : null
   const interestedIds = new Set(saleOverview?.interested.map((buyer) => buyer.buyerId))
@@ -1437,77 +1507,6 @@ export default async function FichaVendedorPage({
 
           {/* ─────────────── PUBLICACIÓN ─────────────── */}
           {activeTab === 'publicacion' && portalPanel}
-          {activeTab === 'publicacion' && v && (
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-base">Anuncios y publicación</CardTitle>
-                <CardDescription>
-                  Genera el anuncio con IA usando la ficha, las notas del agente y las fotos.
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <PublicNotesEditor vehicleId={v.id} initialValue={v.publicNotes} />
-                <div className="flex flex-wrap gap-3">
-                  {(() => {
-                    const lastWallapopAd = v.ads?.find((a) => a.channel === 'WALLAPOP') ?? null
-                    const lastCochesNetAd = v.ads?.find((a) => a.channel === 'COCHESNET') ?? null
-                    return (
-                      <>
-                        <GenerateAdButton
-                          vehicleId={v.id}
-                          channel="WALLAPOP"
-                          lastAd={
-                            lastWallapopAd
-                              ? {
-                                  id: lastWallapopAd.id,
-                                  content: lastWallapopAd.content,
-                                  createdAt: lastWallapopAd.createdAt,
-                                }
-                              : null
-                          }
-                          agentName={lastWallapopAd?.createdBy?.name ?? undefined}
-                        />
-                        <GenerateAdButton
-                          vehicleId={v.id}
-                          channel="COCHESNET"
-                          lastAd={
-                            lastCochesNetAd
-                              ? {
-                                  id: lastCochesNetAd.id,
-                                  content: lastCochesNetAd.content,
-                                  createdAt: lastCochesNetAd.createdAt,
-                                }
-                              : null
-                          }
-                          agentName={lastCochesNetAd?.createdBy?.name ?? undefined}
-                        />
-                        <DownloadPhotosButton sellerLeadId={lead.id} photoCount={v.photos.length} />
-                      </>
-                    )
-                  })()}
-                </div>
-
-                {/* PUB-1: estado de publicación + retirar anuncio */}
-                {v.status === 'PUBLICADO' && (
-                  <div className="space-y-2 border-t pt-4">
-                    <p className="text-sm text-muted-foreground">
-                      Publicado:{' '}
-                      <span className="font-medium text-foreground">
-                        {v.publishedAt
-                          ? new Date(v.publishedAt).toLocaleDateString('es-ES', {
-                              timeZone: 'Europe/Madrid',
-                              dateStyle: 'medium',
-                            })
-                          : 'fecha desconocida'}
-                      </span>
-                    </p>
-                    <UnpublishButton vehicleId={v.id} />
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          )}
-
           {activeTab === 'economia' && v && (
             <SellerPriceComparison
               sellerId={lead.id}
