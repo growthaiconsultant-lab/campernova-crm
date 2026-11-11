@@ -1,3 +1,4 @@
+import { ActionableTable } from '@/components/redesign/actionable-table'
 import { VehicleGalleryButton } from '@/components/vehicle-gallery-button'
 import { PublicVehicleGallery } from '@/components/catalog/public-vehicle-gallery'
 import { createRoot } from 'react-dom/client'
@@ -48,14 +49,27 @@ function render() {
     'PUBLICADO',
     docs.map((d) => ({ category: d.category, exists: true }))
   )
+  const galleryButton = (
+    <VehicleGalleryButton
+      compact
+      vehicleId={vehicleId}
+      title="Fiat de prueba"
+      cover={photos[0]?.url ?? null}
+      count={photos.length}
+    />
+  )
   root.render(
     <main className="crm-theme p-4">
-      <VehicleGalleryButton
-        compact
-        vehicleId={vehicleId}
-        title="Fiat de prueba"
-        cover={photos[0]?.url ?? null}
-        count={photos.length}
+      <ActionableTable
+        rows={[{ id: 'seller-qa', name: 'Vendedor de prueba' }]}
+        rowKey={(row) => row.id}
+        rowHref={(row) => '/vendedores/' + row.id}
+        columns={[
+          { key: 'gallery', header: 'Fotos', rowLink: false, cell: () => galleryButton },
+          { key: 'seller', header: 'Vendedor', cell: (row) => row.name },
+        ]}
+        mobileCard={(row) => row.name}
+        mobileCardLeading={() => galleryButton}
       />
       <PublicVehicleGallery photos={photos.map((p) => ({ url: p.url, alt: p.id }))} />
       <MissingForPublishCard

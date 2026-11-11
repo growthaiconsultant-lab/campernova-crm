@@ -33,6 +33,7 @@ describe('setVehiclePhotoCategory', () => {
       data: { category: 'EXTERIOR' },
     })
     expect(revalidatePath).toHaveBeenCalledWith('/vendedores/s1')
+    expect(revalidatePath).toHaveBeenCalledWith('/vendedores')
   })
 
   it('null limpia la categoría (sin clasificar)', async () => {
