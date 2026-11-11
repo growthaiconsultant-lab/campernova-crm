@@ -774,6 +774,7 @@ model Vehicle {
   valuations        Valuation[]
   valuationAttempts VehicleValuationAttempt[]
   matches           Match[]
+  portalListings    VehiclePortalListing[]
   ads               VehicleAd[]
   costs             VehicleCost[]
   workOrders        WorkOrder[]
@@ -1124,6 +1125,20 @@ model Document {
   buyerLead  BuyerLead?  @relation(fields: [buyerLeadId], references: [id], onDelete: Cascade)
 
   @@map("documents")
+}
+
+/// Confirmación manual de un anuncio publicado por el equipo en un portal externo.
+model VehiclePortalListing {
+  vehicleId   String    @map("vehicle_id")
+  channel     AdChannel
+  url         String
+  publishedOn DateTime  @map("published_on") @db.Date
+  withdrawnAt DateTime? @map("withdrawn_at")
+  revision    Int       @default(1)
+  vehicle     Vehicle   @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+
+  @@id([vehicleId, channel])
+  @@map("vehicle_portal_listings")
 }
 
 /// Anuncio generado por IA para un vehículo en un canal de venta.

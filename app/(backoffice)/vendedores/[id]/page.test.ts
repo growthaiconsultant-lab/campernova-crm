@@ -55,6 +55,7 @@ const vehicle = {
   valuations: [],
   offers: [],
   ads: [],
+  portalListings: [],
   deliveries: [],
 }
 const render = async (tab?: string) =>
@@ -268,4 +269,63 @@ it('la cabecera de Vehículo y documentos permite consultar la siguiente acción
     '?tab=resumen#seller-next',
   ])
     expect(header).toContain(item)
+})
+
+it('Venta recupera una reserva aunque el vehículo reservado ya no sea elegible para matching', async () => {
+  const buyer = { id: 'old-buyer', name: 'Nombre de prueba' }
+  const date = new Date('2025-01-10')
+  find.mockResolvedValue({
+    ...seller,
+    vehicle: {
+      ...vehicle,
+      status: 'RESERVADO',
+      matches: [
+        {
+          id: 'm',
+          score: 70,
+          generatedBy: 'auto',
+          status: 'VISITA',
+          updatedAt: date,
+          buyerLead: buyer,
+        },
+      ],
+      offers: [
+        {
+          id: 'reserva-qa',
+          status: 'ACEPTADA',
+          buyerLeadId: buyer.id,
+          buyerLead: buyer,
+          amount: 48300.31,
+          depositAmount: 1500.33,
+          reservedUntil: new Date('2027-01-15'),
+          createdAt: date,
+          notes: 'Condición antigua',
+        },
+      ],
+      portalListings: [
+        {
+          channel: 'COCHESNET',
+          url: 'https://www.coches.net/anuncio-qa',
+          publishedOn: date,
+          withdrawnAt: null,
+          revision: 1,
+        },
+      ],
+      ads: [{ channel: 'WALLAPOP' }],
+    },
+  })
+  const html = await render('compradores')
+  for (const text of [
+    'Reserva con señal',
+    'Fuera del catálogo público',
+    'Texto preparado',
+    'Publicado según el equipo',
+    'https://www.coches.net/anuncio-qa',
+    'Compradores con interés · 1',
+    'Condición antigua',
+    'id="oferta-reserva-qa"',
+    '1500,33',
+    '15 ene 2027',
+  ])
+    expect(html).toContain(text)
 })

@@ -10,9 +10,11 @@ import type { OfferRow } from './offers-section'
 
 export function BuyerOfferGroups({
   offers,
+  counterpart,
   initialDay,
   onDone,
 }: {
+  counterpart: 'vehículo' | 'comprador'
   offers: OfferRow[]
   initialDay?: string
   onDone: () => void
@@ -98,7 +100,7 @@ export function BuyerOfferGroups({
           )}
           {offer.notes && <p className="whitespace-pre-line break-words">{offer.notes}</p>}
           <Link href={offer.counterpartHref} className="text-brand underline">
-            Ver vehículo
+            Ver {counterpart}
           </Link>
           <OfferActions offer={offer} onDone={onDone} />
         </div>
