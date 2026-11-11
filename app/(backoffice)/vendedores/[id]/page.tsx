@@ -1,3 +1,5 @@
+import { sellerSale } from '@/lib/seller-sale'
+import { SellerSaleOverview, SellerSaleChannels } from '@/components/seller-sale-overview'
 import { pendingSellerCalendarEvents, sellerSteps } from '@/lib/seller-agenda'
 import { notFound } from 'next/navigation'
 import { Suspense } from 'react'
@@ -143,9 +145,11 @@ export default async function FichaVendedorPage({
             },
             ads: {
               include: { createdBy: { select: { name: true } } },
-              orderBy: { createdAt: 'desc' },
-              take: 6,
+              orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+              distinct: ['channel'],
             },
+            portalListings:
+              searchParams.tab === 'compradores' || searchParams.tab === 'publicacion',
             costs: {
               include: { createdBy: { select: { id: true, name: true } } },
               orderBy: { createdAt: 'desc' },
@@ -299,6 +303,7 @@ export default async function FichaVendedorPage({
   }))
   const offerRows = (v?.offers ?? []).map((o) => ({
     id: o.id,
+    buyerId: o.buyerLeadId,
     amount: Number(o.amount),
     createdAt: o.createdAt.toISOString(),
     depositAmount: o.depositAmount ? Number(o.depositAmount) : null,
@@ -312,6 +317,31 @@ export default async function FichaVendedorPage({
     counterpartHref: `/compradores/${o.buyerLead.id}`,
   }))
 
+  const portalPanel =
+    v && (activeTab === 'compradores' || activeTab === 'publicacion') ? (
+      <SellerSaleChannels
+        vehicle={v}
+        sellerId={lead.id}
+        editable={!lead.archivedAt}
+        listings={v.portalListings}
+        ads={v.ads}
+        showToolsLink={activeTab === 'compradores'}
+      />
+    ) : null
+  const saleOverview = activeTab === 'compradores' && v ? sellerSale(offerRows, v.matches) : null
+  const interestedIds = new Set(saleOverview?.interested.map((buyer) => buyer.buyerId))
+  const suggestedMatches = vehicleMatches.filter(
+    (m) => m.status === 'SUGERIDO' && m.generatedBy === 'auto' && !interestedIds.has(m.buyerLead.id)
+  )
+  const suggestedIds = new Set(suggestedMatches.map((m) => m.id))
+  const followedMatches = vehicleMatches.filter((m) => !suggestedIds.has(m.id))
+  const visibleIds = new Set(vehicleMatches.map((m) => m.id))
+  const earlierMatches =
+    activeTab === 'compradores'
+      ? (v?.matches ?? []).filter(
+          (m) => !visibleIds.has(m.id) && (m.generatedBy === 'manual' || m.status !== 'SUGERIDO')
+        )
+      : []
   // Legal / expediente
   const legalInput: VehicleLegalInput | null = v
     ? {
@@ -1019,7 +1049,7 @@ export default async function FichaVendedorPage({
           {saleTab && (
             <nav aria-label="Apartados de venta" className="flex flex-wrap gap-2">
               {[
-                { key: 'compradores', label: 'Ofertas y compradores' },
+                { key: 'compradores', label: 'Resumen de venta' },
                 { key: 'publicacion', label: 'Publicación y anuncios' },
                 { key: 'economia', label: isAdmin ? 'Tasación y economía' : 'Tasación' },
               ].map((tab) => (
@@ -1294,63 +1324,91 @@ export default async function FichaVendedorPage({
             </details>
           )}
           {/* ─────────────── COMPRADORES ─────────────── */}
-          {activeTab === 'compradores' && v && (
-            <div className="space-y-5">
-              <OffersSection
-                side="vehicle"
-                fixedId={v.id}
-                candidates={offerCandidates}
-                offers={offerRows}
-              />
-              <MatchesSection side="vehicle" matches={vehicleMatches} defaultOpen />
-              {v && (
-                <ManualAssociationsCard
+          {activeTab === 'compradores' && v && saleOverview && (
+            <div className="space-y-4">
+              <SellerSaleOverview
+                sale={saleOverview}
+                price={v.salePrice != null ? Number(v.salePrice) : null}
+              >
+                {portalPanel}
+              </SellerSaleOverview>
+
+              {suggestedMatches.length > 0 && (
+                <details className="rounded-xl border bg-card p-4">
+                  <summary className="cursor-pointer font-semibold">
+                    Compradores sugeridos por el CRM · {suggestedMatches.length}
+                  </summary>
+                  <div className="mt-3">
+                    <MatchesSection side="vehicle" matches={suggestedMatches} defaultOpen />
+                  </div>
+                </details>
+              )}
+              <details className="rounded-xl border bg-card p-4">
+                <summary className="cursor-pointer font-semibold">
+                  Gestionar asociaciones y seguimiento
+                </summary>
+                <div className="mt-3 space-y-3">
+                  {followedMatches.length > 0 && (
+                    <MatchesSection side="vehicle" matches={followedMatches} defaultOpen />
+                  )}
+                  {earlierMatches.length > 0 && (
+                    <section>
+                      <h3 className="font-semibold">Seguimiento anterior</h3>
+                      <ul>
+                        {earlierMatches.map((m) => (
+                          <li key={m.id}>
+                            <Link
+                              className="text-sm text-brand underline"
+                              href={'/compradores/' + m.buyerLead.id}
+                            >
+                              {personLabel(m.buyerLead.name, {
+                                role: 'Comprador sin identificar',
+                                id: m.buyerLead.id,
+                              })}
+                            </Link>
+                          </li>
+                        ))}
+                      </ul>
+                    </section>
+                  )}
+                  {v && (
+                    <ManualAssociationsCard
+                      side="vehicle"
+                      fixedId={v.id}
+                      entries={vehicleMatches
+                        .filter((m) => m.generatedBy === 'manual')
+                        .map((m) => ({
+                          id: m.id,
+                          label: personLabel(m.buyerLead.name, {
+                            role: 'Comprador sin identificar',
+                            id: m.buyerLead.id,
+                          }),
+                          href: `/compradores/${m.buyerLead.id}`,
+                          detail: `Manual${m.status === 'RECHAZADO' ? ' · Rechazado' : ''}`,
+                        }))}
+                      listHref={`/vendedores/${lead.id}?tab=compradores`}
+                      disabledReason={
+                        subjectVehicleEligible
+                          ? undefined
+                          : 'Disponible para vehículos tasados o publicados, con entrada validada y vendedor activo.'
+                      }
+                    />
+                  )}
+                </div>
+              </details>
+              <section
+                id="venta-ofertas"
+                className="scroll-mt-16"
+                aria-label="Operaciones del vehículo"
+              >
+                {' '}
+                <OffersSection
                   side="vehicle"
                   fixedId={v.id}
-                  entries={vehicleMatches
-                    .filter((m) => m.generatedBy === 'manual')
-                    .map((m) => ({
-                      id: m.id,
-                      label: personLabel(m.buyerLead.name, {
-                        role: 'Comprador sin identificar',
-                        id: m.buyerLead.id,
-                      }),
-                      href: `/compradores/${m.buyerLead.id}`,
-                      detail: `Manual${m.status === 'RECHAZADO' ? ' · Rechazado' : ''}`,
-                    }))}
-                  listHref={`/vendedores/${lead.id}?tab=compradores`}
-                  disabledReason={
-                    subjectVehicleEligible
-                      ? undefined
-                      : 'Disponible para vehículos tasados o publicados, con entrada validada y vendedor activo.'
-                  }
+                  candidates={offerCandidates}
+                  offers={offerRows}
                 />
-              )}
-              {/* Demanda activa (Block 19) — el argumento de captación */}
-              {v && activeDemandCount > 0 && (
-                <div className="p-5">
-                  <p className="mb-2 font-mono text-[10px] uppercase tracking-[0.12em] text-muted-foreground">
-                    Demanda activa
-                  </p>
-                  <Link
-                    href={`/vendedores/${lead.id}?tab=compradores`}
-                    className="flex items-center gap-3 rounded-lg border border-emerald-200 bg-emerald-50 p-3 transition-colors hover:bg-emerald-100 dark:border-emerald-900/40 dark:bg-emerald-950/30"
-                  >
-                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-emerald-600 text-sm font-bold text-white">
-                      {activeDemandCount}
-                    </div>
-                    <div className="min-w-0">
-                      <p className="text-sm font-semibold text-emerald-800 dark:text-emerald-300">
-                        {activeDemandCount} comprador{activeDemandCount === 1 ? '' : 'es'} esperando
-                      </p>
-                      <p className="text-xs text-emerald-700/80 dark:text-emerald-400/70">
-                        Compatibles y activos · ver compradores →
-                      </p>
-                    </div>
-                  </Link>
-                </div>
-              )}
-
+              </section>
               <CompletedSaleCard side="seller" sales={v.deliveries} />
             </div>
           )}
@@ -1376,6 +1434,7 @@ export default async function FichaVendedorPage({
           )}
 
           {/* ─────────────── PUBLICACIÓN ─────────────── */}
+          {activeTab === 'publicacion' && portalPanel}
           {activeTab === 'publicacion' && v && (
             <Card>
               <CardHeader>

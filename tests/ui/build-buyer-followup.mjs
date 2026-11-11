@@ -16,6 +16,7 @@ async function main() {
       usage: 'tests/ui/buyer-usage-fixture.tsx',
       stock: 'tests/ui/buyer-stock-fixture.tsx',
       offers: 'tests/ui/buyer-offers-fixture.tsx',
+      sellerSale: 'tests/ui/seller-sale-fixture.tsx',
       sellerPreparation: 'tests/ui/seller-preparation-fixture.tsx',
       sellerFollowup: 'tests/ui/seller-followup-fixture.tsx',
       postventa: 'tests/ui/buyer-postventa-fixture.tsx',
@@ -62,6 +63,14 @@ async function main() {
             contents:
               'import React from "react"; export default function Image({src,alt}) { return React.createElement("img",{src,alt}) }',
             resolveDir: process.cwd(),
+          }))
+          plugin.onResolve(
+            { filter: /^@\/app\/\(backoffice\)\/vendedores\/\[id\]\/portal-actions$/ },
+            () => ({ path: 'listing', namespace: 'portal-fixture' })
+          )
+          plugin.onLoad({ filter: /.*/, namespace: 'portal-fixture' }, () => ({
+            contents:
+              'export const savePortalListing=(...args)=>window.portalFixture.save(...args)',
           }))
           const stockStubs = {
             '@/app/(backoffice)/ofertas/actions':

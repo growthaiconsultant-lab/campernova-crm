@@ -1,14 +1,10 @@
 'use client'
 
 import { useId, useState } from 'react'
-import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { Plus, HandCoins, ExternalLink } from 'lucide-react'
+import { Plus, HandCoins } from 'lucide-react'
 import { createOffer } from '@/app/(backoffice)/ofertas/actions'
-import { OFFER_STATUS_LABELS, OFFER_STATUS_COLORS, isReservation } from '@/lib/offers'
-import { OfferActions } from './offer-actions'
 import { BuyerOfferGroups } from './buyer-offer-groups'
-import { formatEur } from '@/lib/format/currency'
 import type { OfferStatus } from '@prisma/client'
 
 export type OfferRow = {
@@ -176,69 +172,15 @@ export function OffersSection({ side, fixedId, candidates, offers, initialDay }:
                 ? ' Asocia un vehículo disponible para registrar la primera oferta.'
                 : ' Genera un match primero para poder registrar una oferta.')}
           </p>
-        ) : side === 'buyer' ? (
+        ) : (
           <BuyerOfferGroups
+            counterpart={side === 'buyer' ? 'vehículo' : 'comprador'}
             offers={offers}
             initialDay={initialDay}
             onDone={() => router.refresh()}
           />
-        ) : (
-          <div className="space-y-3">
-            {offers.map((o) => (
-              <OfferCard key={o.id} offer={o} onDone={() => router.refresh()} />
-            ))}
-          </div>
         )}
       </div>
-    </div>
-  )
-}
-
-function OfferCard({ offer, onDone }: { offer: OfferRow; onDone: () => void }) {
-  const reservation = isReservation(offer.status, offer.depositAmount)
-  return (
-    <div id={`oferta-${offer.id}`} className="scroll-mt-20 rounded-lg border border-border p-4">
-      <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <div className="flex items-center gap-2">
-            <span className="text-[15px] font-bold text-foreground">{formatEur(offer.amount)}</span>
-            <span
-              className="rounded-full px-2 py-0.5 text-[10px] font-semibold"
-              style={{
-                background: `${OFFER_STATUS_COLORS[offer.status]}1a`,
-                color: OFFER_STATUS_COLORS[offer.status],
-              }}
-            >
-              {OFFER_STATUS_LABELS[offer.status]}
-            </span>
-            {reservation && (
-              <span className="rounded-full bg-cyan-100 px-2 py-0.5 text-[10px] font-semibold text-cyan-700">
-                Reserva
-              </span>
-            )}
-          </div>
-          <Link
-            href={offer.counterpartHref}
-            className="mt-1 inline-flex items-center gap-1 text-[12px] text-muted-foreground hover:underline"
-          >
-            {offer.counterpartLabel} <ExternalLink className="h-3 w-3" />
-          </Link>
-          {offer.depositAmount != null && (
-            <p className="mt-0.5 text-[12px] text-muted-foreground">
-              Señal: {formatEur(offer.depositAmount)}
-              {offer.reservedUntil &&
-                ` · reserva hasta ${new Date(offer.reservedUntil).toLocaleDateString('es-ES', {
-                  day: 'numeric',
-                  month: 'short',
-                  timeZone: 'Europe/Madrid',
-                })}`}
-            </p>
-          )}
-          {offer.notes && <p className="mt-1 text-[12px] text-foreground/80">{offer.notes}</p>}
-        </div>
-      </div>
-
-      <OfferActions offer={offer} onDone={onDone} />
     </div>
   )
 }
