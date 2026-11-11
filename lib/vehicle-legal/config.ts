@@ -21,3 +21,14 @@ export const PHOTO_CATEGORY_LABELS: Record<PhotoCategory, string> = {
   DETALLE: 'detalle',
   DOCUMENTAL: 'documental',
 }
+
+export function countPhotosByCategory(photos: ReadonlyArray<{ category?: PhotoCategory | null }>) {
+  const counts: Record<PhotoCategory, number> = {
+    EXTERIOR: 0,
+    INTERIOR: 0,
+    DETALLE: 0,
+    DOCUMENTAL: 0,
+  }
+  for (const photo of photos) if (photo.category) counts[photo.category]++
+  return counts
+}

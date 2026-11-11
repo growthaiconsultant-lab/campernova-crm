@@ -1,6 +1,7 @@
 import { beforeEach, expect, it, vi } from 'vitest'
 import { renderToStaticMarkup } from 'react-dom/server'
 import Page from './page'
+import { PUBLICADO_REQUIRED_DOCS } from '@/lib/vehicle-legal'
 const find = vi.hoisted(() => vi.fn())
 vi.mock('@/lib/auth', () => ({
   requireAgente: async () => ({ id: 'a', role: 'AGENTE', name: 'Comercial' }),
@@ -120,4 +121,106 @@ it.each([
   const html = await render(tab)
   expect(html).toContain(title)
   expect(html).not.toContain('Costes y margen')
+})
+
+const photos = Array.from({ length: 5 }, (_, i) => ({
+  id: 'p' + i,
+  order: i,
+  url: '/qa-photo-' + i + '.jpg',
+  category: null,
+}))
+const documents = PUBLICADO_REQUIRED_DOCS.map((category) => ({
+  id: 'doc-' + category,
+  category,
+  name: category + '.pdf',
+  url: 'private/' + category,
+  fileSize: null,
+  mimeType: null,
+  createdAt: new Date(),
+  uploadedBy: null,
+}))
+const prepared = {
+  ...vehicle,
+  status: 'TASADO',
+  plate: '0000XXX',
+  vin: 'TEST',
+  chargeCheckedAt: new Date(),
+  itvValidUntil: new Date(Date.now() + 20 * 86400000),
+  purchasePrice: 42000,
+  documents,
+  photos,
+}
+it('presenta sólo bloqueos en el contador y mantiene los documentos anteriores, las fotos y los avisos', async () => {
+  const original = documents[0]
+  find.mockResolvedValue({
+    ...seller,
+    vehicle: {
+      ...prepared,
+      documents: [
+        ...documents.filter((d) => d.category !== 'PERMISO_CIRCULACION'),
+        { ...original, id: 'prev', name: 'Anterior.pdf' },
+      ],
+      photos: photos.slice(0, 3),
+    },
+  })
+  const html = await render('preparacion')
+  for (const value of [
+    'Quedan 2 pendientes para publicar',
+    'Adjuntar permiso',
+    'Faltan 2 fotos',
+    'Ya tenemos',
+    '6 de 7 recibidos',
+    'Anterior.pdf',
+    original.name,
+    'qa-photo-2',
+    'La ITV vence el',
+    'Más del expediente',
+  ])
+    expect(html).toContain(value)
+  expect(html).not.toContain('Listo para publicar')
+})
+it('mantiene el aviso cuando está listo y evita invitar a publicar un vehículo ya publicado', async () => {
+  find.mockResolvedValue({ ...seller, vehicle: prepared })
+  const ready = await render('preparacion')
+  for (const value of ['Listo para publicar', 'La ITV vence el', '7 de 7 recibidos', '>Publicar<'])
+    expect(ready).toContain(value)
+  find.mockResolvedValue({ ...seller, vehicle: { ...prepared, status: 'PUBLICADO' } })
+  const published = await render('preparacion')
+  expect(published).toContain('Vehículo publicado')
+  expect(published).not.toContain('Listo para publicar')
+})
+it('enlaza al taller y conserva la distinción entre fecha de ITV vencida e informe guardado', async () => {
+  find.mockResolvedValue({
+    ...seller,
+    vehicle: {
+      ...prepared,
+      itvValidUntil: new Date('2020-03-01'),
+      workOrders: [
+        { id: 'orden-qa', description: 'Revisar frenos', status: 'EN_CURSO', kind: 'REPARACION' },
+      ],
+    },
+  })
+  const html = await render('preparacion')
+  for (const value of [
+    'Quedan 2 pendientes',
+    'ITV vencida',
+    '7 de 7 recibidos',
+    '/taller/orden-qa',
+    'Lo completa Administración',
+  ])
+    expect(html).toContain(value)
+})
+it('sin vehículo mantiene accesibles los documentos del vendedor', async () => {
+  const html = await render('preparacion')
+  expect(html).toContain('Sin vehículo vinculado. Puedes consultar')
+  expect(html).toContain('Documentos vinculados al vendedor')
+  expect(html).not.toContain('Listo para publicar')
+})
+
+it('un vendedor archivado no recibe una invitación de publicación aunque el expediente esté completo', async () => {
+  find.mockResolvedValue({ ...seller, archivedAt: new Date(), vehicle: prepared })
+  const html = await render('preparacion')
+  expect(html).toContain('Ficha del vendedor archivada')
+  expect(html).not.toContain('Listo para publicar')
+  expect(html).not.toContain('>Publicar<')
 })

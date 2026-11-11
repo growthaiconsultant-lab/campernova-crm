@@ -46,7 +46,9 @@ import { VehicleLegalFieldsForm } from '@/components/vehicle-legal/vehicle-legal
 import { VehicleDocumentsList } from '@/components/vehicle-legal/vehicle-documents-list'
 import type { VehicleDocumentItem } from '@/components/vehicle-legal/vehicle-documents-list'
 import { MissingForPublishCard } from '@/components/vehicle-legal/missing-for-publish-card'
-import { CompletionBadge } from '@/components/vehicle-legal/completion-badge'
+import { countPhotosByCategory } from '@/lib/vehicle-legal/config'
+import { PUBLICADO_REQUIRED_DOCS, listMissingRequirements } from '@/lib/vehicle-legal'
+import { WORK_ORDER_STATUS_LABELS } from '@/lib/taller/transitions'
 import { calculateCompletionPercent, DOC_LABELS } from '@/lib/vehicle-legal'
 import type { VehicleLegalInput, DocumentSummary } from '@/lib/vehicle-legal'
 import {
@@ -160,7 +162,7 @@ export default async function FichaVendedorPage({
               where: {
                 status: { in: ['PENDIENTE', 'EN_DIAGNOSTICO', 'PRESUPUESTADA', 'EN_CURSO'] },
               },
-              select: { id: true, kind: true },
+              select: { id: true, kind: true, description: true, status: true },
             },
           },
         },
@@ -314,6 +316,7 @@ export default async function FichaVendedorPage({
         purchasePrice: v.purchasePrice,
         salePrice: v.salePrice,
         photoCount: v.photos.length,
+        photosByCategory: countPhotosByCategory(v.photos),
         workOrdersBlockingCount: v.workOrders?.length ?? 0,
       }
     : null
@@ -337,6 +340,27 @@ export default async function FichaVendedorPage({
     exists: (v?.documents ?? []).some((d) => d.category === cat),
   }))
 
+  const missingForPublication =
+    activeTab === 'preparacion' && legalInput
+      ? listMissingRequirements(legalInput, 'PUBLICADO', docSummary)
+      : []
+  const receivedCount = PUBLICADO_REQUIRED_DOCS.filter((cat) =>
+    docSummary.some((doc) => doc.category === cat && doc.exists)
+  ).length
+  const dataChecks = [
+    ['plate', 'Matrícula'],
+    ['vin', 'Número de bastidor'],
+    ['desiredPrice', 'Precio deseado'],
+    ['purchasePrice', 'Precio de compra'],
+    ['salePrice', 'Precio de venta'],
+    ['itvValidUntil', 'ITV en vigor'],
+    ['chargeCheckedAt', 'Verificación de cargas DGT'],
+    ['workOrders', 'Taller sin órdenes pendientes'],
+  ]
+  const passedChecks = dataChecks.filter(
+    ([field]) =>
+      !missingForPublication.some((req) => req.field === field && req.severity === 'error')
+  )
   const completionPct = legalInput ? calculateCompletionPercent(legalInput, docSummary) : 0
 
   // Score e insights
@@ -765,7 +789,7 @@ export default async function FichaVendedorPage({
                     {/* Listo para publicar */}
                     <div className="rounded-xl border border-border bg-card px-4 py-3">
                       <p className="mb-1 font-mono text-[10px] uppercase tracking-[0.12em] text-muted-foreground">
-                        Listo p/ publicar
+                        Expediente completado
                       </p>
                       <p
                         className={`text-xl font-bold tracking-[-0.02em] ${completionPct >= 90 ? 'text-green-600' : completionPct >= 60 ? 'text-amber-500' : 'text-muted-foreground'}`}
@@ -960,67 +984,248 @@ export default async function FichaVendedorPage({
               ))}
             </nav>
           )}
-          {/* ─────────────── PREPARACIÓN · datos ─────────────── */}
-          {activeTab === 'preparacion' && (
-            <details className="rounded-xl border bg-card p-4">
-              <summary className="cursor-pointer py-1 font-semibold">
-                Datos del vendedor y del vehículo
-              </summary>
-              <div className="mt-3">
-                {' '}
-                <div className="grid gap-6 lg:grid-cols-2">
-                  <Card>
-                    <CardHeader>
-                      <CardTitle className="text-base">Datos del vendedor</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <SellerLeadEditForm
-                        leadId={lead.id}
-                        defaultValues={leadDefaultValues}
-                        agents={agents}
-                        isAdmin={isAdmin}
-                      />
-                    </CardContent>
-                  </Card>
-                  {v && vehicleDefaultValues && (
-                    <Card>
-                      <CardHeader>
-                        <CardTitle className="text-base">Datos del vehículo</CardTitle>
-                      </CardHeader>
-                      <CardContent>
-                        <VehicleEditForm
-                          key={v.updatedAt.toISOString()}
-                          version={v.updatedAt.toISOString()}
-                          vehicleId={v.id}
-                          defaultValues={vehicleDefaultValues}
-                          catalog={readCatalog(v.matchCatalog)}
-                        />
-                      </CardContent>
-                    </Card>
+          {activeTab === 'preparacion' && v && legalInput && (
+            <>
+              <MissingForPublishCard
+                vehicle={legalInput}
+                missing={missingForPublication}
+                archived={!!lead.archivedAt}
+                sellerId={lead.id}
+                isAdmin={isAdmin}
+                vehicleStatus={v.status}
+              />
+              <section
+                aria-labelledby="prep-received"
+                className="space-y-2 rounded-xl border bg-card p-4 sm:p-5"
+              >
+                <h2 id="prep-received" className="mb-2 font-semibold">
+                  Ya tenemos
+                </h2>
+                <details className="border-b pb-2">
+                  <summary className="cursor-pointer py-2 text-sm">
+                    <strong>Documentos del expediente</strong> · {receivedCount} de{' '}
+                    {PUBLICADO_REQUIRED_DOCS.length} recibidos
+                  </summary>
+                  <VehicleDocumentsList
+                    vehicleId={v.id}
+                    documents={docsForList}
+                    isAdmin={isAdmin}
+                    canUpload={isAgente}
+                  />
+                </details>
+                <details className="border-b pb-2">
+                  <summary className="cursor-pointer py-2 text-sm">
+                    <strong>Datos, precios y comprobaciones</strong> · {passedChecks.length} de{' '}
+                    {dataChecks.length} completos
+                  </summary>
+                  {passedChecks.length > 0 && (
+                    <ul className="my-3 flex flex-wrap gap-2">
+                      {passedChecks.map(([field, label]) => (
+                        <li
+                          key={field}
+                          className="rounded-md bg-sidebar-primary/5 px-2 py-1 text-xs"
+                        >
+                          ✓ {label}
+                        </li>
+                      ))}
+                    </ul>
                   )}
-                </div>
-              </div>
-            </details>
-          )}
-
-          {/* ─────────────── PREPARACIÓN · fotos ─────────────── */}
-          {activeTab === 'preparacion' && v && (
-            <details className="rounded-xl border bg-card p-4">
-              <summary className="cursor-pointer py-1 font-semibold">Fotos del vehículo</summary>
-              <div className="mt-3">
-                {' '}
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="text-base">Fotos del vehículo</CardTitle>
-                  </CardHeader>
-                  <CardContent>
+                  <div className="space-y-4">
+                    <VehicleLegalFieldsForm
+                      vehicleId={v.id}
+                      isAdmin={isAdmin}
+                      plate={v.plate ?? null}
+                      vin={v.vin ?? null}
+                      itvValidUntil={v.itvValidUntil ?? null}
+                      titleTransferredAt={v.titleTransferredAt ?? null}
+                      chargeCheckedAt={v.chargeCheckedAt ?? null}
+                      chargeCheckedByName={v.chargeCheckedBy?.name ?? null}
+                    />
+                    <div id="prep-workshop" tabIndex={-1} className="rounded-xl border p-4">
+                      <p className="text-sm font-medium text-cn-ink-700">Taller</p>
+                      <ul className="divide-y">
+                        {v.workOrders.map((order) => (
+                          <li key={order.id} className="py-2">
+                            <Link
+                              className="text-sm text-sidebar-primary underline"
+                              href={'/taller/' + order.id}
+                            >
+                              {order.description || 'Ver orden de taller'} ·{' '}
+                              {WORK_ORDER_STATUS_LABELS[order.status]}
+                            </Link>
+                          </li>
+                        ))}
+                      </ul>
+                      <p className="text-cn-ink-400 mt-0.5 text-xs">
+                        Crea una orden de trabajo para preparar este vehículo. Luego podrás
+                        planificarla y bloquearla en la agenda del taller.
+                      </p>
+                      <a
+                        href={`/taller/nueva?vehicleId=${v.id}`}
+                        className="mt-3 inline-flex h-9 items-center rounded-lg bg-primary px-4 text-sm font-medium text-white hover:opacity-90"
+                      >
+                        Crear orden de taller
+                      </a>
+                    </div>
+                  </div>
+                </details>
+                <details>
+                  <summary className="cursor-pointer py-2 text-sm">
+                    <strong>Galería del vehículo</strong> · {v.photos.length}{' '}
+                    {v.photos.length === 1 ? 'foto' : 'fotos'}
+                  </summary>
+                  <div id="prep-gallery" tabIndex={-1}>
                     <VehiclePhotoUploader vehicleId={v.id} initialPhotos={v.photos} />
-                  </CardContent>
-                </Card>
+                  </div>
+                </details>
+              </section>
+            </>
+          )}
+          {activeTab === 'preparacion' && !v && (
+            <p className="rounded-xl border bg-card p-4">
+              Sin vehículo vinculado. Puedes consultar los datos y los documentos del vendedor.
+            </p>
+          )}
+          {activeTab === 'preparacion' && (
+            <details className="rounded-xl border bg-card p-4" open={!v}>
+              <summary className="cursor-pointer py-1 font-semibold">Más del expediente</summary>
+              <div className="mt-2 space-y-3">
+                {/* ─────────────── PREPARACIÓN · datos ─────────────── */}
+                <details className="rounded-xl border bg-card p-4">
+                  <summary className="cursor-pointer py-1 font-semibold">
+                    Datos del vendedor y del vehículo
+                  </summary>
+                  <div className="mt-3">
+                    <div className="grid gap-6 lg:grid-cols-2">
+                      <Card>
+                        <CardHeader>
+                          <CardTitle className="text-base">Datos del vendedor</CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                          <SellerLeadEditForm
+                            leadId={lead.id}
+                            defaultValues={leadDefaultValues}
+                            agents={agents}
+                            isAdmin={isAdmin}
+                          />
+                        </CardContent>
+                      </Card>
+                      {v && vehicleDefaultValues && (
+                        <Card>
+                          <CardHeader>
+                            <CardTitle className="text-base">Datos del vehículo</CardTitle>
+                          </CardHeader>
+                          <CardContent>
+                            <VehicleEditForm
+                              key={v.updatedAt.toISOString()}
+                              version={v.updatedAt.toISOString()}
+                              vehicleId={v.id}
+                              defaultValues={vehicleDefaultValues}
+                              catalog={readCatalog(v.matchCatalog)}
+                            />
+                          </CardContent>
+                        </Card>
+                      )}
+                    </div>
+                  </div>
+                </details>
+
+                {/* ─────────────── PREPARACIÓN · expediente ─────────────── */}
+                {isAgente && (
+                  <details className="rounded-xl border bg-card p-4">
+                    <summary className="cursor-pointer py-1 font-semibold">
+                      Documentos del vendedor y del vehículo
+                    </summary>
+                    <div className="mt-3">
+                      <div className="space-y-5 pb-5">
+                        {v && (
+                          <>
+                            <h3 className="font-medium">Documentos vinculados al vehículo</h3>
+                            <DocumentsPanel
+                              key={v.id}
+                              initialTarget={{ type: 'vehicle', id: v.id }}
+                              fixedTarget
+                            />
+                          </>
+                        )}
+                        <h3 className="font-medium">Documentos vinculados al vendedor</h3>
+                        <DocumentsPanel
+                          key={params.id}
+                          initialTarget={{ type: 'sellerLead', id: params.id }}
+                          fixedTarget
+                        />
+                      </div>
+                    </div>
+                  </details>
+                )}
+                {/* ─────────────── ENTRADA OFICIAL (PR-A2, corrección 7.5) ─────────────── */}
+                {v && isAgente && (
+                  <details className="rounded-xl border bg-card p-4">
+                    <summary className="cursor-pointer py-1 font-semibold">Entrada oficial</summary>
+                    <div className="mt-3">
+                      <Card className="mt-6">
+                        <CardHeader>
+                          <CardTitle className="text-base">Entrada oficial</CardTitle>
+                          <CardDescription>
+                            Registra la llegada física, clasifica los documentos, valida la entrada
+                            en custodia (crea la orden de inspección) y, si procede, anúlala.
+                          </CardDescription>
+                        </CardHeader>
+                        <CardContent>
+                          <EntryPanel
+                            vehicleId={v.id}
+                            isAdmin={isAdmin}
+                            responsibleName={lead.agent?.name ?? null}
+                            arrivalAt={
+                              v.physicalArrivalAt ? v.physicalArrivalAt.toISOString() : null
+                            }
+                            arrivalByName={v.physicalArrivalBy?.name ?? null}
+                            validatedAt={
+                              v.entryValidatedAt ? v.entryValidatedAt.toISOString() : null
+                            }
+                            validatedByName={v.entryValidatedBy?.name ?? null}
+                            annulledAt={v.entryAnnulledAt ? v.entryAnnulledAt.toISOString() : null}
+                            annulledByName={v.entryAnnulledBy?.name ?? null}
+                            annulmentReason={v.entryAnnulmentReason ?? null}
+                            annulmentNotes={v.entryAnnulmentNotes ?? null}
+                            keysCount={v.keysCount ?? null}
+                            keysLocation={v.keysLocation ?? null}
+                            keysNotes={v.keysNotes ?? null}
+                            parkingLocation={v.naveLocation ?? null}
+                            checklist={entryChecklist}
+                            inspectionOrderId={inspectionOrderId}
+                          />
+                        </CardContent>
+                      </Card>
+                    </div>
+                  </details>
+                )}
+
+                {/* ─────────────── TRUST PASSPORT (Block 20) ─────────────── */}
+                {v && trustPassport && (
+                  <details className="rounded-xl border bg-card p-4">
+                    <summary className="cursor-pointer py-1 font-semibold">
+                      Pasaporte de confianza
+                    </summary>
+                    <div className="mt-3">
+                      <div className="mt-6">
+                        <TrustPassportPanel
+                          vehicleId={v.id}
+                          sections={trustPassport.sections}
+                          score={trustPassport.score}
+                          level={trustPassport.level}
+                          eligibleForSeal={trustPassport.eligibleForSeal}
+                          blockers={trustPassport.blockers}
+                          sealedAt={v.trustVerifiedAt ? v.trustVerifiedAt.toISOString() : null}
+                          sealedByName={v.trustVerifiedBy?.name ?? null}
+                        />
+                      </div>
+                    </div>
+                  </details>
+                )}
               </div>
             </details>
           )}
-
           {/* ─────────────── COMPRADORES ─────────────── */}
           {activeTab === 'compradores' && v && (
             <div className="space-y-5">
@@ -1101,172 +1306,6 @@ export default async function FichaVendedorPage({
                 )}
               </CardContent>
             </Card>
-          )}
-
-          {/* ─────────────── PREPARACIÓN · expediente ─────────────── */}
-          {activeTab === 'preparacion' && isAgente && (
-            <details className="rounded-xl border bg-card p-4">
-              <summary className="cursor-pointer py-1 font-semibold">
-                Documentos del vendedor y del vehículo
-              </summary>
-              <div className="mt-3">
-                {' '}
-                <div className="space-y-5 pb-5">
-                  {v && (
-                    <>
-                      <h3 className="font-medium">Documentos vinculados al vehículo</h3>
-                      <DocumentsPanel
-                        key={v.id}
-                        initialTarget={{ type: 'vehicle', id: v.id }}
-                        fixedTarget
-                      />
-                    </>
-                  )}
-                  <h3 className="font-medium">Documentos vinculados al vendedor</h3>
-                  <DocumentsPanel
-                    key={params.id}
-                    initialTarget={{ type: 'sellerLead', id: params.id }}
-                    fixedTarget
-                  />
-                </div>
-              </div>
-            </details>
-          )}
-          {activeTab === 'preparacion' && v && legalInput && isAgente && (
-            <details className="rounded-xl border bg-card p-4">
-              <summary className="cursor-pointer py-1 font-semibold">
-                Expediente legal y taller
-              </summary>
-              <div className="mt-3">
-                {' '}
-                <Card>
-                  <CardHeader>
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <CardTitle className="text-base">Expediente legal</CardTitle>
-                        <CardDescription>
-                          Documentación obligatoria para publicar y vender el vehículo legalmente.
-                        </CardDescription>
-                      </div>
-                      <CompletionBadge percent={completionPct} />
-                    </div>
-                  </CardHeader>
-                  <CardContent className="space-y-6">
-                    <div>
-                      <p className="mb-3 text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                        Datos legales del vehículo
-                      </p>
-                      <VehicleLegalFieldsForm
-                        vehicleId={v.id}
-                        isAdmin={isAdmin}
-                        plate={v.plate ?? null}
-                        vin={v.vin ?? null}
-                        itvValidUntil={v.itvValidUntil ?? null}
-                        titleTransferredAt={v.titleTransferredAt ?? null}
-                        chargeCheckedAt={v.chargeCheckedAt ?? null}
-                        chargeCheckedByName={v.chargeCheckedBy?.name ?? null}
-                      />
-                    </div>
-                    <div>
-                      <p className="mb-3 text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                        Documentos del expediente
-                      </p>
-                      <VehicleDocumentsList
-                        vehicleId={v.id}
-                        documents={docsForList}
-                        isAdmin={isAdmin}
-                        canUpload={isAgente}
-                      />
-                    </div>
-                    {isAgente && (
-                      <MissingForPublishCard
-                        vehicle={legalInput}
-                        docs={docSummary}
-                        vehicleStatus={v.status}
-                        canPublish={isAgente}
-                      />
-                    )}
-                    <div className="rounded-xl border border-cn-line p-4">
-                      <p className="text-sm font-medium text-cn-ink-700">Taller</p>
-                      <p className="text-cn-ink-400 mt-0.5 text-xs">
-                        Crea una orden de trabajo para preparar este vehículo. Luego podrás
-                        planificarla y bloquearla en la agenda del taller.
-                      </p>
-                      <a
-                        href={`/taller/nueva?vehicleId=${v.id}`}
-                        className="mt-3 inline-flex h-9 items-center rounded-lg bg-primary px-4 text-sm font-medium text-white hover:opacity-90"
-                      >
-                        Crear orden de taller
-                      </a>
-                    </div>
-                  </CardContent>
-                </Card>
-              </div>
-            </details>
-          )}
-
-          {/* ─────────────── ENTRADA OFICIAL (PR-A2, corrección 7.5) ─────────────── */}
-          {activeTab === 'preparacion' && v && isAgente && (
-            <details className="rounded-xl border bg-card p-4">
-              <summary className="cursor-pointer py-1 font-semibold">Entrada oficial</summary>
-              <div className="mt-3">
-                {' '}
-                <Card className="mt-6">
-                  <CardHeader>
-                    <CardTitle className="text-base">Entrada oficial</CardTitle>
-                    <CardDescription>
-                      Registra la llegada física, clasifica los documentos, valida la entrada en
-                      custodia (crea la orden de inspección) y, si procede, anúlala.
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <EntryPanel
-                      vehicleId={v.id}
-                      isAdmin={isAdmin}
-                      responsibleName={lead.agent?.name ?? null}
-                      arrivalAt={v.physicalArrivalAt ? v.physicalArrivalAt.toISOString() : null}
-                      arrivalByName={v.physicalArrivalBy?.name ?? null}
-                      validatedAt={v.entryValidatedAt ? v.entryValidatedAt.toISOString() : null}
-                      validatedByName={v.entryValidatedBy?.name ?? null}
-                      annulledAt={v.entryAnnulledAt ? v.entryAnnulledAt.toISOString() : null}
-                      annulledByName={v.entryAnnulledBy?.name ?? null}
-                      annulmentReason={v.entryAnnulmentReason ?? null}
-                      annulmentNotes={v.entryAnnulmentNotes ?? null}
-                      keysCount={v.keysCount ?? null}
-                      keysLocation={v.keysLocation ?? null}
-                      keysNotes={v.keysNotes ?? null}
-                      parkingLocation={v.naveLocation ?? null}
-                      checklist={entryChecklist}
-                      inspectionOrderId={inspectionOrderId}
-                    />
-                  </CardContent>
-                </Card>
-              </div>
-            </details>
-          )}
-
-          {/* ─────────────── TRUST PASSPORT (Block 20) ─────────────── */}
-          {activeTab === 'preparacion' && v && trustPassport && (
-            <details className="rounded-xl border bg-card p-4">
-              <summary className="cursor-pointer py-1 font-semibold">
-                Pasaporte de confianza
-              </summary>
-              <div className="mt-3">
-                {' '}
-                <div className="mt-6">
-                  <TrustPassportPanel
-                    vehicleId={v.id}
-                    sections={trustPassport.sections}
-                    score={trustPassport.score}
-                    level={trustPassport.level}
-                    eligibleForSeal={trustPassport.eligibleForSeal}
-                    blockers={trustPassport.blockers}
-                    sealedAt={v.trustVerifiedAt ? v.trustVerifiedAt.toISOString() : null}
-                    sealedByName={v.trustVerifiedBy?.name ?? null}
-                  />
-                </div>
-              </div>
-            </details>
           )}
 
           {/* ─────────────── PUBLICACIÓN ─────────────── */}
@@ -1351,7 +1390,7 @@ export default async function FichaVendedorPage({
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-6">
-                <div>
+                <div id="precios-vehiculo" className="scroll-mt-24">
                   <p className="mb-3 text-xs font-medium uppercase tracking-wide text-muted-foreground">
                     Precios y objetivo
                   </p>

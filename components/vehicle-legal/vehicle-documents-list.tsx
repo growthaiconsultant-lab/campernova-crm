@@ -4,7 +4,6 @@ import { useRef, useTransition } from 'react'
 import { toast } from 'sonner'
 import { FileText, Upload, Trash2, ExternalLink, AlertCircle } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { Label } from '@/components/ui/label'
 import {
   uploadVehicleDocument,
   deleteVehicleDocument,
@@ -93,13 +92,15 @@ function UploadInline({
         onChange={handleFile}
         disabled={isPending}
       />
-      <Label
-        htmlFor={`upload-${category}`}
+      <button
+        type="button"
+        onClick={() => inputRef.current?.click()}
+        disabled={isPending}
         className="inline-flex cursor-pointer items-center gap-1.5 rounded-md border border-dashed px-3 py-1.5 text-xs text-muted-foreground transition-colors hover:border-foreground hover:text-foreground"
       >
         <Upload className="h-3 w-3" />
         {isPending ? 'Subiendo…' : 'Subir documento'}
-      </Label>
+      </button>
     </div>
   )
 }
@@ -179,41 +180,58 @@ export function VehicleDocumentsList({ vehicleId, documents, isAdmin, canUpload 
     byCategory.set(doc.category, [...existing, doc])
   }
 
-  return (
-    <div className="space-y-3">
-      {ALL_CATEGORIES.map((cat) => {
-        const docs = byCategory.get(cat) ?? []
-        const isRequired = REQUIRED.has(cat)
-        const hasDocs = docs.length > 0
+  function categoryRow(cat: VehicleDocumentCategory) {
+    const docs = byCategory.get(cat) ?? []
+    const isRequired = REQUIRED.has(cat)
+    const hasDocs = docs.length > 0
 
-        return (
-          <div key={cat} className="space-y-1.5">
-            <div className="flex items-center justify-between gap-2">
-              <div className="flex items-center gap-1.5">
-                <p className="text-xs font-medium">{DOC_LABELS[cat]}</p>
-                {isRequired && !hasDocs && (
-                  <span className="inline-flex items-center gap-0.5 rounded-full bg-amber-50 px-1.5 py-0.5 text-[10px] font-medium text-amber-700">
-                    <AlertCircle className="h-2.5 w-2.5" />
-                    Pendiente
-                  </span>
-                )}
-                {!isRequired && !hasDocs && (
-                  <span className="text-[10px] text-muted-foreground">Opcional</span>
-                )}
-              </div>
-              {canUpload && !hasDocs && <UploadInline vehicleId={vehicleId} category={cat} />}
-            </div>
-            {hasDocs && (
-              <div className="space-y-1">
-                {docs.map((d) => (
-                  <DocumentCard key={d.id} doc={d} isAdmin={isAdmin} />
-                ))}
-                {canUpload && <UploadInline vehicleId={vehicleId} category={cat} />}
-              </div>
+    return (
+      <div key={cat} id={`prep-doc-${cat}`} tabIndex={-1} className="scroll-mt-24 space-y-1.5">
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex items-center gap-1.5">
+            <p className="text-xs font-medium">{DOC_LABELS[cat]}</p>
+            {isRequired && !hasDocs && (
+              <span className="inline-flex items-center gap-0.5 rounded-full bg-amber-50 px-1.5 py-0.5 text-[10px] font-medium text-amber-700">
+                <AlertCircle className="h-2.5 w-2.5" />
+                Pendiente
+              </span>
+            )}
+            {!isRequired && !hasDocs && (
+              <span className="text-[10px] text-muted-foreground">Opcional</span>
             )}
           </div>
-        )
-      })}
+          {canUpload && !hasDocs && <UploadInline vehicleId={vehicleId} category={cat} />}
+        </div>
+        {hasDocs && (
+          <div className="space-y-1">
+            {docs.map((d) => (
+              <DocumentCard key={d.id} doc={d} isAdmin={isAdmin} />
+            ))}
+            {canUpload && <UploadInline vehicleId={vehicleId} category={cat} />}
+          </div>
+        )}
+      </div>
+    )
+  }
+  const received = ALL_CATEGORIES.filter((cat) => byCategory.has(cat))
+  const empty = ALL_CATEGORIES.filter((cat) => !byCategory.has(cat))
+  return (
+    <div className="space-y-4">
+      {received.length ? (
+        received.map(categoryRow)
+      ) : (
+        <p className="text-sm text-muted-foreground">
+          Todavía no hay archivos en el expediente legal.
+        </p>
+      )}
+      {empty.length > 0 && canUpload && (
+        <details>
+          <summary className="cursor-pointer py-2 text-sm font-medium">
+            Adjuntar otro tipo de documento
+          </summary>
+          <div className="space-y-3">{empty.map(categoryRow)}</div>
+        </details>
+      )}
     </div>
   )
 }
