@@ -4,6 +4,10 @@ import { VEHICLE_STATUS_LABELS } from './state-machine'
 import { formatEur } from './format/currency'
 
 export const inventoryTypes = { CAMPER: 'Camper', AUTOCARAVANA: 'Autocaravana' }
+export const inventoryPriceStates = {
+  missing: 'Sin precio de venta',
+  priced: 'Con precio de venta',
+}
 export const inventoryOrders = {
   'createdAt:desc': 'Últimas altas',
   'createdAt:asc': 'Primeras altas',
@@ -19,6 +23,7 @@ export const emptyCriteria = {
   brand: '',
   type: '',
   status: '',
+  priceState: '',
   priceMax: '',
   yearMin: '',
   yearMax: '',
@@ -37,7 +42,7 @@ export function readInventoryParams(params: InventoryParams) {
   }
   const criteria = { ...emptyCriteria }
   for (const key of criteriaKeys) criteria[key] = read(key)
-  criteria.priceMax = criteria.priceMax.replace(',', '.')
+  criteria.priceMax = criteria.priceState === 'missing' ? '' : criteria.priceMax.replace(',', '.')
   const sort = read('sort') || 'createdAt'
   const orderKey =
     (sort === 'valuationRecommended' ? 'salePrice' : sort) +
@@ -69,6 +74,7 @@ const inventorySchema = z
     origin: z
       .string()
       .refine((v) => !v || Object.hasOwn(VEHICLE_ORIGIN_LABELS, v), 'Revisa el origen.'),
+    priceState: z.enum(['', 'missing', 'priced']),
     priceMax: z
       .string()
       .refine(
@@ -115,6 +121,8 @@ export function criterionLabel(key: Criterion, value: string) {
       return 'Desde ' + value
     case 'yearMax':
       return 'Hasta ' + value
+    case 'priceState':
+      return inventoryPriceStates[value as keyof typeof inventoryPriceStates] ?? value
     case 'priceMax':
       return (
         'Hasta ' +

@@ -20,6 +20,8 @@ function filteredInventory(c: InventoryCriteria) {
   if (c.yearMin) conditions.push(Prisma.sql`v.year >= ${Number(c.yearMin)}`)
   if (c.yearMax) conditions.push(Prisma.sql`v.year <= ${Number(c.yearMax)}`)
   if (c.kmMax) conditions.push(Prisma.sql`v.km <= ${Number(c.kmMax)}`)
+  if (c.priceState === 'missing') conditions.push(Prisma.sql`v.sale_price IS NULL`)
+  if (c.priceState === 'priced') conditions.push(Prisma.sql`v.sale_price IS NOT NULL`)
   if (c.priceMax) conditions.push(Prisma.sql`v.sale_price <= ${c.priceMax}::numeric`)
   const tokens = c.brand
     .normalize('NFD')

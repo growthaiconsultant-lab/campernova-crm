@@ -7,6 +7,8 @@ import { VEHICLE_ORIGIN_LABELS } from '@/lib/seller-intake'
 import { vehicleLabel } from '@/lib/display'
 import { isVehicleEligible } from '@/lib/matching'
 import { VEHICLE_STATUS_LABELS } from '@/lib/state-machine'
+import { setMissingSalePrice } from '../vendedores/[id]/cost-actions'
+import { InventoryPriceEditor } from './inventory-price-editor'
 import { VehicleFilters } from './vehicle-filters'
 import { Eyebrow, EmptyState } from '@/components/redesign'
 import type { VehicleStatus } from '@prisma/client'
@@ -31,7 +33,7 @@ const STATUS_HEX: Record<VehicleStatus, string> = {
 }
 
 export default async function VehiculosPage({ searchParams }: { searchParams: InventoryParams }) {
-  await requireCanViewVehiculos()
+  const viewer = await requireCanViewVehiculos()
   const { criteria, order, page: requestedPage } = readInventoryParams(searchParams)
   const {
     vehicles,
@@ -96,81 +98,91 @@ export default async function VehiculosPage({ searchParams }: { searchParams: In
               : 0
             const reference = v.valuationRecommended ?? v.desiredPrice
             return (
-              <Link
+              <article
                 key={v.id}
-                href={`/vendedores/${v.sellerLead.id}`}
                 className="hover:border-ink3/40 group overflow-hidden rounded-[14px] border border-line bg-card transition-colors"
               >
-                {/* Foto */}
-                <div className="relative h-[140px] w-full overflow-hidden bg-track">
-                  {photo ? (
-                    <Image
-                      src={photo.url}
-                      alt={photo.altText ?? `${v.brand} ${v.model}`}
-                      fill
-                      className="object-cover"
-                      sizes="(max-width:640px) 100vw, (max-width:1024px) 50vw, 25vw"
-                    />
-                  ) : (
-                    <div className="flex h-full items-center justify-center text-ink3">
-                      <Package size={28} strokeWidth={1.5} />
-                    </div>
-                  )}
-                  <span
-                    className="absolute left-2.5 top-2.5 rounded-[6px] px-2 py-[3px] font-hanken text-[10.5px] font-semibold text-white"
-                    style={{ backgroundColor: STATUS_HEX[v.status] }}
-                  >
-                    {VEHICLE_STATUS_LABELS[v.status]}
-                  </span>
-                  {v.plate && (
-                    <span className="absolute right-2.5 top-2.5 rounded-[6px] bg-white/90 px-2 py-[3px] font-mono text-[10px] font-semibold text-ink2">
-                      {v.plate}
-                    </span>
-                  )}
-                </div>
-
-                {/* Cuerpo */}
-                <div className="p-3">
-                  <div className="truncate font-hanken text-[13.5px] font-semibold text-ink">
-                    {vehicleLabel(v)}
-                  </div>
-                  <div className="mt-0.5 font-mono text-[11px] text-ink3">
-                    {v.type ? (inventoryTypes[v.type] ?? v.type) : 'Sin tipo'}
-                    {v.km != null ? ` · ${v.km.toLocaleString('es-ES')} km` : ''}
-                  </div>
-                  <div className="mt-1.5">
+                <Link
+                  href={`/vendedores/${v.sellerLead.id}`}
+                  className="block focus-visible:outline-offset-[-3px]"
+                >
+                  {/* Foto */}
+                  <div className="relative h-[140px] w-full overflow-hidden bg-track">
+                    {photo ? (
+                      <Image
+                        src={photo.url}
+                        alt={photo.altText ?? `${v.brand} ${v.model}`}
+                        fill
+                        className="object-cover"
+                        sizes="(max-width:640px) 100vw, (max-width:1024px) 50vw, 25vw"
+                      />
+                    ) : (
+                      <div className="flex h-full items-center justify-center text-ink3">
+                        <Package size={28} strokeWidth={1.5} />
+                      </div>
+                    )}
                     <span
-                      className={`inline-flex rounded-[6px] px-2 py-[3px] font-hanken text-[10.5px] font-semibold ${
-                        v.sellerLead.canal === 'PRO'
-                          ? 'bg-brand-tint text-brand'
-                          : 'bg-track text-ink2'
-                      }`}
+                      className="absolute left-2.5 top-2.5 rounded-[6px] px-2 py-[3px] font-hanken text-[10.5px] font-semibold text-white"
+                      style={{ backgroundColor: STATUS_HEX[v.status] }}
                     >
-                      {VEHICLE_ORIGIN_LABELS[v.sellerLead.canal]}
+                      {VEHICLE_STATUS_LABELS[v.status]}
                     </span>
-                  </div>
-                  <div className="mt-2 flex items-center justify-between gap-2">
-                    <span className="font-hanken text-[15px] font-bold text-ink">
-                      <span className="block">
-                        {v.salePrice != null
-                          ? formatEur(Number(v.salePrice), 'cents')
-                          : 'Sin precio de venta'}
-                      </span>
-                      {v.salePrice == null && reference != null && (
-                        <span className="block text-xs font-normal text-ink2">
-                          {v.valuationRecommended != null ? 'Tasación' : 'Precio deseado'} ·{' '}
-                          {formatEur(Number(reference), 'cents')}
-                        </span>
-                      )}
-                    </span>
-                    {compatibleCount > 0 && (
-                      <span className="rounded-[6px] bg-brand-tint px-2 py-[3px] font-hanken text-[11px] font-semibold text-brand">
-                        {compatibleCount} compatible{compatibleCount === 1 ? '' : 's'}
+                    {v.plate && (
+                      <span className="absolute right-2.5 top-2.5 rounded-[6px] bg-white/90 px-2 py-[3px] font-mono text-[10px] font-semibold text-ink2">
+                        {v.plate}
                       </span>
                     )}
                   </div>
-                </div>
-              </Link>
+
+                  {/* Cuerpo */}
+                  <div className="p-3">
+                    <div className="truncate font-hanken text-[13.5px] font-semibold text-ink">
+                      {vehicleLabel(v)}
+                    </div>
+                    <div className="mt-0.5 font-mono text-[11px] text-ink3">
+                      {v.type ? (inventoryTypes[v.type] ?? v.type) : 'Sin tipo'}
+                      {v.km != null ? ` · ${v.km.toLocaleString('es-ES')} km` : ''}
+                    </div>
+                    <div className="mt-1.5">
+                      <span
+                        className={`inline-flex rounded-[6px] px-2 py-[3px] font-hanken text-[10.5px] font-semibold ${
+                          v.sellerLead.canal === 'PRO'
+                            ? 'bg-brand-tint text-brand'
+                            : 'bg-track text-ink2'
+                        }`}
+                      >
+                        {VEHICLE_ORIGIN_LABELS[v.sellerLead.canal]}
+                      </span>
+                    </div>
+                    <div className="mt-2 flex items-center justify-between gap-2">
+                      <span className="font-hanken text-[15px] font-bold text-ink">
+                        <span className="block">
+                          {v.salePrice != null
+                            ? formatEur(Number(v.salePrice), 'cents')
+                            : 'Sin precio de venta'}
+                        </span>
+                        {v.salePrice == null && reference != null && (
+                          <span className="block text-xs font-normal text-ink2">
+                            {v.valuationRecommended != null ? 'Tasación' : 'Precio deseado'} ·{' '}
+                            {formatEur(Number(reference), 'cents')}
+                          </span>
+                        )}
+                      </span>
+                      {compatibleCount > 0 && (
+                        <span className="rounded-[6px] bg-brand-tint px-2 py-[3px] font-hanken text-[11px] font-semibold text-brand">
+                          {compatibleCount} compatible{compatibleCount === 1 ? '' : 's'}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                </Link>
+                {viewer.role === 'ADMIN' && v.salePrice == null && (
+                  <InventoryPriceEditor
+                    label={vehicleLabel(v)}
+                    savePrice={setMissingSalePrice.bind(null, v.id)}
+                  />
+                )}
+              </article>
             )
           })}
         </div>

@@ -12,6 +12,7 @@ import {
   emptyCriteria,
   inventoryError,
   inventoryOrders,
+  inventoryPriceStates,
   inventoryTypes,
   inventoryUrl,
   type InventoryCriteria,
@@ -41,7 +42,11 @@ export function VehicleFilters({
   const dirty = criteriaKeys.some((k) => draft[k] !== applied[k])
 
   function field(key: Criterion, value: string) {
-    setDraft((previous) => ({ ...previous, [key]: value }))
+    setDraft((previous) => ({
+      ...previous,
+      [key]: value,
+      ...(key === 'priceState' && value === 'missing' ? { priceMax: '' } : {}),
+    }))
     setError('')
   }
   function navigate(next: InventoryCriteria, nextOrder: InventoryOrder) {
@@ -50,7 +55,7 @@ export function VehicleFilters({
     startTransition(() => router.push(inventoryUrl(next, nextOrder), { scroll: false }))
   }
   function select(
-    key: 'type' | 'status' | 'origin',
+    key: 'type' | 'status' | 'origin' | 'priceState',
     label: string,
     all: string,
     options: Record<string, string>
@@ -79,6 +84,7 @@ export function VehicleFilters({
         {label}
         <Input
           type="number"
+          disabled={key === 'priceMax' && draft.priceState === 'missing'}
           min="0"
           step={key === 'priceMax' ? '0.01' : '1'}
           value={draft[key]}
@@ -103,7 +109,7 @@ export function VehicleFilters({
         }}
       >
         <fieldset disabled={pending} className="space-y-3">
-          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
             <label className={labelClass}>
               Buscar vehículo
               <Input
@@ -115,7 +121,8 @@ export function VehicleFilters({
               />
             </label>
             {select('type', 'Tipo', 'Todos los tipos', inventoryTypes)}
-            {select('status', 'Estado', 'Todos los estados', VEHICLE_STATUS_LABELS)}
+            {select('status', 'Estado del vehículo', 'Todos los estados', VEHICLE_STATUS_LABELS)}
+            {select('priceState', 'Precio de venta', 'Todos', inventoryPriceStates)}
             {numeric('priceMax', 'Precio de venta máx. (€)')}
           </div>
           <details open={advanced} onToggle={(e) => setAdvanced(e.currentTarget.open)}>
