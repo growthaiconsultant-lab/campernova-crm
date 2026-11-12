@@ -38,6 +38,7 @@ function makeUser(role: User['role']): User {
     role,
     active: true,
     notifyOnNewLead: true,
+    entryInspectionCoordinator: false,
     lastMatchEmailAt: null,
     createdAt: new Date(),
     updatedAt: new Date(),

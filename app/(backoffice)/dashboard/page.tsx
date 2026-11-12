@@ -9,6 +9,7 @@ import { prismaCalendarDeps } from '@/lib/calendar/prisma-deps'
 import type { CalendarTone } from '@/lib/calendar/types'
 import { ForbiddenToast } from '@/components/forbidden-toast'
 import { CommercialHome } from './commercial-home'
+import { inspectionTasks } from '@/lib/dashboard/inspection-tasks'
 import { Card, KpiCard, ButtonLink } from '@/components/redesign'
 import { cn } from '@/lib/utils'
 
@@ -68,14 +69,16 @@ export default async function DashboardPage({
   const dayEnd = new Date(now)
   dayEnd.setHours(23, 59, 59, 999)
 
-  const [kpis, agendaItems] = await Promise.all([
+  const [kpis, agendaItems, inspections] = await Promise.all([
     getComercialKpis(db, agentId),
+    // Mantener la agenda existente de los perfiles operativos.
     getCalendarItems(
       prismaCalendarDeps(db),
       { from: dayStart, to: dayEnd },
       agentId ? { assigneeId: agentId } : {},
       now
     ),
+    currentUser.role === 'TALLER' ? inspectionTasks(db, currentUser.id) : [],
   ])
 
   const dateLine = now.toLocaleDateString('es-ES', {
@@ -121,6 +124,24 @@ export default async function DashboardPage({
       </div>
 
       {/* KPI cards */}
+      {currentUser.role === 'TALLER' && (
+        <section className="mb-4 rounded-xl border bg-card p-4">
+          <h2 className="font-semibold">Por hacer</h2>
+          {inspections.length ? (
+            <ul className="divide-y">
+              {inspections.map((row) => (
+                <li key={row.href}>
+                  <Link className="block py-3 text-brand underline" href={row.href}>
+                    {row.title}
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="text-sm text-ink2">Sin inspecciones de entrada pendientes.</p>
+          )}
+        </section>
+      )}
       <div className="mb-[18px] grid grid-cols-2 gap-3.5 lg:grid-cols-4">
         <KpiCard
           label="Tareas vencidas"

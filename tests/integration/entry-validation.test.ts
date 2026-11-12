@@ -30,6 +30,8 @@ import {
 } from '@/lib/entry'
 import { PUBLICADO_REQUIRED_DOCS } from '@/lib/vehicle-legal'
 import { createGuardedTestPrisma, uniqueSuffix } from './db'
+import { inspectionTasks } from '@/lib/dashboard/inspection-tasks'
+import { saveInspectionReviewTx } from '@/lib/entry/inspection-review'
 
 const PUBLICADO_REQUIRED_DOCS_FOR_TEST = PUBLICADO_REQUIRED_DOCS
 
@@ -270,6 +272,81 @@ afterAll(async () => {
 })
 
 describe('registerPhysicalArrivalTx · hito previo persistido (corrección 7.1)', () => {
+  it('asigna al llegar, guarda por elemento, conserva las fotos y reutiliza la orden ya terminada al validar', async () => {
+    const f = await seed({ withArrival: false })
+    const nerea = await prismaA.user.create({
+      data: {
+        email: uniqueSuffix() + '@integ.test',
+        name: 'Coordinación de prueba',
+        active: true,
+        role: 'ADMIN',
+        entryInspectionCoordinator: true,
+      },
+    })
+    try {
+      const arrival = await registerArrival(f, prismaA)
+      expect(arrival.inspectionAssigned).toBe(true)
+      const order = await prismaA.workOrder.findFirstOrThrow({
+        where: { vehicleId: f.vehicleId, kind: 'INSPECCION_ENTRADA' },
+      })
+      expect(order.assignedToId).toBe(nerea.id)
+      expect((await inspectionTasks(prismaA, nerea.id)).map((x) => x.href)).toContain(
+        '/taller/' + order.id + '#inspeccion-entrada'
+      )
+      expect((await inspectionTasks(prismaA, f.userId)).map((x) => x.href)).not.toContain(
+        '/taller/' + order.id + '#inspeccion-entrada'
+      )
+      const base = await prismaA.workOrderChecklist.findFirstOrThrow({
+        where: { workOrderId: order.id, item: 'Calefacción' },
+      })
+      const elem = await prismaA.workOrderChecklist.update({
+        where: { id: base.id },
+        data: { photos: ['foto-anterior'] },
+      })
+      const input = {
+        version: elem.updatedAt.toISOString(),
+        installed: true,
+        catalogAtLoad: elem.installed,
+        result: 'NECESITA_REPARACION' as const,
+        notes: 'No arranca',
+        ownerQuote: true,
+      }
+      const save = () =>
+        withLockedRoots(
+          buildEntryRoots({ vehicleId: f.vehicleId, sellerLeadId: f.sellerId }),
+          (tx) => saveInspectionReviewTx(tx, order.id, elem.id, input),
+          { client: prismaA }
+        )
+      expect(await save()).toHaveProperty('version')
+      expect(await save()).toHaveProperty('error')
+      expect(await prismaA.vehicle.findUniqueOrThrow({ where: { id: f.vehicleId } })).toMatchObject(
+        { matchCatalog: { heating: { values: ['Sí'] } } }
+      )
+      await registerArrival(f, prismaA)
+      expect(
+        await prismaA.workOrderChecklist.findUniqueOrThrow({ where: { id: elem.id } })
+      ).toMatchObject({
+        installed: true,
+        result: 'NECESITA_REPARACION',
+        ownerQuote: true,
+        notes: 'No arranca',
+        photos: ['foto-anterior'],
+      })
+      await prismaA.workOrder.update({ where: { id: order.id }, data: { status: 'COMPLETADA' } })
+      expect((await inspectionTasks(prismaA, nerea.id)).map((x) => x.href)).not.toContain(
+        '/taller/' + order.id + '#inspeccion-entrada'
+      )
+      expect((await validate(f, prismaA)).workOrderId).toBe(order.id)
+      expect(await prismaA.workOrder.count({ where: { vehicleId: f.vehicleId } })).toBe(1)
+      expect(
+        await prismaA.activity.count({
+          where: { sellerLeadId: f.sellerId, type: 'ORDEN_INSPECCION_CREADA' },
+        })
+      ).toBe(1)
+    } finally {
+      await prismaA.user.delete({ where: { id: nerea.id } })
+    }
+  })
   it('registra la llegada (fecha + actor) y habilita la validación', async () => {
     const f = await seed({ withArrival: false })
     // Sin llegada registrada, la validación se rechaza.
