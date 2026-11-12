@@ -8,6 +8,7 @@ interface Props {
   vehicleId: string
   desiredPrice: number | null
   purchasePrice: number | null
+  monthlyPaymentFrom: number | null
   salePrice: number | null
   marginPercent: number
 }
@@ -17,22 +18,30 @@ export function VehicleEconomicsForm({
   desiredPrice,
   purchasePrice,
   salePrice,
+  monthlyPaymentFrom,
   marginPercent,
 }: Props) {
   const [isPending, startTransition] = useTransition()
   const [purchase, setPurchase] = useState(purchasePrice?.toString() ?? '')
   const [sale, setSale] = useState(salePrice?.toString() ?? '')
+  const [monthly, setMonthly] = useState(monthlyPaymentFrom?.toString() ?? '')
   const [margin, setMargin] = useState(marginPercent.toString())
+
+  const [saved, setSaved] = useState({ purchase, sale, monthly, margin })
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     startTransition(async () => {
       const result = await updateVehicleEconomics(vehicleId, {
-        purchasePrice: purchase ? parseFloat(purchase) : null,
-        salePrice: sale ? parseFloat(sale) : null,
-        marginPercent: parseFloat(margin),
+        ...(purchase !== saved.purchase
+          ? { purchasePrice: purchase ? parseFloat(purchase) : null }
+          : {}),
+        ...(sale !== saved.sale ? { salePrice: sale ? parseFloat(sale) : null } : {}),
+        ...(monthly !== saved.monthly ? { monthlyPaymentFrom: monthly || null } : {}),
+        ...(margin !== saved.margin ? { marginPercent: parseFloat(margin) } : {}),
       })
       if (result.ok) {
+        setSaved({ purchase, sale, monthly, margin })
         toast.success('Datos económicos guardados.')
       } else {
         toast.error(result.error)
@@ -44,9 +53,9 @@ export function VehicleEconomicsForm({
     'h-10 w-full rounded-lg border border-cn-line bg-white px-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20'
 
   return (
-    <form onSubmit={handleSubmit} className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+    <form onSubmit={handleSubmit} className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
       {desiredPrice !== null && (
-        <div className="sm:col-span-3">
+        <div className="col-span-full">
           <p className="text-xs text-cn-ink-500">
             Precio pedido por el vendedor:{' '}
             <span className="font-medium">
@@ -88,6 +97,28 @@ export function VehicleEconomicsForm({
       </div>
 
       <div>
+        <label
+          htmlFor="monthly-payment-from"
+          className="mb-1.5 block text-xs font-medium text-cn-ink-700"
+        >
+          Cuota mensual desde (€)
+        </label>
+        <input
+          id="monthly-payment-from"
+          type="number"
+          step="0.01"
+          min="0.01"
+          max="99999999.99"
+          value={monthly}
+          onChange={(e) => setMonthly(e.target.value)}
+          className={inputClass}
+          aria-describedby="monthly-payment-hint"
+        />
+        <p id="monthly-payment-hint" className="mt-1 text-xs text-cn-ink-500">
+          Déjalo vacío para retirar la cuota de la web.
+        </p>
+      </div>
+      <div>
         <label className="mb-1.5 block text-xs font-medium text-cn-ink-700">
           Margen objetivo (%)
         </label>
@@ -102,7 +133,7 @@ export function VehicleEconomicsForm({
         />
       </div>
 
-      <div className="flex justify-end sm:col-span-3">
+      <div className="col-span-full flex justify-end">
         <button
           type="submit"
           disabled={isPending}

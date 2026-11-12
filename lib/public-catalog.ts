@@ -37,6 +37,7 @@ export type PublicVehicle = {
   location: string | null
   /** Precio de venta al cliente (salePrice). `null` → "Precio a consultar". */
   price: number | null
+  monthlyPaymentFrom: number | null
   description: string | null
   equipment: PublicVehicleEquipment
   photos: PublicVehiclePhoto[]
@@ -115,6 +116,7 @@ export function mapToPublicVehicle(v: VehicleWithPhotos): PublicVehicle {
     typeLabel: v.type ? (TYPE_LABELS[v.type] ?? 'Vehículo') : 'Vehículo',
     location: v.location ?? null,
     // Precio público = SOLO salePrice. Nunca desiredPrice/purchasePrice/valuación/margen.
+    monthlyPaymentFrom: v.monthlyPaymentFrom == null ? null : Number(v.monthlyPaymentFrom),
     price: v.salePrice != null ? Number(v.salePrice) : null,
     description: v.publicNotes ?? null,
     equipment,

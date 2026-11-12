@@ -4,6 +4,7 @@
  */
 import Image from 'next/image'
 import Link from 'next/link'
+import { formatEur } from '@/lib/format/currency'
 import { MapPin, BadgeCheck } from 'lucide-react'
 import type { PublicVehicle } from '@/lib/public-catalog'
 
@@ -101,6 +102,11 @@ export function VehicleCatalogCard({
         >
           {v.price != null ? eur(v.price) : 'Precio a consultar'}
         </p>
+        {v.monthlyPaymentFrom != null && (
+          <p className="mt-1 text-sm font-semibold">
+            Desde {formatEur(v.monthlyPaymentFrom, 'cents')}/mes
+          </p>
+        )}
       </div>
     </Link>
   )

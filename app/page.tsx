@@ -47,6 +47,7 @@ export default async function LandingPage() {
     type: v.typeLabel,
     photo: v.photos[0] ?? null,
     price: v.price,
+    monthlyPaymentFrom: v.monthlyPaymentFrom,
     specs: [
       v.year,
       v.km != null ? v.km.toLocaleString('es-ES') + ' km' : null,

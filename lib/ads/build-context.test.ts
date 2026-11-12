@@ -47,6 +47,7 @@ function makeVehicle(overrides: Partial<VehicleWithRelations> = {}): VehicleWith
     trustNotes: null,
     purchasePrice: null,
     salePrice: null,
+    monthlyPaymentFrom: null,
     marginPercent: new Prisma.Decimal(4),
     entryDate: null,
     naveLocation: null,

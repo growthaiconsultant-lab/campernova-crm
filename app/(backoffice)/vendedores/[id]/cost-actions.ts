@@ -5,6 +5,7 @@ import { z } from 'zod'
 import { db } from '@/lib/db'
 import { requireAdmin } from '@/lib/auth'
 import { admittedVehicleWhere } from '@/lib/seller-intake'
+import { revalidatePublicCatalog } from '@/lib/revalidate-public-catalog'
 import { formatEur } from '@/lib/format/currency'
 
 type ActionResult =
@@ -28,7 +29,19 @@ const createCostSchema = z.object({
   invoiceUrl: z.string().url('URL inválida').optional().or(z.literal('')),
 })
 
+const publicAmountSchema = z
+  .string()
+  .trim()
+  .transform((value) => value.replace(',', '.'))
+  .pipe(
+    z
+      .string()
+      .regex(/^\d{1,8}(?:\.\d{1,2})?$/)
+      .refine((value) => Number(value) > 0)
+  )
+
 const updateEconomicsSchema = z.object({
+  monthlyPaymentFrom: publicAmountSchema.nullable().optional(),
   purchasePrice: z.coerce.number().positive().optional().nullable(),
   salePrice: z.coerce.number().positive().optional().nullable(),
   marginPercent: z.coerce.number().min(0).max(100).optional(),
@@ -158,17 +171,6 @@ export async function deleteVehicleCost(costId: string): Promise<ActionResult> {
   return { ok: true }
 }
 
-const firstSalePriceSchema = z
-  .string()
-  .trim()
-  .transform((value) => value.replace(',', '.'))
-  .pipe(
-    z
-      .string()
-      .regex(/^\d{1,8}(?:\.\d{1,2})?$/)
-      .refine((value) => Number(value) > 0)
-  )
-
 export async function setMissingSalePrice(
   vehicleId: string,
   input: unknown
@@ -176,7 +178,7 @@ export async function setMissingSalePrice(
   const actor = await requireAdmin()
   if (typeof vehicleId !== 'string' || !vehicleId.trim())
     return { ok: false, error: 'Vehículo no válido.' }
-  const parsed = firstSalePriceSchema.safeParse(input)
+  const parsed = publicAmountSchema.safeParse(input)
   if (!parsed.success)
     return {
       ok: false,
@@ -216,7 +218,7 @@ export async function setMissingSalePrice(
   if ('error' in result) return { ok: false, error: result.error }
   revalidateVehiclePage(result.sellerLeadId)
   revalidatePath('/vehiculos')
-  if (result.status === 'PUBLICADO') revalidatePath('/comprar', 'layout')
+  if (result.status === 'PUBLICADO') revalidatePublicCatalog()
   return { ok: true }
 }
 
@@ -231,10 +233,12 @@ export async function updateVehicleEconomics(
     return { ok: false, error: 'Datos inválidos', fieldErrors: parsed.error.flatten().fieldErrors }
   }
 
+  if (!Object.values(parsed.data).some((value) => value !== undefined)) return { ok: true }
+
   const sellerLeadId = await getSellerLeadId(vehicleId)
   if (!sellerLeadId) return { ok: false, error: 'Vehículo no encontrado' }
 
-  const { purchasePrice, salePrice, marginPercent } = parsed.data
+  const { purchasePrice, salePrice, monthlyPaymentFrom, marginPercent } = parsed.data
 
   await db.$transaction([
     db.vehicle.update({
@@ -242,6 +246,7 @@ export async function updateVehicleEconomics(
       data: {
         ...(purchasePrice !== undefined ? { purchasePrice } : {}),
         ...(salePrice !== undefined ? { salePrice } : {}),
+        ...(monthlyPaymentFrom !== undefined ? { monthlyPaymentFrom } : {}),
         ...(marginPercent !== undefined ? { marginPercent } : {}),
       },
     }),
@@ -255,6 +260,12 @@ export async function updateVehicleEconomics(
           salePrice !== undefined
             ? `Precio venta: ${salePrice?.toLocaleString('es-ES', { style: 'currency', currency: 'EUR' }) ?? 'borrado'}`
             : null,
+          monthlyPaymentFrom !== undefined
+            ? 'Cuota mensual desde: ' +
+              (monthlyPaymentFrom === null
+                ? 'retirada'
+                : formatEur(Number(monthlyPaymentFrom), 'cents') + '/mes')
+            : null,
           marginPercent !== undefined ? `Margen objetivo: ${marginPercent}%` : null,
         ]
           .filter(Boolean)
@@ -265,6 +276,10 @@ export async function updateVehicleEconomics(
     }),
   ])
 
+  if (salePrice !== undefined || monthlyPaymentFrom !== undefined) {
+    revalidatePublicCatalog()
+    revalidatePath('/vehiculos')
+  }
   revalidateVehiclePage(sellerLeadId)
   return { ok: true }
 }

@@ -20,7 +20,13 @@ vi.mock('@/lib/auth', () => ({
 vi.mock('next/cache', () => ({ revalidatePath: vi.fn() }))
 import { discardSellerLead } from '@/app/(backoffice)/vendedores/[id]/actions'
 import { advanceLeadStatus } from '@/app/(backoffice)/vendedores/[id]/quick-advance-actions'
-import { setMissingSalePrice } from '@/app/(backoffice)/vendedores/[id]/cost-actions'
+import { getPublishedVehicleBySlug, vehicleSlug } from '@/lib/public-catalog'
+import { VehicleCatalogCard } from '@/components/catalog/vehicle-catalog-card'
+import { createElement } from 'react'
+import {
+  setMissingSalePrice,
+  updateVehicleEconomics,
+} from '@/app/(backoffice)/vendedores/[id]/cost-actions'
 vi.mock('@/lib/db', async () => ({ db: (await import('./db')).createGuardedTestPrisma() }))
 vi.mock('next/navigation', async (original) => ({
   ...(await original<typeof import('next/navigation')>()),
@@ -291,5 +297,46 @@ it('encuentra descartes del vehículo o de su vendedor desde las acciones de fic
     actor.id = ''
     await db.activity.deleteMany({ where: { agentId: user.id } })
     await db.user.delete({ where: { id: user.id } })
+  }
+})
+
+it('publica, cambia y retira la cuota explícita sin modificar el precio de venta', async () => {
+  const v = await create({ salePrice: 49900 })
+  const slug = vehicleSlug(v)
+  const admin = await db.user.create({
+    data: { name: 'Prueba de cuota', role: 'ADMIN', email: uniqueSuffix() + '@example.test' },
+  })
+  try {
+    const read = async () => {
+      const vehicle = await getPublishedVehicleBySlug(slug)
+      expect(vehicle?.price).toBe(49900)
+      return renderToStaticMarkup(
+        createElement(VehicleCatalogCard, { vehicle: vehicle! })
+      ).replaceAll('\u00a0', ' ')
+    }
+    expect(await read()).not.toContain('/mes')
+    await expect(updateVehicleEconomics(v.id, { monthlyPaymentFrom: '444,08' })).rejects.toThrow(
+      'administración'
+    )
+    actor.id = admin.id
+    actor.role = 'ADMIN'
+    for (const [amount, label] of [
+      ['444,08', '444,08'],
+      ['350', '350'],
+    ]) {
+      expect(await updateVehicleEconomics(v.id, { monthlyPaymentFrom: amount })).toEqual({
+        ok: true,
+      })
+      expect(await read()).toContain('Desde ' + label + ' €/mes')
+    }
+    expect(await updateVehicleEconomics(v.id, { marginPercent: 5 })).toEqual({ ok: true })
+    expect(await read()).toContain('Desde 350 €/mes')
+    expect(await updateVehicleEconomics(v.id, { monthlyPaymentFrom: null })).toEqual({ ok: true })
+    expect(await read()).not.toContain('/mes')
+  } finally {
+    actor.role = 'AGENTE'
+    actor.id = ''
+    await db.activity.deleteMany({ where: { agentId: admin.id } })
+    await db.user.delete({ where: { id: admin.id } })
   }
 })

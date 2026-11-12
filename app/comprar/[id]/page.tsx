@@ -1,6 +1,7 @@
 import type { Metadata } from 'next'
 import { PublicVehicleGallery } from '@/components/catalog/public-vehicle-gallery'
 import Link from 'next/link'
+import { formatEur } from '@/lib/format/currency'
 import { notFound } from 'next/navigation'
 import { Shield, Eye, Handshake, Sparkles, Check, MapPin, Phone, BadgeCheck } from 'lucide-react'
 import { PublicNav } from '@/components/public-nav'
@@ -317,6 +318,11 @@ export default async function VehicleDetailPage({ params }: Props) {
               >
                 {v.price != null ? eur(v.price) : 'Precio a consultar'}
               </p>
+              {v.monthlyPaymentFrom != null && (
+                <p className="mt-2 text-base font-semibold">
+                  Desde {formatEur(v.monthlyPaymentFrom, 'cents')}/mes
+                </p>
+              )}
               {v.price != null && (
                 <p
                   className="mt-1.5 font-mono text-[12px] uppercase tracking-[0.06em]"

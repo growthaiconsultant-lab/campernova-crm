@@ -4,6 +4,7 @@ import { useRef, useState } from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
 import { MessageCircle, X } from 'lucide-react'
+import { formatEur } from '@/lib/format/currency'
 import { BUSINESS } from '@/lib/seo'
 import { buildWhatsAppUrl } from '@/lib/whatsapp'
 
@@ -13,6 +14,7 @@ export type HomeVehicle = {
   type: string
   photo: { url: string; alt: string } | null
   price: number | null
+  monthlyPaymentFrom: number | null
   specs: string
 }
 
@@ -23,6 +25,7 @@ const archive: HomeVehicle[] = [
     type: 'Camper',
     photo: { url: '/cn-landing/media/v-nugget.jpg', alt: 'Ford Nugget con techo elevable' },
     price: null,
+    monthlyPaymentFrom: null,
     specs: 'Transit Custom · Techo elevable',
   },
   {
@@ -34,6 +37,7 @@ const archive: HomeVehicle[] = [
       alt: 'Autocaravanas de archivo en la exposición',
     },
     price: null,
+    monthlyPaymentFrom: null,
     specs: '',
   },
 ]
@@ -131,7 +135,12 @@ export function HomeCatalog({ vehicles }: { vehicles: HomeVehicle[] }) {
               aria-haspopup="dialog"
               onClick={() => showFinance(subject)}
             >
-              {archived ? 'Consultar financiación' : 'Consultar cuota'} ↗
+              {v.monthlyPaymentFrom != null
+                ? `Desde ${formatEur(v.monthlyPaymentFrom, 'cents')}/mes`
+                : archived
+                  ? 'Consultar financiación'
+                  : 'Consultar cuota'}{' '}
+              ↗
             </button>
           </div>
           <a

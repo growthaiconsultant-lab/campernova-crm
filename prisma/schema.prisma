@@ -723,6 +723,7 @@ model Vehicle {
   valuationMax         Decimal?              @map("valuation_max") @db.Decimal(10, 2)
   publicNotes          String?               @map("public_notes")
   purchasePrice        Decimal?              @map("purchase_price") @db.Decimal(10, 2)
+  monthlyPaymentFrom   Decimal?              @map("monthly_payment_from") @db.Decimal(10, 2)
   salePrice            Decimal?              @map("sale_price") @db.Decimal(10, 2)
   marginPercent        Decimal               @default(4.0) @map("margin_percent") @db.Decimal(5, 2)
   entryDate            DateTime?             @map("entry_date")
