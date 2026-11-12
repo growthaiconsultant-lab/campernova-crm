@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   CAPTURE_BOARD_COLUMNS,
+  captureViewOf,
   CAPTURE_STATUS_LABELS,
   captureAnchorId,
   findDuplicateCaptureByPhone,
@@ -19,7 +20,17 @@ describe('labels/opciones', () => {
   })
   it('el tablero excluye RECHAZADO', () => {
     expect(CAPTURE_BOARD_COLUMNS).not.toContain('RECHAZADO')
-    expect(CAPTURE_BOARD_COLUMNS).toHaveLength(5)
+    expect(CAPTURE_BOARD_COLUMNS).toEqual([
+      'NO_CONTACTADO',
+      'CONTACTADO',
+      'EN_CURSO',
+      'ENTRADA_AGENDADA',
+    ])
+    for (const status of CAPTURE_BOARD_COLUMNS)
+      expect(captureViewOf({ status, sellerLeadId: null })).toBe('abiertas')
+    expect(captureViewOf({ status: 'EN_CURSO', sellerLeadId: 'seller' })).toBe('convertidas')
+    expect(captureViewOf({ status: 'CONVERTIDO', sellerLeadId: null })).toBe('convertidas')
+    expect(captureViewOf({ status: 'RECHAZADO', sellerLeadId: null })).toBe('rechazadas')
   })
   it('validadores', () => {
     expect(isValidPortal('WALLAPOP')).toBe(true)

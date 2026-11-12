@@ -23,7 +23,7 @@ const OPTIONS = [
     desc: 'Un propietario que quiere vender su vehículo',
   },
   {
-    href: '/captaciones',
+    href: '/captaciones?nueva=1',
     icon: ScanSearch,
     title: 'Captación',
     desc: 'Un anuncio de portal que queremos perseguir',

@@ -15,6 +15,7 @@ export default defineConfig({
     'seller-preparation.spec.ts',
     'seller-checklist.spec.ts',
     'vehicle-inventory.spec.ts',
+    'capture-workspace.spec.ts',
     'inventory-operations.spec.ts',
     'seller-sale.spec.ts',
     'search-request.spec.ts',

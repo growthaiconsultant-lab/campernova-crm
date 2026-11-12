@@ -16,6 +16,7 @@ async function main() {
       usage: 'tests/ui/buyer-usage-fixture.tsx',
       stock: 'tests/ui/buyer-stock-fixture.tsx',
       offers: 'tests/ui/buyer-offers-fixture.tsx',
+      captures: 'tests/ui/capture-workspace-fixture.tsx',
       vehicleInventory: 'tests/ui/vehicle-inventory-fixture.tsx',
       inventoryOperations: 'tests/ui/inventory-operations-fixture.tsx',
       sellerSale: 'tests/ui/seller-sale-fixture.tsx',
@@ -35,6 +36,15 @@ async function main() {
       {
         name: 'next-browser-fixture',
         setup(plugin) {
+          plugin.onResolve({ filter: /^\.\/actions$/ }, (args) =>
+            args.importer.replaceAll('\\', '/').includes('/captaciones/')
+              ? { path: args.path, namespace: 'capture-actions' }
+              : undefined
+          )
+          plugin.onLoad({ filter: /.*/, namespace: 'capture-actions' }, () => ({
+            contents:
+              'export const createCapture=(...args)=>window.captureFixture.create(...args);export const updateCaptureStatus=(...args)=>window.captureFixture.status(...args);export const scheduleEntrada=(...args)=>window.captureFixture.schedule(...args);export const updateCapture=()=>({});export const convertCaptureToSellerLead=()=>({sellerLeadId:"seller-demo"})',
+          }))
           plugin.onResolve({ filter: /^\.\/(actions|rv-suggest-actions)$/ }, (args) =>
             args.importer.endsWith('vehicle-edit-form.tsx')
               ? { path: args.path, namespace: 'checklist' }
