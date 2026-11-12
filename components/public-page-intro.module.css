@@ -1,0 +1,137 @@
+.hero {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  background: #172a22;
+  color: #fff8e9;
+}
+.photo {
+  position: absolute;
+  z-index: -1;
+  inset: 0 0 0 42%;
+}
+.photo img {
+  object-fit: cover;
+}
+.photo::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(90deg, #172a22, transparent 40%),
+    linear-gradient(180deg, #0c1915a8, transparent 48%);
+}
+.inner {
+  width: min(1280px, calc(100% - 64px));
+  margin-inline: auto;
+  padding-block: calc(var(--cn-public-menu-height) + clamp(30px, 3.5vw, 58px))
+    clamp(36px, 4.5vw, 72px);
+}
+.label {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  color: #ffdaad;
+  font:
+    650 11px/1.5 var(--font-inter),
+    sans-serif;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+}
+.label::before {
+  content: '';
+  width: 26px;
+  height: 2px;
+  background: #dca87c;
+}
+.hero h1 {
+  width: 52%;
+  margin: 18px 0;
+  font:
+    480 clamp(44px, 4.6vw, 74px)/1.02 var(--font-fraunces),
+    Georgia,
+    serif;
+  letter-spacing: -0.055em;
+  text-wrap: balance;
+  color: inherit;
+}
+.hero em {
+  color: #ffd6a8;
+  font:
+    italic 1em/1 Georgia,
+    serif;
+}
+.description {
+  width: min(48%, 55ch);
+  color: #f0efe4;
+  font-size: clamp(15px, 1.15vw, 18px);
+  line-height: 1.55;
+}
+.actions {
+  margin-top: 24px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px 22px;
+}
+.actions a {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+  gap: 10px;
+  color: inherit;
+  font-size: 14px;
+  font-weight: 650;
+  text-decoration: underline;
+  text-underline-offset: 4px;
+}
+.actions a:first-child {
+  border-radius: 99px;
+  background: #fff1d6;
+  color: #192d24;
+  padding: 10px 20px;
+  text-decoration: none;
+}
+.actions a:focus-visible {
+  outline: 3px solid #f2b374;
+  outline-offset: 3px;
+}
+.actions a:hover {
+  text-decoration: underline;
+}
+.compact .inner {
+  padding-bottom: 30px;
+}
+.compact h1 {
+  font-size: clamp(40px, 3.9vw, 60px);
+}
+@media (max-width: 700px) {
+  .photo {
+    inset: 0;
+  }
+  .photo::after {
+    background: linear-gradient(180deg, #0e2019ad, #14271ed6 48%, #172a22 100%);
+  }
+  .inner {
+    width: calc(100% - 40px);
+    padding-block: calc(var(--cn-public-menu-height) + 50px) 32px;
+  }
+  .hero h1 {
+    width: 100%;
+    max-width: 18ch;
+    font-size: clamp(37px, 9vw, 54px);
+    margin: 13px 0;
+    text-wrap: pretty;
+  }
+  .description {
+    width: 100%;
+    max-width: 52ch;
+  }
+  .actions {
+    margin-top: 19px;
+  }
+  .compact .inner {
+    padding-block: calc(var(--cn-public-menu-height) + 25px) 22px;
+  }
+}

@@ -6,6 +6,7 @@ import { BUSINESS_MAPS_URL } from '@/lib/seo'
 const NAV_LINKS = [
   { href: homeFormPaths['/comprar'], label: 'Comprar' },
   { href: homeFormPaths['/vender'], label: 'Vender' },
+  { href: '/busqueda-bajo-pedido', label: 'Búsqueda a medida' },
   { href: '/como-funciona', label: 'Cómo funciona' },
   { href: '/sobre', label: 'Sobre nosotros' },
   { href: '/contacto', label: 'Contacto' },

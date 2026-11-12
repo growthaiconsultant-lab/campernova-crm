@@ -2,6 +2,7 @@ import type { Metadata } from 'next'
 import Link from 'next/link'
 import { ArrowRight } from 'lucide-react'
 import { PublicNav } from '@/components/public-nav'
+import { PublicPageIntro } from '@/components/public-page-intro'
 import { PublicFooter } from '@/components/public-footer'
 import { pageMetadata } from '@/lib/seo'
 
@@ -61,50 +62,35 @@ const VENTA_STEPS = [
 export default function ComoFuncionaPage() {
   return (
     <>
-      <PublicNav />
+      <PublicNav overPhoto />
 
-      <main className="min-h-screen" style={{ background: 'var(--cn-cream-100)' }}>
-        {/* Hero */}
-        <section className="px-8 pb-10 pt-16 max-[640px]:px-5">
-          <div className="mx-auto max-w-[1280px]">
-            <p
-              className="mb-5 font-mono text-[11px] font-semibold uppercase tracking-[0.14em]"
-              style={{ color: 'var(--cn-terra-500)' }}
-            >
-              · Cómo funciona
-            </p>
-            <h1
-              className="cn-interior-title text-[2.2rem] font-bold leading-[1.1] tracking-[-0.025em] lg:text-[3rem]"
-              style={{
-                fontFamily: 'var(--font-fraunces)',
-                color: 'var(--cn-teal-900)',
-                maxWidth: '22ch',
-              }}
-            >
-              Un proceso claro de principio a fin.
-            </h1>
-            <p
-              className="mt-7 text-[17px] leading-relaxed"
-              style={{ color: 'var(--cn-ink-500)', maxWidth: '56ch' }}
-            >
-              Sin sorpresas, sin presión, sin gestiones por tu cuenta. Te enseñamos cómo trabajamos
-              en cada lado de la operación.
-            </p>
-          </div>
-        </section>
+      <main
+        className="cn-public-interior min-h-screen"
+        style={{ background: 'var(--cn-cream-100)' }}
+      >
+        <PublicPageIntro
+          label="Cómo funciona"
+          title="Un proceso claro"
+          accent="de principio a fin."
+          description="Sin sorpresas, sin presión, sin gestiones por tu cuenta. Te enseñamos cómo trabajamos en cada lado de la operación."
+          photo="/cn-landing/media/proceso-vende.jpg"
+        >
+          <a href="#pasos-comprar">Si quiero comprar ↓</a>
+          <a href="#pasos-vender">Si quiero vender ↓</a>
+        </PublicPageIntro>
 
         {/* Two-column steps */}
         <section className="px-8 py-20 max-[640px]:px-5">
           <div className="mx-auto max-w-[1280px]">
             <div className="grid gap-16 md:grid-cols-2">
               {/* Comprar */}
-              <div>
-                <h3
+              <div id="pasos-comprar" className="scroll-mt-24">
+                <h2
                   className="mb-10 text-[2rem] tracking-[-0.02em]"
                   style={{ fontFamily: 'var(--font-fraunces)', color: 'var(--cn-teal-700)' }}
                 >
                   Si quieres comprar
-                </h3>
+                </h2>
                 <div className="flex flex-col gap-4">
                   {COMPRA_STEPS.map((s) => (
                     <div
@@ -119,12 +105,12 @@ export default function ComoFuncionaPage() {
                         {s.n}
                       </span>
                       <div className="pt-1">
-                        <h4
+                        <h3
                           className="text-[17px] font-semibold leading-snug tracking-[-0.01em]"
                           style={{ color: 'var(--cn-teal-900)' }}
                         >
                           {s.l}
-                        </h4>
+                        </h3>
                         <p
                           className="mt-2 text-[14px] leading-relaxed"
                           style={{ color: 'var(--cn-ink-500)' }}
@@ -148,13 +134,13 @@ export default function ComoFuncionaPage() {
               </div>
 
               {/* Vender */}
-              <div>
-                <h3
+              <div id="pasos-vender" className="scroll-mt-24">
+                <h2
                   className="mb-10 text-[2rem] tracking-[-0.02em]"
                   style={{ fontFamily: 'var(--font-fraunces)', color: 'var(--cn-terra-500)' }}
                 >
                   Si quieres vender
-                </h3>
+                </h2>
                 <div className="flex flex-col gap-4">
                   {VENTA_STEPS.map((s) => (
                     <div
@@ -169,12 +155,12 @@ export default function ComoFuncionaPage() {
                         {s.n}
                       </span>
                       <div className="pt-1">
-                        <h4
+                        <h3
                           className="text-[17px] font-semibold leading-snug tracking-[-0.01em]"
                           style={{ color: 'var(--cn-teal-900)' }}
                         >
                           {s.l}
-                        </h4>
+                        </h3>
                         <p
                           className="mt-2 text-[14px] leading-relaxed"
                           style={{ color: 'var(--cn-ink-500)' }}

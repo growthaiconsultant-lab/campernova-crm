@@ -1,8 +1,8 @@
 import type { Metadata } from 'next'
-import Image from 'next/image'
 import Link from 'next/link'
 import { PublicNav } from '@/components/public-nav'
-import { homeFormPaths } from '@/lib/public-navigation'
+import { PublicPageIntro } from '@/components/public-page-intro'
+import { PublicFooter } from '@/components/public-footer'
 import { SearchForm } from './search-form'
 import './search-form.css'
 
@@ -18,54 +18,25 @@ const catalog = '/comprar/vehiculos'
 export default function SearchRequestPage() {
   return (
     <>
-      <PublicNav />
+      <PublicNav overPhoto />
       <main id="contenido" className="cn-search">
-        <section className="cn-search-hero" aria-labelledby="search-title">
-          <div className="cn-search-lead">
-            <p className="cn-eyebrow">Búsqueda bajo pedido</p>
-            <h1 id="search-title">
-              Tu próxima aventura
-              <br />
-              empieza contigo.
-            </h1>
-            <p className="cn-search-introduction">
-              Cuéntanos cómo viajas y qué necesitas en tu camper o autocaravana. Un asesor de
-              CampersNova revisará tu ficha y te llamará para hablar de tu búsqueda.
-            </p>
-            <div className="cn-search-links">
-              <a className="cn-search-start" href="#ficha">
-                Empezar mi búsqueda <span aria-hidden="true">↓</span>
-              </a>
-              <Link href={catalog}>Ver vehículos disponibles</Link>
-            </div>
-          </div>
-          <Image
-            src="/images/landing/hero-sunset-couple.png"
-            alt="Dos viajeros contemplan el mar al atardecer desde el interior de su camper"
-            width={1536}
-            height={1024}
-            sizes="(max-width: 760px) 100vw, 50vw"
-            priority
-          />
-        </section>
+        <PublicPageIntro
+          label="Búsqueda a medida"
+          title="Tu próxima aventura"
+          accent="empieza contigo."
+          description="Cuéntanos cómo viajas y qué necesitas en tu camper o autocaravana. Un asesor de CampersNova revisará tu ficha y te llamará para hablar de tu búsqueda."
+          photo="/images/landing/hero-sunset-couple.png"
+        >
+          <a href="#ficha">
+            Empezar mi búsqueda <span aria-hidden="true">↓</span>
+          </a>
+          <Link href={catalog}>Ver vehículos disponibles</Link>
+        </PublicPageIntro>
         <div id="ficha" className="cn-search-ficha">
           <SearchForm />
         </div>
       </main>
-      <footer className="cn-search-footer">
-        <Link href="/" aria-label="CampersNova, inicio">
-          <Image src="/cn-landing/img/logo-cn-crema.png" alt="" width={90} height={44} />
-        </Link>
-        <nav aria-label="Enlaces al pie">
-          <a href={homeFormPaths['/comprar']}>Comprar</a>
-          <a href={homeFormPaths['/vender']}>Vender</a>
-          <Link href={catalog}>Catálogo</Link>
-          <Link href="/contacto">Contacto</Link>
-          <Link href="/privacidad">Privacidad</Link>
-          <Link href="/aviso-legal">Aviso legal</Link>
-          <Link href="/cookies">Cookies</Link>
-        </nav>
-      </footer>
+      <PublicFooter />
     </>
   )
 }
