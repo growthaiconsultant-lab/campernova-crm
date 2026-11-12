@@ -86,20 +86,19 @@ export async function readInstagramFeed(token: string): Promise<InstagramPost[]>
     const response = await fetch(url, {
       headers: { Authorization: 'Bearer ' + token },
       redirect: 'error',
-      cache: 'no-store',
       signal: AbortSignal.timeout(5000),
     })
     if (!response.ok) throw new Error('Instagram no disponible (HTTP ' + response.status + ')')
     return response.json() as Promise<unknown>
   }
   const account = z
-    .object({ id: z.literal(campersNovaAccountId), username: z.string() })
+    .object({ username: z.string() })
     .parse(await get(campersNovaAccountId, 'id,username'))
   if (account.username.toLowerCase() !== 'campersnova')
     throw new Error('La cuenta autorizada no coincide con @campersnova')
   return latestPosts(
     await get(
-      account.id + '/media',
+      campersNovaAccountId + '/media',
       'id,media_type,media_product_type,media_url,thumbnail_url,permalink,caption,timestamp',
       '25'
     )

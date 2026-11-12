@@ -15,8 +15,10 @@ export async function getInstagramFeed() {
   if (!process.env.INSTAGRAM_ACCESS_TOKEN) return null
   try {
     return await cachedFeed()
-  } catch {
-    console.warn('[instagram] Sin instantánea disponible para el mosaico')
+  } catch (error) {
+    const status = error instanceof Error && /HTTP (\d{3})/.exec(error.message)
+    const reason = status ? 'HTTP ' + status[1] : error instanceof Error ? error.name : 'Error'
+    console.warn('[instagram] Sin instantánea disponible para el mosaico:', reason)
     return null
   }
 }
