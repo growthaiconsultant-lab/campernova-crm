@@ -63,7 +63,7 @@ export default function ComoFuncionaPage() {
     <>
       <PublicNav />
 
-      <main className="min-h-screen pt-20" style={{ background: 'var(--cn-cream-100)' }}>
+      <main className="min-h-screen" style={{ background: 'var(--cn-cream-100)' }}>
         {/* Hero */}
         <section className="px-8 pb-10 pt-16 max-[640px]:px-5">
           <div className="mx-auto max-w-[1280px]">
@@ -74,7 +74,7 @@ export default function ComoFuncionaPage() {
               · Cómo funciona
             </p>
             <h1
-              className="text-[2.2rem] font-bold leading-[1.1] tracking-[-0.025em] lg:text-[3rem]"
+              className="cn-interior-title text-[2.2rem] font-bold leading-[1.1] tracking-[-0.025em] lg:text-[3rem]"
               style={{
                 fontFamily: 'var(--font-fraunces)',
                 color: 'var(--cn-teal-900)',
@@ -186,14 +186,14 @@ export default function ComoFuncionaPage() {
                   ))}
                 </div>
                 <div className="mt-12">
-                  <Link
-                    href="/vender"
+                  <a
+                    href="/vende-tu-camper"
                     className="inline-flex items-center gap-2 rounded-full border px-6 py-3 text-[14px] font-semibold transition hover:bg-cn-cream-50"
                     style={{ borderColor: 'var(--cn-terra-500)', color: 'var(--cn-terra-500)' }}
                   >
                     Empezar valoración
                     <ArrowRight size={16} />
-                  </Link>
+                  </a>
                 </div>
               </div>
             </div>
@@ -226,20 +226,20 @@ export default function ComoFuncionaPage() {
               Cuéntanos qué necesitas y te ayudamos a dar el siguiente paso con seguridad.
             </p>
             <div className="flex flex-wrap justify-center gap-3">
-              <Link
-                href="/comprar"
+              <a
+                href="/encuentra-tu-camper"
                 className="inline-flex items-center gap-2 rounded-full px-6 py-3 text-[14px] font-semibold text-white transition hover:opacity-90"
                 style={{ background: 'var(--cn-teal-900)' }}
               >
                 Quiero comprar
-              </Link>
-              <Link
-                href="/vender"
+              </a>
+              <a
+                href="/vende-tu-camper"
                 className="inline-flex items-center gap-2 rounded-full border px-6 py-3 text-[14px] font-semibold transition hover:bg-cn-cream-100"
                 style={{ borderColor: 'var(--cn-line)', color: 'var(--cn-teal-900)' }}
               >
                 Quiero vender
-              </Link>
+              </a>
             </div>
           </div>
         </section>

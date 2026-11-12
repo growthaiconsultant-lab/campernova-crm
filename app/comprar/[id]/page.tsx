@@ -115,7 +115,7 @@ export default async function VehicleDetailPage({ params }: Props) {
       <JsonLd data={vehicleJsonLd(v)} />
       <PublicNav />
 
-      <main className="min-h-screen pt-20" style={{ background: 'var(--cn-cream-100)' }}>
+      <main className="min-h-screen" style={{ background: 'var(--cn-cream-100)' }}>
         <div className="mx-auto max-w-[1280px] px-8 pb-24 pt-8 max-[640px]:px-5">
           {/* Breadcrumb */}
           <nav
@@ -185,7 +185,7 @@ export default async function VehicleDetailPage({ params }: Props) {
                 {v.availability}
               </p>
               <h1
-                className="text-[clamp(2rem,4vw,3rem)] leading-[1.05] tracking-[-0.02em]"
+                className="cn-interior-title text-[clamp(2rem,4vw,3rem)] leading-[1.05] tracking-[-0.02em]"
                 style={{ fontFamily: 'var(--font-fraunces)', color: 'var(--cn-teal-900)' }}
               >
                 {titleYear(v)}

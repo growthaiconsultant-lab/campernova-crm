@@ -348,3 +348,11 @@ body:has([data-crm-shell]) label:has(> select.opacity-0:focus-visible) > span {
     @apply text-foreground;
   }
 }
+
+/* Titulares editoriales de las páginas públicas interiores. */
+h1.cn-interior-title {
+  font-family: var(--font-fraunces), Georgia, serif;
+  font-weight: 480;
+  letter-spacing: -0.05em;
+  line-height: 1.04;
+}

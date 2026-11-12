@@ -401,24 +401,6 @@
 .cn-home-page {
   position: relative;
 }
-.cn-home-menu-edge {
-  position: absolute;
-  top: 0;
-  left: 0;
-  height: 1px;
-  width: 1px;
-  pointer-events: none;
-}
-.cn-home-page > .cn-site-menu {
-  margin-bottom: calc(0px - var(--cn-public-menu-height));
-}
-.cn-home-page .cn-site-over-photo {
-  background: linear-gradient(180deg, rgba(14, 21, 21, 0.37), rgba(14, 21, 21, 0.09));
-  border-bottom-color: transparent;
-}
-.cn-home-page .cn-site-over-photo .cn-site-menu-inner {
-  border-bottom: 1px solid rgba(255, 252, 238, 0.48);
-}
 .cn-home-page .home-opening .hero {
   padding-top: var(--cn-public-menu-height);
 }
@@ -426,31 +408,8 @@
   object-position: 50% 59%;
 }
 @media (min-width: 1071px) {
-  .cn-home-page {
-    --cn-public-menu-height: clamp(72px, 5.45vw, 94px);
-  }
-  .cn-home-page .cn-site-menu-inner,
   .cn-home-page .hero-copy {
     width: min(96%, 1680px);
-  }
-  .cn-home-page .cn-site-logo {
-    width: clamp(92px, 7vw, 128px);
-  }
-  .cn-home-page .cn-site-links {
-    flex: 1;
-    gap: clamp(16px, 1.9vw, 38px);
-    font-size: clamp(13px, 1vw, 18px);
-  }
-  .cn-home-page .cn-site-links a:first-child,
-  .cn-home-page .cn-site-links a:last-child {
-    margin-left: auto;
-  }
-  .cn-home-page .cn-site-links a:last-child {
-    padding: 10px 22px;
-  }
-  .cn-home-page .cn-site-links a:last-child::after {
-    content: '↗' / '';
-    margin-left: 9px;
   }
   .cn-home-page .hero-copy {
     padding-bottom: clamp(25px, 3vh, 44px);

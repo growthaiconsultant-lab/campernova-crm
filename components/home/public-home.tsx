@@ -128,10 +128,10 @@ export function PublicHome({ vehicles }: { vehicles: HomeVehicle[] }) {
                   visitas.
                 </p>
                 <div className="actions">
-                  <Link href="/vender/empezar" className="inkbtn">
+                  <a href="/vende-tu-camper" className="inkbtn">
                     Valorar mi camper →
-                  </Link>
-                  <Link href="/vender" className="quietlink">
+                  </a>
+                  <Link href="/como-funciona" className="quietlink">
                     Cómo funciona
                   </Link>
                 </div>

@@ -67,7 +67,7 @@ export function CatalogView({
       {vehicles.length > 0 && <JsonLd data={itemListJsonLd(vehicles)} />}
       <PublicNav />
 
-      <main className="min-h-screen pt-20" style={{ background: 'var(--cn-cream-100)' }}>
+      <main className="min-h-screen" style={{ background: 'var(--cn-cream-100)' }}>
         <div className="mx-auto max-w-[1280px] px-8 pb-24 pt-8 max-[640px]:px-5">
           {/* Breadcrumb */}
           <nav
@@ -98,7 +98,7 @@ export function CatalogView({
               · {eyebrow}
             </p>
             <h1
-              className="mt-3 text-[clamp(2.2rem,5vw,3.4rem)] leading-[1.04] tracking-[-0.02em]"
+              className="cn-interior-title mt-3 text-[clamp(2.2rem,5vw,3.4rem)] leading-[1.04] tracking-[-0.02em]"
               style={{ fontFamily: 'var(--font-fraunces)', color: 'var(--cn-teal-900)' }}
             >
               {title}
@@ -173,13 +173,13 @@ export function CatalogView({
                   Decirle a Nova qué busco
                   <ArrowRight size={16} />
                 </Link>
-                <Link
-                  href="/vender"
+                <a
+                  href="/vende-tu-camper"
                   className="text-[14px] font-medium hover:underline"
                   style={{ color: 'var(--cn-teal-700)' }}
                 >
                   ¿Quieres vender el tuyo?
-                </Link>
+                </a>
               </div>
             </div>
           )}

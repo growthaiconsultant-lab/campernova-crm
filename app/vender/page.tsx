@@ -206,7 +206,7 @@ export default function VenderPage() {
               </p>
 
               <h1
-                className="mb-5 text-[2.4rem] font-bold leading-[1.12] tracking-[-0.02em] max-[640px]:text-[1.9rem] lg:text-[3rem]"
+                className="cn-interior-title mb-5 text-[2.4rem] font-bold leading-[1.12] tracking-[-0.02em] max-[640px]:text-[1.9rem] lg:text-[3rem]"
                 style={{ color: 'var(--cn-teal-900)', fontFamily: 'var(--font-fraunces)' }}
               >
                 Vende tu camper o autocaravana con garantías, sin complicaciones.

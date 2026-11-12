@@ -1,0 +1,94 @@
+/* Tipografía y superficies compartidas con la portada. El formulario conserva su jerarquía de lectura. */
+@font-face {
+  font-family: 'CN Fraunces';
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
+  src: url('fonts/Fraunces-latin.woff2') format('woff2');
+}
+body.cn-campaign {
+  overflow-x: clip;
+  --ink: #192e26;
+  --green: #244638;
+  --cream: #f6f2e8;
+  --cream50: #fffcf6;
+}
+.cn-campaign .hero::after {
+  background:
+    linear-gradient(180deg, #0a191ab0, transparent 28%),
+    linear-gradient(0deg, #101e17a8, transparent 48%),
+    linear-gradient(90deg, #0f211ce8 0%, #101e19a6 48%, #101c1954 100%);
+}
+.cn-campaign .hero .copy h1,
+.cn-campaign .cab h2,
+.cn-campaign .cab-solo h2,
+.cn-campaign .feat h2,
+.cn-campaign .life blockquote {
+  font-family: 'CN Fraunces', Georgia, serif;
+  font-weight: 480;
+  line-height: 1;
+  letter-spacing: -0.055em;
+}
+.cn-campaign .hero .copy h1 {
+  font-size: clamp(48px, 5vw, 84px);
+  margin: 14px 0 22px;
+  text-wrap: initial;
+}
+.cn-campaign .hero .copy h1 em {
+  font:
+    italic 0.94em/.99 Georgia,
+    serif;
+  letter-spacing: -0.052em;
+  color: #ffdaab;
+}
+.cn-campaign .hero .copy .pill-live {
+  border: 0;
+  padding: 0;
+  background: none;
+  box-shadow: none;
+  backdrop-filter: none;
+  color: #fff2db;
+  text-transform: uppercase;
+  font: 650 11px/1.4 var(--sans);
+  letter-spacing: 0.14em;
+  margin: 0;
+}
+.cn-campaign .pill-live i {
+  height: 2px;
+  width: 26px;
+  border-radius: 0;
+  animation: none;
+  background: #e7ac78;
+}
+.cn-campaign .hero .ficha {
+  background: var(--cream50);
+  border-radius: 18px;
+}
+.cn-campaign .ficha .btn {
+  border-radius: 9999px;
+}
+@media (min-width: 1071px) {
+  .cn-campaign .hero-in {
+    max-width: 1680px;
+    width: 96%;
+    padding-inline: 0;
+    grid-template-columns: minmax(0, 1fr) minmax(400px, 470px);
+    padding-top: calc(var(--cn-public-menu-height) + 28px);
+    padding-bottom: 34px;
+  }
+}
+@media (max-width: 640px) {
+  .cn-campaign .hero .copy h1 {
+    font-size: clamp(40px, 9.8vw, 60px);
+    margin: 12px 0 16px;
+  }
+  .cn-campaign .hero .copy .pill-live {
+    font-size: 10px;
+  }
+  .cn-campaign .hero .ficha {
+    padding: 22px 19px;
+  }
+  .cn-campaign .hero::after {
+    background: linear-gradient(180deg, #0d1c18a8 0%, #10201957 12%, #102019e8 60%, #102019 100%);
+  }
+}

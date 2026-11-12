@@ -1,4 +1,11 @@
 ;(function () {
+  function updateScrollState() {
+    document.documentElement.classList.toggle('cn-page-scrolled', window.scrollY > 2)
+  }
+  updateScrollState()
+  window.addEventListener('pageshow', updateScrollState)
+  window.addEventListener('scroll', updateScrollState, { passive: true })
+
   function closeMenu(event) {
     const drawer = document.querySelector('.cn-site-drawer[open]')
     if (!drawer) return
