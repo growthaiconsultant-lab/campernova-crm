@@ -6,3 +6,8 @@ export const publicNavigation: { href: string; label: string; activePath?: strin
   { href: '/como-funciona', label: 'Cómo funciona' },
   { href: '/sobre', label: 'Sobre nosotros' },
 ]
+
+export const homeFormPaths = {
+  '/comprar': '/encuentra-tu-camper',
+  '/vender': '/vende-tu-camper',
+} as const

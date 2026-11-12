@@ -3,22 +3,31 @@
 import { useRef, useState } from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
-import { publicNavigation } from '@/lib/public-navigation'
+import { homeFormPaths, publicNavigation } from '@/lib/public-navigation'
 import { ArrowUpRight, Menu } from 'lucide-react'
 
 export function HomeNav() {
   const [open, setOpen] = useState(false)
   const toggle = useRef<HTMLButtonElement>(null)
-  const items = publicNavigation.map(({ href, label }) => (
-    <Link
-      key={href}
-      href={href}
-      aria-current={href === '/' ? 'page' : undefined}
-      onClick={() => setOpen(false)}
-    >
-      {label}
-    </Link>
-  ))
+  const items = publicNavigation.map(({ href, label }) => {
+    if (href === '/comprar' || href === '/vender') {
+      return (
+        <a key={href} href={homeFormPaths[href]} onClick={() => setOpen(false)}>
+          {label}
+        </a>
+      )
+    }
+    return (
+      <Link
+        key={href}
+        href={href}
+        aria-current={href === '/' ? 'page' : undefined}
+        onClick={() => setOpen(false)}
+      >
+        {label}
+      </Link>
+    )
+  })
   return (
     <div
       className="shell nav"
