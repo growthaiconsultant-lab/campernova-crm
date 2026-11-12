@@ -1,6 +1,7 @@
 import { z } from 'zod'
 
-const graph = 'https://graph.instagram.com/v25.0/'
+const graph = 'https://graph.facebook.com/v25.0/'
+const campersNovaAccountId = '17841473663135583'
 export const profileUrl = 'https://www.instagram.com/campersnova/'
 
 const media = z.object({
@@ -92,13 +93,13 @@ export async function readInstagramFeed(token: string): Promise<InstagramPost[]>
     return response.json() as Promise<unknown>
   }
   const account = z
-    .object({ user_id: z.string().regex(/^\d+$/), username: z.string() })
-    .parse(await get('me', 'user_id,username'))
+    .object({ id: z.literal(campersNovaAccountId), username: z.string() })
+    .parse(await get(campersNovaAccountId, 'id,username'))
   if (account.username.toLowerCase() !== 'campersnova')
     throw new Error('La cuenta autorizada no coincide con @campersnova')
   return latestPosts(
     await get(
-      account.user_id + '/media',
+      account.id + '/media',
       'id,media_type,media_product_type,media_url,thumbnail_url,permalink,caption,timestamp',
       '25'
     )

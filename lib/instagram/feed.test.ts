@@ -50,11 +50,14 @@ describe('mosaico de Instagram', () => {
   it('verifica la cuenta con autorización de servidor antes de leer sus medios', async () => {
     const api = vi
       .fn()
-      .mockResolvedValueOnce(Response.json({ user_id: '123', username: 'campersnova' }))
+      .mockResolvedValueOnce(Response.json({ id: '17841473663135583', username: 'campersnova' }))
       .mockResolvedValueOnce(Response.json({ data: [photo(1)] }))
     vi.stubGlobal('fetch', api)
     expect((await readInstagramFeed('test-only'))[0]?.id).toBe('1')
-    expect(api.mock.calls.map((c) => c[0].pathname)).toEqual(['/v25.0/me', '/v25.0/123/media'])
+    expect(api.mock.calls.map((c) => c[0].href.split('?')[0])).toEqual([
+      'https://graph.facebook.com/v25.0/17841473663135583',
+      'https://graph.facebook.com/v25.0/17841473663135583/media',
+    ])
     for (const [url, init] of api.mock.calls) {
       expect(url.href).not.toContain('test-only')
       expect(init.headers.Authorization).toBe('Bearer test-only')
@@ -63,7 +66,7 @@ describe('mosaico de Instagram', () => {
   it('no lee medios de otra cuenta y propaga fallos para conservar la caché', async () => {
     const api = vi
       .fn()
-      .mockResolvedValueOnce(Response.json({ user_id: '123', username: 'otra' }))
+      .mockResolvedValueOnce(Response.json({ id: '17841473663135583', username: 'otra' }))
       .mockResolvedValueOnce(new Response(null, { status: 429 }))
     vi.stubGlobal('fetch', api)
     await expect(readInstagramFeed('test-only')).rejects.toThrow('no coincide')
