@@ -32,6 +32,7 @@ const fullVehicle = {
   purchasePrice: 52000,
   marginPercent: 4,
   salePrice: 59900,
+  monthlyPaymentFrom: 444.08,
   publicNotes: 'Impecable, un solo dueño, libro de revisiones completo.',
   photos: [
     { id: 'p2', vehicleId: 'clabc123xyz', url: 'https://x/2.jpg', order: 1, altText: null },
@@ -43,6 +44,7 @@ describe('mapToPublicVehicle — seguridad de datos', () => {
   it('el precio público es salePrice, NUNCA los internos', () => {
     const pub = mapToPublicVehicle(fullVehicle)
     expect(pub.price).toBe(59900)
+    expect(pub.monthlyPaymentFrom).toBe(444.08)
     const serialized = JSON.stringify(pub)
     // Ningún precio/dato interno puede aparecer en la salida pública
     expect(serialized).not.toContain('52000') // purchasePrice
@@ -67,6 +69,7 @@ describe('mapToPublicVehicle — seguridad de datos', () => {
         'km',
         'location',
         'model',
+        'monthlyPaymentFrom',
         'photos',
         'price',
         'seats',

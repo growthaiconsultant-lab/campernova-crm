@@ -1641,6 +1641,9 @@ export default async function FichaVendedorPage({
                     vehicleId={v.id}
                     desiredPrice={v.desiredPrice ? Number(v.desiredPrice) : null}
                     purchasePrice={v.purchasePrice ? Number(v.purchasePrice) : null}
+                    monthlyPaymentFrom={
+                      v.monthlyPaymentFrom == null ? null : Number(v.monthlyPaymentFrom)
+                    }
                     salePrice={v.salePrice ? Number(v.salePrice) : null}
                     marginPercent={v.marginPercent ? Number(v.marginPercent) : 4}
                   />

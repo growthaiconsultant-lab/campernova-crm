@@ -164,6 +164,15 @@ describe('updateVehicleEconomics', () => {
     expect(mockDb.$transaction).toHaveBeenCalledOnce()
   })
 
+  it.each(['-1', '0', '1.234', '100000000', 'NaN', '4e2'])(
+    'rechaza una cuota inválida %s',
+    async (amount) => {
+      vi.mocked(requireAdmin).mockResolvedValue(mockAdmin)
+      expect((await updateVehicleEconomics('v-1', { monthlyPaymentFrom: amount })).ok).toBe(false)
+      expect(mockDb.vehicle.update).not.toHaveBeenCalled()
+    }
+  )
+
   it('rechaza margen > 100', async () => {
     vi.mocked(requireAdmin).mockResolvedValue(mockAdmin)
 
