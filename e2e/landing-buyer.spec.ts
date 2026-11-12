@@ -1,6 +1,5 @@
-import { test, expect, type Page } from '@playwright/test'
+import { test, expect, type Page } from './web-landing-fixture'
 const CRM = '**/api/landing/encuentra-tu-camper'
-const NIRA = 'https://docs.niraagency.com/api/formulario/campersnova-encuentra'
 test.beforeEach(async ({ page }) => {
   await page.addInitScript(() => localStorage.setItem('cn_cookie_consent', 'essential'))
 })
@@ -46,11 +45,10 @@ test('buyer assets render without JS errors or overflow', async ({ page, request
 })
 test('validates required choices and consent before any destination', async ({ page }) => {
   let calls = 0
-  for (const url of [CRM, NIRA])
-    await page.route(url, async (r) => {
-      calls++
-      await r.fulfill({ json: { ok: true } })
-    })
+  await page.route(CRM, async (r) => {
+    calls++
+    await r.fulfill({ json: { ok: true } })
+  })
   await page.goto('/encuentra-tu-camper.html')
   await page.locator('[data-ir="1"]').click()
   await expect(page.locator('.step.on .err')).toBeVisible()
@@ -60,34 +58,27 @@ test('validates required choices and consent before any destination', async ({ p
   await expect(page.locator('.step.on .err')).toContainText('Marca la casilla')
   expect(calls).toBe(0)
 })
-test('sends original buyer contract without email to both correct destinations', async ({
-  page,
-}) => {
+test('sends original buyer contract without email only to the CRM', async ({ page }) => {
   const received: Record<string, unknown>[] = []
-  for (const url of [CRM, NIRA])
-    await page.route(url, async (r) => {
-      received.push(r.request().postDataJSON())
-      await r.fulfill({ json: { ok: true } })
-    })
+  await page.route(CRM, async (r) => {
+    received.push(r.request().postDataJSON())
+    await r.fulfill({ json: { ok: true } })
+  })
   await page.goto('/encuentra-tu-camper.html?utm_source=meta&utm_campaign=compra')
   await fill(page)
   await page.locator('button[type=submit]').click()
   await expect(page.locator('#cn-done h3')).toHaveText('¡Recibido!')
-  expect(received).toHaveLength(2)
-  expect(received.filter((p) => p.gdpr_consent === true)).toHaveLength(1)
-  const answers = received.map((p) => p.respuestas as Record<string, string>)
-  expect(answers[0].event_id).toBe(answers[1].event_id)
-  expect(answers[0].pagina).toBe('/encuentra-tu-camper.html')
-  expect(answers[0].origen).toContain('utm_campaign=compra')
-  expect(answers[0].email).toBeUndefined()
-  expect(
-    (received.find((p) => p.gdpr_consent === true)?.respuestas as Record<string, unknown>)
-      .atribucion
-  ).toEqual({ utm_source: 'meta', utm_campaign: 'compra' })
-  expect(
-    (received.find((p) => p.gdpr_consent !== true)?.respuestas as Record<string, unknown>)
-      .atribucion
-  ).toBeUndefined()
+  expect(received).toHaveLength(1)
+  expect(received[0]).toMatchObject({
+    gdpr_consent: true,
+    respuestas: {
+      pagina: '/encuentra-tu-camper.html',
+      atribucion: { utm_source: 'meta', utm_campaign: 'compra' },
+    },
+  })
+  const answers = received[0].respuestas as Record<string, unknown>
+  expect(answers.origen).toContain('utm_campaign=compra')
+  expect(answers.email).toBeUndefined()
   await expect(page.locator('#cn-retry')).toBeHidden()
 })
 for (const visit of [
@@ -99,13 +90,8 @@ for (const visit of [
 ]) {
   test(`buyer preserves a coherent campaign snapshot: ${visit}`, async ({ page }) => {
     let crm: Record<string, unknown> | undefined
-    let nira: Record<string, unknown> | undefined
     await page.route(CRM, async (r) => {
       crm = r.request().postDataJSON()
-      await r.fulfill({ json: { ok: true } })
-    })
-    await page.route(NIRA, async (r) => {
-      nira = r.request().postDataJSON()
       await r.fulfill({ json: { ok: true } })
     })
     if (visit === 'blocked-storage')
@@ -155,32 +141,22 @@ for (const visit of [
             ? { utm_source: 'meta', utm_campaign: 'qa_storage' }
             : {}
     expect(answers.atribucion).toEqual(expected)
-    const niraAnswers = nira?.respuestas as Record<string, unknown>
-    expect(niraAnswers.atribucion).toBeUndefined()
-    expect(Object.values(niraAnswers).every((v) => typeof v === 'string')).toBe(true)
   })
 }
-for (const failed of ['crm', 'nira'])
-  test(`retries only unconfirmed buyer ${failed}`, async ({ page }) => {
-    const calls = { crm: 0, nira: 0 }
-    for (const [name, url] of [
-      ['crm', CRM],
-      ['nira', NIRA],
-    ] as const)
-      await page.route(url, async (r) => {
-        calls[name]++
-        await r.fulfill({
-          status: name === failed && calls[name] === 1 ? 503 : 200,
-          json: { ok: !(name === failed && calls[name] === 1) },
-        })
-      })
-    await page.goto('/encuentra-tu-camper.html')
-    await fill(page)
-    await page.locator('button[type=submit]').click()
-    await expect(page.locator('#cn-done h3')).toHaveText('Falta completar el envío')
-    await expect(page.locator('#cn-wa')).toHaveAttribute('href', /wa\.me\/34645639185\?text=/)
-    await page.locator('#cn-retry').click()
-    await expect(page.locator('#cn-done h3')).toHaveText('¡Recibido!')
-    expect(calls[failed as 'crm' | 'nira']).toBe(2)
-    expect(calls[failed === 'crm' ? 'nira' : 'crm']).toBe(1)
+
+test('retries the same CRM submission after a failure', async ({ page }) => {
+  const bodies: unknown[] = []
+  await page.route(CRM, async (route) => {
+    bodies.push(route.request().postDataJSON())
+    const ok = bodies.length > 1
+    await route.fulfill({ status: ok ? 200 : 503, json: { ok } })
   })
+  await page.goto('/encuentra-tu-camper')
+  await fill(page)
+  await page.locator('button[type=submit]').click()
+  await expect(page.locator('#cn-done h3')).toHaveText('No se ha podido enviar')
+  await page.locator('#cn-retry').click()
+  await expect(page.locator('#cn-done h3')).toHaveText('¡Recibido!')
+  expect(bodies).toHaveLength(2)
+  expect(bodies[1]).toEqual(bodies[0])
+})
