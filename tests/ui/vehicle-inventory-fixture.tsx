@@ -18,7 +18,7 @@ function render() {
     Object.fromEntries(new URLSearchParams(location.search))
   )
   root.render(
-    <main className="crm-theme p-3">
+    <main data-crm-shell className="crm-theme p-3">
       <Topbar userName="Demo" userEmail="demo@example.test" userRole="Administrador" />
       <VehicleFilters applied={criteria} order={order} />
       {(criteria.priceState === 'missing'
