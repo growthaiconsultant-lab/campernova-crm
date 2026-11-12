@@ -72,7 +72,7 @@ export function latestPosts(payload: unknown): InstagramPost[] {
     })
   }
   if (data.length && !items.size) throw new Error('Instagram devolvió publicaciones ilegibles')
-  return [...items.values()]
+  return Array.from(items.values())
     .sort((a, b) => Date.parse(b.timestamp) - Date.parse(a.timestamp))
     .slice(0, 5)
 }
