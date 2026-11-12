@@ -79,8 +79,8 @@ export type CaptureRow = {
 }
 
 export type CalendarDeps = {
-  listDeliveries: (from: Date, to: Date) => Promise<DeliveryRow[]>
-  listWorkOrders: (from: Date, to: Date) => Promise<WorkOrderRow[]>
+  listDeliveries: (from: Date, to: Date, ownerId?: string) => Promise<DeliveryRow[]>
+  listWorkOrders: (from: Date, to: Date, ownerId?: string) => Promise<WorkOrderRow[]>
   listFollowups: (from: Date, to: Date) => Promise<FollowupRow[]>
   listNextActions: (from: Date, to: Date) => Promise<NextActionRow[]>
   listEvents: (from: Date, to: Date) => Promise<EventRow[]>

@@ -1,4 +1,4 @@
-import type { PrismaClient } from '@prisma/client'
+import type { Prisma } from '@prisma/client'
 import { PORTAL_LABELS } from '../captacion'
 import type {
   CalendarDeps,
@@ -15,11 +15,11 @@ const SELLER_ACTIVE = { notIn: ['CERRADO', 'DESCARTADO'] as ('CERRADO' | 'DESCAR
 const BUYER_ACTIVE = { notIn: ['CERRADO', 'PERDIDO'] as ('CERRADO' | 'PERDIDO')[] }
 
 /** Adapter real de las deps del calendario con Prisma. */
-export function prismaCalendarDeps(db: PrismaClient): CalendarDeps {
+export function prismaCalendarDeps(db: Prisma.TransactionClient): CalendarDeps {
   return {
-    async listDeliveries(from, to): Promise<DeliveryRow[]> {
+    async listDeliveries(from, to, ownerId): Promise<DeliveryRow[]> {
       return db.delivery.findMany({
-        where: { scheduledAt: { gte: from, lt: to } },
+        where: { scheduledAt: { gte: from, lt: to }, responsableId: ownerId },
         select: {
           id: true,
           scheduledAt: true,
@@ -33,10 +33,11 @@ export function prismaCalendarDeps(db: PrismaClient): CalendarDeps {
       })
     },
 
-    async listWorkOrders(from, to): Promise<WorkOrderRow[]> {
+    async listWorkOrders(from, to, ownerId): Promise<WorkOrderRow[]> {
       // Solapa la ventana si empieza antes de `to` y termina (o empieza) en/después de `from`.
       const rows = await db.workOrder.findMany({
         where: {
+          assignedToId: ownerId,
           scheduledStart: { not: null, lt: to },
           OR: [
             { scheduledEnd: { gte: from } },
