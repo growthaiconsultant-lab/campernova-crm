@@ -7,6 +7,9 @@ import { requireAdmin, requireCanEditTaller, requireCanViewTaller } from '@/lib/
 import type { Prisma, WorkOrderStatus } from '@prisma/client'
 import { suggestSchedule, DEFAULT_HOURS_PER_DAY } from '@/lib/taller/scheduling'
 import { getMechanicBacklogHours } from '@/lib/taller/prisma-deps'
+import { reviewSchema, saveInspectionReviewTx } from '@/lib/entry/inspection-review'
+import { initialEquipment } from '@/lib/entry/inspection-equipment'
+import { recalculateMatchesForVehicle } from '@/lib/matching'
 import { isLockError, withLockedRoots, type LockRoot } from '@/lib/locking'
 import {
   WORK_ORDER_CORRECTION_TARGET,
@@ -54,6 +57,7 @@ const INITIAL_CHECKLIST = [
 
 function revalidateTaller(woId?: string) {
   revalidatePath('/taller')
+  revalidatePath('/dashboard')
   if (woId) revalidatePath(`/taller/${woId}`)
 }
 
@@ -321,6 +325,59 @@ export async function reopenWorkOrder(
   })
 }
 
+export async function addInspectionItem(orderId: string, raw: unknown) {
+  await requireCanEditTaller()
+  const parsed = z
+    .object({
+      item: z.string().trim().min(1).max(100),
+      category: z.enum(['MECANICA', 'CAMPER', 'ELECTRICIDAD']),
+    })
+    .safeParse(raw)
+  if (!parsed.success) return { error: 'Indica el nombre del elemento y su categoría.' }
+  const result = await withOpenWorkOrder(orderId, async (tx) => {
+    const order = await tx.workOrder.findFirst({
+      where: { id: orderId, kind: 'INSPECCION_ENTRADA' },
+      select: { vehicle: { select: { equipment: true, matchCatalog: true, heatingType: true } } },
+    })
+    if (!order) return 'Esta orden no es una inspección de entrada.'
+    const existing = await tx.workOrderChecklist.findFirst({
+      where: { workOrderId: orderId, item: { equals: parsed.data.item, mode: 'insensitive' } },
+    })
+    if (existing) return 'Ya existe ese elemento en la inspección.'
+    await tx.workOrderChecklist.create({
+      data: {
+        workOrderId: orderId,
+        ...parsed.data,
+        installed: initialEquipment(order.vehicle, parsed.data.item),
+      },
+    })
+    return null
+  })
+  if (!result.ok) return { error: result.error }
+  if (result.data) return { error: result.data }
+  revalidateTaller(orderId)
+  return { ok: true }
+}
+
+export async function saveInspectionReview(orderId: string, itemId: string, raw: unknown) {
+  await requireCanEditTaller()
+  const parsed = reviewSchema.safeParse(raw)
+  if (!parsed.success) return { error: parsed.error.issues[0].message }
+  const result = await withOpenWorkOrder(orderId, (tx) =>
+    saveInspectionReviewTx(tx, orderId, itemId, parsed.data)
+  )
+  if (!result.ok) return { error: result.error }
+  if (!result.data || 'error' in result.data)
+    return { error: result.data?.error ?? 'No se pudo guardar la inspección.' }
+  revalidateTaller(orderId)
+  if (result.data.sync) {
+    revalidatePath('/vendedores/[id]', 'page')
+    revalidatePath('/vehiculos')
+    await recalculateMatchesForVehicle(result.data.vehicleId, db)
+  }
+  return { version: result.data.version }
+}
+
 export async function updateChecklistItem(
   checklistItemId: string,
   data: { result: string; notes?: string | null; photos?: string[] }
@@ -342,7 +399,7 @@ export async function updateChecklistItem(
       data: {
         result: parsed.data.result,
         notes: parsed.data.notes ?? null,
-        photos: parsed.data.photos ?? [],
+        photos: parsed.data.photos,
       },
     })
   )

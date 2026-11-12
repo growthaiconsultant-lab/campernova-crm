@@ -115,14 +115,12 @@ export function EntryPanel(props: EntryPanelProps) {
   const isValidated = props.validatedAt != null && !isAnnulled
   const hasArrival = props.arrivalAt != null
   // Estado terminal de la entrada: anulada. Activa: validada y no anulada.
-  const canRegisterArrival = !hasArrival && !isValidated && !isAnnulled
   // Fase de arranque: la llegada física deja de ser requisito para validar (ENTRY_REQUIRE_PRECONDITIONS).
   const canValidate =
     !isValidated && !isAnnulled && (ENTRY_REQUIRE_PRECONDITIONS ? hasArrival : true)
   const canAnnul = props.isAdmin && isValidated
 
   // ── Sub-acciones ─────────────────────────────────────────────────────────────
-  const [arrivalPending, startArrival] = useTransition()
   const [validatePending, startValidate] = useTransition()
   const [annulPending, startAnnul] = useTransition()
 
@@ -135,22 +133,6 @@ export function EntryPanel(props: EntryPanelProps) {
 
   const [annulReason, setAnnulReason] = useState('DUPLICADO')
   const [annulNotes, setAnnulNotes] = useState('')
-
-  function handleArrival() {
-    setError(null)
-    startArrival(async () => {
-      const res = await registerPhysicalArrival({ vehicleId: props.vehicleId })
-      if (res.ok) {
-        toast.success(
-          res.data?.alreadyRegistered ? 'La llegada ya estaba registrada' : 'Llegada registrada'
-        )
-        router.refresh()
-      } else {
-        setError(res.error)
-        toast.error(res.error)
-      }
-    })
-  }
 
   function handleValidate() {
     setError(null)
@@ -326,23 +308,6 @@ export function EntryPanel(props: EntryPanelProps) {
         </div>
       </div>
 
-      {/* Registrar llegada física */}
-      {canRegisterArrival && (
-        <div className="rounded-xl border border-cn-line p-4">
-          <div className="flex items-center gap-2">
-            <Truck className="h-4 w-4 text-muted-foreground" />
-            <p className="text-sm font-medium text-cn-ink-700">Registrar llegada física</p>
-          </div>
-          <p className="text-cn-ink-400 mt-0.5 text-xs">
-            Confirma que el vehículo está físicamente en la nave. Es el paso previo a validar la
-            entrada oficial.
-          </p>
-          <Button size="sm" className="mt-3 h-9" onClick={handleArrival} disabled={arrivalPending}>
-            {arrivalPending ? 'Registrando…' : 'Registrar llegada'}
-          </Button>
-        </div>
-      )}
-
       {/* Validar entrada (llaves + aparcamiento) */}
       {canValidate && (
         <div className="rounded-xl border border-cn-line p-4">
@@ -351,8 +316,8 @@ export function EntryPanel(props: EntryPanelProps) {
             <p className="text-sm font-medium text-cn-ink-700">Validar entrada oficial</p>
           </div>
           <p className="text-cn-ink-400 mt-0.5 text-xs">
-            Registra la ubicación de aparcamiento y la custodia de llaves. Al validar se crea la
-            orden de inspección de entrada en Taller.
+            Registra la ubicación de aparcamiento y la custodia de llaves. La inspección de la
+            llegada sigue en la misma orden de Taller.
             {ENTRY_REQUIRE_PRECONDITIONS
               ? props.responsibleName
                 ? ''
@@ -530,5 +495,55 @@ function Readout({ label, value }: { label: string; value: string | null }) {
       <p className="text-cn-ink-400 text-[11px] uppercase tracking-wide">{label}</p>
       <p className="text-cn-ink-700">{value ?? '—'}</p>
     </div>
+  )
+}
+
+export function ConfirmArrival({
+  vehicleId,
+  arrived = false,
+}: {
+  vehicleId: string
+  arrived?: boolean
+}) {
+  const router = useRouter(),
+    [busy, setBusy] = useState(false),
+    [error, setError] = useState('')
+  async function confirm() {
+    setBusy(true)
+    setError('')
+    try {
+      const r = await registerPhysicalArrival({ vehicleId })
+      if (!r.ok) setError(r.error)
+      else {
+        if (r.data?.inspectionClosed)
+          toast.success('Llegada confirmada. La inspección anterior está cerrada.')
+        else if (r.data?.inspectionAssigned)
+          toast.success('Llegada confirmada. Inspección asignada en Por hacer.')
+        else toast.warning('Llegada confirmada. La inspección está pendiente de asignar en Taller.')
+        router.refresh()
+      }
+    } catch {
+      setError('Comprueba si la llegada se ha registrado antes de reintentar.')
+    } finally {
+      setBusy(false)
+    }
+  }
+  return (
+    <section className="space-y-2 rounded-xl border bg-card p-4">
+      <h2 className="font-semibold">Llegada al taller</h2>
+      <p className="text-sm text-muted-foreground">
+        {arrived
+          ? 'Llegada registrada. Puedes recuperar la inspección y su asignación.'
+          : 'Cuando el vehículo esté en la nave, confirma su llegada para asignar la inspección de entrada.'}
+      </p>
+      <Button type="button" disabled={busy} onClick={confirm}>
+        {busy
+          ? 'Guardando…'
+          : arrived
+            ? 'Asignar inspección de entrada'
+            : 'Confirmar llegada y avisar a taller'}
+      </Button>
+      {error && <p role="alert">{error}</p>}
+    </section>
   )
 }

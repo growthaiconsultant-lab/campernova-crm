@@ -80,6 +80,7 @@ function revalidateEntry(sellerLeadId: string | null) {
   if (sellerLeadId) revalidatePath(`/vendedores/${sellerLeadId}`)
   revalidatePath('/vehiculos')
   revalidatePath('/taller')
+  revalidatePath('/dashboard')
 }
 
 // ─── Actions ──────────────────────────────────────────────────────────────────
@@ -90,7 +91,7 @@ function revalidateEntry(sellerLeadId: string | null) {
  */
 export async function registerPhysicalArrival(
   formData: unknown
-): Promise<ActionResult<{ vehicleId: string; alreadyRegistered: boolean }>> {
+): Promise<ActionResult<Awaited<ReturnType<typeof registerPhysicalArrivalTx>>>> {
   const actor = await requireAgente()
 
   const parsed = registerArrivalSchema.safeParse(formData)
@@ -107,7 +108,7 @@ export async function registerPhysicalArrival(
 
   const roots = buildEntryRoots({ vehicleId: input.vehicleId, sellerLeadId: vehicle.sellerLeadId })
 
-  let result: { vehicleId: string; alreadyRegistered: boolean }
+  let result: Awaited<ReturnType<typeof registerPhysicalArrivalTx>>
   try {
     result = await withLockedRoots(roots, (tx) =>
       registerPhysicalArrivalTx(tx, {

@@ -8,6 +8,7 @@ import { personLabel, vehicleLabel } from '../display'
 import { NEXT_ACTION_LABELS } from '../next-action'
 import { admittedSellerWhere } from '../seller-intake'
 import { BUYER_LEAD_ACTIVE_STATUSES } from '../state-machine'
+import { inspectionTasks } from './inspection-tasks'
 
 const clock = new Intl.DateTimeFormat('es-ES', {
   timeZone: 'Europe/Madrid',
@@ -77,80 +78,90 @@ export async function getWorkday(
     nextActionDueAt: true,
     agent: name,
   } as const
-  const [buyers, sellers, events, reservations, captures, deliveries, orders, afterSales] =
-    await Promise.all([
-      db.buyerLead.findMany({
-        where: { ...reminders, mergedIntoId: null, status: { in: BUYER_LEAD_ACTIVE_STATUSES } },
-        select: reminderFields,
-      }),
-      db.sellerLead.findMany({
-        where: {
-          ...reminders,
-          ...admittedSellerWhere,
-          status: { notIn: ['CERRADO', 'DESCARTADO'] },
-        },
-        select: reminderFields,
-      }),
-      db.calendarEvent.findMany({
-        where: {
-          assignedToId: ownerId,
-          status: { in: ['PROGRAMADO', 'CONFIRMADO', 'EN_CURSO'] },
-          startAt: { lt: to },
-          OR: [
-            { startAt: { gte: from } },
-            { type: { in: ['LLAMADA', 'SEGUIMIENTO'] } },
-            { commitment: 'INTERNO' },
-          ],
-        },
-        select: {
-          id: true,
-          title: true,
-          type: true,
-          commitment: true,
-          allDay: true,
-          startAt: true,
-          assignedTo: name,
-          buyerLead: name,
-          sellerLead: name,
-          vehicle: { select: { brand: true, model: true, year: true } },
-        },
-      }),
-      db.offer.findMany({
-        where: {
-          status: 'ACEPTADA',
-          depositAmount: { gt: 0 },
-          buyerLead: { agentId: ownerId },
-          OR: [{ reservedUntil: { lt: to } }, { reservedUntil: null }],
-        },
-        select: {
-          id: true,
-          buyerLeadId: true,
-          reservedUntil: true,
-          buyerLead: { select: { name: true, agent: name } },
-          vehicle: { select: { brand: true, model: true, year: true } },
-        },
-      }),
-      db.vehicleCapture.findMany({
-        where: {
-          assignedToId: ownerId,
-          sellerLeadId: null,
-          status: { notIn: ['CONVERTIDO', 'RECHAZADO'] },
-        },
-        select: {
-          id: true,
-          title: true,
-          status: true,
-          portal: true,
-          entradaScheduledAt: true,
-          assignedTo: name,
-          phone: true,
-          listingUrl: true,
-        },
-      }),
-      calendar.listDeliveries(from, to, ownerId),
-      calendar.listWorkOrders(from, to, ownerId),
-      ownerId ? [] : calendar.listFollowups(from, to),
-    ])
+  const [
+    buyers,
+    sellers,
+    events,
+    reservations,
+    captures,
+    deliveries,
+    orders,
+    afterSales,
+    inspections,
+  ] = await Promise.all([
+    db.buyerLead.findMany({
+      where: { ...reminders, mergedIntoId: null, status: { in: BUYER_LEAD_ACTIVE_STATUSES } },
+      select: reminderFields,
+    }),
+    db.sellerLead.findMany({
+      where: {
+        ...reminders,
+        ...admittedSellerWhere,
+        status: { notIn: ['CERRADO', 'DESCARTADO'] },
+      },
+      select: reminderFields,
+    }),
+    db.calendarEvent.findMany({
+      where: {
+        assignedToId: ownerId,
+        status: { in: ['PROGRAMADO', 'CONFIRMADO', 'EN_CURSO'] },
+        startAt: { lt: to },
+        OR: [
+          { startAt: { gte: from } },
+          { type: { in: ['LLAMADA', 'SEGUIMIENTO'] } },
+          { commitment: 'INTERNO' },
+        ],
+      },
+      select: {
+        id: true,
+        title: true,
+        type: true,
+        commitment: true,
+        allDay: true,
+        startAt: true,
+        assignedTo: name,
+        buyerLead: name,
+        sellerLead: name,
+        vehicle: { select: { brand: true, model: true, year: true } },
+      },
+    }),
+    db.offer.findMany({
+      where: {
+        status: 'ACEPTADA',
+        depositAmount: { gt: 0 },
+        buyerLead: { agentId: ownerId },
+        OR: [{ reservedUntil: { lt: to } }, { reservedUntil: null }],
+      },
+      select: {
+        id: true,
+        buyerLeadId: true,
+        reservedUntil: true,
+        buyerLead: { select: { name: true, agent: name } },
+        vehicle: { select: { brand: true, model: true, year: true } },
+      },
+    }),
+    db.vehicleCapture.findMany({
+      where: {
+        assignedToId: ownerId,
+        sellerLeadId: null,
+        status: { notIn: ['CONVERTIDO', 'RECHAZADO'] },
+      },
+      select: {
+        id: true,
+        title: true,
+        status: true,
+        portal: true,
+        entradaScheduledAt: true,
+        assignedTo: name,
+        phone: true,
+        listingUrl: true,
+      },
+    }),
+    calendar.listDeliveries(from, to, ownerId),
+    calendar.listWorkOrders(from, to, ownerId),
+    ownerId ? [] : calendar.listFollowups(from, to),
+    inspectionTasks(db, ownerId),
+  ])
   const tasks: DayRow[] = []
   const agenda: DayRow[] = []
   function due(date: Date | null, allDay = false) {
@@ -271,5 +282,5 @@ export async function getWorkday(
   }
   tasks.sort(chronological)
   agenda.sort(chronological)
-  return { tasks, agenda }
+  return { tasks: [...inspections, ...tasks], agenda }
 }

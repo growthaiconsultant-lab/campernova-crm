@@ -62,7 +62,7 @@ import {
   deriveDocumentChecklist,
   ENTRY_SIGNAL_CATEGORIES,
 } from '@/lib/entry'
-import { EntryPanel } from './entry-panel'
+import { ConfirmArrival, EntryPanel } from './entry-panel'
 import type { VehicleDocumentCategory } from '@prisma/client'
 import { calculateLeadScore, calculateClosureProbability, leadScoreColor } from '@/lib/lead-score'
 import { sellerAcquisitionScore, ACTIVE_DEMAND_MATCH_THRESHOLD } from '@/lib/scoring'
@@ -168,9 +168,13 @@ export default async function FichaVendedorPage({
             entryAnnulledBy: { select: { name: true } },
             workOrders: {
               where: {
-                status: { in: ['PENDIENTE', 'EN_DIAGNOSTICO', 'PRESUPUESTADA', 'EN_CURSO'] },
+                OR: [
+                  { status: { in: ['PENDIENTE', 'EN_DIAGNOSTICO', 'PRESUPUESTADA', 'EN_CURSO'] } },
+                  { kind: 'INSPECCION_ENTRADA' },
+                ],
               },
-              select: { id: true, kind: true, description: true, status: true },
+              orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+              select: { id: true, kind: true, description: true, status: true, assignedToId: true },
             },
           },
         },
@@ -215,6 +219,8 @@ export default async function FichaVendedorPage({
       ? 'resumen'
       : activeTab
 
+  const openOrders =
+    v?.workOrders?.filter((o) => o.status !== 'COMPLETADA' && o.status !== 'RECHAZADA') ?? []
   const showHeaderStep = isAdmitted && activeTab !== 'resumen'
   const nextStep = showHeaderStep
     ? sellerSteps(
@@ -430,7 +436,7 @@ export default async function FichaVendedorPage({
         salePrice: v.salePrice,
         photoCount: v.photos.length,
         photosByCategory: countPhotosByCategory(v.photos),
-        workOrdersBlockingCount: v.workOrders?.length ?? 0,
+        workOrdersBlockingCount: openOrders.length,
       }
     : null
 
@@ -519,7 +525,10 @@ export default async function FichaVendedorPage({
     state: row.state as string,
     requiresDocument: row.category === 'CONTRATO_GESTION',
   }))
-  const inspectionOrderId = v?.workOrders.find((w) => w.kind === 'INSPECCION_ENTRADA')?.id ?? null
+  const inspection =
+    openOrders.find((w) => w.kind === 'INSPECCION_ENTRADA') ??
+    v?.workOrders.find((w) => w.kind === 'INSPECCION_ENTRADA')
+  const inspectionOrderId = inspection?.id ?? null
 
   const insightInput = {
     daysSinceLastActivity: daysSinceActivity,
@@ -1139,6 +1148,23 @@ export default async function FichaVendedorPage({
               ))}
             </nav>
           )}
+          {activeTab === 'preparacion' &&
+            v &&
+            isAgente &&
+            !lead.archivedAt &&
+            !v.entryAnnulledAt &&
+            (!v.physicalArrivalAt ||
+            !inspection ||
+            (openOrders.includes(inspection) && inspection.assignedToId === null) ? (
+              <ConfirmArrival vehicleId={v.id} arrived={!!v.physicalArrivalAt} />
+            ) : inspectionOrderId ? (
+              <Link
+                href={'/taller/' + inspectionOrderId + '#inspeccion-entrada'}
+                className="block rounded-lg border bg-card p-3 font-semibold text-brand"
+              >
+                Abrir inspección de entrada en Taller →
+              </Link>
+            ) : null)}
           {activeTab === 'preparacion' && v && vehicleDefaultValues && (
             <section
               id="checklist-match"
@@ -1219,7 +1245,7 @@ export default async function FichaVendedorPage({
                     <div id="prep-workshop" tabIndex={-1} className="rounded-xl border p-4">
                       <p className="text-sm font-medium text-cn-ink-700">Taller</p>
                       <ul className="divide-y">
-                        {v.workOrders.map((order) => (
+                        {openOrders.map((order) => (
                           <li key={order.id} className="py-2">
                             <Link
                               className="text-sm text-sidebar-primary underline"
@@ -1329,7 +1355,7 @@ export default async function FichaVendedorPage({
                           <CardTitle className="text-base">Entrada oficial</CardTitle>
                           <CardDescription>
                             Registra la llegada física, clasifica los documentos, valida la entrada
-                            en custodia (crea la orden de inspección) y, si procede, anúlala.
+                            en custodia y, si procede, anúlala.
                           </CardDescription>
                         </CardHeader>
                         <CardContent>

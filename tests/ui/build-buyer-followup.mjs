@@ -18,6 +18,7 @@ async function main() {
       offers: 'tests/ui/buyer-offers-fixture.tsx',
       offersList: 'tests/ui/offers-list-fixture.tsx',
       workday: 'tests/ui/workday-fixture.tsx',
+      inspection: 'tests/ui/inspection-fixture.tsx',
       captures: 'tests/ui/capture-workspace-fixture.tsx',
       vehicleInventory: 'tests/ui/vehicle-inventory-fixture.tsx',
       inventoryOperations: 'tests/ui/inventory-operations-fixture.tsx',
@@ -38,6 +39,15 @@ async function main() {
       {
         name: 'next-browser-fixture',
         setup(plugin) {
+          plugin.onResolve({ filter: /^\.\.\/actions$/ }, (args) =>
+            args.importer.endsWith('inspection-review.tsx')
+              ? { path: args.path, namespace: 'inspection-actions' }
+              : undefined
+          )
+          plugin.onLoad({ filter: /.*/, namespace: 'inspection-actions' }, () => ({
+            contents:
+              'export const saveInspectionReview=(...args)=>window.inspectionFixture.save(...args);export const addInspectionItem=(...args)=>window.inspectionFixture.add(...args)',
+          }))
           plugin.onResolve({ filter: /^\.\/actions$/ }, (args) =>
             args.importer.replaceAll('\\', '/').includes('/captaciones/')
               ? { path: args.path, namespace: 'capture-actions' }
