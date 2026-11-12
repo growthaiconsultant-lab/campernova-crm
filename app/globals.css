@@ -356,3 +356,24 @@ h1.cn-interior-title {
   letter-spacing: -0.05em;
   line-height: 1.04;
 }
+
+/* Paleta compartida por las páginas interiores de la web. */
+.cn-public-interior {
+  --cn-teal-900: #192d24;
+  --cn-teal-700: #305441;
+  --cn-terra-500: #88532f;
+  --cn-cream-100: #f5f1e7;
+  --cn-cream-50: #fcfaf3;
+  --cn-line: #d8d7c9;
+}
+.cn-inventory-inner {
+  width: min(1280px, calc(100% - 64px));
+}
+@media (max-width: 700px) {
+  .cn-inventory-inner {
+    width: calc(100% - 40px);
+  }
+  .cn-public-interior > section {
+    padding-block: 36px;
+  }
+}

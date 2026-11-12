@@ -1,6 +1,7 @@
 import type { Metadata } from 'next'
 import { Mail, Phone, MapPin, Clock, MessageCircle, ArrowRight } from 'lucide-react'
 import { PublicNav } from '@/components/public-nav'
+import { PublicPageIntro } from '@/components/public-page-intro'
 import { PublicFooter } from '@/components/public-footer'
 import { JsonLd } from '@/components/json-ld'
 import { autoDealerJsonLd, BUSINESS_MAPS_URL, pageMetadata } from '@/lib/seo'
@@ -12,19 +13,21 @@ export const metadata: Metadata = pageMetadata({
   path: '/contacto',
 })
 
+const PHONE = { href: 'tel:+34645639185', value: '645 63 91 85' }
+const WHATSAPP = 'https://wa.me/34645639185'
+
 const CHANNELS = [
   {
     Icon: Phone,
     title: 'Teléfono',
-    value: '645 63 91 85',
-    href: 'tel:+34645639185',
+    ...PHONE,
     detail: 'Lun–Vie 10:00–19:00 · Sáb 10:00–13:00',
   },
   {
     Icon: MessageCircle,
     title: 'WhatsApp',
     value: 'Escríbenos por WhatsApp',
-    href: 'https://wa.me/34645639185',
+    href: WHATSAPP,
     detail: 'Respuesta rápida para dudas sobre tasación o compra.',
   },
   {
@@ -47,35 +50,24 @@ export default function ContactoPage() {
   return (
     <>
       <JsonLd data={autoDealerJsonLd()} />
-      <PublicNav />
+      <PublicNav overPhoto />
 
-      <main className="min-h-screen" style={{ background: 'var(--cn-cream-100)' }}>
-        {/* Hero */}
-        <section
-          className="px-8 pb-16 pt-16 max-[640px]:px-5"
-          style={{ background: 'var(--cn-teal-900)' }}
+      <main
+        className="cn-public-interior min-h-screen"
+        style={{ background: 'var(--cn-cream-100)' }}
+      >
+        <PublicPageIntro
+          label="Contacto"
+          title="Estamos aquí"
+          accent="para ayudarte."
+          description="Cuéntanos qué necesitas. Te respondemos por el canal que prefieras."
+          photo="/cn-landing/media/nave-fachada.jpg"
         >
-          <div className="mx-auto max-w-[1280px]">
-            <p
-              className="font-mono text-[11px] uppercase tracking-[0.18em]"
-              style={{ color: 'rgba(255,255,255,0.6)' }}
-            >
-              · Contacto
-            </p>
-            <h1
-              className="cn-interior-title mt-4 text-[clamp(2.2rem,5vw,3.5rem)] leading-[1.05] tracking-[-0.02em] text-white"
-              style={{ fontFamily: 'var(--font-fraunces)', maxWidth: '22ch' }}
-            >
-              Estamos aquí para ayudarte.
-            </h1>
-            <p
-              className="mt-5 text-[18px] leading-relaxed"
-              style={{ color: 'rgba(255,255,255,0.72)', maxWidth: '52ch' }}
-            >
-              Cuéntanos qué necesitas. Te respondemos por el canal que prefieras.
-            </p>
-          </div>
-        </section>
+          <a href={WHATSAPP} target="_blank" rel="noopener noreferrer">
+            Escribir por WhatsApp ↗
+          </a>
+          <a href={PHONE.href}>Llamar al {PHONE.value}</a>
+        </PublicPageIntro>
 
         {/* Channels */}
         <section className="px-8 py-16 max-[640px]:px-5">
