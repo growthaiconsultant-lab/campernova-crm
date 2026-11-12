@@ -1,6 +1,7 @@
 import Image from 'next/image'
 import Link from 'next/link'
 import { BUSINESS, BUSINESS_MAPS_URL } from '@/lib/seo'
+import { homeFormPaths } from '@/lib/public-navigation'
 import { HomeNav } from './home-nav'
 import { HomeCatalog, type HomeVehicle } from './home-catalog'
 import './public-home.css'
@@ -279,8 +280,8 @@ export function PublicHome({ vehicles }: { vehicles: HomeVehicle[] }) {
             </div>
             <div>
               <b>CampersNova</b>
-              <Link href="/comprar">Comprar</Link>
-              <Link href="/vender">Vender</Link>
+              <a href={homeFormPaths['/comprar']}>Comprar</a>
+              <a href={homeFormPaths['/vender']}>Vender</a>
               <Link href="/sobre">Sobre nosotros</Link>
               <a href="#taller">Taller</a>
               <a href="#garantias">Garantías y posventa</a>

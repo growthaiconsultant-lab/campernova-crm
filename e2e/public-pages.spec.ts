@@ -4,13 +4,15 @@ import { test, expect } from '@playwright/test'
 
 test.describe('Landing page /', () => {
   for (const width of [1440, 390]) {
-    test(`opens the original public pages from the home menu at ${width}px`, async ({ page }) => {
+    test(`opens the public pages and campaign forms from the home menu at ${width}px`, async ({
+      page,
+    }) => {
       await page.setViewportSize({ width, height: 900 })
       const routes = [
         ['Inicio', '/'],
-        ['Comprar', '/comprar'],
+        ['Comprar', '/encuentra-tu-camper'],
         ['Búsqueda a medida', '/busqueda-bajo-pedido'],
-        ['Vender', '/vender'],
+        ['Vender', '/vende-tu-camper'],
         ['Cómo funciona', '/como-funciona'],
         ['Sobre nosotros', '/sobre'],
         ['Contacto', '/contacto'],
@@ -20,9 +22,19 @@ test.describe('Landing page /', () => {
         if (width < 761) await page.getByRole('button', { name: 'Menú' }).click()
         const link = page.locator('header').getByRole('link', { name: label, exact: true })
         await expect(link).toHaveAttribute('href', href)
+        if (label === 'Comprar' || label === 'Vender') {
+          await expect(
+            page.locator('footer').getByRole('link', { name: label, exact: true })
+          ).toHaveAttribute('href', href)
+        }
         await link.click()
         await expect(page).toHaveURL(new URL(href, page.url()).href)
         await expect(page.getByRole('heading', { level: 1 }).first()).toBeVisible()
+        if (label === 'Comprar' || label === 'Vender') {
+          const form = page.locator('#cn-form')
+          await expect(form).toBeVisible()
+          await expect(form).toHaveAttribute('action', '/api/landing' + href)
+        }
       }
     })
   }
