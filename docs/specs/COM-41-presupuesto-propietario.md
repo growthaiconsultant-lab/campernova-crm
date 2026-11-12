@@ -17,7 +17,7 @@ COM-40 permite marcar reparaciones durante la inspección. Taller y Administraci
 ## Criterios de aceptación
 
 - El correo identifica al taller con el logotipo oficial de CampersNova. Muestra vehículo, versión y total con IVA, con un botón para revisar el presupuesto y una alternativa de texto para lectores de correo sencillos.
-
+- La página del propietario utiliza el mismo logotipo y estilo del correo. Muestra versión, estado, vehículo y total con IVA antes del desglose. Al responder, conserva los trabajos visibles junto a la decisión, su fecha y el motivo opcional de rechazo.
 - Sólo las partidas marcadas de la inspección forman el borrador. Se pueden guardar importes parciales. El documento para el propietario incluye el trabajo propuesto y los importes en euros con IVA. Las notas internas quedan en taller.
 - Revisar el destinatario antes de enviar. Avisar si cambian las partidas o el destinatario entre revisión y envío. Conservar versiones enviadas y respuestas, incluso tras cambiar la inspección.
 - El enlace privado permite consultar, aceptar o rechazar una versión. Abrir el correo no implica responder. La primera respuesta es definitiva. Una nueva versión enviada sustituye a la pendiente.

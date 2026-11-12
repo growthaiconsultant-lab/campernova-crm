@@ -1,4 +1,4 @@
-import { randomBytes } from 'node:crypto'
+import { page } from './document'
 import { revalidatePath } from 'next/cache'
 import { z } from 'zod'
 import { verifyQuoteLink } from '@/lib/email/owner-quote'
@@ -11,25 +11,6 @@ function escape(value: string) {
   return value.replace(
     /[&<>"']/g,
     (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!
-  )
-}
-function page(body: string, status = 200, script = '') {
-  const nonce = randomBytes(16).toString('base64')
-  return new Response(
-    `<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Presupuesto de reparaciones · CampersNova</title>
-  <style nonce="${nonce}">*{box-sizing:border-box}body{margin:0;background:#f4f6f5;color:#182c25;font:1rem/1.5 system-ui,sans-serif}header{background:#213e33;color:white;padding:1rem max(1rem,calc((100vw - 42rem)/2));font-weight:700}main{max-width:42rem;margin:2rem auto;padding:1.5rem;background:white;border-radius:1rem;overflow-wrap:anywhere}h1{line-height:1.15;font-size:1.8rem;margin:.25rem 0}h2{font-size:1.15rem}ul{list-style:none;padding:0}li{display:flex;justify-content:space-between;gap:1rem;border-bottom:1px solid #dce5df;padding:.8rem 0}li span{white-space:nowrap}textarea{display:block;width:100%;padding:.6rem;font:inherit}button{margin:.75rem .5rem 0 0;border:1px solid #366853;border-radius:.45rem;padding:.65rem 1rem;background:white;color:#264e3f;font:inherit;cursor:pointer}button.primary{color:white;background:#366853}.total{font-weight:700;font-size:1.2rem;text-align:right}.estado{display:inline-block;padding:.25rem .65rem;background:#ebf3ef;border-radius:.4rem;font-weight:600}details{margin-top:1.5rem}summary{cursor:pointer}label{display:block;margin:.6rem 0}</style></head>
-  <body><header>CampersNova · Taller</header><main>${body}</main>${script ? `<script nonce="${nonce}">${script}</script>` : ''}</body></html>`,
-    {
-      status,
-      headers: {
-        'Content-Type': 'text/html; charset=utf-8',
-        'Cache-Control': 'private, no-store',
-        'Referrer-Policy': 'no-referrer',
-        'X-Robots-Tag': 'noindex, nofollow, noarchive',
-        'X-Content-Type-Options': 'nosniff',
-        'Content-Security-Policy': `default-src 'none'; style-src 'nonce-${nonce}'; script-src 'nonce-${nonce}'; form-action 'self'; frame-ancestors 'none'; base-uri 'none'`,
-      },
-    }
   )
 }
 const unavailable = () =>
@@ -71,12 +52,36 @@ export async function POST(request: Request) {
       '<h1>Este presupuesto se ha sustituido</h1><p>Consulta la versión más reciente en tu correo.</p>'
     )
   const lines = quoteLines.parse(q.lines)
+  const total = euro(quoteTotal(lines))
   const auth = '<input type="hidden" name="token" value="' + escape(token) + '">'
   const actions =
     q.status === 'PENDIENTE'
-      ? `<form method="post">${auth}<button class="primary" name="decision" value="ACEPTADO">Aceptar presupuesto de ${euro(quoteTotal(lines))}</button></form><details><summary>Rechazar presupuesto</summary><form method="post">${auth}<label>Motivo del rechazo (opcional)<textarea name="reason" rows="2" maxlength="500"></textarea></label><button name="decision" value="RECHAZADO">Confirmar rechazo</button></form></details>`
-      : `<p>Respuesta registrada el ${q.answeredAt?.toLocaleString('es-ES', { timeZone: 'Europe/Madrid' }) ?? ''}.</p>${q.reason ? '<p>Motivo · ' + escape(q.reason) + '</p>' : ''}`
-  return page(`<p>Versión ${q.version}</p><h1>Presupuesto de reparaciones</h1><p>${escape(q.vehicleLabel ?? '')}${q.ownerName ? ' · ' + escape(q.ownerName) : ''}</p>
-    <p class="estado">${quoteLabels[q.status]}</p><h2>Trabajos propuestos</h2><ul>${lines.map((l) => `<li><div><strong>${escape(l.item)}</strong><br>${escape(l.description)}</div><span>${euro(l.cents ?? 0)}</span></li>`).join('')}</ul>
-    <p class="total">Total con IVA · ${euro(quoteTotal(lines))}</p>${actions}`)
+      ? `<div class="actions">
+          <form method="post">${auth}<button class="primary" name="decision" value="ACEPTADO">Aceptar presupuesto de ${total}</button></form>
+          <details>
+            <summary><span class="closed-label">Rechazar presupuesto</span><span class="open-label">Cancelar</span></summary>
+            <form method="post">${auth}
+              <label for="reason">Motivo del rechazo (opcional)</label>
+              <textarea id="reason" name="reason" rows="2" maxlength="500"></textarea>
+              <button class="primary" name="decision" value="RECHAZADO">Confirmar rechazo</button>
+            </form>
+          </details>
+        </div>`
+      : `<section class="receipt" aria-label="Respuesta registrada">
+          <strong>${q.status === 'ACEPTADO' ? 'Has aceptado el presupuesto de ' + total + '.' : 'Has rechazado el presupuesto.'}</strong>
+          ${q.answeredAt ? '<p>Respuesta registrada el ' + q.answeredAt.toLocaleString('es-ES', { timeZone: 'Europe/Madrid', dateStyle: 'short', timeStyle: 'short' }) + '.</p>' : ''}
+          ${q.reason ? '<p>Motivo · ' + escape(q.reason) + '</p>' : ''}
+        </section>`
+  return page(`
+    <div class="meta"><span>Presupuesto · Versión ${q.version}</span><span class="status ${q.status}">${quoteLabels[q.status]}</span></div>
+    <h1>Tu presupuesto de reparaciones</h1>
+    <section class="overview" aria-label="Resumen del presupuesto">
+      <div><span class="label">Vehículo</span><strong>${escape(q.vehicleLabel || 'Tu vehículo')}</strong>
+        ${q.ownerName ? '<span class="label">A nombre de ' + escape(q.ownerName) + '</span>' : ''}
+      </div>
+      <div class="total"><span class="label">Total con IVA</span><strong>${total}</strong></div>
+    </section>
+    <h2>Trabajos propuestos</h2>
+    <ul>${lines.map((l) => `<li><div><strong>${escape(l.item)}</strong><p>${escape(l.description)}</p></div><span>${euro(l.cents ?? 0)}</span></li>`).join('')}</ul>
+    ${actions}`)
 }
