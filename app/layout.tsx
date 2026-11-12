@@ -1,12 +1,7 @@
 import type { Metadata } from 'next'
 import Script from 'next/script'
-import {
-  Inter,
-  Fraunces,
-  JetBrains_Mono,
-  Cormorant_Garamond,
-  Hanken_Grotesk,
-} from 'next/font/google'
+import localFont from 'next/font/local'
+import { Inter, Fraunces, JetBrains_Mono, Hanken_Grotesk } from 'next/font/google'
 import './globals.css'
 import { CookieBanner } from '@/components/cookie-banner'
 import { PostHogProvider } from '@/components/posthog-provider'
@@ -32,9 +27,10 @@ const jetbrainsMono = JetBrains_Mono({
   display: 'swap',
 })
 
-const cormorant = Cormorant_Garamond({
-  subsets: ['latin'],
-  weight: ['400', '600', '700'],
+const cormorant = localFont({
+  src: './fonts/cormorant-garamond-latin.woff2',
+  weight: '300 700',
+  adjustFontFallback: 'Times New Roman',
   variable: '--font-cormorant',
   display: 'swap',
 })
