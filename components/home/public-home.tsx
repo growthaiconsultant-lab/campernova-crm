@@ -6,11 +6,12 @@ import { InstagramMosaic } from './instagram-mosaic'
 import { PublicNav } from '@/components/public-nav'
 import { HomeBrands } from './home-brands'
 import { Ownership } from './ownership'
-import { HomeCatalog, type HomeVehicle } from './home-catalog'
+import type { CardVehicle } from '@/components/catalog/vehicle-catalog-card'
+import { HomeCatalog } from './home-catalog'
 import './public-home.css'
 import './home-opening.css'
 
-export function PublicHome({ vehicles }: { vehicles: HomeVehicle[] }) {
+export function PublicHome({ vehicles }: { vehicles: CardVehicle[] }) {
   return (
     <div className="cn-home-page">
       <PublicNav overPhoto />

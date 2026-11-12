@@ -44,17 +44,15 @@ export default async function LandingPage() {
   const vehicles = available.map((v) => ({
     slug: v.slug,
     title: v.title,
-    type: v.typeLabel,
-    photo: v.photos[0] ?? null,
+    typeLabel: v.typeLabel,
+    brand: v.brand,
+    model: v.model,
+    year: v.year,
+    km: v.km,
+    seats: v.seats,
+    photos: v.photos.slice(0, 1),
     price: v.price,
     monthlyPaymentFrom: v.monthlyPaymentFrom,
-    specs: [
-      v.year,
-      v.km != null ? v.km.toLocaleString('es-ES') + ' km' : null,
-      v.seats != null ? v.seats + ' plazas' : null,
-    ]
-      .filter((value) => value != null)
-      .join(' · '),
   }))
   return (
     <>
