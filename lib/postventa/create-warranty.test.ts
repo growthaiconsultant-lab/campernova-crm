@@ -44,7 +44,7 @@ describe('createWarrantyForDelivery', () => {
     )
     expect(db.warranty.create).not.toHaveBeenCalled()
   })
-  it('crea warranty con endDate = startDate + 12 meses', async () => {
+  it('crea la garantía de la nueva venta por 24 meses', async () => {
     const db = makeDb()
     db.delivery.findUnique.mockResolvedValue(BASE_DELIVERY)
 
@@ -53,11 +53,21 @@ describe('createWarrantyForDelivery', () => {
     expect(db.warranty.create).toHaveBeenCalledOnce()
     const { data } = db.warranty.create.mock.calls[0][0]
     expect(data.startDate).toEqual(BASE_DELIVERY.completedAt)
-    const expectedEnd = new Date(BASE_DELIVERY.completedAt)
-    expectedEnd.setFullYear(expectedEnd.getFullYear() + 1)
-    expect(data.endDate).toEqual(expectedEnd)
+    expect(data.endDate).toEqual(new Date('2028-05-01T10:00:00Z'))
     expect(data.vehicleId).toBe('vehicle-1')
     expect(data.buyerLeadId).toBe('buyer-1')
+  })
+
+  it('ajusta una entrega de un 29 de febrero al final del mes de vencimiento', async () => {
+    const db = makeDb()
+    db.delivery.findUnique.mockResolvedValue({
+      ...BASE_DELIVERY,
+      completedAt: new Date('2028-02-29T10:00:00Z'),
+    })
+    await createWarrantyForDelivery('delivery-1', db as never)
+    expect(db.warranty.create.mock.calls[0][0].data.endDate).toEqual(
+      new Date('2030-02-28T10:00:00Z')
+    )
   })
 
   it('crea 2 followups: DIA_7 y DIA_30', async () => {

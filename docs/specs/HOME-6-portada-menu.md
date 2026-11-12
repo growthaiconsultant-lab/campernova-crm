@@ -21,5 +21,6 @@ La primera pantalla reúne el menú, la imagen principal y la franja de marcas. 
 
 ## Rollout
 
-Entregar la vista previa para revisión. La publicación en campersnova.com corresponde a un paso posterior.
-El flujo interno de entregas calcula actualmente un vencimiento a un año en `lib/postventa/create-warranty.ts`. Coordinar el cambio de duración para nuevas entregas antes del lanzamiento comercial de la oferta. Esta propuesta visual no altera garantías registradas ni fechas de contratos.
+Publicación autorizada por el titular con el ajuste de posventa y la activación de Instagram en producción.
+
+Las nuevas entregas de venta crean una garantía de 24 meses en vehículo y vivienda desde el cierre. Para un cierre el 29 de febrero se usa el último día de febrero del año de vencimiento. Se mantiene el registro en la transacción de entrega. Las garantías existentes conservan las fechas que tienen guardadas. El despliegue no requiere una migración de datos.

@@ -190,7 +190,7 @@ export default async function EntregaDetailPage({ params }: { params: { id: stri
           </div>
           <p className="mt-1.5 font-hanken text-[12px] leading-[1.5] text-ink2">
             {delivery.kind === 'VENTA'
-              ? 'Esta entrega por venta activa una garantía de 12 meses y los seguimientos de los días 7 y 30.'
+              ? 'Esta entrega por venta activa una garantía de 24 meses en vehículo y vivienda y los seguimientos de los días 7 y 30.'
               : 'Esta entrega física no registra una venta ni activa una garantía.'}{' '}
             Checklist y firma son opcionales; puedes completar desde Programada o En curso.
           </p>

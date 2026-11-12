@@ -112,7 +112,7 @@ export function SignForm({
           <h3 className="font-semibold">Completar entrega</h3>
           <p className="text-sm text-cn-ink-500">
             Al completar: el vehículo pasa a VENDIDO, el match a CERRADO, el comprador a CERRADO y
-            se activa la garantía de 12 meses.
+            se activa la garantía de 24 meses en vehículo y vivienda.
           </p>
           {!canComplete && (
             <p className="text-sm text-amber-600">
