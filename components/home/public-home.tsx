@@ -259,30 +259,37 @@ export function PublicHome({ vehicles }: { vehicles: HomeVehicle[] }) {
         <div className="shell">
           <div className="cols">
             <div>
-              <Image
-                alt="CampersNova"
-                src="/logo-cn-cropped.png"
-                width={756}
-                height={334}
-                sizes="100px"
-              />
+              <Link href="/" aria-label="CampersNova, inicio">
+                <Image
+                  alt="CampersNova"
+                  src="/logo-cn-cropped.png"
+                  width={756}
+                  height={334}
+                  sizes="100px"
+                />
+              </Link>
             </div>
             <div>
               <b>Vehículos</b>
+              <Link href="/comprar/vehiculos">Catálogo completo</Link>
               <Link href="/comprar/campers">Campers en venta</Link>
               <Link href="/comprar/autocaravanas">Autocaravanas en venta</Link>
               <Link href="/comprar/marcas">Buscar por marca</Link>
-              <a href="#busqueda">Búsqueda a medida</a>
+              <Link href="/busqueda-bajo-pedido">Búsqueda a medida</Link>
             </div>
             <div>
               <b>CampersNova</b>
+              <Link href="/comprar">Comprar</Link>
+              <Link href="/vender">Vender</Link>
               <Link href="/sobre">Sobre nosotros</Link>
               <a href="#taller">Taller</a>
               <a href="#garantias">Garantías y posventa</a>
+              <a href="#tienda">Tienda online</a>
               <Link href="/como-funciona">Cómo funciona</Link>
             </div>
             <div>
               <b>Contacto</b>
+              <Link href="/contacto">Contacto</Link>
               <a href={`tel:${BUSINESS.phone}`}>{BUSINESS.phoneDisplay}</a>
               <a href="mailto:info@campersnova.com">info@campersnova.com</a>
               <a

@@ -3,6 +3,30 @@ import { test, expect } from '@playwright/test'
 // ── Landing page ─────────────────────────────────────────────────────────────
 
 test.describe('Landing page /', () => {
+  for (const width of [1440, 390]) {
+    test(`opens the original public pages from the home menu at ${width}px`, async ({ page }) => {
+      await page.setViewportSize({ width, height: 900 })
+      const routes = [
+        ['Inicio', '/'],
+        ['Comprar', '/comprar'],
+        ['Búsqueda a medida', '/busqueda-bajo-pedido'],
+        ['Vender', '/vender'],
+        ['Cómo funciona', '/como-funciona'],
+        ['Sobre nosotros', '/sobre'],
+        ['Contacto', '/contacto'],
+      ] as const
+      for (const [label, href] of routes) {
+        await page.goto('/')
+        if (width < 761) await page.getByRole('button', { name: 'Menú' }).click()
+        const link = page.locator('header').getByRole('link', { name: label, exact: true })
+        await expect(link).toHaveAttribute('href', href)
+        await link.click()
+        await expect(page).toHaveURL(new URL(href, page.url()).href)
+        await expect(page.getByRole('heading', { level: 1 }).first()).toBeVisible()
+      }
+    })
+  }
+
   test('shows the travel hero, workshop and public catalog', async ({ page }) => {
     await page.goto('/')
     await expect(page).toHaveTitle(/CampersNova/)
