@@ -17,6 +17,7 @@ const PUBLIC_PATHS = [
   '/api/landing/encuentra-tu-camper',
   '/api/landing/busqueda-bajo-pedido',
   '/contacto',
+  '/presupuesto-propietario',
   '/aviso-legal',
   '/privacidad',
   '/cookies',

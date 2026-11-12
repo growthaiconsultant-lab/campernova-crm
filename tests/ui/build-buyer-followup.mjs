@@ -39,6 +39,14 @@ async function main() {
       {
         name: 'next-browser-fixture',
         setup(plugin) {
+          plugin.onResolve({ filter: /\.\.\/owner-quote-actions$/ }, ({ path }) => ({
+            path,
+            namespace: 'owner-quote-actions',
+          }))
+          plugin.onLoad({ filter: /.*/, namespace: 'owner-quote-actions' }, () => ({
+            contents:
+              'export const saveQuoteAction=(...args)=>window.inspectionFixture.saveQuote(...args); export const sendQuoteAction=(...args)=>window.inspectionFixture.sendQuote(...args)',
+          }))
           plugin.onResolve({ filter: /^\.\.\/actions$/ }, (args) =>
             args.importer.endsWith('inspection-review.tsx')
               ? { path: args.path, namespace: 'inspection-actions' }
