@@ -34,8 +34,11 @@ export function PublicHome({ vehicles }: { vehicles: HomeVehicle[] }) {
                   Hoy dormimos <span>aquí.</span>
                 </h1>
                 <p>
-                  ¿Mar o montaña este fin de semana? Pásate por la nave en Barcelona. Te enseñamos
-                  las campers y hablamos de ese viaje que tienes en mente.
+                  ¿Mar o montaña este fin de semana? Sal a descubrirlo con{' '}
+                  <a className="hero-cover-link" href="#garantia-compra">
+                    2 años de garantía en vehículo y vivienda
+                  </a>
+                  .
                 </p>
                 <div className="actions">
                   <a className="pill" href="#comprar">

@@ -22,3 +22,4 @@ La primera pantalla reúne el menú, la imagen principal y la franja de marcas. 
 ## Rollout
 
 Entregar la vista previa para revisión. La publicación en campersnova.com corresponde a un paso posterior.
+El flujo interno de entregas calcula actualmente un vencimiento a un año en `lib/postventa/create-warranty.ts`. Coordinar el cambio de duración para nuevas entregas antes del lanzamiento comercial de la oferta. Esta propuesta visual no altera garantías registradas ni fechas de contratos.
