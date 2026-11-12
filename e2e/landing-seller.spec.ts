@@ -1,4 +1,4 @@
-import { test, expect, type Page } from './web-landing-fixture'
+import { test, expect, captureNira, type Page } from './web-landing-fixture'
 
 const CRM = '**/api/landing/vende-tu-camper'
 test.beforeEach(async ({ page }) => {
@@ -71,7 +71,10 @@ test('validates vehicle fields and consent before submitting', async ({ page }) 
 })
 
 for (const priority of ['Venderla pronto', 'Sacar el mejor precio']) {
-  test(`sends priority ${priority} only to the CRM with attribution`, async ({ page }) => {
+  test(`sends priority ${priority} to the CRM and Nira when Meta refers the visit`, async ({
+    page,
+  }) => {
+    const nira = await captureNira(page, 'vende')
     const received: Record<string, unknown>[] = []
     await page.route(CRM, async (route) => {
       received.push(route.request().postDataJSON())
@@ -81,6 +84,10 @@ for (const priority of ['Venderla pronto', 'Sacar el mejor precio']) {
     await fill(page, priority)
     await page.locator('button[type=submit]').click()
     await expect(page.locator('#cn-done h3')).toHaveText('¡Recibido!')
+    expect(nira).toHaveLength(1)
+    expect(nira[0].respuestas.event_id).toBe(
+      (received[0].respuestas as Record<string, unknown>).event_id
+    )
     expect(received).toHaveLength(1)
     expect(received[0]).toMatchObject({
       gdpr_consent: true,
@@ -93,6 +100,7 @@ for (const priority of ['Venderla pronto', 'Sacar el mejor precio']) {
 }
 
 test('retries the same CRM submission after a failure', async ({ page }) => {
+  const nira = await captureNira(page, 'vende')
   const bodies: unknown[] = []
   await page.route(CRM, async (route) => {
     bodies.push(route.request().postDataJSON())
@@ -102,9 +110,10 @@ test('retries the same CRM submission after a failure', async ({ page }) => {
   await page.goto('/vende-tu-camper?utm_source=instagram&utm_campaign=qa_retry&ad_id=qa_ad')
   await fill(page)
   await page.locator('button[type=submit]').click()
-  await expect(page.locator('#cn-done h3')).toHaveText('No se ha podido enviar')
+  await expect(page.locator('#cn-done h3')).toHaveText('Falta completar el envío')
   await page.locator('#cn-retry').click()
   await expect(page.locator('#cn-done h3')).toHaveText('¡Recibido!')
+  expect(nira).toHaveLength(1)
   expect(bodies).toHaveLength(2)
   expect(bodies[1]).toEqual(bodies[0])
 })

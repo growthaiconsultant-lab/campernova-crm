@@ -1,5 +1,5 @@
 import { readFileSync } from 'node:fs'
-import { test, expect, type Page } from './web-landing-fixture'
+import { test, expect, captureNira, type Page } from './web-landing-fixture'
 const tag = readFileSync('docs/analytics/gtm-meta-base.html', 'utf8').match(
   /<script>([\s\S]*?)<\/script>/
 )![1]
@@ -91,6 +91,7 @@ for (const slug of ['vende-tu-camper', 'encuentra-tu-camper']) {
   }) => {
     const requests = await intercept(page)
     await page.addInitScript(() => localStorage.setItem('cn_cookie_consent', 'all'))
+    const nira = await captureNira(page, slug === 'vende-tu-camper' ? 'vende' : 'encuentra')
     const bodies: Record<string, unknown>[] = []
     let crmCount = 0
     await page.route(`**/api/landing/${slug}`, async (r) => {
@@ -102,11 +103,12 @@ for (const slug of ['vende-tu-camper', 'encuentra-tu-camper']) {
     await expect.poll(async () => (await calls(page, 'PageView')).length).toBe(1)
     await fill(page, slug)
     await page.locator('button[type=submit]').click()
-    await expect(page.locator('#cn-done h3')).toHaveText('No se ha podido enviar')
+    await expect(page.locator('#cn-done h3')).toHaveText('Falta completar el envío')
     expect(await calls(page, 'Lead')).toHaveLength(0)
     await page.locator('#cn-retry').click()
     await expect(page.locator('#cn-done h3')).toHaveText('¡Recibido!')
     expect((await calls(page, 'Lead')).length).toBe(1)
+    expect(nira).toHaveLength(1)
     const answers = bodies.map((b) => b.respuestas as Record<string, unknown>)
     expect(answers.every((a) => a.pagina === `/${slug}.html`)).toBe(true)
     const crm = bodies.find((b) => b.gdpr_consent === true)!

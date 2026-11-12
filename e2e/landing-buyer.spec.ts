@@ -1,4 +1,4 @@
-import { test, expect, type Page } from './web-landing-fixture'
+import { test, expect, captureNira, type Page } from './web-landing-fixture'
 const CRM = '**/api/landing/encuentra-tu-camper'
 test.beforeEach(async ({ page }) => {
   await page.addInitScript(() => localStorage.setItem('cn_cookie_consent', 'essential'))
@@ -64,7 +64,7 @@ test('sends original buyer contract without email only to the CRM', async ({ pag
     received.push(r.request().postDataJSON())
     await r.fulfill({ json: { ok: true } })
   })
-  await page.goto('/encuentra-tu-camper.html?utm_source=meta&utm_campaign=compra')
+  await page.goto('/encuentra-tu-camper.html?utm_source=google&utm_campaign=compra')
   await fill(page)
   await page.locator('button[type=submit]').click()
   await expect(page.locator('#cn-done h3')).toHaveText('¡Recibido!')
@@ -73,7 +73,7 @@ test('sends original buyer contract without email only to the CRM', async ({ pag
     gdpr_consent: true,
     respuestas: {
       pagina: '/encuentra-tu-camper.html',
-      atribucion: { utm_source: 'meta', utm_campaign: 'compra' },
+      atribucion: { utm_source: 'google', utm_campaign: 'compra' },
     },
   })
   const answers = received[0].respuestas as Record<string, unknown>
@@ -89,6 +89,7 @@ for (const visit of [
   'blocked-storage',
 ]) {
   test(`buyer preserves a coherent campaign snapshot: ${visit}`, async ({ page }) => {
+    const nira = await captureNira(page, 'encuentra')
     let crm: Record<string, unknown> | undefined
     await page.route(CRM, async (r) => {
       crm = r.request().postDataJSON()
@@ -115,7 +116,7 @@ for (const visit of [
             : visit === 'blocked-storage'
               ? '?utm_source=meta&utm_campaign=qa_storage'
               : ''
-    await page.goto('/encuentra-tu-camper.html' + next)
+    await page.goto('/encuentra-tu-camper.html' + next, { referer: page.url() })
     await fill(page)
     await page.locator('button[type=submit]').click()
     await expect(page.locator('#cn-done h3')).toHaveText('¡Recibido!')
@@ -141,6 +142,8 @@ for (const visit of [
             ? { utm_source: 'meta', utm_campaign: 'qa_storage' }
             : {}
     expect(answers.atribucion).toEqual(expected)
+    expect(nira).toHaveLength(expected.utm_source ? 1 : 0)
+    if (nira.length) expect(nira[0].respuestas.event_id).toBe(answers.event_id)
   })
 }
 
@@ -159,4 +162,22 @@ test('retries the same CRM submission after a failure', async ({ page }) => {
   await expect(page.locator('#cn-done h3')).toHaveText('¡Recibido!')
   expect(bodies).toHaveLength(2)
   expect(bodies[1]).toEqual(bodies[0])
+})
+
+test('a click from Meta retries only Nira after the CRM confirmed', async ({ page }) => {
+  const nira = await captureNira(page, 'encuentra', true)
+  let crm = 0
+  await page.route(CRM, async (route) => {
+    crm++
+    await route.fulfill({ json: { ok: true } })
+  })
+  await page.goto('/encuentra-tu-camper?fbclid=example-click')
+  await fill(page)
+  await page.locator('button[type=submit]').click()
+  await expect(page.locator('#cn-done h3')).toHaveText('Falta completar el envío')
+  await page.locator('#cn-retry').click()
+  await expect(page.locator('#cn-done h3')).toHaveText('¡Recibido!')
+  expect(crm).toBe(1)
+  expect(nira).toHaveLength(2)
+  expect(nira[1]).toEqual(nira[0])
 })

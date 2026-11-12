@@ -85,6 +85,7 @@ export default function RootLayout({
     <html lang="es">
       <head>
         <meta name="facebook-domain-verification" content="dkbsd7oht54oe4wqqfc3tji8w7dr2v" />
+        <Script src="/cn-landing/visit-source.js?v=1" strategy="beforeInteractive" />
         <Script src="/cn-landing/cn-consent.js?v=69" strategy="beforeInteractive" />
       </head>
       <body

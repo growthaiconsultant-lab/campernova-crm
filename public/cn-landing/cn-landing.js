@@ -220,30 +220,8 @@ var CN_CONFIG = window.CN_CONFIG || {
   if (yearInput) yearInput.max = new Date().getFullYear() + 1;
 
   /* de qué anuncio viene el contacto */
-  var origen = {};
-  var attributionKeys = ['utm_source', 'utm_medium', 'utm_campaign', 'utm_content', 'utm_term', 'utm_id', 'campaign_id', 'adset_id', 'ad_id', 'placement'];
-  var originKeys = attributionKeys.concat(['fbclid']);
-  function cleanOrigin(values) {
-    var clean = {};
-    originKeys.forEach(function (k) {
-      var v = values && values[k];
-      if (typeof v !== 'string') return;
-      v = v.replace(/[\u0000-\u001f\u007f]/g, '').trim().slice(0, 200);
-      if (v && v.indexOf('{{') === -1 && v.indexOf('}}') === -1) clean[k] = v;
-    });
-    return clean;
-  }
-  try {
-    var qs = new URLSearchParams(location.search);
-    var incoming = {}, tagged = false;
-    originKeys.forEach(function (k) { if (qs.has(k)) { tagged = true; incoming[k] = qs.get(k); } });
-    if (tagged) {
-      origen = cleanOrigin(incoming);
-      try { sessionStorage.setItem('cn_attribution_v1', JSON.stringify(origen)); } catch {}
-    } else {
-      try { origen = cleanOrigin(JSON.parse(sessionStorage.getItem('cn_attribution_v1') || '{}')); } catch {}
-    }
-  } catch {}
+  var visit = window.CNLandingVisit || { params: {}, fromMeta: false };
+  var origen = visit.params;
 
   function aviso(msg) { var e = steps[actual].querySelector('.err'); e.textContent = msg; e.classList.remove('on'); void e.offsetWidth; e.classList.add('on'); }
   function muestra(i) {
@@ -310,53 +288,65 @@ var CN_CONFIG = window.CN_CONFIG || {
       slug === 'campersnova-encuentra'
         ? '/api/landing/encuentra-tu-camper'
         : '/api/landing/vende-tu-camper'
-    var controller = new AbortController()
-    var timeout = setTimeout(function () {
-      controller.abort()
-    }, 15000)
-    fetch(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      redirect: 'error',
-      signal: controller.signal,
-      body: JSON.stringify(submission.payload),
-    })
-      .then(function (response) {
-        if (!response.ok) throw new Error('http')
-        return response.json()
-      })
-      .then(function (result) {
-        return result.ok === true
-      })
-      .catch(function () {
-        return false
-      })
-      .then(function (ok) {
+    async function deliver(destination, endpoint, payload) {
+      if (submission.sent[destination]) return
+      var controller = new AbortController()
+      var timeout = setTimeout(function () {
+        controller.abort()
+      }, 15000)
+      try {
+        var response = await fetch(endpoint, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          redirect: 'error',
+          signal: controller.signal,
+          body: JSON.stringify(payload),
+        })
+        if (response.ok && (await response.json()).ok === true) submission.sent[destination] = true
+      } catch {
+        // An unconfirmed destination stays pending for an explicit retry.
+      } finally {
         clearTimeout(timeout)
-        var hecho = document.getElementById('cn-done')
-        form.querySelector('.cuerpo').style.display = 'none'
-        hecho.querySelector('h2,h3').textContent = ok ? '¡Recibido!' : 'No se ha podido enviar'
-        hecho.querySelector('p').textContent = ok
-          ? submission.successText
+      }
+    }
+    var jobs = [deliver('crm', url, submission.crm)]
+    if (submission.nira)
+      jobs.push(
+        deliver('nira', 'https://docs.niraagency.com/api/formulario/' + slug, submission.nira)
+      )
+    Promise.all(jobs).then(function () {
+      var ok = submission.sent.crm && (!submission.nira || submission.sent.nira)
+      var partial = !ok && (submission.sent.crm || submission.sent.nira)
+      var hecho = document.getElementById('cn-done')
+      form.querySelector('.cuerpo').style.display = 'none'
+      hecho.querySelector('h2,h3').textContent = ok
+        ? '¡Recibido!'
+        : partial
+          ? 'Falta completar el envío'
+          : 'No se ha podido enviar'
+      hecho.querySelector('p').textContent = ok
+        ? submission.successText
+        : partial
+          ? 'La solicitud se ha recibido parcialmente. Pulsa Reintentar envío para completar la entrega.'
           : 'Ha fallado la conexión. Puedes reintentar o mandarnos los datos por WhatsApp: el mensaje ya va escrito con lo que has puesto.'
-        retry.hidden = ok
-        retry.disabled = false
-        retry.textContent = 'Reintentar envío'
-        document.getElementById('cn-wa').href = submission.wa
-        hecho.classList.add('on')
-        if (ok && window.CNConsent) {
-          window.CNConsent.trackMeta(
-            'track',
-            'Lead',
-            { content_name: slug },
-            { eventID: submission.eventId }
-          )
-        }
-        var fj = document.querySelector('.fijo')
-        if (fj) fj.remove()
-        if (form.getBoundingClientRect().top < 70)
-          form.scrollIntoView({ behavior: 'smooth', block: 'start' })
-      })
+      retry.hidden = ok
+      retry.disabled = false
+      retry.textContent = 'Reintentar envío'
+      document.getElementById('cn-wa').href = submission.wa
+      hecho.classList.add('on')
+      if (submission.sent.crm && !submission.tracked && window.CNConsent) {
+        submission.tracked = window.CNConsent.trackMeta(
+          'track',
+          'Lead',
+          { content_name: slug },
+          { eventID: submission.eventId }
+        )
+      }
+      var fj = document.querySelector('.fijo')
+      if (fj) fj.remove()
+      if (form.getBoundingClientRect().top < 70)
+        form.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    })
   }
   document.getElementById('cn-retry').addEventListener('click', function () {
     if (submission && !this.disabled && !this.hidden) sendPending()
@@ -382,19 +372,22 @@ var CN_CONFIG = window.CN_CONFIG || {
     var eventId = 'cn' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7)
     d.respuestas.event_id = eventId
 
-    var attribution = {}
-    attributionKeys.forEach(function (k) {
-      if (origen[k]) attribution[k] = origen[k]
-    })
-    d.respuestas.atribucion = attribution
+    var attribution = Object.assign({}, origen)
+    delete attribution.fbclid
+    var payload = {
+      nombre: nombre,
+      contacto: tel,
+      respuestas: d.respuestas,
+      web_url: (form.querySelector('[name=web_url]') || {}).value || '',
+    }
     submission = {
-      payload: {
-        nombre: nombre,
-        contacto: tel,
+      crm: Object.assign({}, payload, {
         gdpr_consent: true,
-        respuestas: d.respuestas,
-        web_url: (form.querySelector('[name=web_url]') || {}).value || '',
-      },
+        respuestas: Object.assign({}, d.respuestas, { atribucion: attribution }),
+      }),
+      nira: visit.fromMeta ? payload : null,
+      sent: { crm: false, nira: false },
+      tracked: false,
       eventId: eventId,
       wa: wa,
       successText: document.getElementById('cn-done').querySelector('p').textContent,
