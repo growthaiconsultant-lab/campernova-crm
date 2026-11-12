@@ -111,7 +111,8 @@ export function mapToPublicVehicle(v: VehicleWithPhotos): PublicVehicle {
     year: v.year,
     km: v.km,
     seats: v.seats,
-    length: v.length ?? null,
+    // Una longitud de tres cifras en metros es un error de unidad. Evita inferir otra medida.
+    length: v.length != null && v.length > 0 && v.length < 100 ? v.length : null,
     type: v.type,
     typeLabel: v.type ? (TYPE_LABELS[v.type] ?? 'Vehículo') : 'Vehículo',
     location: v.location ?? null,
