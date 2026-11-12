@@ -6,10 +6,16 @@ import Link from 'next/link'
 import { homeFormPaths, publicNavigation } from '@/lib/public-navigation'
 import { ArrowUpRight, Menu } from 'lucide-react'
 
-export function HomeNav() {
+export function HomeNav({
+  currentPath = '/',
+  navigation = publicNavigation,
+}: {
+  currentPath?: string
+  navigation?: typeof publicNavigation
+} = {}) {
   const [open, setOpen] = useState(false)
   const toggle = useRef<HTMLButtonElement>(null)
-  const items = publicNavigation.map(({ href, label }) => {
+  const items = navigation.map(({ href, label }) => {
     if (href === '/comprar' || href === '/vender') {
       return (
         <a key={href} href={homeFormPaths[href]} onClick={() => setOpen(false)}>
@@ -21,7 +27,7 @@ export function HomeNav() {
       <Link
         key={href}
         href={href}
-        aria-current={href === '/' ? 'page' : undefined}
+        aria-current={href === currentPath ? 'page' : undefined}
         onClick={() => setOpen(false)}
       >
         {label}
