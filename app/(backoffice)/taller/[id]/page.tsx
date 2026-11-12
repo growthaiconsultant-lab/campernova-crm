@@ -13,6 +13,8 @@ import { WorkOrderTabs, TabPanel } from './work-order-tabs'
 import { WorkOrderActionsBar } from './work-order-actions-bar'
 import { ChecklistItemRow } from './checklist-item-row'
 import { InspectionReview } from './inspection-review'
+import { OwnerQuotePanel } from './owner-quote-panel'
+import { quoteLines } from '@/lib/entry/owner-quote'
 import { initialEquipment } from '@/lib/entry/inspection-equipment'
 import { TimeEntrySection } from './time-entry-form'
 import { PartsSection } from './parts-section'
@@ -66,11 +68,12 @@ export default async function WorkOrderPage({ params }: { params: { id: string }
             matchCatalog: true,
             equipment: true,
             heatingType: true,
-            sellerLead: { select: { id: true, name: true } },
+            sellerLead: { select: { id: true, name: true, email: true } },
           },
         },
         assignedTo: { select: { id: true, name: true } },
         approvedBy: { select: { id: true, name: true } },
+        ownerQuotes: { orderBy: { version: 'desc' } },
         checklist: { orderBy: [{ category: 'asc' }, { item: 'asc' }] },
         timeEntries: {
           include: { worker: { select: { id: true, name: true } } },
@@ -433,7 +436,31 @@ export default async function WorkOrderPage({ params }: { params: { id: string }
                     version: i.updatedAt.toISOString(),
                     catalogAtLoad: initialEquipment(wo.vehicle, i.item),
                   }))}
-                />
+                >
+                  {(wo.checklist.some((i) => i.ownerQuote) || wo.ownerQuotes.length > 0) && (
+                    <OwnerQuotePanel
+                      key={wo.ownerQuotes[0]?.version + '-' + wo.ownerQuotes[0]?.revision}
+                      orderId={wo.id}
+                      marks={wo.checklist
+                        .filter((i) => i.ownerQuote)
+                        .map(({ id, item, notes }) => ({ id, item, notes }))}
+                      sellerId={wo.vehicle.sellerLead.id}
+                      email={wo.vehicle.sellerLead.email?.trim() ?? ''}
+                      canEdit={canEdit}
+                      quotes={wo.ownerQuotes.map((q) => ({
+                        version: q.version,
+                        revision: q.revision,
+                        status: q.status,
+                        lines: quoteLines.parse(q.lines),
+                        ownerEmail: q.ownerEmail,
+                        ownerName: q.ownerName,
+                        reason: q.reason,
+                        sentAt: q.sentAt?.toISOString() ?? null,
+                        answeredAt: q.answeredAt?.toISOString() ?? null,
+                      }))}
+                    />
+                  )}
+                </InspectionReview>
               ) : (
                 <div className="space-y-6">
                   {(Object.keys(checklistByCategory) as ChecklistItemCategory[]).map((cat) => (
