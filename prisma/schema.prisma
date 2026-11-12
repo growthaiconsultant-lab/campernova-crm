@@ -1210,9 +1210,10 @@ model WorkOrder {
   createdAt      DateTime               @default(now()) @map("created_at")
   updatedAt      DateTime               @updatedAt @map("updated_at")
 
-  vehicle     Vehicle              @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
-  assignedTo  User?                @relation("AssignedWorkOrders", fields: [assignedToId], references: [id])
-  approvedBy  User?                @relation("ApprovedWorkOrders", fields: [approvedById], references: [id])
+  vehicle     Vehicle                @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+  assignedTo  User?                  @relation("AssignedWorkOrders", fields: [assignedToId], references: [id])
+  approvedBy  User?                  @relation("ApprovedWorkOrders", fields: [approvedById], references: [id])
+  ownerQuotes InspectionOwnerQuote[]
   checklist   WorkOrderChecklist[]
   timeEntries WorkOrderTimeEntry[]
   parts       WorkOrderPart[]
@@ -1227,6 +1228,34 @@ model WorkOrder {
   // (Prisma no expresa índices parciales declarativamente; se documenta aquí, igual que el índice
   // parcial de Delivery).
   @@map("work_orders")
+}
+
+enum OwnerQuoteStatus {
+  BORRADOR
+  EN_ENVIO
+  PENDIENTE
+  ACEPTADO
+  RECHAZADO
+  SUSTITUIDO
+}
+
+model InspectionOwnerQuote {
+  id           String           @id @default(cuid())
+  workOrderId  String           @map("work_order_id")
+  workOrder    WorkOrder        @relation(fields: [workOrderId], references: [id], onDelete: Restrict)
+  version      Int
+  revision     Int              @default(1)
+  status       OwnerQuoteStatus @default(BORRADOR)
+  lines        Json
+  ownerName    String?          @map("owner_name")
+  ownerEmail   String?          @map("owner_email")
+  vehicleLabel String?          @map("vehicle_label")
+  sentAt       DateTime?        @map("sent_at")
+  answeredAt   DateTime?        @map("answered_at")
+  reason       String?
+
+  @@unique([workOrderId, version])
+  @@map("inspection_owner_quotes")
 }
 
 /// Ítem individual del checklist técnico de una orden de taller.

@@ -155,10 +155,12 @@ function InspectionElement({
 }
 
 export function InspectionReview({
+  children,
   rows,
   orderId,
   editable,
 }: {
+  children?: React.ReactNode
   rows: ReviewItem[]
   orderId: string
   editable: boolean
@@ -207,6 +209,7 @@ export function InspectionReview({
         ) : (
           <p className="text-sm">Todavía no hay partidas marcadas.</p>
         )}
+        {children}
       </section>
       {(Object.keys(categories) as ChecklistItemCategory[]).map((c) => {
         const group = rows.filter((r) => r.category === c)
