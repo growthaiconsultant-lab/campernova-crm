@@ -3,7 +3,8 @@ import { Toaster } from 'sonner'
 import { formatEur } from '@/lib/format/currency'
 import { createRoot } from 'react-dom/client'
 import { VehicleFilters } from '@/app/(backoffice)/vehiculos/vehicle-filters'
-import { inventoryUrl, readInventoryParams } from '@/lib/vehicle-inventory-filters'
+import { Topbar } from '@/components/layout/topbar'
+import { readInventoryParams } from '@/lib/vehicle-inventory-filters'
 
 const root = createRoot(document.getElementById('root')!)
 let price: number | null = null
@@ -18,11 +19,8 @@ function render() {
   )
   root.render(
     <main className="crm-theme p-3">
-      <VehicleFilters
-        key={inventoryUrl(criteria, 'createdAt:desc')}
-        applied={criteria}
-        order={order}
-      />
+      <Topbar userName="Demo" userEmail="demo@example.test" userRole="Administrador" />
+      <VehicleFilters applied={criteria} order={order} />
       {(criteria.priceState === 'missing'
         ? price === null
         : criteria.priceState === 'priced'
