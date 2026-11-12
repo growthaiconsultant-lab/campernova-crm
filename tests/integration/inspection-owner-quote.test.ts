@@ -4,6 +4,8 @@ import { saveQuoteAction, sendQuoteAction } from '@/app/(backoffice)/taller/owne
 import { POST, GET } from '@/app/presupuesto-propietario/route'
 import { quoteLines } from '@/lib/entry/owner-quote'
 import { randomBytes } from 'node:crypto'
+import { renderToStaticMarkup } from 'react-dom/server'
+import WorkOrderPage from '@/app/(backoffice)/taller/[id]/page'
 
 const client = createGuardedTestPrisma()
 const { send, authorize } = vi.hoisted(() => ({ send: vi.fn(), authorize: vi.fn() }))
@@ -12,7 +14,11 @@ vi.mock('@/lib/db', () => ({
     return client
   },
 }))
-vi.mock('@/lib/auth', () => ({ requireCanEditTaller: authorize }))
+vi.mock('@/lib/auth', () => ({ requireCanEditTaller: authorize, requireCanViewTaller: authorize }))
+vi.mock('next/navigation', async (original) => ({
+  ...(await original<typeof import('next/navigation')>()),
+  useRouter: () => ({ refresh() {} }),
+}))
 vi.mock('@/lib/email/client', () => ({ getResend: () => ({ emails: { send } }) }))
 vi.mock('next/cache', () => ({ revalidatePath: vi.fn() }))
 
@@ -80,6 +86,34 @@ afterEach(async () => {
   vi.unstubAllEnvs()
 })
 afterAll(() => client.$disconnect())
+
+it.each([
+  ['ACEPTADO', 'Aceptado', 'Has aceptado el presupuesto de'],
+  ['RECHAZADO', 'Rechazado', 'Has rechazado el presupuesto'],
+])(
+  'muestra la respuesta %s en la página del propietario y en la inspección',
+  async (decision, label, receipt) => {
+    await save()
+    await emailLatest()
+    const token = link()
+    const pending = await visit(token)
+    const summary = await pending.text()
+    expect(summary).toContain('src="/cn-landing/img/logo-cn-crema.png"')
+    expect(pending.headers.get('Content-Security-Policy')).toContain("img-src 'self'")
+    expect(summary).toContain('Ford Transit')
+    expect(summary).toContain('Total con IVA')
+    const answered = await (await visit(token, decision, 'Revisar en diciembre')).text()
+    expect(answered).toContain(receipt)
+    expect(answered).toContain('Respuesta registrada el')
+    expect(answered).not.toContain('name="decision"')
+    const inspection = renderToStaticMarkup(await WorkOrderPage({ params: { id: orderId } }))
+    expect(inspection).toContain(label + ' desde el enlace de')
+    if (decision === 'RECHAZADO') {
+      expect(answered).toContain('Motivo · Revisar en diciembre')
+      expect(inspection).toContain('Motivo del rechazo · Revisar en diciembre')
+    }
+  }
+)
 
 it('guarda borradores parciales y rechaza permisos insuficientes, correos o marcas cambiados', async () => {
   authorize.mockRejectedValueOnce(new Error('denegado'))
