@@ -28,6 +28,7 @@ export function Topbar({ leading }: TopbarProps) {
   const [buyersHref, setBuyersHref] = useState('/compradores')
   const [sellersHref, setSellersHref] = useState('/vendedores')
   const sellerList = pathname === '/vendedores'
+  const inventoryList = pathname === '/vehiculos'
   const sellerSection = sellerList || pathname.startsWith('/vendedores/')
   const buyerDetail = Boolean(params.id && pathname === `/compradores/${params.id}`)
   useEffect(() => {
@@ -37,14 +38,16 @@ export function Topbar({ leading }: TopbarProps) {
     if (pathname === '/vendedores') setSellersHref(href)
   }, [pathname, searchParams])
 
-  if (buyerDetail || sellerSection) {
+  if (buyerDetail || sellerSection || inventoryList) {
     return (
       <header className="flex min-h-12 shrink-0 items-center gap-1 bg-[#173a2f] px-3 py-1 sm:gap-3 sm:px-6">
         <div className="lg:hidden [&>button:hover]:bg-white/10 [&>button]:text-white">
           {leading}
         </div>
-        {sellerList ? (
-          <span className="px-1.5 text-sm font-semibold text-white">Vendedores</span>
+        {sellerList || inventoryList ? (
+          <span className="px-1.5 text-sm font-semibold text-white">
+            {inventoryList ? 'Vehículos' : 'Vendedores'}
+          </span>
         ) : (
           <Link
             className="inline-flex min-h-11 items-center gap-1.5 rounded-md px-1.5 text-sm font-semibold text-white hover:bg-white/10"

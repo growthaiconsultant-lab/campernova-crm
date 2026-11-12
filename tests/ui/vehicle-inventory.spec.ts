@@ -1,7 +1,7 @@
 import { expect, test } from '@playwright/test'
 import path from 'node:path'
 
-test('aplica todos los campos juntos y sincroniza controles, chips y navegación', async ({
+test('aplica el estado al momento y conserva el borrador para combinar los otros filtros', async ({
   page,
 }) => {
   await page.route('http://inventory.test/**', (r) =>
@@ -15,18 +15,36 @@ test('aplica todos los campos juntos y sincroniza controles, chips y navegación
   await page.addScriptTag({ path: path.resolve('.artifacts/buyer-followup/vehicleInventory.js') })
   const search = page.getByRole('searchbox', { name: 'Buscar vehículo' })
   const apply = page.getByRole('button', { name: 'Aplicar filtros' })
+  const bar = page.locator('header')
+  await expect(bar.getByText('Vehículos', { exact: true })).toBeVisible()
+  await expect(bar.getByRole('button', { name: 'Buscar en el CRM' })).toBeVisible()
+  await expect(bar.getByRole('button', { name: 'Crear un registro' })).toBeVisible()
+  await expect(apply).toBeDisabled()
   await search.fill('Volkswagen Crafter')
   await page.getByRole('combobox', { name: 'Tipo', exact: true }).selectOption('CAMPER')
   await page
     .getByRole('combobox', { name: 'Estado del vehículo', exact: true })
     .selectOption('PUBLICADO')
   await page.getByLabel('Precio de venta máx. (€)', { exact: true }).fill('60000')
-  await expect(page).toHaveURL(/page=2$/)
+  await expect(page).toHaveURL('http://inventory.test/vehiculos?status=PUBLICADO')
+  await expect(page.getByRole('button', { name: 'Quitar Publicado', exact: true })).toBeVisible()
+  await expect(search).toHaveValue('Volkswagen Crafter')
+  await expect(page.getByRole('combobox', { name: 'Tipo', exact: true })).toHaveValue('CAMPER')
   await expect(page.getByRole('status')).toHaveText('Cambios pendientes de aplicar')
   await apply.click()
   await expect(page).toHaveURL(
     /brand=Volkswagen\+Crafter&type=CAMPER&status=PUBLICADO&priceMax=60000$/
   )
+  const state = page.getByRole('combobox', { name: 'Estado del vehículo', exact: true })
+  await state.selectOption('DESCARTADO')
+  await expect(page).toHaveURL(
+    /brand=Volkswagen\+Crafter&type=CAMPER&status=DESCARTADO&priceMax=60000$/
+  )
+  await expect(apply).toBeDisabled()
+  await state.selectOption('')
+  await expect(page).toHaveURL(/type=CAMPER&priceMax=60000$/)
+  await page.goBack()
+  await expect(state).toHaveValue('DESCARTADO')
   const remove = page.getByRole('button', { name: 'Quitar Camper', exact: true })
   await remove.click()
   await expect(page.getByRole('combobox', { name: 'Tipo', exact: true })).toHaveValue('')
@@ -47,6 +65,8 @@ test('aplica todos los campos juntos y sincroniza controles, chips y navegación
     .getByRole('combobox', { name: 'Ordenar por', exact: true })
     .selectOption('salePrice:asc')
   await expect(page).toHaveURL(/sort=salePrice&dir=asc$/)
+  await state.selectOption('DESCARTADO')
+  await expect(page).toHaveURL(/status=DESCARTADO&sort=salePrice&dir=asc$/)
   await expect(search).toHaveValue('Todavía sin aplicar')
   await page.getByRole('button', { name: 'Limpiar todo' }).click()
   await expect(search).toHaveValue('')

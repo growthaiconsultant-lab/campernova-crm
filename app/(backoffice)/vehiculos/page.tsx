@@ -65,11 +65,7 @@ export default async function VehiculosPage({ searchParams }: { searchParams: In
       </div>
 
       <div className="mb-4">
-        <VehicleFilters
-          key={inventoryUrl(criteria, 'createdAt:desc')}
-          applied={criteria}
-          order={order}
-        />
+        <VehicleFilters applied={criteria} order={order} />
       </div>
 
       {vehicles.length === 0 ? (

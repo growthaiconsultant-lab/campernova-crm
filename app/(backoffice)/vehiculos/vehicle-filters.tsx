@@ -24,15 +24,18 @@ const selectClass =
   'h-10 w-full rounded-md border border-input bg-background px-3 text-sm text-foreground'
 const labelClass = 'grid min-w-0 gap-1 text-sm font-medium'
 
-export function VehicleFilters({
-  applied,
-  order,
-}: {
-  applied: InventoryCriteria
-  order: InventoryOrder
-}) {
+type FilterProps = { applied: InventoryCriteria; order: InventoryOrder }
+
+export function VehicleFilters(props: FilterProps) {
+  // El estado se aplica por separado. Cambiarlo conserva el borrador del resto del formulario.
+  const draftKey = inventoryUrl({ ...props.applied, status: '' }, 'createdAt:desc')
+  return <InventoryFilterForm key={draftKey} {...props} />
+}
+
+function InventoryFilterForm({ applied, order }: FilterProps) {
   const router = useRouter()
-  const [draft, setDraft] = useState(applied)
+  const [edits, setEdits] = useState<Partial<Omit<InventoryCriteria, 'status'>>>({})
+  const draft = { ...applied, ...edits }
   const [advanced, setAdvanced] = useState(
     Boolean(applied.origin || applied.yearMin || applied.yearMax || applied.kmMax)
   )
@@ -41,8 +44,14 @@ export function VehicleFilters({
   const keys = criteriaKeys.filter((k) => applied[k])
   const dirty = criteriaKeys.some((k) => draft[k] !== applied[k])
 
-  function field(key: Criterion, value: string) {
-    setDraft((previous) => ({
+  function applyStatus(status: string) {
+    setError('')
+    startTransition(() =>
+      router.push(inventoryUrl({ ...applied, status }, order), { scroll: false })
+    )
+  }
+  function field(key: Exclude<Criterion, 'status'>, value: string) {
+    setEdits((previous) => ({
       ...previous,
       [key]: value,
       ...(key === 'priceState' && value === 'missing' ? { priceMax: '' } : {}),
@@ -50,9 +59,11 @@ export function VehicleFilters({
     setError('')
   }
   function navigate(next: InventoryCriteria, nextOrder: InventoryOrder) {
-    setDraft(next)
     setError('')
-    startTransition(() => router.push(inventoryUrl(next, nextOrder), { scroll: false }))
+    startTransition(() => {
+      setEdits({})
+      router.push(inventoryUrl(next, nextOrder), { scroll: false })
+    })
   }
   function select(
     key: 'type' | 'status' | 'origin' | 'priceState',
@@ -66,7 +77,9 @@ export function VehicleFilters({
         <select
           className={selectClass}
           value={draft[key]}
-          onChange={(e) => field(key, e.target.value)}
+          onChange={(e) =>
+            key === 'status' ? applyStatus(e.target.value) : field(key, e.target.value)
+          }
         >
           <option value="">{all}</option>
           {Object.entries(options).map(([value, name]) => (
@@ -135,7 +148,7 @@ export function VehicleFilters({
             </div>
           </details>
           <div className="flex flex-wrap items-end gap-2">
-            <Button type="submit" size="sm">
+            <Button type="submit" size="sm" disabled={!dirty}>
               Aplicar filtros
             </Button>
             <Button
@@ -193,7 +206,9 @@ export function VehicleFilters({
                 disabled={pending}
                 aria-label={'Quitar ' + label}
                 className="max-w-full break-words rounded-md bg-brand-tint px-2 py-1 text-sm text-brand"
-                onClick={() => navigate({ ...applied, [key]: '' }, order)}
+                onClick={() =>
+                  key === 'status' ? applyStatus('') : navigate({ ...applied, [key]: '' }, order)
+                }
               >
                 {label} <span aria-hidden="true">×</span>
               </button>
