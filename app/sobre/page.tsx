@@ -3,6 +3,7 @@ import Image from 'next/image'
 import Link from 'next/link'
 import { Check, ArrowRight } from 'lucide-react'
 import { PublicNav } from '@/components/public-nav'
+import { PublicPageIntro } from '@/components/public-page-intro'
 import { PublicFooter } from '@/components/public-footer'
 import { JsonLd } from '@/components/json-ld'
 import {
@@ -31,37 +32,21 @@ export default function SobrePage() {
   return (
     <>
       <JsonLd data={autoDealerJsonLd()} />
-      <PublicNav />
+      <PublicNav overPhoto />
 
-      <main className="min-h-screen" style={{ background: 'var(--cn-cream-100)' }}>
-        {/* Instalaciones y equipo — 2 columnas texto */}
-        <section className="px-8 py-16 max-[640px]:px-5">
-          <div className="mx-auto max-w-[1280px]">
-            <div className="grid gap-10 lg:grid-cols-2 lg:items-end">
-              <div>
-                <p
-                  className="mb-4 font-mono text-[11px] font-semibold uppercase tracking-[0.14em]"
-                  style={{ color: 'var(--cn-terra-500)' }}
-                >
-                  · Instalaciones y equipo
-                </p>
-                <h1
-                  className="cn-interior-title text-[2.2rem] font-bold leading-[1.1] tracking-[-0.025em] lg:text-[2.8rem]"
-                  style={{ color: 'var(--cn-teal-900)', fontFamily: 'var(--font-fraunces)' }}
-                >
-                  No somos un portal. Somos una empresa con instalaciones propias.
-                </h1>
-              </div>
-              <p
-                className="max-w-[52ch] text-[16px] leading-relaxed lg:pb-1"
-                style={{ color: 'var(--cn-ink-500)' }}
-              >
-                Tenemos espacio en Barcelona para custodia, limpieza y fotografía profesional. Cada
-                vehículo pasa por nuestras manos, no solo por una pantalla.
-              </p>
-            </div>
-          </div>
-        </section>
+      <main
+        className="cn-public-interior min-h-screen"
+        style={{ background: 'var(--cn-cream-100)' }}
+      >
+        <PublicPageIntro
+          label="Sobre nosotros"
+          title="Un equipo con"
+          accent="nave propia."
+          description="En nuestra nave de Barcelona cuidamos, preparamos y fotografiamos cada vehículo. Aquí puedes conocer al equipo y ver de cerca la camper con la que te imaginas viajando."
+          photo="/cn-landing/media/portal-compra.jpg"
+        >
+          <a href="#visitanos">Ven a conocernos ↓</a>
+        </PublicPageIntro>
 
         {/* Mission + benefits */}
         <section className="px-8 py-20 max-[640px]:px-5">
@@ -119,7 +104,8 @@ export default function SobrePage() {
 
         {/* Visit block */}
         <section
-          className="px-8 py-20 max-[640px]:px-5"
+          id="visitanos"
+          className="scroll-mt-20 px-8 py-20 max-[640px]:px-5"
           style={{ background: 'var(--cn-cream-50)', borderTop: '1px solid var(--cn-line)' }}
         >
           <div className="mx-auto max-w-[1280px]">

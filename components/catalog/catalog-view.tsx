@@ -6,6 +6,7 @@
 import Link from 'next/link'
 import { ArrowRight } from 'lucide-react'
 import { PublicNav } from '@/components/public-nav'
+import { PublicPageIntro } from '@/components/public-page-intro'
 import { PublicFooter } from '@/components/public-footer'
 import { JsonLd } from '@/components/json-ld'
 import { VehicleCatalogCard } from '@/components/catalog/vehicle-catalog-card'
@@ -65,13 +66,23 @@ export function CatalogView({
     <>
       <JsonLd data={breadcrumbJsonLd(breadcrumb)} />
       {vehicles.length > 0 && <JsonLd data={itemListJsonLd(vehicles)} />}
-      <PublicNav />
+      <PublicNav overPhoto />
 
-      <main className="min-h-screen" style={{ background: 'var(--cn-cream-100)' }}>
-        <div className="mx-auto max-w-[1280px] px-8 pb-24 pt-8 max-[640px]:px-5">
+      <main
+        className="cn-public-interior min-h-screen"
+        style={{ background: 'var(--cn-cream-100)' }}
+      >
+        <PublicPageIntro
+          label={eyebrow}
+          title={title}
+          description={intro}
+          photo="/cn-landing/media/hero-compra.jpg"
+          compact
+        />
+        <div className="cn-inventory-inner mx-auto pb-24 pt-6">
           {/* Breadcrumb */}
           <nav
-            className="mb-7 flex flex-wrap items-center gap-2 font-mono text-[13px] tracking-[0.06em]"
+            className="mb-4 flex flex-wrap items-center gap-2 font-mono text-[13px] tracking-[0.06em]"
             style={{ color: 'var(--cn-ink-500)' }}
             aria-label="Migas de pan"
           >
@@ -89,37 +100,16 @@ export function CatalogView({
             ))}
           </nav>
 
-          {/* Hero */}
-          <header className="mb-10 max-w-[44ch]">
-            <p
-              className="font-mono text-[11px] uppercase tracking-[0.14em]"
-              style={{ color: 'var(--cn-teal-700)' }}
-            >
-              · {eyebrow}
+          {vehicles.length > 0 && (
+            <p className="mb-3 text-[15px] font-semibold">
+              {vehicles.length}{' '}
+              {vehicles.length === 1 ? 'vehículo disponible' : 'vehículos disponibles'}
             </p>
-            <h1
-              className="cn-interior-title mt-3 text-[clamp(2.2rem,5vw,3.4rem)] leading-[1.04] tracking-[-0.02em]"
-              style={{ fontFamily: 'var(--font-fraunces)', color: 'var(--cn-teal-900)' }}
-            >
-              {title}
-            </h1>
-            <p className="mt-5 text-[17px] leading-relaxed" style={{ color: 'var(--cn-ink-700)' }}>
-              {intro}
-            </p>
-            {vehicles.length > 0 && (
-              <p
-                className="mt-4 font-mono text-[12px] uppercase tracking-[0.08em]"
-                style={{ color: 'var(--cn-ink-500)' }}
-              >
-                {vehicles.length}{' '}
-                {vehicles.length === 1 ? 'vehículo disponible' : 'vehículos disponibles'}
-              </p>
-            )}
-          </header>
+          )}
 
           {/* Related facet links */}
           {related && related.links.length > 0 && (
-            <nav className="mb-10 flex flex-wrap gap-2.5" aria-label={related.heading}>
+            <nav className="mb-5 flex flex-wrap gap-2.5" aria-label={related.heading}>
               {related.links.map((l) => (
                 <Link
                   key={l.href}
