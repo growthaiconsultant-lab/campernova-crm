@@ -114,6 +114,12 @@ it('entrega una versión inmutable, reintenta con el mismo enlace y conserva la 
   expect(await getQuote()).toMatchObject({ status: 'EN_ENVIO', sentAt: null })
   const token = link(),
     firstArgs = send.mock.lastCall
+  const message = firstArgs?.[0]
+  expect(message.html).toContain(`href="https://crm.example.test/presupuesto-propietario#${token}"`)
+  expect(message.html).toContain('cid:' + message.attachments[0].contentId)
+  expect(message.html).toContain('Ford Transit')
+  expect(message.html).toContain('145,50')
+  expect(message.html).not.toContain('Observación privada')
   expect(await emailLatest()).toEqual({ ok: true })
   expect(send.mock.lastCall?.[0]).toEqual(firstArgs?.[0])
   expect(send.mock.lastCall?.[1].idempotencyKey).toEqual(firstArgs?.[1].idempotencyKey)

@@ -1,6 +1,7 @@
 import { createHmac, timingSafeEqual } from 'node:crypto'
 import type { InspectionOwnerQuote } from '@prisma/client'
 import { getResend } from './client'
+import { ownerQuoteEmail } from './templates/owner-quote'
 import { euro, quoteLines, quoteTotal } from '../entry/owner-quote'
 import { QuoteError } from '../entry/owner-quote-store'
 
@@ -38,15 +39,13 @@ export function quoteMailer() {
         from,
         to: q.ownerEmail,
         subject: 'Presupuesto de reparaciones · CampersNova · v' + q.version,
-        text: [
-          q.ownerName ? 'Hola, ' + q.ownerName + ':' : 'Hola,',
-          'El taller ha preparado el presupuesto de reparaciones de ' + q.vehicleLabel + '.',
-          'Total con IVA: ' +
-            total +
-            '. Puedes revisar cada trabajo y aceptar o rechazar el presupuesto en tu enlace privado:',
+        ...ownerQuoteEmail({
+          ownerName: q.ownerName,
+          vehicleLabel: q.vehicleLabel,
+          version: q.version,
+          total,
           link,
-          'Equipo de CampersNova',
-        ].join('\n\n'),
+        }),
       },
       options
     )
