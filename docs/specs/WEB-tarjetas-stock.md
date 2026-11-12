@@ -18,6 +18,7 @@ Inicio y Catálogo comparten la tarjeta aprobada, con foto, tipo y base, modelo,
 - Una columna en móvil y tres en escritorio. El título se adapta a nombres largos.
 - Los vehículos de archivo y los reservados mantienen sus estados y destinos.
 - Un precio o una cuota sin informar se pueden consultar sin mostrar importes inventados.
+- La web omite longitudes registradas con un error evidente de unidad, como 599 metros.
 - El diálogo de financiación conserva el vehículo, la entrada y el plazo opcionales.
 
 ## Rollout

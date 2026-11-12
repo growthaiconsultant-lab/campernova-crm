@@ -84,6 +84,15 @@ describe('mapToPublicVehicle — seguridad de datos', () => {
     )
   })
 
+  it.each([
+    [599, null],
+    [0, null],
+    [null, null],
+    [5.99, 5.99],
+  ])('presenta la longitud pública en metros (%s → %s)', (length, expected) => {
+    expect(mapToPublicVehicle({ ...fullVehicle, length }).length).toBe(expected)
+  })
+
   it('mapea título, tipo, descripción y equipamiento', () => {
     const pub = mapToPublicVehicle(fullVehicle)
     expect(pub.title).toBe('Volkswagen California Ocean')
