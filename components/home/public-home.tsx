@@ -2,6 +2,7 @@ import Image from 'next/image'
 import Link from 'next/link'
 import { BUSINESS, BUSINESS_MAPS_URL } from '@/lib/seo'
 import { homeFormPaths } from '@/lib/public-navigation'
+import { InstagramMosaic } from './instagram-mosaic'
 import { HomeNav } from './home-nav'
 import { HomeCatalog, type HomeVehicle } from './home-catalog'
 import './public-home.css'
@@ -64,6 +65,7 @@ export function PublicHome({ vehicles }: { vehicles: HomeVehicle[] }) {
       </header>
       <main id="main-content">
         <HomeCatalog vehicles={vehicles} />
+        <InstagramMosaic />
         <section className="journey" id="busqueda">
           <Image
             alt="Dos viajeros viendo caer el sol desde su camper"
