@@ -3,23 +3,19 @@ import { test, expect } from '@playwright/test'
 // ── Landing page ─────────────────────────────────────────────────────────────
 
 test.describe('Landing page /', () => {
-  test('loads with hero heading and page title', async ({ page }) => {
+  test('shows the travel hero, workshop and public catalog', async ({ page }) => {
     await page.goto('/')
     await expect(page).toHaveTitle(/CampersNova/)
-    await expect(page.getByRole('heading', { level: 1 })).toContainText('Compra o vende tu camper')
-  })
-
-  test('nav links are present', async ({ page }) => {
-    await page.goto('/')
-    const nav = page.getByRole('navigation').first()
-    await expect(nav.getByRole('link', { name: 'Cómo funciona' })).toBeVisible()
-    await expect(nav.getByRole('link', { name: 'Sobre nosotros' })).toBeVisible()
-  })
-
-  test('navigates to /como-funciona via nav', async ({ page }) => {
-    await page.goto('/')
-    await page.getByRole('navigation').first().getByRole('link', { name: 'Cómo funciona' }).click()
-    await expect(page).toHaveURL('/como-funciona')
+    await expect(page.getByRole('heading', { level: 1 })).toHaveText('Hoy dormimos aquí.')
+    await page.getByRole('link', { name: 'Ver campers disponibles' }).click()
+    await expect(page).toHaveURL(/#comprar$/)
+    await expect(page.getByRole('link', { name: 'Ver todo el catálogo' })).toBeVisible()
+    await page.getByRole('button', { name: 'Autocaravanas', exact: true }).click()
+    await expect(page.getByRole('button', { name: 'Autocaravanas', exact: true })).toHaveAttribute(
+      'aria-pressed',
+      'true'
+    )
+    await expect(page.getByText('Tienda online · Próximamente')).toBeAttached()
   })
 })
 

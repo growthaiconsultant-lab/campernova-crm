@@ -1,21 +1,11 @@
 import type { Metadata } from 'next'
-import { PublicNav } from '@/components/public-nav'
-import { PublicFooter } from '@/components/public-footer'
-import { WhatsAppFab } from '@/components/whatsapp-fab'
-import { HeroSection } from '@/components/landing/hero'
-import { TrustStrip } from '@/components/landing/trust-strip'
-import { TwoRoutes } from '@/components/landing/two-routes'
-import { SearchMethod } from '@/components/landing/search-method'
-import { HowItWorksSection } from '@/components/landing/how-it-works'
-import { WhyUsPillars } from '@/components/landing/why-us-pillars'
-import { SellBlock } from '@/components/landing/sell-block'
-import { LifestyleBanner } from '@/components/landing/lifestyle-banner'
-import { PodcastSection } from '@/components/landing/podcast'
-import { TestimonialsSection } from '@/components/landing/testimonials'
-import { FinalCta } from '@/components/landing/final-cta'
+import { PublicHome } from '@/components/home/public-home'
 import { LandingAnalytics } from '@/components/landing/analytics'
 import { JsonLd } from '@/components/json-ld'
 import { autoDealerJsonLd } from '@/lib/seo'
+import { getCatalogInventory } from '@/lib/public-catalog'
+
+export const revalidate = 600
 
 export const metadata: Metadata = {
   // `absolute` evita que la plantilla del layout añada "· CampersNova" (ya está en el título).
@@ -49,33 +39,26 @@ export const metadata: Metadata = {
   },
 }
 
-export default function LandingPage() {
+export default async function LandingPage() {
+  const { available } = await getCatalogInventory()
+  const vehicles = available.map((v) => ({
+    slug: v.slug,
+    title: v.title,
+    type: v.typeLabel,
+    photo: v.photos[0] ?? null,
+    price: v.price,
+    specs: [
+      v.year,
+      v.km != null ? v.km.toLocaleString('es-ES') + ' km' : null,
+      v.seats != null ? v.seats + ' plazas' : null,
+    ]
+      .filter((value) => value != null)
+      .join(' · '),
+  }))
   return (
     <>
-      {/* JSON-LD — negocio local (AutoDealer) con NAP correcto */}
       <JsonLd data={autoDealerJsonLd()} />
-
-      <PublicNav />
-
-      <main>
-        <HeroSection />
-        <TrustStrip />
-        <TwoRoutes />
-        <SearchMethod />
-        {/* <NovaAssistant /> */}
-        <HowItWorksSection />
-        <WhyUsPillars />
-        <SellBlock />
-        <LifestyleBanner />
-        <PodcastSection />
-        <TestimonialsSection />
-        <FinalCta />
-      </main>
-
-      <PublicFooter />
-      <WhatsAppFab />
-
-      {/* PostHog landing analytics — client only */}
+      <PublicHome vehicles={vehicles} />
       <LandingAnalytics />
     </>
   )
