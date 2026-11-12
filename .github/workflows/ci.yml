@@ -318,16 +318,17 @@ jobs:
           # LANDING-2 adds two nullable consent fields; buyer email becomes nullable without DML.
           assert buyer_email_nullable "$(psql "$PSQL_URL" -tAc "SELECT is_nullable FROM information_schema.columns WHERE table_schema='public' AND table_name='buyer_leads' AND column_name='email'")" YES
           assert buyer_consent_columns "$(psql "$PSQL_URL" -tAc "SELECT count(*) FROM information_schema.columns WHERE table_schema='public' AND table_name='buyer_leads' AND column_name IN ('gdpr_consent_at','gdpr_consent_ip') AND is_nullable='YES'")" 2
-          assert columns "$columns" 530
+          # COM-42 enlaza el presupuesto con su reparación mediante una FK opcional y única.
+          assert columns "$columns" 531
           assert inspection_checklist_columns "$(psql "$PSQL_URL" -tAc "SELECT count(*) FROM information_schema.columns WHERE table_schema='public' AND table_name='work_order_checklist' AND column_name IN ('installed','owner_quote') AND data_type='boolean'")" 2
           assert matching_catalog_columns "$(psql "$PSQL_URL" -tAc "SELECT count(*) FROM information_schema.columns WHERE table_schema='public' AND table_name IN ('vehicles','buyer_leads') AND column_name='match_catalog' AND data_type='jsonb' AND is_nullable='NO'")" 2
           assert enums "$enums" 60
           # COM-7 añade únicamente BuyerLeadStatus.NO_CONTESTA (+1 valor enum).
           # COM-8 añade BuyerLeadStatus.BAJO_PEDIDO (+1 valor enum).
           assert enum_values "$enum_values" 322
-          assert foreign_keys "$fks" 86
+          assert foreign_keys "$fks" 87
           # COM-13: +1 table, +5 columns, +2 FKs, +3 indexes (chat unique becomes nonunique).
-          assert indexes "$indexes" 140
+          assert indexes "$indexes" 141
           assert inspection_coordinator_index "$(psql "$PSQL_URL" -tAc "SELECT count(*) FROM pg_index WHERE indexrelid=to_regclass('public.users_one_entry_inspection_coordinator') AND indisunique AND indpred IS NOT NULL")" 1
           assert document_target_check "$(psql "$PSQL_URL" -tAc "SELECT count(*) FROM pg_constraint WHERE conname='vehicle_documents_target_check' AND convalidated")" 1
           assert operation_key_checks "$(psql "$PSQL_URL" -tAc "SELECT count(*) FROM pg_constraint WHERE conname IN ('vehicle_documents_operation_key_check','deliveries_operation_key_check') AND convalidated")" 2

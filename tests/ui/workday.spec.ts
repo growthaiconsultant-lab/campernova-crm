@@ -43,6 +43,30 @@ test('alterna los bloques de administración y abre el resto de pendientes en la
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
 })
 
+test('programa las partidas juntas desde Por hacer', async ({ page }) => {
+  await page.goto('http://inicio.test/dashboard?reparacion=1')
+  const task = page
+    .getByRole('article')
+    .filter({ hasText: 'Programar reparaciones · Ford Transit' })
+  await expect(task.getByText('Cambiar la bomba')).toBeVisible()
+  await task.getByText('Programar en taller', { exact: true }).click()
+  await task.getByLabel('Responsable', { exact: true }).selectOption('worker')
+  await task.getByLabel('Horas previstas').fill('3')
+  await task.getByLabel('Inicio', { exact: true }).fill('2026-11-16')
+  await task.getByLabel('Fin (entrega)').fill('2026-11-17')
+  await task.getByRole('button', { name: 'Guardar en la agenda' }).click()
+  await expect(task).toHaveCount(0)
+  expect(JSON.parse((await page.locator('body').getAttribute('data-booking'))!)).toEqual({
+    quoteId: 'quote-test',
+    values: {
+      assignedToId: 'worker',
+      estimatedHours: 3,
+      scheduledStart: '2026-11-16',
+      scheduledEnd: '2026-11-17',
+    },
+  })
+})
+
 test('el comercial entra en Mi día y solo tiene controles personales', async ({ page }) => {
   await page.goto('http://inicio.test/dashboard?comercial=1')
   await expect(page.getByRole('heading', { name: 'Mi día' })).toBeVisible()

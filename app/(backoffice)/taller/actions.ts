@@ -652,7 +652,10 @@ export async function scheduleWorkOrder(woId: string, formData: unknown): Promis
   const result = await withOpenWorkOrder(woId, async (tx) => {
     const order = await tx.workOrder.findUnique({
       where: { id: woId },
-      select: { vehicle: { select: { sellerLeadId: true } } },
+      select: {
+        vehicle: { select: { sellerLeadId: true } },
+        approvedQuote: { select: { workOrderId: true } },
+      },
     })
     if (!order) throw new Error('WORK_ORDER_NOT_FOUND')
     await tx.workOrder.update({
@@ -664,12 +667,13 @@ export async function scheduleWorkOrder(woId: string, formData: unknown): Promis
         ...(estimatedHours != null ? { estimatedHours } : {}),
       },
     })
-    return order.vehicle.sellerLeadId
+    return { sellerId: order.vehicle.sellerLeadId, inspectionId: order.approvedQuote?.workOrderId }
   })
   if (!result.ok) return result
 
   revalidateTaller(woId)
   revalidatePath('/taller/agenda')
-  if (result.data) revalidatePath(`/vendedores/${result.data}`)
+  if (result.data?.inspectionId) revalidatePath('/taller/' + result.data.inspectionId)
+  if (result.data) revalidatePath(`/vendedores/${result.data.sellerId}`)
   return { ok: true }
 }

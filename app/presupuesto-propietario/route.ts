@@ -46,7 +46,10 @@ export async function POST(request: Request) {
     )
   const q = await recordQuoteDelivery(id, parsed.data, reason)
   if (!q) return unavailable()
-  if (parsed.data) revalidatePath('/taller/' + q.workOrderId)
+  if (parsed.data) {
+    revalidatePath('/taller/' + q.workOrderId)
+    if (q.status === 'ACEPTADO') revalidatePath('/dashboard')
+  }
   if (q.status === 'SUSTITUIDO')
     return page(
       '<h1>Este presupuesto se ha sustituido</h1><p>Consulta la versión más reciente en tu correo.</p>'

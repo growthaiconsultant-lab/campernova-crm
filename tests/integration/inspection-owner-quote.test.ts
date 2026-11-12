@@ -6,6 +6,12 @@ import { quoteLines } from '@/lib/entry/owner-quote'
 import { randomBytes } from 'node:crypto'
 import { renderToStaticMarkup } from 'react-dom/server'
 import WorkOrderPage from '@/app/(backoffice)/taller/[id]/page'
+import TallerAgendaPage from '@/app/(backoffice)/taller/agenda/page'
+import { approvedRepairQueue } from '@/lib/dashboard/approved-repairs'
+import { scheduleApprovedRepair } from '@/app/(backoffice)/taller/owner-quote-actions'
+import { scheduleWorkOrder } from '@/app/(backoffice)/taller/actions'
+import { CommercialHome } from '@/app/(backoffice)/dashboard/commercial-home'
+import DashboardPage from '@/app/(backoffice)/dashboard/page'
 
 const client = createGuardedTestPrisma()
 const { send, authorize } = vi.hoisted(() => ({ send: vi.fn(), authorize: vi.fn() }))
@@ -14,15 +20,21 @@ vi.mock('@/lib/db', () => ({
     return client
   },
 }))
-vi.mock('@/lib/auth', () => ({ requireCanEditTaller: authorize, requireCanViewTaller: authorize }))
+vi.mock('@/lib/auth', () => ({
+  requireCanEditTaller: authorize,
+  requireCanViewTaller: authorize,
+  requireAuth: authorize,
+}))
 vi.mock('next/navigation', async (original) => ({
   ...(await original<typeof import('next/navigation')>()),
   useRouter: () => ({ refresh() {} }),
+  useSearchParams: () => new URLSearchParams(),
 }))
 vi.mock('@/lib/email/client', () => ({ getResend: () => ({ emails: { send } }) }))
 vi.mock('next/cache', () => ({ revalidatePath: vi.fn() }))
 
 const email = 'propietario@example.test'
+const testUsers: string[] = []
 let orderId: string, sellerId: string, itemId: string
 const getQuote = () =>
   client.inspectionOwnerQuote.findFirstOrThrow({
@@ -83,9 +95,134 @@ afterEach(async () => {
   await client.inspectionOwnerQuote.deleteMany({ where: { workOrderId: orderId } })
   await client.vehicle.deleteMany({ where: { sellerLeadId: sellerId } })
   await client.sellerLead.delete({ where: { id: sellerId } })
+  await client.user.deleteMany({ where: { id: { in: testUsers.splice(0) } } })
+  vi.useRealTimers()
   vi.unstubAllEnvs()
 })
 afterAll(() => client.$disconnect())
+
+it('agrupa las partidas aceptadas para coordinación y refleja la planificación y sus cambios en la inspección cerrada', async () => {
+  const makeUser = async (name: string, entryInspectionCoordinator = false) => {
+    const u = await client.user.create({
+      data: {
+        name,
+        role: 'TALLER',
+        email: crypto.randomUUID() + '@example.test',
+        entryInspectionCoordinator,
+      },
+    })
+    testUsers.push(u.id)
+    return u
+  }
+  const coordinator =
+    (await client.user.findFirst({ where: { entryInspectionCoordinator: true, active: true } })) ??
+    (await makeUser('Nerea de prueba', true))
+  const worker = await makeUser('Técnico de prueba')
+  const extra = await client.workOrderChecklist.create({
+    data: { workOrderId: orderId, category: 'CAMPER', item: 'Calefacción', ownerQuote: true },
+  })
+  const lines = [line(), { itemId: extra.id, description: 'Cambiar la bujía', cents: 18000 }]
+  await saveQuoteAction(orderId, { version: 0, revision: 0, lines })
+  await emailLatest()
+  const q = await getQuote(),
+    token = link()
+  const queue = () => approvedRepairQueue(client, coordinator.id)
+  const pending = async () => (await queue())?.tasks.filter((t) => t.inspectionId === orderId)
+  expect(await pending()).toEqual([])
+  await client.workOrder.update({ where: { id: orderId }, data: { status: 'COMPLETADA' } })
+  await Promise.all([visit(token, 'ACEPTADO'), visit(token, 'ACEPTADO')])
+  expect(await pending()).toHaveLength(1)
+  const task = (await pending())![0]
+  expect(task.lines).toHaveLength(2)
+  expect(task.lines.map((l) => l.item).sort()).toEqual(['Bomba', 'Calefacción'])
+  authorize.mockResolvedValue(coordinator)
+  const home = await DashboardPage({ searchParams: {} })
+  const markup = renderToStaticMarkup(
+    home.type === CommercialHome ? await CommercialHome(home.props) : home
+  )
+  expect(markup).toContain('Programar en taller')
+  expect(markup).toContain('Cambiar la bujía')
+  expect(await approvedRepairQueue(client, worker.id)).toBeNull()
+  const booking = {
+    assignedToId: worker.id,
+    scheduledStart: '2026-11-16',
+    scheduledEnd: '2026-11-17',
+    estimatedHours: 3,
+  }
+  authorize.mockResolvedValue(worker)
+  expect(await scheduleApprovedRepair(q.id, booking)).toMatchObject({ ok: false })
+  authorize.mockResolvedValue(coordinator)
+  expect(
+    await scheduleApprovedRepair(q.id, { ...booking, scheduledEnd: '2026-11-15' })
+  ).toMatchObject({ ok: false })
+  const booked = await Promise.all([
+    scheduleApprovedRepair(q.id, booking),
+    scheduleApprovedRepair(q.id, booking),
+  ])
+  expect(booked.filter((r) => r.ok)).toHaveLength(1)
+  const repairId = (await getQuote()).repairOrderId!
+  const repair = await client.workOrder.findUniqueOrThrow({ where: { id: repairId } })
+  expect(repair).toMatchObject({
+    kind: 'REPARACION',
+    assignedToId: worker.id,
+    vehicleId: (await client.workOrder.findUniqueOrThrow({ where: { id: orderId } })).vehicleId,
+  })
+  expect(repair.description).toContain('Cambiar la bujía')
+  expect(repair.description).not.toContain('Observación privada')
+  expect(
+    await client.workOrder.count({ where: { vehicleId: repair.vehicleId, kind: 'REPARACION' } })
+  ).toBe(1)
+  expect(await pending()).toEqual([])
+  vi.setSystemTime(new Date('2026-11-16T09:00:00Z'))
+  expect(renderToStaticMarkup(await TallerAgendaPage({ searchParams: {} }))).toContain(
+    '/taller/' + repairId
+  )
+  const inspection = () => WorkOrderPage({ params: { id: orderId } }).then(renderToStaticMarkup)
+  const initial = await inspection()
+  expect(initial).toContain('16/11/2026')
+  expect(initial).toContain('17/11/2026')
+  expect(initial).toContain(worker.name)
+  expect(
+    await scheduleWorkOrder(repairId, {
+      ...booking,
+      assignedToId: coordinator.id,
+      scheduledStart: '2026-11-19T12:00:00Z',
+      scheduledEnd: '2026-11-20T12:00:00Z',
+    })
+  ).toMatchObject({ ok: true })
+  const revised = await inspection()
+  expect(revised).toContain('19/11/2026')
+  expect(revised).toContain('20/11/2026')
+  expect(revised).toContain('Responsable del trabajo · ' + coordinator.name)
+})
+
+it('mantiene solo la última aceptación pendiente y bloquea un formulario de una versión anterior', async () => {
+  await save()
+  await emailLatest()
+  await visit(link(), 'ACEPTADO')
+  const old = await getQuote()
+  await save(old.version, old.revision)
+  await emailLatest()
+  const mine = async () =>
+    (await approvedRepairQueue(client))!.tasks.filter((t) => t.inspectionId === orderId)
+  expect((await mine()).map((t) => t.version)).toEqual([1])
+  await visit(link(), 'RECHAZADO')
+  expect((await mine()).map((t) => t.version)).toEqual([1])
+  const rejected = await getQuote()
+  await save(rejected.version, rejected.revision)
+  await emailLatest()
+  await visit(link(), 'ACEPTADO')
+  expect((await mine()).map((t) => t.version)).toEqual([3])
+  authorize.mockResolvedValue({ role: 'ADMIN', id: 'admin' })
+  expect(
+    await scheduleApprovedRepair(old.id, {
+      assignedToId: 'worker',
+      scheduledStart: '2026-11-16',
+      scheduledEnd: '2026-11-17',
+      estimatedHours: 3,
+    })
+  ).toMatchObject({ ok: false, error: expect.stringContaining('última versión') })
+})
 
 it.each([
   ['ACEPTADO', 'Aceptado', 'Has aceptado el presupuesto de'],

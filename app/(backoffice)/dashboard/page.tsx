@@ -2,6 +2,8 @@ import Link from 'next/link'
 import { Suspense } from 'react'
 import { Clock, Flame, CalendarDays } from 'lucide-react'
 import { db } from '@/lib/db'
+import { approvedRepairQueue } from '@/lib/dashboard/approved-repairs'
+import { ApprovedRepairTasks } from './approved-repair-tasks'
 import { requireAuth } from '@/lib/auth'
 import { getComercialKpis, type ActionRow } from '@/lib/kpi/comercial'
 import { getCalendarItems } from '@/lib/calendar/aggregate'
@@ -69,7 +71,7 @@ export default async function DashboardPage({
   const dayEnd = new Date(now)
   dayEnd.setHours(23, 59, 59, 999)
 
-  const [kpis, agendaItems, inspections] = await Promise.all([
+  const [kpis, agendaItems, inspections, repairs] = await Promise.all([
     getComercialKpis(db, agentId),
     // Mantener la agenda existente de los perfiles operativos.
     getCalendarItems(
@@ -79,6 +81,7 @@ export default async function DashboardPage({
       now
     ),
     currentUser.role === 'TALLER' ? inspectionTasks(db, currentUser.id) : [],
+    currentUser.role === 'TALLER' ? approvedRepairQueue(db, currentUser.id) : null,
   ])
 
   const dateLine = now.toLocaleDateString('es-ES', {
@@ -127,6 +130,7 @@ export default async function DashboardPage({
       {currentUser.role === 'TALLER' && (
         <section className="mb-4 rounded-xl border bg-card p-4">
           <h2 className="font-semibold">Por hacer</h2>
+          {repairs && <ApprovedRepairTasks queue={repairs} />}
           {inspections.length ? (
             <ul className="divide-y">
               {inspections.map((row) => (
@@ -138,7 +142,9 @@ export default async function DashboardPage({
               ))}
             </ul>
           ) : (
-            <p className="text-sm text-ink2">Sin inspecciones de entrada pendientes.</p>
+            !repairs?.tasks.length && (
+              <p className="text-sm text-ink2">Sin tareas de taller pendientes.</p>
+            )
           )}
         </section>
       )}

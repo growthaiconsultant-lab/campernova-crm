@@ -35,6 +35,13 @@ export type QuoteView = {
   ownerName: string | null
   ownerEmail: string | null
   sentAt: string | null
+  repair?: {
+    id: string
+    start: string | null
+    end: string | null
+    technician: string | null
+  } | null
+  awaitingSchedule?: boolean
   answeredAt: string | null
   reason: string | null
 }

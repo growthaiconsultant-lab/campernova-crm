@@ -23,30 +23,69 @@ const query = new URLSearchParams(location.search)
 Object.assign(window, { inventoryNavigate: (url: string) => location.assign(url) })
 const admin = !query.has('comercial')
 const team = admin && query.get('vista') !== 'mi-trabajo'
-createRoot(document.getElementById('root')!).render(
-  <main data-crm-shell className="crm-theme p-4">
-    <WorkdayView
-      admin={admin}
-      team={team}
-      owner={team ? (query.get('agent') ?? undefined) : 'actor'}
-      now={now}
-      agents={[
-        { id: 'actor', name: 'Admin' },
-        ...[
-          'Alba',
-          'Bruno',
-          'Clara',
-          'Diego',
-          'Elena',
-          'Hugo',
-          'Irene',
-          'Julia',
-          'Marta',
-          'Nora',
-          'Vera',
-        ].map((name) => ({ id: name.toLowerCase(), name })),
-      ]}
-      day={{ tasks: team ? tasks : tasks.slice(0, 1), agenda: team ? [meeting] : [] }}
-    />
-  </main>
-)
+let showRepair = query.has('reparacion')
+const root = createRoot(document.getElementById('root')!)
+Object.assign(window, {
+  testRepairBooking: (quoteId: string, values: unknown) => {
+    document.body.dataset.booking = JSON.stringify({ quoteId, values })
+    showRepair = false
+    render()
+    return { ok: true }
+  },
+})
+function render() {
+  root.render(
+    <main data-crm-shell className="crm-theme p-4">
+      <WorkdayView
+        repairs={
+          showRepair
+            ? {
+                tasks: [
+                  {
+                    quoteId: 'quote-test',
+                    inspectionId: 'inspection-test',
+                    version: 1,
+                    vehicle: 'Ford Transit',
+                    owner: 'Marta',
+                    coordinator: 'Nerea',
+                    answeredAt: now.toISOString(),
+                    lines: [
+                      {
+                        itemId: 'pump',
+                        item: 'Bomba de agua',
+                        description: 'Cambiar la bomba',
+                        cents: 14500,
+                      },
+                    ],
+                  },
+                ],
+                users: [{ id: 'worker', name: 'Técnico de prueba' }],
+              }
+            : null
+        }
+        admin={admin}
+        team={team}
+        owner={team ? (query.get('agent') ?? undefined) : 'actor'}
+        now={now}
+        agents={[
+          { id: 'actor', name: 'Admin' },
+          ...[
+            'Alba',
+            'Bruno',
+            'Clara',
+            'Diego',
+            'Elena',
+            'Hugo',
+            'Irene',
+            'Julia',
+            'Marta',
+            'Nora',
+            'Vera',
+          ].map((name) => ({ id: name.toLowerCase(), name })),
+        ]}
+        day={{ tasks: team ? tasks : tasks.slice(0, 1), agenda: team ? [meeting] : [] }}
+      />
+    </main>
+  )
+}
+render()

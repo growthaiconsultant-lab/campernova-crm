@@ -73,7 +73,19 @@ export default async function WorkOrderPage({ params }: { params: { id: string }
         },
         assignedTo: { select: { id: true, name: true } },
         approvedBy: { select: { id: true, name: true } },
-        ownerQuotes: { orderBy: { version: 'desc' } },
+        ownerQuotes: {
+          orderBy: { version: 'desc' },
+          include: {
+            repairOrder: {
+              select: {
+                id: true,
+                scheduledStart: true,
+                scheduledEnd: true,
+                assignedTo: { select: { name: true } },
+              },
+            },
+          },
+        },
         checklist: { orderBy: [{ category: 'asc' }, { item: 'asc' }] },
         timeEntries: {
           include: { worker: { select: { id: true, name: true } } },
@@ -455,6 +467,18 @@ export default async function WorkOrderPage({ params }: { params: { id: string }
                         ownerEmail: q.ownerEmail,
                         ownerName: q.ownerName,
                         reason: q.reason,
+                        repair: q.repairOrder
+                          ? {
+                              id: q.repairOrder.id,
+                              start: q.repairOrder.scheduledStart?.toISOString() ?? null,
+                              end: q.repairOrder.scheduledEnd?.toISOString() ?? null,
+                              technician: q.repairOrder.assignedTo?.name ?? null,
+                            }
+                          : null,
+                        awaitingSchedule:
+                          q.status === 'ACEPTADO' &&
+                          !q.repairOrder &&
+                          q.id === wo.ownerQuotes.find((v) => v.status === 'ACEPTADO')?.id,
                         sentAt: q.sentAt?.toISOString() ?? null,
                         answeredAt: q.answeredAt?.toISOString() ?? null,
                       }))}

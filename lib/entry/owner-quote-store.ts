@@ -3,6 +3,7 @@ import { z } from 'zod'
 import { db } from '@/lib/db'
 import { withLockedRoots } from '@/lib/locking'
 import { draftInput, quoteLines } from './owner-quote'
+import { inspectionCoordinator } from './inspection-coordinator'
 
 export class QuoteError extends Error {}
 const stale = 'El presupuesto ha cambiado. Actualiza la inspección y revisa la versión actual.'
@@ -120,6 +121,87 @@ export function claimQuoteDelivery(
         vehicleLabel: [brand, model, year].filter(Boolean).join(' ') || 'Vehículo de la inspección',
       },
     })
+  })
+}
+
+export const repairBookingInput = z
+  .object({
+    assignedToId: z.string().min(1),
+    scheduledStart: z.string().date(),
+    scheduledEnd: z.string().date(),
+    estimatedHours: z.number().positive().max(9999.99),
+  })
+  .refine(
+    (s) => s.scheduledEnd >= s.scheduledStart,
+    'La fecha final debe ser igual o posterior al inicio.'
+  )
+
+export async function bookApprovedRepair(
+  quoteId: string,
+  input: z.infer<typeof repairBookingInput>,
+  actor: { id: string; role: string }
+) {
+  const ref = await db.inspectionOwnerQuote.findUnique({
+    where: { id: quoteId },
+    select: { workOrderId: true },
+  })
+  if (!ref) throw new QuoteError('No se encuentra el presupuesto.')
+  return lockInspection(ref.workOrderId, async (tx) => {
+    if (
+      actor.role !== 'ADMIN' &&
+      (actor.role !== 'TALLER' || (await inspectionCoordinator(tx))?.id !== actor.id)
+    )
+      throw new QuoteError(
+        'Solo coordinación de taller o Administración pueden programar estas reparaciones.'
+      )
+    const q = await tx.inspectionOwnerQuote.findFirst({
+      where: { workOrderId: ref.workOrderId, status: 'ACEPTADO' },
+      orderBy: { version: 'desc' },
+      include: {
+        workOrder: { select: { vehicleId: true, vehicle: { select: { sellerLeadId: true } } } },
+      },
+    })
+    if (q?.id !== quoteId)
+      throw new QuoteError('Revisa la última versión aceptada antes de programar.')
+    if (q.repairOrderId)
+      throw new QuoteError(
+        'Estas reparaciones ya están programadas. Consulta la orden en la inspección.'
+      )
+    const technician = await tx.user.findFirst({
+      where: { id: input.assignedToId, active: true },
+      select: { id: true },
+    })
+    if (!technician) throw new QuoteError('Elige un responsable activo.')
+    const lines = quoteLines.parse(q.lines)
+    const order = await tx.workOrder.create({
+      data: {
+        kind: 'REPARACION',
+        vehicleId: q.workOrder.vehicleId,
+        assignedToId: technician.id,
+        description:
+          'Reparaciones aprobadas · Presupuesto v' +
+          q.version +
+          '\n' +
+          lines.map((l) => l.item + ' · ' + l.description).join('\n'),
+        scheduledStart: new Date(input.scheduledStart + 'T12:00:00Z'),
+        scheduledEnd: new Date(input.scheduledEnd + 'T12:00:00Z'),
+        estimatedHours: input.estimatedHours,
+      },
+      select: { id: true },
+    })
+    await tx.inspectionOwnerQuote.update({ where: { id: q.id }, data: { repairOrderId: order.id } })
+    await tx.activity.create({
+      data: {
+        type: 'ORDEN_TALLER_CREADA',
+        agentId: actor.id,
+        sellerLeadId: q.workOrder.vehicle.sellerLeadId,
+        content: 'Programadas las reparaciones aprobadas del presupuesto v' + q.version + '.',
+      },
+    })
+    return {
+      inspectionId: q.workOrderId,
+      sellerId: q.workOrder.vehicle.sellerLeadId,
+    }
   })
 }
 
