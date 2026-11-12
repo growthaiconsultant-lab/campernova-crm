@@ -86,6 +86,18 @@
   display: flex;
   gap: 29px;
 }
+@media (min-width: 761px) and (max-width: 1050px) {
+  .public-home .nav {
+    width: calc(100% - 32px);
+    gap: 12px;
+  }
+  .public-home .nav nav {
+    gap: 12px;
+  }
+  .public-home .nav nav a {
+    white-space: nowrap;
+  }
+}
 .public-home nav a,
 .public-home .contact,
 .public-home .mobileMenu {

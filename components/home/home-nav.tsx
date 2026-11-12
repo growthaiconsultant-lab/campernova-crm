@@ -2,23 +2,22 @@
 
 import { useRef, useState } from 'react'
 import Image from 'next/image'
+import Link from 'next/link'
+import { publicNavigation } from '@/lib/public-navigation'
 import { ArrowUpRight, Menu } from 'lucide-react'
-
-const links = [
-  ['comprar', 'Comprar'],
-  ['vender', 'Vender'],
-  ['taller', 'Taller'],
-  ['garantias', 'Garantías'],
-  ['tienda', 'Tienda'],
-] as const
 
 export function HomeNav() {
   const [open, setOpen] = useState(false)
   const toggle = useRef<HTMLButtonElement>(null)
-  const items = links.map(([id, label]) => (
-    <a key={id} href={'#' + id} onClick={() => setOpen(false)}>
+  const items = publicNavigation.map(({ href, label }) => (
+    <Link
+      key={href}
+      href={href}
+      aria-current={href === '/' ? 'page' : undefined}
+      onClick={() => setOpen(false)}
+    >
       {label}
-    </a>
+    </Link>
   ))
   return (
     <div
@@ -30,7 +29,7 @@ export function HomeNav() {
         }
       }}
     >
-      <a href="#main-content" aria-label="Ir al contenido">
+      <Link href="/" aria-label="CampersNova, inicio">
         <Image
           priority
           className="logo"
@@ -39,11 +38,11 @@ export function HomeNav() {
           width={108}
           height={48}
         />
-      </a>
+      </Link>
       <nav aria-label="Navegación principal">{items}</nav>
-      <a className="contact" href="#visitanos">
+      <Link className="contact" href="/contacto">
         Contacto <ArrowUpRight />
-      </a>
+      </Link>
       <button
         ref={toggle}
         type="button"
@@ -56,9 +55,9 @@ export function HomeNav() {
       </button>
       <nav id="home-menu" className={'dropdown' + (open ? ' open' : '')} aria-label="Menú móvil">
         {items}
-        <a href="#visitanos" onClick={() => setOpen(false)}>
+        <Link href="/contacto" onClick={() => setOpen(false)}>
           Contacto
-        </a>
+        </Link>
       </nav>
     </div>
   )
