@@ -257,7 +257,7 @@ export function SearchForm() {
         <p className="cn-hint">
           Esta solicitud no formaliza un encargo de búsqueda ni implica ningún pago.
         </p>
-        <Link className="cn-primary" href="/comprar">
+        <Link className="cn-primary" href="/comprar/vehiculos">
           Explorar vehículos disponibles <span aria-hidden="true">↗</span>
         </Link>
       </section>

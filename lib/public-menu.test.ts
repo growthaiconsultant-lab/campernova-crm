@@ -8,7 +8,9 @@ it.each(['encuentra-tu-camper', 'vende-tu-camper'])(
   'mantiene el menú compartido en la landing %s',
   (slug) => {
     const html = readFileSync('public/' + slug + '.html', 'utf8')
-    const expected = renderToStaticMarkup(createElement(PublicMenu, { pathname: '/' + slug }))
+    const expected = renderToStaticMarkup(
+      createElement(PublicMenu, { pathname: '/' + slug, transparent: true })
+    )
     expect(html).toContain('<!-- cn-site-menu -->' + expected + '<!-- /cn-site-menu -->')
   }
 )

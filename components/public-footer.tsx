@@ -1,10 +1,11 @@
 import Link from 'next/link'
 import { LogoCampersNova } from '@/components/logo-campers-nova'
+import { homeFormPaths } from '@/lib/public-navigation'
 import { BUSINESS_MAPS_URL } from '@/lib/seo'
 
 const NAV_LINKS = [
-  { href: '/comprar', label: 'Comprar' },
-  { href: '/vender', label: 'Vender' },
+  { href: homeFormPaths['/comprar'], label: 'Comprar' },
+  { href: homeFormPaths['/vender'], label: 'Vender' },
   { href: '/como-funciona', label: 'Cómo funciona' },
   { href: '/sobre', label: 'Sobre nosotros' },
   { href: '/contacto', label: 'Contacto' },
@@ -70,12 +71,12 @@ export function PublicFooter() {
             <ul className="flex flex-col gap-2.5">
               {NAV_LINKS.map(({ href, label }) => (
                 <li key={href}>
-                  <Link
+                  <a
                     href={href}
                     className="text-sm text-cn-ink-700 transition-colors hover:text-cn-teal-900"
                   >
                     {label}
-                  </Link>
+                  </a>
                 </li>
               ))}
             </ul>

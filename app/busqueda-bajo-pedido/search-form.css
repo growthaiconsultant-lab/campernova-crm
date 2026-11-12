@@ -350,9 +350,9 @@
   text-transform: uppercase;
 }
 .cn-search-hero h1 {
-  font-family: inherit;
+  font-family: var(--font-fraunces), Georgia, serif;
   font-size: clamp(43px, 4.35vw, 70px);
-  font-weight: 700;
+  font-weight: 480;
   line-height: 0.99;
   letter-spacing: -0.066em;
   margin: 0;

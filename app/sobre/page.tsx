@@ -33,7 +33,7 @@ export default function SobrePage() {
       <JsonLd data={autoDealerJsonLd()} />
       <PublicNav />
 
-      <main className="min-h-screen pt-20" style={{ background: 'var(--cn-cream-100)' }}>
+      <main className="min-h-screen" style={{ background: 'var(--cn-cream-100)' }}>
         {/* Instalaciones y equipo — 2 columnas texto */}
         <section className="px-8 py-16 max-[640px]:px-5">
           <div className="mx-auto max-w-[1280px]">
@@ -46,7 +46,7 @@ export default function SobrePage() {
                   · Instalaciones y equipo
                 </p>
                 <h1
-                  className="text-[2.2rem] font-bold leading-[1.1] tracking-[-0.025em] lg:text-[2.8rem]"
+                  className="cn-interior-title text-[2.2rem] font-bold leading-[1.1] tracking-[-0.025em] lg:text-[2.8rem]"
                   style={{ color: 'var(--cn-teal-900)', fontFamily: 'var(--font-fraunces)' }}
                 >
                   No somos un portal. Somos una empresa con instalaciones propias.

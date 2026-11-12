@@ -47,7 +47,7 @@ export default async function BrandsIndexPage() {
       />
       <PublicNav />
 
-      <main className="min-h-screen pt-20" style={{ background: 'var(--cn-cream-100)' }}>
+      <main className="min-h-screen" style={{ background: 'var(--cn-cream-100)' }}>
         <div className="mx-auto max-w-[1280px] px-8 pb-24 pt-8 max-[640px]:px-5">
           <nav
             className="mb-7 flex flex-wrap items-center gap-2 font-mono text-[13px] tracking-[0.06em]"
@@ -76,7 +76,7 @@ export default async function BrandsIndexPage() {
               · Marcas
             </p>
             <h1
-              className="mt-3 text-[clamp(2.2rem,5vw,3.4rem)] leading-[1.04] tracking-[-0.02em]"
+              className="cn-interior-title mt-3 text-[clamp(2.2rem,5vw,3.4rem)] leading-[1.04] tracking-[-0.02em]"
               style={{ fontFamily: 'var(--font-fraunces)', color: 'var(--cn-teal-900)' }}
             >
               Autocaravanas y campers por marca

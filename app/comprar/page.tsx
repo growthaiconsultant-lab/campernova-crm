@@ -196,7 +196,7 @@ export default function ComprarPage() {
                   · Búsqueda guiada
                 </p>
                 <h1
-                  className="mb-3 text-[2rem] font-bold leading-tight tracking-[-0.02em] lg:text-[2.4rem]"
+                  className="cn-interior-title mb-3 text-[2rem] font-bold leading-tight tracking-[-0.02em] lg:text-[2.4rem]"
                   style={{ color: 'var(--cn-teal-900)', fontFamily: 'var(--font-fraunces)' }}
                 >
                   Cuéntanos qué buscas. Te ayudamos a encontrarlo.
@@ -304,13 +304,13 @@ export default function ComprarPage() {
 
                   {isRedirectedSeller && (
                     <div className="mt-2 text-center">
-                      <Link
-                        href="/vender"
+                      <a
+                        href="/vende-tu-camper"
                         className="inline-flex items-center gap-2 rounded-full px-6 py-3 text-[14px] font-semibold text-white transition-opacity hover:opacity-90"
                         style={{ background: 'var(--cn-terra-500)' }}
                       >
                         Ir a vender mi camper →
-                      </Link>
+                      </a>
                     </div>
                   )}
 

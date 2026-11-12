@@ -1,5 +1,12 @@
+@font-face {
+  font-family: 'CN Menu Inter';
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+  src: url('/cn-landing/fonts/Inter-latin.woff2') format('woff2');
+}
 :root {
-  --cn-public-menu-height: 70px;
+  --cn-public-menu-height: clamp(72px, 5.45vw, 94px);
 }
 .cn-site-menu {
   position: sticky;
@@ -9,11 +16,11 @@
   color: #faf6ed;
   border-bottom: 1px solid #374740;
   box-sizing: border-box;
-  font-family: var(--font-inter, Inter), Arial, sans-serif;
+  font-family: 'CN Menu Inter', Arial, sans-serif;
 }
 .cn-site-menu-inner {
   margin: 0 auto;
-  width: min(1280px, calc(100% - 88px));
+  width: min(96%, 1680px);
   height: calc(var(--cn-public-menu-height) - 1px);
   display: flex;
   align-items: center;
@@ -22,7 +29,7 @@
 }
 .cn-site-menu .cn-site-logo {
   display: block;
-  width: 82px;
+  width: clamp(92px, 7vw, 128px);
   height: auto;
 }
 .cn-site-menu nav {
@@ -33,7 +40,9 @@
 .cn-site-menu .cn-site-links {
   display: flex;
   align-items: center;
-  gap: clamp(14px, 1.6vw, 27px);
+  gap: clamp(16px, 1.9vw, 38px);
+  flex: 1;
+  font-size: clamp(13px, 1vw, 18px);
 }
 .cn-site-menu a {
   color: inherit;
@@ -66,6 +75,27 @@
 }
 .cn-site-drawer summary::-webkit-details-marker {
   display: none;
+}
+.cn-site-menu .cn-site-links a:first-child,
+.cn-site-menu .cn-site-links a:last-child {
+  margin-left: auto;
+}
+.cn-site-menu .cn-site-links a:last-child {
+  padding: 10px 22px;
+}
+.cn-site-menu .cn-site-links a:last-child::after {
+  content: '↗' / '';
+  margin-left: 9px;
+}
+.cn-site-over-photo {
+  margin-bottom: calc(0px - var(--cn-public-menu-height));
+}
+:root:not(.cn-page-scrolled) .cn-site-over-photo {
+  background: linear-gradient(180deg, rgba(14, 21, 21, 0.37), rgba(14, 21, 21, 0.09));
+  border-bottom-color: transparent;
+}
+:root:not(.cn-page-scrolled) .cn-site-over-photo .cn-site-menu-inner {
+  border-bottom: 1px solid rgba(255, 252, 238, 0.48);
 }
 @media (max-width: 1070px) {
   :root {

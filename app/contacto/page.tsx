@@ -1,5 +1,4 @@
 import type { Metadata } from 'next'
-import Link from 'next/link'
 import { Mail, Phone, MapPin, Clock, MessageCircle, ArrowRight } from 'lucide-react'
 import { PublicNav } from '@/components/public-nav'
 import { PublicFooter } from '@/components/public-footer'
@@ -50,7 +49,7 @@ export default function ContactoPage() {
       <JsonLd data={autoDealerJsonLd()} />
       <PublicNav />
 
-      <main className="min-h-screen pt-20" style={{ background: 'var(--cn-cream-100)' }}>
+      <main className="min-h-screen" style={{ background: 'var(--cn-cream-100)' }}>
         {/* Hero */}
         <section
           className="px-8 pb-16 pt-16 max-[640px]:px-5"
@@ -64,7 +63,7 @@ export default function ContactoPage() {
               · Contacto
             </p>
             <h1
-              className="mt-4 text-[clamp(2.2rem,5vw,3.5rem)] leading-[1.05] tracking-[-0.02em] text-white"
+              className="cn-interior-title mt-4 text-[clamp(2.2rem,5vw,3.5rem)] leading-[1.05] tracking-[-0.02em] text-white"
               style={{ fontFamily: 'var(--font-fraunces)', maxWidth: '22ch' }}
             >
               Estamos aquí para ayudarte.
@@ -166,14 +165,14 @@ export default function ContactoPage() {
             <p className="text-[16px]" style={{ color: 'var(--cn-ink-500)', maxWidth: '48ch' }}>
               Empieza con una tasación gratuita online. Te respondemos en menos de 24 horas.
             </p>
-            <Link
-              href="/vender"
+            <a
+              href="/vende-tu-camper"
               className="inline-flex items-center gap-2 rounded-full px-7 py-3.5 text-[15px] font-semibold text-white transition hover:opacity-90"
               style={{ background: 'var(--cn-terra-500)' }}
             >
               Solicitar tasación gratis
               <ArrowRight size={16} />
-            </Link>
+            </a>
           </div>
         </section>
       </main>
