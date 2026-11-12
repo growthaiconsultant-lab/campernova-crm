@@ -19,7 +19,10 @@ export default async function BackofficeLayout({ children }: { children: React.R
   const roleLabel = ROLE_LABELS[user.role] ?? user.role
 
   return (
-    <div className="crm-theme flex h-dvh overflow-hidden bg-background font-sans text-foreground">
+    <div
+      data-crm-shell
+      className="crm-theme flex h-dvh overflow-hidden bg-background font-sans text-foreground"
+    >
       <Sidebar userRole={user.role} userName={user.name} roleLabel={roleLabel} />
 
       <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
