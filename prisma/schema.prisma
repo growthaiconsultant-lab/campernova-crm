@@ -562,6 +562,7 @@ model User {
   role             UserRole  @default(AGENTE)
   active           Boolean   @default(true)
   notifyOnNewLead  Boolean   @default(true) @map("notify_on_new_lead")
+  entryInspectionCoordinator Boolean @default(false) @map("entry_inspection_coordinator")
   lastMatchEmailAt DateTime? @map("last_match_email_at")
   createdAt        DateTime  @default(now()) @map("created_at")
   updatedAt        DateTime  @updatedAt @map("updated_at")
@@ -1235,6 +1236,8 @@ model WorkOrderChecklist {
   category    ChecklistItemCategory
   item        String
   result      ChecklistItemResult   @default(PENDIENTE)
+  installed   Boolean?
+  ownerQuote  Boolean               @default(false) @map("owner_quote")
   notes       String?
   photos      Json                  @default("[]")
   createdAt   DateTime              @default(now()) @map("created_at")

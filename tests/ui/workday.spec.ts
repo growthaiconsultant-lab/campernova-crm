@@ -49,3 +49,28 @@ test('el comercial entra en Mi día y solo tiene controles personales', async ({
   await expect(page.getByRole('navigation', { name: 'Ámbito del inicio' })).toHaveCount(0)
   await expect(page.getByRole('combobox')).toHaveCount(0)
 })
+
+test('Responsable mantiene el tema del CRM al abrir y permite seleccionar con teclado', async ({
+  page,
+}) => {
+  await page.goto('http://inicio.test/dashboard')
+  const field = page.getByRole('combobox', { name: 'Responsable' })
+  await field.focus()
+  await field.press('Enter')
+  const popup = page.getByRole('listbox')
+  await expect(popup).toHaveCSS('background-color', 'rgb(255, 255, 255)')
+  const selected = popup.getByRole('option', { name: 'Todo el equipo' })
+  await expect(selected).toHaveCSS('color', 'rgb(11, 95, 82)')
+  await page.keyboard.press('ArrowDown')
+  await expect(popup.getByRole('option', { name: 'Admin', exact: true })).toBeFocused()
+  await expect(selected).toHaveAttribute('data-state', 'checked')
+  await page.keyboard.press('End')
+  await expect(popup.getByRole('option', { name: 'Vera', exact: true })).toBeFocused()
+  await expect(popup.getByRole('option', { name: 'Vera', exact: true })).toBeInViewport()
+  await page.keyboard.press('Escape')
+  await expect(field).toBeFocused()
+  await field.click()
+  await popup.getByRole('option', { name: 'Admin', exact: true }).click()
+  await expect(page).toHaveURL(/agent=actor/)
+  await expect(field).toHaveText('Admin')
+})

@@ -12,6 +12,8 @@ import type {
 import { WorkOrderTabs, TabPanel } from './work-order-tabs'
 import { WorkOrderActionsBar } from './work-order-actions-bar'
 import { ChecklistItemRow } from './checklist-item-row'
+import { InspectionReview } from './inspection-review'
+import { initialEquipment } from '@/lib/entry/inspection-equipment'
 import { TimeEntrySection } from './time-entry-form'
 import { PartsSection } from './parts-section'
 import { ScheduleCard } from './schedule-card'
@@ -61,6 +63,9 @@ export default async function WorkOrderPage({ params }: { params: { id: string }
             brand: true,
             model: true,
             year: true,
+            matchCatalog: true,
+            equipment: true,
+            heatingType: true,
             sellerLead: { select: { id: true, name: true } },
           },
         },
@@ -168,7 +173,11 @@ export default async function WorkOrderPage({ params }: { params: { id: string }
                 wo.kind === 'MEJORA' ? 'bg-violet-100 text-violet-700' : 'bg-track text-ink2'
               }`}
             >
-              {wo.kind === 'MEJORA' ? 'Mejora' : 'Reparación'}
+              {wo.kind === 'INSPECCION_ENTRADA'
+                ? 'Inspección de entrada'
+                : wo.kind === 'MEJORA'
+                  ? 'Mejora'
+                  : 'Reparación'}
             </span>
           </div>
           <p className="mt-1 font-hanken text-[13px] text-ink2">
@@ -230,7 +239,7 @@ export default async function WorkOrderPage({ params }: { params: { id: string }
       {/* Tabs */}
       <Card>
         <CardContent className="pb-6 pt-0">
-          <WorkOrderTabs>
+          <WorkOrderTabs defaultTab={wo.kind === 'INSPECCION_ENTRADA' ? 'checklist' : 'resumen'}>
             {/* ── RESUMEN ── */}
             <TabPanel tab="resumen">
               <div className="space-y-4">
@@ -409,32 +418,50 @@ export default async function WorkOrderPage({ params }: { params: { id: string }
 
             {/* ── CHECKLIST ── */}
             <TabPanel tab="checklist">
-              <div className="space-y-6">
-                {(Object.keys(checklistByCategory) as ChecklistItemCategory[]).map((cat) => (
-                  <div key={cat}>
-                    <p className="text-cn-ink-400 mb-2 text-xs font-semibold uppercase tracking-wide">
-                      {CATEGORY_LABELS[cat]}
-                    </p>
-                    <div className="overflow-x-auto rounded-xl border border-cn-line">
-                      <table className="w-full min-w-[480px]">
-                        <tbody>
-                          {checklistByCategory[cat].map((item) => (
-                            <ChecklistItemRow
-                              key={item.id}
-                              id={item.id}
-                              item={item.item}
-                              result={item.result as ChecklistItemResult}
-                              notes={item.notes}
-                              isClosed={isClosed}
-                              canEdit={canEdit}
-                            />
-                          ))}
-                        </tbody>
-                      </table>
+              {wo.kind === 'INSPECCION_ENTRADA' ? (
+                <InspectionReview
+                  orderId={wo.id}
+                  editable={canEdit && !isClosed}
+                  rows={wo.checklist.map((i) => ({
+                    id: i.id,
+                    item: i.item,
+                    category: i.category,
+                    installed: i.installed,
+                    result: i.result,
+                    ownerQuote: i.ownerQuote,
+                    notes: i.notes,
+                    version: i.updatedAt.toISOString(),
+                    catalogAtLoad: initialEquipment(wo.vehicle, i.item),
+                  }))}
+                />
+              ) : (
+                <div className="space-y-6">
+                  {(Object.keys(checklistByCategory) as ChecklistItemCategory[]).map((cat) => (
+                    <div key={cat}>
+                      <p className="text-cn-ink-400 mb-2 text-xs font-semibold uppercase tracking-wide">
+                        {CATEGORY_LABELS[cat]}
+                      </p>
+                      <div className="overflow-x-auto rounded-xl border border-cn-line">
+                        <table className="w-full min-w-[480px]">
+                          <tbody>
+                            {checklistByCategory[cat].map((item) => (
+                              <ChecklistItemRow
+                                key={item.id}
+                                id={item.id}
+                                item={item.item}
+                                result={item.result as ChecklistItemResult}
+                                notes={item.notes}
+                                isClosed={isClosed}
+                                canEdit={canEdit}
+                              />
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
                     </div>
-                  </div>
-                ))}
-              </div>
+                  ))}
+                </div>
+              )}
             </TabPanel>
 
             {/* ── HORAS ── */}

@@ -77,6 +77,8 @@ beforeEach(() => {
   vi.mocked(registerPhysicalArrivalTx).mockResolvedValue({
     vehicleId: 'v1',
     alreadyRegistered: false,
+    inspectionAssigned: true,
+    inspectionClosed: false,
   })
   mockDb.$transaction.mockImplementation((fn: (tx: unknown) => unknown) => fn(mockDb))
 })
@@ -100,6 +102,8 @@ describe('registerPhysicalArrival', () => {
     vi.mocked(registerPhysicalArrivalTx).mockResolvedValue({
       vehicleId: 'v1',
       alreadyRegistered: true,
+      inspectionAssigned: true,
+      inspectionClosed: false,
     })
     const res = await registerPhysicalArrival({ vehicleId: 'v1' })
     expect(res.ok).toBe(true)

@@ -15,6 +15,7 @@
  */
 import type { Prisma } from '@prisma/client'
 import { EntryError } from './errors'
+import { ensureEntryInspection } from './inspection'
 
 export type RegisterArrivalParams = {
   vehicleId: string
@@ -38,7 +39,7 @@ export async function registerPhysicalArrivalTx(
   tx: Prisma.TransactionClient,
   p: RegisterArrivalParams,
   hooks: RegisterArrivalHooks = {}
-): Promise<{ vehicleId: string; alreadyRegistered: boolean }> {
+) {
   // (1) Relectura del vehículo + consistencia de raíz.
   const vehicle = await tx.vehicle.findUnique({
     where: { id: p.vehicleId },
@@ -59,9 +60,20 @@ export async function registerPhysicalArrivalTx(
 
   // (3) Idempotencia: si la llegada ya está registrada, no-op. (Una entrada anulada implica que la
   // llegada ya se registró antes de validar, así que este caso también cae aquí.)
-  if (vehicle.physicalArrivalAt != null) {
-    return { vehicleId: p.vehicleId, alreadyRegistered: true }
+  if (vehicle.entryAnnulledAt) throw new EntryError('ENTRY_ANNULLED_TERMINAL')
+  const inspection = await ensureEntryInspection(
+    tx,
+    p.vehicleId,
+    vehicle.sellerLeadId,
+    p.actorId,
+    vehicle.physicalArrivalAt ? 'retry' : 'arrival'
+  )
+  const result = {
+    vehicleId: p.vehicleId,
+    inspectionAssigned: Boolean(inspection.assignedToId),
+    inspectionClosed: inspection.status === 'COMPLETADA' || inspection.status === 'RECHAZADA',
   }
+  if (vehicle.physicalArrivalAt != null) return { ...result, alreadyRegistered: true }
 
   await hooks.beforeWrite?.()
 
@@ -71,7 +83,7 @@ export async function registerPhysicalArrivalTx(
     where: { id: p.vehicleId, physicalArrivalAt: null },
     data: { physicalArrivalAt: now, physicalArrivalById: p.actorId },
   })
-  if (cas.count === 0) return { vehicleId: p.vehicleId, alreadyRegistered: true }
+  if (cas.count === 0) return { ...result, alreadyRegistered: true }
 
   // (5) Traza (NO fuente de verdad). El estado se lee de las columnas del vehículo.
   await tx.activity.create({
@@ -83,5 +95,5 @@ export async function registerPhysicalArrivalTx(
     },
   })
 
-  return { vehicleId: p.vehicleId, alreadyRegistered: false }
+  return { ...result, alreadyRegistered: false }
 }

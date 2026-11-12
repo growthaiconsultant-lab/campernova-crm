@@ -4,7 +4,7 @@
  * La entrada oficial marca que el vehículo entra formalmente en custodia: existe un contrato de
  * gestión vigente, está físicamente en la nave, tiene expediente mínimo, comercial responsable,
  * ubicación de aparcamiento y llaves registradas, y su checklist documental está clasificado. Al
- * validar se crea EXACTAMENTE UNA orden de inspección de entrada (INSPECCION_ENTRADA) para Taller.
+ * validar se reutiliza la orden de llegada o se crea una única orden de inspección de entrada (INSPECCION_ENTRADA) para Taller.
  *
  * Protocolo (idéntico patrón a `createDeliveryTx`):
  *   1. lectura preliminar (fuera) resuelve las raíces `Vehicle → SellerLead`;
@@ -12,7 +12,7 @@
  *   3. relectura DENTRO de la transacción (fail-closed): `VEHICLE_ROOT_CHANGED`, `LEAD_ARCHIVED`;
  *   4. guards de estado terminal/idempotencia: `ENTRY_ALREADY_VALIDATED`, `ENTRY_ANNULLED_TERMINAL`;
  *   5. preconditions (input + documentos releídos bajo el lock);
- *   6. unicidad de orden de inspección (conteo = 1ª barrera; índice parcial = 2ª);
+ *   6. reutilización de la orden de llegada bajo el lock (índice único parcial de respaldo);
  *   7. CAS sobre `entryValidatedAt IS NULL` + escritura del vehículo + orden + Activity, atómico.
  *
  * `IF THE INSPECTION ORDER FAILS TO CREATE, THE WHOLE TX REVERTS` — no hay entrada sin inspección.
@@ -22,7 +22,7 @@
  * Efectos externos (revalidate/KPIs) van FUERA de la transacción, en el server action.
  */
 import { Prisma } from '@prisma/client'
-import type { ChecklistItemCategory, VehicleDocumentCategory } from '@prisma/client'
+import type { VehicleDocumentCategory } from '@prisma/client'
 import type { LockRoot } from '@/lib/locking'
 import { PUBLICADO_REQUIRED_DOCS } from '@/lib/vehicle-legal'
 import { areCategoriesClassified, isContratoGestionSatisfied } from './checklist'
@@ -31,13 +31,8 @@ import { isReadyForOfficialEntry } from './entry-expediente'
 import { EntryError } from './errors'
 import { getEntryChecklistSignals, getEntryExpedienteInput } from './prisma-deps'
 
-/** Estados de WorkOrder en los que una orden de inspección de entrada está ACTIVA (no terminal). */
-export const ACTIVE_WORKORDER_STATUSES = [
-  'PENDIENTE',
-  'EN_DIAGNOSTICO',
-  'PRESUPUESTADA',
-  'EN_CURSO',
-] as const
+export { ACTIVE_WORKORDER_STATUSES, INSPECTION_CHECKLIST } from './inspection-template'
+import { ensureEntryInspection } from './inspection'
 
 /** Nombre del índice único parcial de orden de inspección activa (segunda barrera en BD). */
 export const ACTIVE_INSPECTION_UNIQUE_INDEX = 'work_orders_active_inspection_key'
@@ -53,34 +48,6 @@ export const ENTRY_CLASSIFIED_DOC_CATEGORIES: readonly VehicleDocumentCategory[]
 export const ENTRY_SIGNAL_CATEGORIES: readonly VehicleDocumentCategory[] = [
   'CONTRATO_GESTION',
   ...PUBLICADO_REQUIRED_DOCS,
-]
-
-/** Checklist inicial de la orden de inspección de entrada (mismos 21 ítems del taller). */
-export const INSPECTION_CHECKLIST: ReadonlyArray<{
-  category: ChecklistItemCategory
-  item: string
-}> = [
-  { category: 'MECANICA', item: 'Motor' },
-  { category: 'MECANICA', item: 'Caja de cambios' },
-  { category: 'MECANICA', item: 'Frenos' },
-  { category: 'MECANICA', item: 'Suspensión' },
-  { category: 'MECANICA', item: 'Neumáticos' },
-  { category: 'MECANICA', item: 'Batería motor' },
-  { category: 'MECANICA', item: 'ITV y documentación' },
-  { category: 'CAMPER', item: 'Agua' },
-  { category: 'CAMPER', item: 'Gas' },
-  { category: 'CAMPER', item: 'Calefacción' },
-  { category: 'CAMPER', item: 'Boiler' },
-  { category: 'CAMPER', item: 'Nevera' },
-  { category: 'CAMPER', item: 'Placas solares' },
-  { category: 'CAMPER', item: 'Limpieza interior' },
-  { category: 'CAMPER', item: 'Limpieza exterior' },
-  { category: 'ELECTRICIDAD', item: 'Centralita' },
-  { category: 'ELECTRICIDAD', item: 'Inversor' },
-  { category: 'ELECTRICIDAD', item: 'Baterías auxiliares' },
-  { category: 'ELECTRICIDAD', item: 'Luces' },
-  { category: 'ELECTRICIDAD', item: 'Tomas 230V' },
-  { category: 'ELECTRICIDAD', item: 'Cargadores' },
 ]
 
 /**
@@ -202,16 +169,6 @@ export async function validateEntryTx(
     }
   }
 
-  // (7) Unicidad de orden de inspección: 1ª barrera por conteo (el índice parcial es la 2ª).
-  const activeInspections = await tx.workOrder.count({
-    where: {
-      vehicleId: p.vehicleId,
-      kind: 'INSPECCION_ENTRADA',
-      status: { in: [...ACTIVE_WORKORDER_STATUSES] },
-    },
-  })
-  if (activeInspections > 0) throw new EntryError('INSPECTION_ALREADY_ACTIVE')
-
   await hooks.beforeWrite?.()
 
   // (8) CAS sobre `entryValidatedAt IS NULL` — segunda barrera de idempotencia frente a carreras.
@@ -237,21 +194,13 @@ export async function validateEntryTx(
   if (cas.count === 0) throw new EntryError('ENTRY_ALREADY_VALIDATED')
 
   // (9) Orden de inspección de entrada (exactamente una). Si falla, toda la tx revierte.
-  const workOrder = await tx.workOrder.create({
-    data: {
-      vehicleId: p.vehicleId,
-      kind: 'INSPECCION_ENTRADA',
-      description: 'Inspección de entrada del vehículo',
-      checklist: {
-        create: INSPECTION_CHECKLIST.map((c) => ({
-          category: c.category,
-          item: c.item,
-          result: 'PENDIENTE' as const,
-        })),
-      },
-    },
-    select: { id: true },
-  })
+  const workOrder = await ensureEntryInspection(
+    tx,
+    p.vehicleId,
+    vehicle.sellerLeadId,
+    p.actorId,
+    vehicle.physicalArrivalAt ? 'retry' : 'none'
+  )
 
   // (10) Traza (NO fuente de verdad). El estado se lee de las columnas del vehículo. La traza de
   // llaves solo se registra si realmente se aportaron (fase relajada: pueden faltar).
@@ -273,12 +222,6 @@ export async function validateEntryTx(
             },
           ]
         : []),
-      {
-        type: 'ORDEN_INSPECCION_CREADA',
-        content: 'Orden de inspección de entrada creada',
-        agentId: p.actorId,
-        sellerLeadId: vehicle.sellerLeadId,
-      },
     ],
   })
 

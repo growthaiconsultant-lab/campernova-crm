@@ -142,9 +142,9 @@
 
   /* ── Rediseño CRM (reproducción fiel del handoff) — tema scopeado ─────
      Tokens EXACTOS del mockup (design_handoff_campersnova/ESPEC §2). Se aplica
-     solo en el <div> raíz de app/(backoffice)/layout.tsx (.crm-theme). La web
-     pública NO se toca (conserva Inter/Fraunces + identidad crema). */
-  .crm-theme {
+     al CRM, incluidos los menús y diálogos que Radix monta bajo body. */
+  .crm-theme,
+  body:has([data-crm-shell]) {
     /* Tokens crudos del mockup — fuente de verdad de los componentes fieles */
     --bg: #f4f6f8;
     --card-hex: #ffffff;
@@ -225,6 +225,116 @@
        Cambiar de tipografía = cambiar --font-crm en app/layout.tsx (1 línea). */
     --font-inter: var(--font-crm);
     font-family: var(--font-crm), system-ui, sans-serif;
+  }
+}
+
+/* The shell marker disappears on navigation to the public site. Using the
+   same theme on body keeps nested portals in the correct typeface and palette. */
+body:has([data-crm-shell]) :is([data-ui-select-content], [data-radix-menu-content]) {
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--card-hex);
+  color: var(--ink);
+  box-shadow: 0 6px 18px rgb(20 25 34 / 12%);
+  --accent: 170 25% 95%;
+}
+
+body:has([data-crm-shell]) [data-ui-select-trigger] {
+  background-color: var(--card-hex);
+  border-radius: var(--radius);
+}
+
+body:has([data-crm-shell]) [data-ui-select-content] {
+  max-height: min(21rem, var(--radix-select-content-available-height, 70dvh));
+  max-width: calc(100vw - 1rem);
+}
+
+body:has([data-crm-shell]) [data-ui-select-trigger]:is([data-state='open'], :focus-visible) {
+  border-color: var(--brand);
+}
+
+body:has([data-crm-shell])
+  :is([data-ui-select-content], [data-radix-menu-content])
+  :is([role='option'], [role^='menuitem']) {
+  min-height: 2.25rem;
+  border-radius: 6px;
+}
+
+body:has([data-crm-shell])
+  :is([data-ui-select-content], [data-radix-menu-content])
+  [data-state='checked'] {
+  color: var(--brand2);
+  background-color: var(--brand-tint);
+  font-weight: 600;
+}
+
+body:has([data-crm-shell])
+  :is([data-ui-select-content], [data-radix-menu-content])
+  [data-highlighted]:focus-visible {
+  outline: 2px solid var(--brand);
+  outline-offset: -2px;
+}
+
+body:has([data-crm-shell]) select:not([aria-hidden='true']):focus-visible,
+body:has([data-crm-shell]) label:has(> select.opacity-0:focus-visible) > span {
+  outline: 2px solid var(--brand);
+  outline-offset: 2px;
+}
+
+@media (pointer: coarse) {
+  body:has([data-crm-shell])
+    :is([data-ui-select-content], [data-radix-menu-content])
+    :is([role='option'], [role^='menuitem']) {
+    min-height: 2.75rem;
+  }
+}
+
+/* Keep the actual select, form value and OS touch picker. Where the browser
+   exposes its desktop picker to CSS, give it the same states as the Radix menu. */
+@media (pointer: fine) {
+  @supports (appearance: base-select) and selector(::picker(select)) {
+    body:has([data-crm-shell]) select:not([multiple], [size], [aria-hidden='true']),
+    body:has([data-crm-shell])
+      select:not([multiple], [size], [aria-hidden='true'])::picker(select) {
+      appearance: base-select;
+    }
+
+    body:has([data-crm-shell]) select::picker(select) {
+      margin-block: 4px;
+      padding: 4px;
+      max-block-size: min(22rem, 50dvh);
+      overflow-y: auto;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: var(--card-hex);
+      color: var(--ink);
+      font:
+        400 0.875rem/1.4 var(--font-crm),
+        system-ui,
+        sans-serif;
+      box-shadow: 0 6px 18px rgb(20 25 34 / 12%);
+    }
+
+    body:has([data-crm-shell]) select:not([multiple], [size]) option {
+      min-height: 2.25rem;
+      padding: 0.4rem 0.6rem;
+      border-radius: 6px;
+    }
+
+    body:has([data-crm-shell]) select:not([multiple], [size]) option:enabled:hover {
+      background: var(--track);
+    }
+
+    body:has([data-crm-shell]) select:not([multiple], [size]) option:checked {
+      background: var(--brand-tint);
+      color: var(--brand2);
+      font-weight: 600;
+    }
+
+    body:has([data-crm-shell]) select:not([multiple], [size]) option:focus-visible {
+      outline: 2px solid var(--brand);
+      outline-offset: -2px;
+    }
   }
 }
 

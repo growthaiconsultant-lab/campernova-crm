@@ -3,13 +3,9 @@ window.cnOK = true;
    Un solo script para las dos páginas: movimiento + formulario.
 
    CONFIGURACIÓN (lo único que hay que tocar):
-   - endpoint: servidor de formularios de Nira.
-   - crmEndpoint: entrada pública del CRM. Ambos destinos deben confirmar el envío.
    - pixel: mantener vacío. GTM es el único cargador del píxel de Meta.
    - whatsapp: número al que se abre WhatsApp después de enviar (o si el envío falla). */
 var CN_CONFIG = window.CN_CONFIG || {
-  endpoint: 'https://docs.niraagency.com/api/formulario/',
-  crmEndpoint: '',
   pixel: '',
   whatsapp: '34645639185'
 };
@@ -71,7 +67,7 @@ var CN_CONFIG = window.CN_CONFIG || {
     b.addEventListener('click', function () {
       var v = b.closest('.reel').querySelector('video');
       v.muted = !v.muted;
-      if (!v.muted) { try { v.currentTime = 0; } catch (e) {} var p = v.play(); if (p && p.catch) p.catch(function () {}); }
+      if (!v.muted) { try { v.currentTime = 0; } catch {} var p = v.play(); if (p && p.catch) p.catch(function () {}); }
       b.classList.toggle('activo', !v.muted);
       b.querySelector('.t').textContent = v.muted ? 'Escuchar' : 'Silenciar';
     });
@@ -82,7 +78,7 @@ var CN_CONFIG = window.CN_CONFIG || {
     b.addEventListener('click', function () {
       var v = b.querySelector('video');
       v.muted = !v.muted;
-      if (!v.muted) { try { v.currentTime = 0; } catch (e) {} var p = v.play(); if (p && p.catch) p.catch(function () {}); }
+      if (!v.muted) { try { v.currentTime = 0; } catch {} var p = v.play(); if (p && p.catch) p.catch(function () {}); }
       b.classList.toggle('activo', !v.muted);
       var s = b.querySelector('small'); if (s) s.textContent = v.muted ? (s.getAttribute('data-off') || 'Toca para escucharlo') : 'Toca para silenciar';
     });
@@ -144,7 +140,7 @@ var CN_CONFIG = window.CN_CONFIG || {
       [].forEach.call(document.querySelectorAll('.qcard.activo'), function (o) { if (o !== c) { o.classList.remove('activo'); var ov = o.querySelector('video'); ov.muted = true; o.querySelector('.escuchar .t').textContent = 'Escuchar'; } });
       c.classList.toggle('activo', activo);
       v.muted = !activo;
-      if (activo) { try { v.currentTime = 0; } catch (er) {} var p = v.play(); if (p && p.catch) p.catch(function () {}); }
+      if (activo) { try { v.currentTime = 0; } catch {} var p = v.play(); if (p && p.catch) p.catch(function () {}); }
       b.querySelector('.t').textContent = activo ? 'Silenciar' : 'Escuchar';
     });
   });
@@ -243,11 +239,11 @@ var CN_CONFIG = window.CN_CONFIG || {
     originKeys.forEach(function (k) { if (qs.has(k)) { tagged = true; incoming[k] = qs.get(k); } });
     if (tagged) {
       origen = cleanOrigin(incoming);
-      try { sessionStorage.setItem('cn_attribution_v1', JSON.stringify(origen)); } catch (e) {}
+      try { sessionStorage.setItem('cn_attribution_v1', JSON.stringify(origen)); } catch {}
     } else {
-      try { origen = cleanOrigin(JSON.parse(sessionStorage.getItem('cn_attribution_v1') || '{}')); } catch (e) {}
+      try { origen = cleanOrigin(JSON.parse(sessionStorage.getItem('cn_attribution_v1') || '{}')); } catch {}
     }
-  } catch (e) {}
+  } catch {}
 
   function aviso(msg) { var e = steps[actual].querySelector('.err'); e.textContent = msg; e.classList.remove('on'); void e.offsetWidth; e.classList.add('on'); }
   function muestra(i) {
@@ -305,75 +301,106 @@ var CN_CONFIG = window.CN_CONFIG || {
   }
 
   function sendPending() {
-    var btn = form.querySelector('button[type=submit]');
-    var retry = document.getElementById('cn-retry');
-    btn.disabled = true; retry.disabled = true; retry.textContent = 'Enviando…';
-    var jobs = [
-      { name: 'crm', url: CN_CONFIG.crmEndpoint || (slug === 'campersnova-encuentra' ? '/api/landing/encuentra-tu-camper' : '/api/landing/vende-tu-camper') },
-      { name: 'nira', url: CN_CONFIG.endpoint + slug }
-    ].filter(function (job) { return !submission.sent[job.name]; });
-    Promise.all(jobs.map(function (job) {
-      var controller = new AbortController();
-      var timeout = setTimeout(function () { controller.abort(); }, 15000);
-      var body = Object.assign({}, submission.payload);
-      if (job.name === 'crm') {
-        body.gdpr_consent = true;
-        body.respuestas = Object.assign({}, submission.payload.respuestas, { atribucion: submission.attribution });
-      }
-      return fetch(job.url, {
-        method: 'POST', headers: { 'Content-Type': 'application/json' }, signal: controller.signal,
-        body: JSON.stringify(body)
-      }).then(function (r) { if (!r.ok) throw new Error('http'); return r.json(); })
-        .then(function (j) { if (j.ok !== true) throw new Error('nok'); submission.sent[job.name] = true; })
-        .catch(function () {})
-        .then(function () { clearTimeout(timeout); });
-    })).then(function () {
-      var ok = submission.sent.crm && submission.sent.nira;
-      var partial = submission.sent.crm || submission.sent.nira;
-      var hecho = document.getElementById('cn-done');
-      form.querySelector('.cuerpo').style.display = 'none';
-      hecho.querySelector('h2,h3').textContent = ok ? '¡Recibido!' : partial ? 'Falta completar el envío' : 'No se ha podido enviar';
-      hecho.querySelector('p').textContent = ok
-        ? submission.successText
-        : partial ? 'Hemos recibido parte de tu solicitud. Pulsa Reintentar para completar el envío o escríbenos por WhatsApp con los datos ya preparados.'
-        : 'Ha fallado la conexión. Puedes reintentar o mandarnos los datos por WhatsApp: el mensaje ya va escrito con lo que has puesto.';
-      retry.hidden = ok; retry.disabled = false; retry.textContent = 'Reintentar envío';
-      document.getElementById('cn-wa').href = submission.wa;
-      hecho.classList.add('on');
-      if ((submission.sent.crm || submission.sent.nira) && !submission.tracked && window.CNConsent) {
-        submission.tracked = window.CNConsent.trackMeta('track', 'Lead', { content_name: slug }, { eventID: submission.eventId });
-      }
-      var fj = document.querySelector('.fijo'); if (fj) fj.remove();
-      if (form.getBoundingClientRect().top < 70) form.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    });
+    var btn = form.querySelector('button[type=submit]')
+    var retry = document.getElementById('cn-retry')
+    btn.disabled = true
+    retry.disabled = true
+    retry.textContent = 'Enviando…'
+    var url =
+      slug === 'campersnova-encuentra'
+        ? '/api/landing/encuentra-tu-camper'
+        : '/api/landing/vende-tu-camper'
+    var controller = new AbortController()
+    var timeout = setTimeout(function () {
+      controller.abort()
+    }, 15000)
+    fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      redirect: 'error',
+      signal: controller.signal,
+      body: JSON.stringify(submission.payload),
+    })
+      .then(function (response) {
+        if (!response.ok) throw new Error('http')
+        return response.json()
+      })
+      .then(function (result) {
+        return result.ok === true
+      })
+      .catch(function () {
+        return false
+      })
+      .then(function (ok) {
+        clearTimeout(timeout)
+        var hecho = document.getElementById('cn-done')
+        form.querySelector('.cuerpo').style.display = 'none'
+        hecho.querySelector('h2,h3').textContent = ok ? '¡Recibido!' : 'No se ha podido enviar'
+        hecho.querySelector('p').textContent = ok
+          ? submission.successText
+          : 'Ha fallado la conexión. Puedes reintentar o mandarnos los datos por WhatsApp: el mensaje ya va escrito con lo que has puesto.'
+        retry.hidden = ok
+        retry.disabled = false
+        retry.textContent = 'Reintentar envío'
+        document.getElementById('cn-wa').href = submission.wa
+        hecho.classList.add('on')
+        if (ok && window.CNConsent) {
+          window.CNConsent.trackMeta(
+            'track',
+            'Lead',
+            { content_name: slug },
+            { eventID: submission.eventId }
+          )
+        }
+        var fj = document.querySelector('.fijo')
+        if (fj) fj.remove()
+        if (form.getBoundingClientRect().top < 70)
+          form.scrollIntoView({ behavior: 'smooth', block: 'start' })
+      })
   }
   document.getElementById('cn-retry').addEventListener('click', function () {
-    if (submission && !this.disabled) sendPending();
-  });
+    if (submission && !this.disabled && !this.hidden) sendPending()
+  })
   form.addEventListener('submit', function (e) {
-    e.preventDefault();
-    if (submission) return;
+    e.preventDefault()
+    if (submission) return
     for (var i = 0; i < steps.length; i++) {
-      var f = falta(steps[i]);
-      if (f) { muestra(i); aviso(f); return; }
+      var f = falta(steps[i])
+      if (f) {
+        muestra(i)
+        aviso(f)
+        return
+      }
     }
-    var btn = form.querySelector('button[type=submit]');
-    btn.querySelector('.t').textContent = 'Enviando…';
-    var d = recoge();
-    var nombre = ((form.querySelector('[name=nombre]') || {}).value || '').trim();
-    var tel = ((form.querySelector('[name=telefono]') || {}).value || '').trim();
-    var texto = waIntro + (nombre ? ' Soy ' + nombre + '.' : '') + '\n' + d.resumen.join('\n');
-    var wa = 'https://wa.me/' + CN_CONFIG.whatsapp + '?text=' + encodeURIComponent(texto);
-    var eventId = 'cn' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
-    d.respuestas.event_id = eventId;
+    var btn = form.querySelector('button[type=submit]')
+    btn.querySelector('.t').textContent = 'Enviando…'
+    var d = recoge()
+    var nombre = ((form.querySelector('[name=nombre]') || {}).value || '').trim()
+    var tel = ((form.querySelector('[name=telefono]') || {}).value || '').trim()
+    var texto = waIntro + (nombre ? ' Soy ' + nombre + '.' : '') + '\n' + d.resumen.join('\n')
+    var wa = 'https://wa.me/' + CN_CONFIG.whatsapp + '?text=' + encodeURIComponent(texto)
+    var eventId = 'cn' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7)
+    d.respuestas.event_id = eventId
 
-    var attribution = {};
-    attributionKeys.forEach(function (k) { if (origen[k]) attribution[k] = origen[k]; });
-    submission = { payload: { nombre: nombre, contacto: tel, respuestas: d.respuestas, web_url: (form.querySelector('[name=web_url]') || {}).value || '' }, attribution: attribution,
-      eventId: eventId, wa: wa, sent: { crm: false, nira: false }, tracked: false,
-      successText: document.getElementById('cn-done').querySelector('p').textContent };
-    sendPending();
-  });
+    var attribution = {}
+    attributionKeys.forEach(function (k) {
+      if (origen[k]) attribution[k] = origen[k]
+    })
+    d.respuestas.atribucion = attribution
+    submission = {
+      payload: {
+        nombre: nombre,
+        contacto: tel,
+        gdpr_consent: true,
+        respuestas: d.respuestas,
+        web_url: (form.querySelector('[name=web_url]') || {}).value || '',
+      },
+      eventId: eventId,
+      wa: wa,
+      successText: document.getElementById('cn-done').querySelector('p').textContent,
+    }
+    sendPending()
+  })
 
   /* botón fijo en móvil: aparece cuando el formulario no está a la vista */
   var fijo = document.querySelector('.fijo');
@@ -428,5 +455,5 @@ var CN_CONFIG = window.CN_CONFIG || {
     else { var n = (d + 1) % 7; t2 = 'Abrimos ' + (n === 6 ? 'el lunes' : 'mañana') + ' a las 10:00'; }
     var tx = el.querySelector('.pie-tx'), b = document.createElement('b'), s = document.createElement('small');
     b.textContent = t1; s.textContent = t2; tx.textContent = ''; tx.appendChild(b); tx.appendChild(s); el.hidden = false;
-  } catch (e) {}
+  } catch {}
 })();
