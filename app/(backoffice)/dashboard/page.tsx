@@ -8,7 +8,7 @@ import { getCalendarItems } from '@/lib/calendar/aggregate'
 import { prismaCalendarDeps } from '@/lib/calendar/prisma-deps'
 import type { CalendarTone } from '@/lib/calendar/types'
 import { ForbiddenToast } from '@/components/forbidden-toast'
-import { DashboardFilters } from './dashboard-filters'
+import { CommercialHome } from './commercial-home'
 import { Card, KpiCard, ButtonLink } from '@/components/redesign'
 import { cn } from '@/lib/utils'
 
@@ -52,14 +52,15 @@ function firstName(name: string): string {
 export default async function DashboardPage({
   searchParams,
 }: {
-  searchParams: { agent?: string; error?: string }
+  searchParams: { agent?: string; vista?: string; error?: string }
 }) {
   const currentUser = await requireAuth()
-  const isAdmin = currentUser.role === 'ADMIN'
-  const isAgente = currentUser.role === 'AGENTE'
-
-  // AGENTE ve lo suyo; ADMIN puede filtrar por agente (o ver todo el equipo).
-  const agentId = isAgente ? currentUser.id : (searchParams.agent ?? null)
+  if (currentUser.role === 'ADMIN' || currentUser.role === 'AGENTE') {
+    return (
+      <CommercialHome user={{ id: currentUser.id, role: currentUser.role }} query={searchParams} />
+    )
+  }
+  const agentId = searchParams.agent ?? null
 
   const now = new Date()
   const dayStart = new Date(now)
@@ -67,7 +68,7 @@ export default async function DashboardPage({
   const dayEnd = new Date(now)
   dayEnd.setHours(23, 59, 59, 999)
 
-  const [kpis, agendaItems, agents] = await Promise.all([
+  const [kpis, agendaItems] = await Promise.all([
     getComercialKpis(db, agentId),
     getCalendarItems(
       prismaCalendarDeps(db),
@@ -75,13 +76,6 @@ export default async function DashboardPage({
       agentId ? { assigneeId: agentId } : {},
       now
     ),
-    isAdmin
-      ? db.user.findMany({
-          where: { active: true, role: { in: ['ADMIN', 'AGENTE'] } },
-          select: { id: true, name: true },
-          orderBy: { name: 'asc' },
-        })
-      : Promise.resolve([]),
   ])
 
   const dateLine = now.toLocaleDateString('es-ES', {
@@ -124,9 +118,6 @@ export default async function DashboardPage({
             )}
           </p>
         </div>
-        {isAdmin && (
-          <DashboardFilters agents={agents} currentAgentId={searchParams.agent ?? null} />
-        )}
       </div>
 
       {/* KPI cards */}

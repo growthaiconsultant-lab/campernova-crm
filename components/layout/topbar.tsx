@@ -28,14 +28,15 @@ const listTitles: Record<string, string | undefined> = {
  * Móvil: hamburguesa (leading) + acciones compactas.
  * El buscador ⌘K está cableado (overlay global); la campana sigue visual.
  */
-export function Topbar({ leading }: TopbarProps) {
+export function Topbar({ leading, userRole }: TopbarProps) {
   const pathname = usePathname()
   const params = useParams<{ id?: string }>()
   const searchParams = useSearchParams()
   const [buyersHref, setBuyersHref] = useState('/compradores')
   const [sellersHref, setSellersHref] = useState('/vendedores')
   const sellerList = pathname === '/vendedores'
-  const listTitle = listTitles[pathname]
+  const commercialHome = pathname === '/dashboard' && ['Administrador', 'Agente'].includes(userRole)
+  const listTitle = commercialHome ? 'Inicio' : listTitles[pathname]
   const sellerSection = sellerList || pathname.startsWith('/vendedores/')
   const buyerDetail = Boolean(params.id && pathname === `/compradores/${params.id}`)
   useEffect(() => {

@@ -10,6 +10,7 @@ export default defineConfig({
     'buyer-stock.spec.ts',
     'buyer-offers.spec.ts',
     'offers-list.spec.ts',
+    'workday.spec.ts',
     'buyer-documents.spec.ts',
     'buyer-postventa.spec.ts',
     'seller-followup.spec.ts',

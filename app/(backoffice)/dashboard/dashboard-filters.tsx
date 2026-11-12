@@ -33,13 +33,15 @@ export function DashboardFilters({ agents, currentAgentId }: Props) {
 
   return (
     <div className="flex items-center gap-2">
-      <span className="text-sm text-muted-foreground">Agente:</span>
+      <label htmlFor="inicio-responsable" className="text-sm text-muted-foreground">
+        Responsable
+      </label>
       <Select value={currentAgentId ?? '__all__'} onValueChange={setAgent}>
-        <SelectTrigger className="w-[200px]">
+        <SelectTrigger id="inicio-responsable" className="w-[200px] max-w-full">
           <SelectValue />
         </SelectTrigger>
         <SelectContent>
-          <SelectItem value="__all__">Todos</SelectItem>
+          <SelectItem value="__all__">Todo el equipo</SelectItem>
           {agents.map((a) => (
             <SelectItem key={a.id} value={a.id}>
               {a.name}
