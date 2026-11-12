@@ -460,7 +460,7 @@ export default function ComprarPage() {
                     'Cero filtros que no entiendes',
                     'Stock real, no maquetado',
                     'Te llamamos solo cuando lo pidas',
-                    'Garantía mecánica de 12 meses',
+                    'Garantía de 2 años en vehículo y vivienda',
                   ].map((item) => (
                     <li
                       key={item}

@@ -12,7 +12,7 @@ export async function generateMetadata(): Promise<Metadata> {
   return pageMetadata({
     title: 'Autocaravanas seminuevas en venta · revisadas y con garantía',
     description:
-      'Autocaravanas seminuevas en venta en Barcelona: capuchinas, perfiladas e integrales revisadas en taller propio, con garantía de 12 meses, financiación y cambio de nombre incluido.',
+      'Autocaravanas seminuevas en venta en Barcelona: capuchinas, perfiladas e integrales revisadas en taller propio, con garantía de 2 años en vehículo y vivienda, financiación y cambio de nombre gratuito.',
     path: PATH,
     noindex: vehicles.length === 0,
   })
@@ -37,7 +37,7 @@ export default async function AutocaravanasPage() {
       ]}
       eyebrow="Autocaravanas"
       title="Autocaravanas seminuevas en venta"
-      intro="Capuchinas, perfiladas e integrales seleccionadas una a una. Revisamos cada autocaravana en nuestro taller, verificamos kilometraje y documentación, y la entregamos con garantía de 12 meses ampliable. Financiación a tu medida y cambio de nombre incluido."
+      intro="Capuchinas, perfiladas e integrales seleccionadas una a una. Revisamos cada autocaravana en nuestro taller, verificamos kilometraje y documentación, y la entregamos con garantía de 2 años en vehículo y vivienda. Financiación a tu medida y cambio de nombre gratuito."
       vehicles={vehicles}
       related={{
         heading: 'Otras formas de buscar',

@@ -1,7 +1,7 @@
 import type { Metadata } from 'next'
 import Image from 'next/image'
 import Link from 'next/link'
-import { HomeNav } from '@/components/home/home-nav'
+import { PublicNav } from '@/components/public-nav'
 import { homeFormPaths } from '@/lib/public-navigation'
 import { SearchForm } from './search-form'
 import './search-form.css'
@@ -13,24 +13,12 @@ export const metadata: Metadata = {
   alternates: { canonical: '/busqueda-bajo-pedido' },
 }
 
-const path = '/busqueda-bajo-pedido'
 const catalog = '/comprar/vehiculos'
-const navigation = [
-  { href: '/', label: 'Inicio' },
-  { href: '/comprar', label: 'Comprar' },
-  { href: '/vender', label: 'Vender' },
-  { href: catalog, label: 'Catálogo' },
-  { href: path, label: 'Búsqueda a medida' },
-  { href: '/como-funciona', label: 'Cómo funciona' },
-  { href: '/sobre', label: 'Sobre nosotros' },
-]
 
 export default function SearchRequestPage() {
   return (
     <>
-      <header className="cn-search-header">
-        <HomeNav currentPath={path} navigation={navigation} />
-      </header>
+      <PublicNav />
       <main id="contenido" className="cn-search">
         <section className="cn-search-hero" aria-labelledby="search-title">
           <div className="cn-search-lead">

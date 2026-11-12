@@ -1,5 +1,6 @@
 'use client'
 
+import { PublicNav } from '@/components/public-nav'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import Image from 'next/image'
 import HCaptcha from '@hcaptcha/react-hcaptcha'
@@ -393,12 +394,7 @@ export default function VenderEmpezarPage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-background to-muted/30">
-      <header className="border-b bg-background/80 backdrop-blur">
-        <div className="mx-auto flex max-w-2xl items-center justify-between px-4 py-4">
-          <span className="text-lg font-bold text-primary">CampersNova</span>
-          <span className="text-sm text-muted-foreground">Vende tu camper o autocaravana</span>
-        </div>
-      </header>
+      <PublicNav />
 
       <main className="mx-auto max-w-2xl px-4 py-8">
         <div className="mb-8 text-center">

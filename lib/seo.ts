@@ -17,7 +17,7 @@ export const SITE_NAME = 'CampersNova'
 export const SITE_LEGAL_NAME = 'Campers Nova S.L'
 
 export const SITE_DESCRIPTION =
-  'Compra y vende autocaravanas y campers seminuevas con garantía. En CampersNova custodiamos, preparamos y vendemos tu vehículo en depósito: taller propio, garantía de 12 meses ampliable, financiación y cambio de nombre incluido.'
+  'Compra y vende autocaravanas y campers seminuevas con garantía. En CampersNova custodiamos, preparamos y vendemos tu vehículo en depósito: taller propio, garantía de 2 años en vehículo y vivienda, financiación y cambio de nombre gratuito.'
 
 export const SITE_KEYWORDS = [
   'autocaravanas seminuevas',
