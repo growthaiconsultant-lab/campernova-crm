@@ -3,6 +3,9 @@ import { Suspense } from 'react'
 import { CalendarDays, ChevronRight, ListChecks } from 'lucide-react'
 import type { User } from '@prisma/client'
 import { db } from '@/lib/db'
+import { approvedRepairQueue } from '@/lib/dashboard/approved-repairs'
+import { ApprovedRepairTasks } from './approved-repair-tasks'
+import type { ApprovedRepairQueue } from '@/lib/dashboard/approved-repairs'
 import { getWorkday, type DayRow } from '@/lib/dashboard/workday'
 import { ForbiddenToast } from '@/components/forbidden-toast'
 import { DashboardFilters } from './dashboard-filters'
@@ -77,7 +80,7 @@ export async function CommercialHome({
   const selectedAgent = typeof query.agent === 'string' && query.agent ? query.agent : undefined
   const owner = personal ? user.id : selectedAgent
   const now = new Date()
-  const [day, agents] = await Promise.all([
+  const [day, agents, repairs] = await Promise.all([
     getWorkday(db, owner, now),
     admin && !personal
       ? db.user.findMany({
@@ -86,9 +89,18 @@ export async function CommercialHome({
           orderBy: { name: 'asc' },
         })
       : [],
+    admin ? approvedRepairQueue(db, owner) : null,
   ])
   return (
-    <WorkdayView admin={admin} team={!personal} owner={owner} day={day} agents={agents} now={now} />
+    <WorkdayView
+      admin={admin}
+      team={!personal}
+      owner={owner}
+      day={day}
+      agents={agents}
+      now={now}
+      repairs={repairs}
+    />
   )
 }
 
@@ -99,7 +111,9 @@ export function WorkdayView({
   day,
   agents,
   now,
+  repairs,
 }: {
+  repairs?: ApprovedRepairQueue | null
   admin: boolean
   team: boolean
   owner?: string
@@ -151,9 +165,15 @@ export function WorkdayView({
         <section aria-labelledby="home-tasks">
           <h2 id="home-tasks" className="mb-2 flex items-center gap-2 font-semibold">
             <ListChecks aria-hidden size={18} />
-            Por hacer <span className="text-sm text-ink2">{day.tasks.length}</span>
+            Por hacer{' '}
+            <span className="text-sm text-ink2">
+              {day.tasks.length + (repairs?.tasks.length ?? 0)}
+            </span>
           </h2>
-          <DayList rows={day.tasks} team={team} empty="Sin tareas pendientes para hoy." />
+          {repairs && <ApprovedRepairTasks queue={repairs} />}
+          {(day.tasks.length > 0 || !repairs?.tasks.length) && (
+            <DayList rows={day.tasks} team={team} empty="Sin tareas pendientes para hoy." />
+          )}
         </section>
         <section aria-labelledby="home-agenda">
           <h2 id="home-agenda" className="mb-2 flex items-center gap-2 font-semibold">

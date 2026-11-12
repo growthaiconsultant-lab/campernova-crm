@@ -2,6 +2,7 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
+import Link from 'next/link'
 import { euro, quoteLabels, quoteTotal, type QuoteView } from '@/lib/entry/owner-quote'
 import { saveQuoteAction, sendQuoteAction } from '../owner-quote-actions'
 
@@ -13,6 +14,8 @@ const date = (value: string) =>
     timeStyle: 'short',
     timeZone: 'Europe/Madrid',
   })
+const repairDate = (s: string | null) =>
+  s ? new Date(s).toLocaleDateString('es-ES', { timeZone: 'Europe/Madrid' }) : 'Sin fecha'
 function Summary({ q }: { q: QuoteView }) {
   const complete = q.lines.every((l) => l.cents !== null)
   return (
@@ -48,6 +51,21 @@ function Summary({ q }: { q: QuoteView }) {
         </p>
       )}
       {q.reason && <p className="text-sm">Motivo del rechazo · {q.reason}</p>}
+      {q.awaitingSchedule && (
+        <p className="text-sm font-semibold">Reparaciones pendientes de programar en taller</p>
+      )}
+      {q.repair && (
+        <div className="rounded-md bg-brand-tint p-3 text-sm">
+          <strong>Planificación de las reparaciones</strong>
+          <p>
+            Inicio · {repairDate(q.repair.start)} · Fin · {repairDate(q.repair.end)}
+          </p>
+          <p>Responsable del trabajo · {q.repair.technician || 'Sin asignar'}</p>
+          <Link className="text-brand underline" href={'/taller/' + q.repair.id}>
+            Ver orden de reparación
+          </Link>
+        </div>
+      )}
     </div>
   )
 }
@@ -74,7 +92,8 @@ export function OwnerQuotePanel({
     [error, setError] = useState('')
   const [draft, setDraft] = useState<Record<string, { description: string; price: string }>>({})
   const awaitingOwner = quotes.find((q) => q.status === 'PENDIENTE')
-  const pending = !!awaitingOwner || quotes.some((q) => q.status === 'EN_ENVIO')
+  const pending =
+    !!awaitingOwner || quotes.some((q) => q.status === 'EN_ENVIO' || q.awaitingSchedule)
   useEffect(() => {
     if (!pending || mode !== 'ver') return
     const refresh = () => {

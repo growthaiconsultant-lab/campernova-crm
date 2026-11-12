@@ -1,9 +1,10 @@
 'use client'
 
-import { useState, useTransition } from 'react'
+import { useId, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { CalendarClock } from 'lucide-react'
+import { scheduleApprovedRepair } from '../owner-quote-actions'
 import { suggestScheduleForOrder, scheduleWorkOrder } from '../actions'
 
 interface User {
@@ -11,8 +12,7 @@ interface User {
   name: string
 }
 
-interface Props {
-  woId: string
+type Props = ({ woId: string; quoteId?: never } | { quoteId: string; woId?: never }) & {
   users: User[]
   assignedToId: string | null
   assignedToName: string | null
@@ -39,6 +39,7 @@ const inputClass =
 
 export function ScheduleCard({
   woId,
+  quoteId,
   users,
   assignedToId,
   assignedToName,
@@ -49,6 +50,7 @@ export function ScheduleCard({
   canEdit,
 }: Props) {
   const router = useRouter()
+  const fieldId = useId()
   const [isPending, startTransition] = useTransition()
 
   const isScheduled = Boolean(scheduledStart && scheduledEnd)
@@ -84,13 +86,23 @@ export function ScheduleCard({
   function handlePlanificar() {
     if (!assignee) return toast.error('Elige el responsable.')
     if (!startDate || !endDate) return toast.error('Indica las fechas (o pulsa "Sugerir fecha").')
+    if (quoteId && (!hours || !(Number(hours) > 0)))
+      return toast.error('Indica las horas previstas.')
+    if (endDate < startDate) return toast.error('La fecha de fin no puede ser anterior al inicio.')
     startTransition(async () => {
-      const r = await scheduleWorkOrder(woId, {
-        assignedToId: assignee,
-        scheduledStart: `${startDate}T12:00:00`,
-        scheduledEnd: `${endDate}T12:00:00`,
-        estimatedHours: hours ? parseFloat(hours) : null,
-      })
+      const input = { assignedToId: assignee, estimatedHours: hours ? Number(hours) : null }
+      const r =
+        woId !== undefined
+          ? await scheduleWorkOrder(woId, {
+              ...input,
+              scheduledStart: startDate + 'T12:00:00',
+              scheduledEnd: endDate + 'T12:00:00',
+            })
+          : await scheduleApprovedRepair(quoteId, {
+              ...input,
+              scheduledStart: startDate,
+              scheduledEnd: endDate,
+            })
       if (r.ok) {
         toast.success('Orden planificada y bloqueada en la agenda.')
         setSuggestion(null)
@@ -98,6 +110,7 @@ export function ScheduleCard({
         router.refresh()
       } else {
         toast.error(r.error)
+        if (quoteId) router.refresh()
       }
     })
   }
@@ -138,10 +151,14 @@ export function ScheduleCard({
         <div className="space-y-4">
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div>
-              <label className="mb-1.5 block text-xs font-medium text-cn-ink-700">
+              <label
+                htmlFor={fieldId + '-who'}
+                className="mb-1.5 block text-xs font-medium text-cn-ink-700"
+              >
                 Responsable
               </label>
               <select
+                id={fieldId + '-who'}
                 value={assignee}
                 onChange={(e) => setAssignee(e.target.value)}
                 className={inputClass}
@@ -155,10 +172,14 @@ export function ScheduleCard({
               </select>
             </div>
             <div>
-              <label className="mb-1.5 block text-xs font-medium text-cn-ink-700">
+              <label
+                htmlFor={fieldId + '-hours'}
+                className="mb-1.5 block text-xs font-medium text-cn-ink-700"
+              >
                 Horas previstas
               </label>
               <input
+                id={fieldId + '-hours'}
                 type="number"
                 step="0.5"
                 min="0"
@@ -188,8 +209,14 @@ export function ScheduleCard({
 
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div>
-              <label className="mb-1.5 block text-xs font-medium text-cn-ink-700">Inicio</label>
+              <label
+                htmlFor={fieldId + '-start'}
+                className="mb-1.5 block text-xs font-medium text-cn-ink-700"
+              >
+                Inicio
+              </label>
               <input
+                id={fieldId + '-start'}
                 type="date"
                 value={startDate}
                 onChange={(e) => setStartDate(e.target.value)}
@@ -197,10 +224,15 @@ export function ScheduleCard({
               />
             </div>
             <div>
-              <label className="mb-1.5 block text-xs font-medium text-cn-ink-700">
+              <label
+                htmlFor={fieldId + '-end'}
+                className="mb-1.5 block text-xs font-medium text-cn-ink-700"
+              >
                 Fin (entrega)
               </label>
               <input
+                id={fieldId + '-end'}
+                min={startDate || undefined}
                 type="date"
                 value={endDate}
                 onChange={(e) => setEndDate(e.target.value)}
@@ -223,7 +255,7 @@ export function ScheduleCard({
               disabled={isPending}
               className="h-10 rounded-lg bg-primary px-5 text-sm font-medium text-white hover:opacity-90 disabled:opacity-50"
             >
-              Planificar y bloquear en agenda
+              {quoteId ? 'Guardar en la agenda' : 'Planificar y bloquear en agenda'}
             </button>
           </div>
         </div>

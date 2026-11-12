@@ -39,13 +39,22 @@ async function main() {
       {
         name: 'next-browser-fixture',
         setup(plugin) {
+          plugin.onResolve({ filter: /^\.\.\/actions$/ }, (args) =>
+            args.importer.endsWith('schedule-card.tsx')
+              ? { path: args.path, namespace: 'schedule-fixture' }
+              : undefined
+          )
+          plugin.onLoad({ filter: /.*/, namespace: 'schedule-fixture' }, () => ({
+            contents:
+              'export const scheduleWorkOrder=()=>({ok:true});export const suggestScheduleForOrder=()=>({ok:false,error:"Sin sugerencia"})',
+          }))
           plugin.onResolve({ filter: /\.\.\/owner-quote-actions$/ }, ({ path }) => ({
             path,
             namespace: 'owner-quote-actions',
           }))
           plugin.onLoad({ filter: /.*/, namespace: 'owner-quote-actions' }, () => ({
             contents:
-              'export const saveQuoteAction=(...args)=>window.inspectionFixture.saveQuote(...args); export const sendQuoteAction=(...args)=>window.inspectionFixture.sendQuote(...args)',
+              'export const saveQuoteAction=(...args)=>window.inspectionFixture.saveQuote(...args); export const sendQuoteAction=(...args)=>window.inspectionFixture.sendQuote(...args); export const scheduleApprovedRepair=(...args)=>window.testRepairBooking(...args)',
           }))
           plugin.onResolve({ filter: /^\.\.\/actions$/ }, (args) =>
             args.importer.endsWith('inspection-review.tsx')

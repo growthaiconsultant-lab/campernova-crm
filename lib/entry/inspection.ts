@@ -1,6 +1,7 @@
 import type { Prisma } from '@prisma/client'
 import { INSPECTION_CHECKLIST, ACTIVE_WORKORDER_STATUSES } from './inspection-template'
 import { initialEquipment } from './inspection-equipment'
+import { inspectionCoordinator } from './inspection-coordinator'
 
 // Caller holds the Vehicle and SellerLead root locks for both arrival and validation.
 export async function ensureEntryInspection(
@@ -25,17 +26,7 @@ export async function ensureEntryInspection(
     }))
   if (existing && (handoff === 'none' || (handoff === 'retry' && existing.assignedToId) || !active))
     return existing
-  const coordinator =
-    handoff !== 'none'
-      ? await tx.user.findFirst({
-          where: {
-            entryInspectionCoordinator: true,
-            active: true,
-            role: { in: ['ADMIN', 'TALLER'] },
-          },
-          select: { id: true },
-        })
-      : null
+  const coordinator = handoff !== 'none' ? await inspectionCoordinator(tx) : null
   if (existing) {
     if (!coordinator) return existing
     return tx.workOrder.update({

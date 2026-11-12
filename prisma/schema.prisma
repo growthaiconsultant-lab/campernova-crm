@@ -1213,7 +1213,8 @@ model WorkOrder {
   vehicle     Vehicle                @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
   assignedTo  User?                  @relation("AssignedWorkOrders", fields: [assignedToId], references: [id])
   approvedBy  User?                  @relation("ApprovedWorkOrders", fields: [approvedById], references: [id])
-  ownerQuotes InspectionOwnerQuote[]
+  ownerQuotes InspectionOwnerQuote[] @relation("InspectionQuotes")
+  approvedQuote InspectionOwnerQuote? @relation("ApprovedRepair")
   checklist   WorkOrderChecklist[]
   timeEntries WorkOrderTimeEntry[]
   parts       WorkOrderPart[]
@@ -1242,7 +1243,9 @@ enum OwnerQuoteStatus {
 model InspectionOwnerQuote {
   id           String           @id @default(cuid())
   workOrderId  String           @map("work_order_id")
-  workOrder    WorkOrder        @relation(fields: [workOrderId], references: [id], onDelete: Restrict)
+  workOrder    WorkOrder        @relation("InspectionQuotes", fields: [workOrderId], references: [id], onDelete: Restrict)
+  repairOrderId String?         @unique @map("repair_order_id")
+  repairOrder   WorkOrder?      @relation("ApprovedRepair", fields: [repairOrderId], references: [id], onDelete: Restrict)
   version      Int
   revision     Int              @default(1)
   status       OwnerQuoteStatus @default(BORRADOR)
