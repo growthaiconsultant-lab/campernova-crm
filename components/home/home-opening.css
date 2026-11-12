@@ -337,7 +337,7 @@
 .public-home .home-opening {
   display: flex;
   flex-direction: column;
-  min-height: calc(100svh - var(--cn-public-menu-height));
+  min-height: 100svh;
 }
 .public-home .home-opening .hero {
   height: auto;
@@ -350,7 +350,7 @@
   object-position: 58% 51%;
 }
 .public-home .home-opening h1 {
-  line-height: 0.99;
+  line-height: 0.89;
 }
 .public-home .ownership h2 {
   font-family: var(--font-inter), Arial, sans-serif;
@@ -397,10 +397,79 @@
     margin-top: 10px;
   }
 }
-.public-home .hero-cover-link {
-  color: #fff0d0;
-  text-decoration: underline;
-  text-decoration-color: #dfcc9c;
-  text-underline-offset: 4px;
-  font-weight: 650;
+
+.cn-home-page {
+  position: relative;
+}
+.cn-home-menu-edge {
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 1px;
+  width: 1px;
+  pointer-events: none;
+}
+.cn-home-page > .cn-site-menu {
+  margin-bottom: calc(0px - var(--cn-public-menu-height));
+}
+.cn-home-page .cn-site-over-photo {
+  background: linear-gradient(180deg, rgba(14, 21, 21, 0.37), rgba(14, 21, 21, 0.09));
+  border-bottom-color: transparent;
+}
+.cn-home-page .cn-site-over-photo .cn-site-menu-inner {
+  border-bottom: 1px solid rgba(255, 252, 238, 0.48);
+}
+.cn-home-page .home-opening .hero {
+  padding-top: var(--cn-public-menu-height);
+}
+.cn-home-page .home-opening .land {
+  object-position: 50% 59%;
+}
+@media (min-width: 1071px) {
+  .cn-home-page {
+    --cn-public-menu-height: clamp(72px, 5.45vw, 94px);
+  }
+  .cn-home-page .cn-site-menu-inner,
+  .cn-home-page .hero-copy {
+    width: min(96%, 1680px);
+  }
+  .cn-home-page .cn-site-logo {
+    width: clamp(92px, 7vw, 128px);
+  }
+  .cn-home-page .cn-site-links {
+    flex: 1;
+    gap: clamp(16px, 1.9vw, 38px);
+    font-size: clamp(13px, 1vw, 18px);
+  }
+  .cn-home-page .cn-site-links a:first-child,
+  .cn-home-page .cn-site-links a:last-child {
+    margin-left: auto;
+  }
+  .cn-home-page .cn-site-links a:last-child {
+    padding: 10px 22px;
+  }
+  .cn-home-page .cn-site-links a:last-child::after {
+    content: '↗' / '';
+    margin-left: 9px;
+  }
+  .cn-home-page .hero-copy {
+    padding-bottom: clamp(25px, 3vh, 44px);
+  }
+  .cn-home-page .hero-copy h1 {
+    font-size: clamp(90px, 8.8vw, 164px);
+  }
+  .cn-home-page .hero-copy p {
+    font-size: clamp(16px, 1.13vw, 22px);
+    max-width: 46ch;
+  }
+}
+@media (max-width: 760px) {
+  .cn-home-page .home-opening .land {
+    object-position: 66% center;
+  }
+  .cn-home-page .home-opening .veil {
+    background:
+      linear-gradient(180deg, rgba(7, 16, 13, 0.5), transparent 22%),
+      linear-gradient(0deg, #102019f5, rgba(16, 32, 25, 0.5) 42%, transparent 78%);
+  }
 }

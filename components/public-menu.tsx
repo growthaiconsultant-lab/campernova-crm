@@ -2,7 +2,13 @@ import React from 'react'
 import { publicNavigation, publicMenuSection } from '../lib/public-navigation'
 
 /** Also rendered into the two static campaign pages by scripts/sync-public-menu.tsx. */
-export function PublicMenu({ pathname }: { pathname: string }) {
+export function PublicMenu({
+  pathname,
+  transparent = false,
+}: {
+  pathname: string
+  transparent?: boolean
+}) {
   const section = publicMenuSection(pathname)
   const items = publicNavigation.map(({ href, label }) => (
     <a
@@ -20,7 +26,7 @@ export function PublicMenu({ pathname }: { pathname: string }) {
     </a>
   ))
   return (
-    <header className="cn-site-menu">
+    <header className={transparent ? 'cn-site-menu cn-site-over-photo' : 'cn-site-menu'}>
       <div className="cn-site-menu-inner">
         <a href="/" aria-label="CampersNova, inicio">
           {/* The same native image markup is used in the standalone campaign pages. */}

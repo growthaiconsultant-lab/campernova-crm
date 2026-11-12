@@ -12,8 +12,8 @@ import './home-opening.css'
 
 export function PublicHome({ vehicles }: { vehicles: HomeVehicle[] }) {
   return (
-    <>
-      <PublicNav />
+    <div className="cn-home-page">
+      <PublicNav overPhoto />
       <div className="public-home">
         <main id="main-content">
           <div className="home-opening">
@@ -34,11 +34,8 @@ export function PublicHome({ vehicles }: { vehicles: HomeVehicle[] }) {
                   Hoy dormimos <span>aquí.</span>
                 </h1>
                 <p>
-                  ¿Mar o montaña este fin de semana? Sal a descubrirlo con{' '}
-                  <a className="hero-cover-link" href="#garantia-compra">
-                    2 años de garantía en vehículo y vivienda
-                  </a>
-                  .
+                  ¿Mar o montaña este fin de semana? Pásate por la nave en Barcelona. Te enseñamos
+                  las campers y hablamos de ese viaje que tienes en mente.
                 </p>
                 <div className="actions">
                   <a className="pill" href="#comprar">
@@ -55,8 +52,8 @@ export function PublicHome({ vehicles }: { vehicles: HomeVehicle[] }) {
                       <path d="M4 12h15m-6-6 6 6-6 6" />
                     </svg>
                   </a>
-                  <Link className="textlink" href="/busqueda-bajo-pedido">
-                    Buscadme una camper{' '}
+                  <a className="textlink" href="#taller">
+                    Conocer el taller{' '}
                     <svg
                       aria-hidden="true"
                       viewBox="0 0 24 24"
@@ -68,7 +65,7 @@ export function PublicHome({ vehicles }: { vehicles: HomeVehicle[] }) {
                     >
                       <path d="M5 19 19 5M6 5h13v13" />
                     </svg>
-                  </Link>
+                  </a>
                 </div>
               </div>
             </section>
@@ -295,6 +292,6 @@ export function PublicHome({ vehicles }: { vehicles: HomeVehicle[] }) {
           </div>
         </footer>
       </div>
-    </>
+    </div>
   )
 }
