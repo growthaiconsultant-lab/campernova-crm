@@ -1,16 +1,19 @@
 import { db } from '@/lib/db'
 import { requireAgente } from '@/lib/auth'
-import { QuickAddCapture } from './quick-add-capture'
-import { CaptureCard, type CaptureCardData } from './capture-card'
-import { CaptureBoard } from './capture-board'
-import { Eyebrow } from '@/components/redesign'
-import { resolveCaptureFocusId } from '@/lib/captacion'
-import type { CaptureStatus } from '@prisma/client'
+import { CaptureWorkspace } from './capture-workspace'
+import type { CaptureCardData } from './capture-card'
+import { captureViewOf, isValidPortal, resolveCaptureFocusId } from '@/lib/captacion'
 
 export default async function CaptacionesPage({
   searchParams,
 }: {
-  searchParams: { focus?: string }
+  searchParams: {
+    focus?: string
+    vista?: string
+    portal?: string
+    responsable?: string
+    nueva?: string
+  }
 }) {
   await requireAgente()
 
@@ -32,7 +35,7 @@ export default async function CaptacionesPage({
     phone: c.phone,
     portal: c.portal,
     title: c.title,
-    askingPrice: c.askingPrice ? Number(c.askingPrice) : null,
+    askingPrice: c.askingPrice == null ? null : Number(c.askingPrice),
     status: c.status,
     notes: c.notes,
     rejectionReason: c.rejectionReason,
@@ -42,74 +45,29 @@ export default async function CaptacionesPage({
     sellerLeadId: c.sellerLeadId,
   }))
 
-  const byStatus = new Map<CaptureStatus, CaptureCardData[]>()
-  for (const c of cards) {
-    const list = byStatus.get(c.status) ?? []
-    list.push(c)
-    byStatus.set(c.status, list)
-  }
-  const rejected = byStatus.get('RECHAZADO') ?? []
-  const activeCount = cards.filter((c) => c.status !== 'RECHAZADO').length
   const focusId = resolveCaptureFocusId(
     searchParams.focus,
-    cards.map((capture) => capture.id)
+    cards.map((c) => c.id)
   )
-  const focusesRejected = rejected.some((capture) => capture.id === focusId)
-
+  const focused = cards.find((c) => c.id === focusId)
+  const view = focused
+    ? captureViewOf(focused)
+    : searchParams.vista === 'convertidas' || searchParams.vista === 'rechazadas'
+      ? searchParams.vista
+      : 'abiertas'
   return (
-    <div>
-      {/* Título de módulo (chrome global en el header 60px) */}
-      <div className="mb-4 flex items-end justify-between gap-3">
-        <div>
-          <Eyebrow>CRM · Captación</Eyebrow>
-          <h1 className="mt-1 font-hanken text-[23px] font-bold tracking-[-0.02em] text-ink">
-            Captaciones
-          </h1>
-          <p className="mt-1 font-hanken text-[13.5px] text-ink2">
-            Anuncios de portales que perseguimos para captar stock ·{' '}
-            <b className="text-ink">
-              {activeCount} activa{activeCount === 1 ? '' : 's'}
-            </b>
-          </p>
-        </div>
-        {rejected.length > 0 && (
-          <a
-            href="#rechazadas"
-            className="shrink-0 rounded-[9px] border border-line bg-card px-[13px] py-2 font-hanken text-[12px] font-semibold text-ink2 transition-colors hover:bg-canvas"
-          >
-            Rechazadas ({rejected.length})
-          </a>
-        )}
-      </div>
-
-      <div className="mb-4">
-        <QuickAddCapture />
-      </div>
-
-      {/* Tablero por estado (CAP1) — tarjetas arrastrables entre columnas */}
-      <CaptureBoard
-        cards={cards.filter((c) => c.status !== 'RECHAZADO')}
-        agents={agents}
-        focusId={focusId}
-      />
-
-      {/* Rechazadas */}
-      {rejected.length > 0 && (
-        <details
-          id="rechazadas"
-          open={focusesRejected ? true : undefined}
-          className="mt-4 rounded-[14px] border border-line bg-card"
-        >
-          <summary className="cursor-pointer px-4 py-3 font-hanken text-[13px] font-semibold text-ink2">
-            Rechazadas ({rejected.length})
-          </summary>
-          <div className="grid gap-2 p-3 sm:grid-cols-2 lg:grid-cols-3">
-            {rejected.map((c) => (
-              <CaptureCard key={c.id} c={c} agents={agents} focused={focusId === c.id} />
-            ))}
-          </div>
-        </details>
-      )}
-    </div>
+    <CaptureWorkspace
+      cards={cards}
+      agents={agents}
+      view={view}
+      focusId={focusId}
+      portal={
+        !focused && searchParams.portal && isValidPortal(searchParams.portal)
+          ? searchParams.portal
+          : ''
+      }
+      owner={focused ? '' : (searchParams.responsable ?? '')}
+      showCreate={searchParams.nueva === '1'}
+    />
   )
 }

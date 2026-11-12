@@ -44,7 +44,10 @@ export async function createCapture(
   // El aviso de duplicado por teléfono solo tiene sentido si se ha informado el teléfono.
   if (!allowDuplicate && phone) {
     const [captures, sellers] = await Promise.all([
-      db.vehicleCapture.findMany({ select: { id: true, phone: true, status: true } }),
+      db.vehicleCapture.findMany({
+        where: { sellerLeadId: null },
+        select: { id: true, phone: true, status: true },
+      }),
       db.sellerLead.findMany({ select: { id: true, name: true, phone: true } }),
     ])
     const dupCap = findDuplicateCaptureByPhone(phone, captures)
@@ -88,8 +91,10 @@ export async function updateCaptureStatus(
   await requireAgente()
   if (!isValidCaptureStatus(status)) return { error: 'Estado no válido' }
 
-  const capture = await db.vehicleCapture.findUnique({ where: { id }, select: { id: true } })
-  if (!capture) return { error: 'Captación no encontrada' }
+  if (status === 'CONVERTIDO')
+    return { error: 'Crea la ficha de vendedor para convertir la captación.' }
+  if (status === 'ENTRADA_AGENDADA')
+    return { error: 'Indica la fecha y hora para agendar la entrada.' }
 
   let reason: LostReason | null = null
   if (status === 'RECHAZADO' && rejectionReason) {
@@ -97,14 +102,19 @@ export async function updateCaptureStatus(
     reason = rejectionReason
   }
 
-  await db.vehicleCapture.update({
-    where: { id },
+  const changed = await db.vehicleCapture.updateMany({
+    where: { id, sellerLeadId: null },
     data: {
       status: status as CaptureStatus,
       ...(status === 'RECHAZADO' ? { rejectionReason: reason } : {}),
     },
   })
 
+  if (!changed.count)
+    return {
+      error: 'La captación ya está vinculada a un vendedor o ha dejado de estar disponible.',
+    }
+  revalidatePath('/calendario')
   revalidatePath('/captaciones')
   return {}
 }
@@ -121,13 +131,14 @@ export async function scheduleEntrada(
   const date = new Date(dateTimeIso)
   if (isNaN(date.getTime())) return { error: 'Fecha no válida' }
 
-  const capture = await db.vehicleCapture.findUnique({ where: { id }, select: { id: true } })
-  if (!capture) return { error: 'Captación no encontrada' }
-
-  await db.vehicleCapture.update({
-    where: { id },
+  const changed = await db.vehicleCapture.updateMany({
+    where: { id, sellerLeadId: null },
     data: { status: 'ENTRADA_AGENDADA', entradaScheduledAt: date },
   })
+  if (!changed.count)
+    return {
+      error: 'La captación ya está vinculada a un vendedor o ha dejado de estar disponible.',
+    }
 
   revalidatePath('/captaciones')
   revalidatePath('/calendario')
@@ -245,6 +256,7 @@ export async function convertCaptureToSellerLead(
 }
 
 type EditInput = {
+  phone?: string | null
   notes?: string | null
   assignedToId?: string | null
   askingPrice?: number | null
@@ -264,6 +276,7 @@ export async function updateCapture(id: string, data: EditInput): Promise<{ erro
   await db.vehicleCapture.update({
     where: { id },
     data: {
+      ...(data.phone !== undefined ? { phone: data.phone?.trim() || null } : {}),
       ...(data.notes !== undefined ? { notes: data.notes?.trim().slice(0, 1000) || null } : {}),
       ...(data.assignedToId !== undefined ? { assignedToId: data.assignedToId || null } : {}),
       ...(data.askingPrice !== undefined ? { askingPrice: data.askingPrice } : {}),

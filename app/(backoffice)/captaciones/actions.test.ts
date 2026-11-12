@@ -15,7 +15,7 @@ vi.mock('@/lib/capture-conversion', async (importOriginal) => {
 
 const { mockDb } = vi.hoisted(() => ({
   mockDb: {
-    vehicleCapture: { findUnique: vi.fn() },
+    vehicleCapture: { findUnique: vi.fn(), updateMany: vi.fn() },
     $transaction: vi.fn(),
   },
 }))
@@ -25,7 +25,7 @@ import { requireAgente } from '@/lib/auth'
 import { revalidatePath } from 'next/cache'
 import { runAndSavePreliminaryValuation } from '@/lib/valuation/save'
 import { convertCaptureTx, ConversionConflictError } from '@/lib/capture-conversion'
-import { convertCaptureToSellerLead } from './actions'
+import { convertCaptureToSellerLead, updateCaptureStatus, scheduleEntrada } from './actions'
 
 const capture = {
   id: 'cap-1',
@@ -103,5 +103,20 @@ describe('convertCaptureToSellerLead · conversión atómica', () => {
     await expect(convertCaptureToSellerLead('cap-1')).rejects.toThrow('DB caída')
     expect(runAndSavePreliminaryValuation).not.toHaveBeenCalled()
     expect(revalidatePath).not.toHaveBeenCalled()
+  })
+})
+
+describe('etapas del tablero', () => {
+  it('pide la operación de conversión y una fecha para agendar', async () => {
+    expect(await updateCaptureStatus('cap', 'CONVERTIDO')).toHaveProperty('error')
+    expect(await updateCaptureStatus('cap', 'ENTRADA_AGENDADA')).toHaveProperty('error')
+    expect(mockDb.vehicleCapture.updateMany).not.toHaveBeenCalled()
+  })
+  it('un cambio de etapa o fecha desactualizado respeta la ficha ya vinculada', async () => {
+    mockDb.vehicleCapture.updateMany.mockResolvedValue({ count: 0 })
+    expect(await updateCaptureStatus('cap', 'EN_CURSO')).toHaveProperty('error')
+    expect(await scheduleEntrada('cap', '2027-01-15T11:00:00Z')).toHaveProperty('error')
+    for (const [query] of mockDb.vehicleCapture.updateMany.mock.calls)
+      expect(query.where).toEqual({ id: 'cap', sellerLeadId: null })
   })
 })

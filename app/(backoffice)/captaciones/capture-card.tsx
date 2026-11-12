@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useTransition } from 'react'
+import { useRef, useState, useTransition } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import {
@@ -19,6 +19,8 @@ import {
 } from './actions'
 import {
   CAPTURE_STATUS_COLORS,
+  CAPTURE_BOARD_COLUMNS,
+  captureViewOf,
   CAPTURE_STATUS_LABELS,
   PORTAL_LABELS,
   captureAnchorId,
@@ -46,26 +48,8 @@ export type CaptureCardData = {
 
 type Agent = { id: string; name: string }
 
-const STATUS_ORDER: CaptureStatus[] = [
-  'NO_CONTACTADO',
-  'CONTACTADO',
-  'EN_CURSO',
-  'ENTRADA_AGENDADA',
-  'CONVERTIDO',
-  'RECHAZADO',
-]
-
 const EUR = (n: number) =>
   n.toLocaleString('es-ES', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 })
-
-function initialsOf(name: string) {
-  return name
-    .split(' ')
-    .slice(0, 2)
-    .map((n) => n[0])
-    .join('')
-    .toUpperCase()
-}
 
 export function CaptureCard({
   c,
@@ -84,6 +68,7 @@ export function CaptureCard({
   const [entradaAt, setEntradaAt] = useState('')
   const [editing, setEditing] = useState(false)
   const [notes, setNotes] = useState(c.notes ?? '')
+  const [phone, setPhone] = useState(c.phone ?? '')
   const [assignedToId, setAssignedToId] = useState(c.assignedToId ?? '')
   const [converting, startConvert] = useTransition()
   const [error, setError] = useState<string | null>(null)
@@ -134,10 +119,27 @@ export function CaptureCard({
     })
   }
 
+  const original = useRef({ phone, notes, assignedToId })
+  function edit() {
+    original.current = {
+      phone: c.phone ?? '',
+      notes: c.notes ?? '',
+      assignedToId: c.assignedToId ?? '',
+    }
+    setPhone(c.phone ?? '')
+    setNotes(c.notes ?? '')
+    setAssignedToId(c.assignedToId ?? '')
+    setError(null)
+    setEditing(true)
+  }
   function saveEdit() {
     setError(null)
     startTransition(async () => {
-      const res = await updateCapture(c.id, { notes, assignedToId })
+      const res = await updateCapture(c.id, {
+        ...(notes !== original.current.notes && { notes }),
+        ...(assignedToId !== original.current.assignedToId && { assignedToId }),
+        ...(phone.trim() !== original.current.phone && { phone }),
+      })
       if (res.error) setError(res.error)
       else {
         setEditing(false)
@@ -146,11 +148,15 @@ export function CaptureCard({
     })
   }
 
+  const view = captureViewOf(c)
+  const primary =
+    'mt-2 inline-flex w-full items-center justify-center gap-2 rounded-md bg-brand px-3 py-2 text-sm font-semibold text-white hover:bg-brand2 disabled:opacity-50'
   const dot = CAPTURE_STATUS_COLORS[c.status]
   const idle = !editing && !rejecting && !scheduling
 
   return (
-    <div
+    <article
+      aria-label={c.title || 'Vehículo sin título'}
       id={captureAnchorId(c.id)}
       className={cn(
         'scroll-mt-24 rounded-[11px] border border-line bg-card p-[11px] shadow-[0_1px_2px_rgba(20,25,34,0.04)]',
@@ -168,7 +174,7 @@ export function CaptureCard({
       </div>
 
       {/* Título */}
-      <p className="truncate font-hanken text-[12.5px] font-semibold leading-[1.25] text-ink">
+      <p className="break-words font-hanken text-[14px] font-semibold leading-[1.25] text-ink">
         {c.title || 'Vehículo sin título'}
       </p>
 
@@ -200,29 +206,25 @@ export function CaptureCard({
             <span className="font-mono text-[10.5px] text-ink3">Sin teléfono</span>
           )}
         </div>
-        {c.assignedToName && (
-          <span
-            title={c.assignedToName}
-            className="flex h-[22px] w-[22px] shrink-0 items-center justify-center rounded-full bg-brand-tint font-hanken text-[9px] font-bold text-brand2"
-          >
-            {initialsOf(c.assignedToName)}
-          </span>
-        )}
+        <span className="min-w-0 break-words text-right text-xs text-ink2">
+          {c.assignedToName || 'Sin asignar'}
+        </span>
       </div>
 
       {!editing && c.notes && (
         <p className="mt-1.5 whitespace-pre-wrap font-hanken text-[12px] text-ink2">{c.notes}</p>
       )}
 
-      {c.status === 'RECHAZADO' && c.rejectionReason && (
+      {view === 'rechazadas' && (
         <p className="mt-1 font-hanken text-[11px] text-bad">
-          Motivo: {LOST_REASON_OPTIONS.find((o) => o.value === c.rejectionReason)?.label}
+          Motivo:{' '}
+          {LOST_REASON_OPTIONS.find((o) => o.value === c.rejectionReason)?.label ?? 'Sin registrar'}
         </p>
       )}
 
       {c.entradaScheduledAt && c.status === 'ENTRADA_AGENDADA' && (
         <p className="mt-1.5 inline-flex items-center gap-1 font-mono text-[11px] font-medium text-info">
-          <CalendarClock size={12} strokeWidth={2} />
+          <CalendarClock size={12} strokeWidth={2} /> Entrada ·
           {new Date(c.entradaScheduledAt).toLocaleString('es-ES', {
             day: 'numeric',
             month: 'short',
@@ -233,25 +235,71 @@ export function CaptureCard({
         </p>
       )}
 
-      {c.sellerLeadId && (
-        <Link
-          href={`/vendedores/${c.sellerLeadId}`}
-          className="mt-2 inline-flex items-center gap-1 font-hanken text-[12px] font-semibold text-brand hover:underline"
-        >
-          <ExternalLink size={12} strokeWidth={2} /> Ver ficha de vendedor
-        </Link>
-      )}
-
-      {!c.sellerLeadId && c.status === 'ENTRADA_AGENDADA' && idle && (
-        <button
-          type="button"
-          onClick={convert}
-          disabled={converting}
-          className="mt-2 inline-flex w-full items-center justify-center gap-1.5 rounded-[9px] bg-brand px-2 py-[7px] font-hanken text-[11.5px] font-semibold text-white transition-colors hover:bg-brand2 disabled:opacity-50"
-        >
-          <ArrowRightLeft size={14} strokeWidth={2} />
-          {converting ? 'Convirtiendo…' : 'Convertir a ficha de vendedor'}
-        </button>
+      {idle && (
+        <div className="mt-2 border-t border-line pt-2">
+          {view === 'abiertas' && <p className="text-xs font-medium text-ink2">Siguiente paso</p>}
+          {view === 'abiertas' &&
+            c.status === 'NO_CONTACTADO' &&
+            (c.phone || c.listingUrl ? (
+              <a
+                className={primary}
+                target="_blank"
+                rel="noopener noreferrer"
+                href={
+                  c.phone
+                    ? buildWhatsAppUrl(c.phone, 'Hola, te contacto de CampersNova por tu anuncio.')
+                    : c.listingUrl!
+                }
+              >
+                {c.phone ? 'Contactar por WhatsApp' : 'Contactar desde el anuncio'}
+              </a>
+            ) : (
+              <button type="button" className={primary} onClick={edit}>
+                Añadir teléfono de contacto
+              </button>
+            ))}
+          {view === 'abiertas' && c.status === 'CONTACTADO' && (
+            <button
+              type="button"
+              className={primary}
+              disabled={pending}
+              onClick={() => changeStatus('EN_CURSO')}
+            >
+              Iniciar seguimiento
+            </button>
+          )}
+          {view === 'abiertas' &&
+            (c.status === 'EN_CURSO' ||
+              (c.status === 'ENTRADA_AGENDADA' && !c.entradaScheduledAt)) && (
+              <button
+                type="button"
+                className={primary}
+                onClick={() => changeStatus('ENTRADA_AGENDADA')}
+              >
+                Agendar entrada
+              </button>
+            )}
+          {view === 'abiertas' && c.status === 'ENTRADA_AGENDADA' && c.entradaScheduledAt && (
+            <button type="button" className={primary} onClick={convert} disabled={converting}>
+              <ArrowRightLeft size={14} aria-hidden />
+              {converting ? 'Creando ficha…' : 'Crear ficha de vendedor'}
+            </button>
+          )}
+          {view === 'convertidas' &&
+            (c.sellerLeadId ? (
+              <Link
+                href={'/vendedores/' + c.sellerLeadId}
+                className="inline-flex items-center gap-2 text-sm font-semibold text-brand underline"
+              >
+                Ver ficha del vendedor
+              </Link>
+            ) : (
+              <p className="text-sm text-ink2">
+                Conversión sin ficha vinculada. Revisa el registro antes de reabrirlo.
+              </p>
+            ))}
+          {view === 'rechazadas' && <p className="text-sm text-ink2">Sin acción pendiente.</p>}
+        </div>
       )}
 
       {/* Agendar entrada inline */}
@@ -259,6 +307,7 @@ export function CaptureCard({
         <div className="border-info/30 mt-2 space-y-2 rounded-[9px] border bg-info-tint p-2">
           <p className="font-hanken text-[11px] font-medium text-info">¿Cuándo trae el vehículo?</p>
           <input
+            aria-label="Fecha y hora de entrada"
             type="datetime-local"
             value={entradaAt}
             onChange={(e) => setEntradaAt(e.target.value)}
@@ -287,7 +336,17 @@ export function CaptureCard({
       {/* Edición inline */}
       {editing && (
         <div className="mt-2 space-y-2">
+          <label className="grid gap-1 text-xs font-medium">
+            Teléfono de contacto
+            <input
+              type="tel"
+              value={phone}
+              onChange={(e) => setPhone(e.target.value)}
+              className="rounded-md border bg-background p-2 text-sm"
+            />
+          </label>
           <textarea
+            aria-label="Notas de la captación"
             value={notes}
             onChange={(e) => setNotes(e.target.value)}
             rows={2}
@@ -295,11 +354,15 @@ export function CaptureCard({
             className="w-full rounded-[8px] border border-line px-2 py-1 font-hanken text-[12px] outline-none focus:border-brand"
           />
           <select
+            aria-label="Asignar responsable"
             value={assignedToId}
             onChange={(e) => setAssignedToId(e.target.value)}
             className="w-full rounded-[8px] border border-line px-2 py-1 font-hanken text-[12px]"
           >
             <option value="">Sin asignar</option>
+            {c.assignedToId && !agents.some((a) => a.id === c.assignedToId) && (
+              <option value={c.assignedToId}>{c.assignedToName ?? 'Responsable anterior'}</option>
+            )}
             {agents.map((a) => (
               <option key={a.id} value={a.id}>
                 {a.name}
@@ -330,6 +393,7 @@ export function CaptureCard({
       {rejecting && (
         <div className="border-bad/30 mt-2 space-y-2 rounded-[9px] border bg-bad-tint p-2">
           <select
+            aria-label="Motivo del rechazo"
             value={reason}
             onChange={(e) => setReason(e.target.value)}
             className="w-full rounded-[8px] border border-line px-2 py-1 font-hanken text-[12px]"
@@ -366,39 +430,43 @@ export function CaptureCard({
       {/* Acciones: selector de estado + editar */}
       {idle && (
         <div className="mt-2.5 flex items-center gap-1.5">
-          <label className="relative flex-1">
-            <span
-              className={cn(
-                'flex items-center gap-1.5 rounded-[8px] border border-line px-2 py-1 font-hanken text-[11.5px] font-semibold'
-              )}
-              style={{ color: dot }}
-            >
-              <span className="h-1.5 w-1.5 rounded-full" style={{ background: dot }} />
-              {CAPTURE_STATUS_LABELS[c.status]}
-            </span>
-            <select
-              className="absolute inset-0 cursor-pointer opacity-0"
-              value={c.status}
-              onChange={(e) => changeStatus(e.target.value as CaptureStatus)}
-              disabled={pending}
-            >
-              {STATUS_ORDER.map((s) => (
-                <option key={s} value={s}>
-                  {CAPTURE_STATUS_LABELS[s]}
-                </option>
-              ))}
-            </select>
-          </label>
+          {!c.sellerLeadId && (
+            <label className="relative flex-1">
+              <span
+                className={cn(
+                  'flex items-center gap-1.5 rounded-[8px] border border-line px-2 py-1 font-hanken text-[11.5px] font-semibold'
+                )}
+                style={{ color: dot }}
+              >
+                <span className="h-1.5 w-1.5 rounded-full" style={{ background: dot }} />
+                {CAPTURE_STATUS_LABELS[c.status]}
+              </span>
+              <select
+                aria-label="Cambiar etapa"
+                className="absolute inset-0 cursor-pointer opacity-0"
+                value={c.status}
+                onChange={(e) => changeStatus(e.target.value as CaptureStatus)}
+                disabled={pending}
+              >
+                {c.status === 'CONVERTIDO' && <option value="CONVERTIDO">Convertido</option>}
+                {[...CAPTURE_BOARD_COLUMNS, 'RECHAZADO' as const].map((s) => (
+                  <option key={s} value={s}>
+                    {CAPTURE_STATUS_LABELS[s]}
+                  </option>
+                ))}
+              </select>
+            </label>
+          )}
           <button
             type="button"
-            onClick={() => setEditing(true)}
-            aria-label="Editar"
+            onClick={edit}
+            aria-label="Editar captación"
             className="flex h-7 w-7 items-center justify-center rounded-[8px] border border-line text-ink2 transition-colors hover:bg-canvas"
           >
             <Pencil size={13} strokeWidth={2} />
           </button>
         </div>
       )}
-    </div>
+    </article>
   )
 }

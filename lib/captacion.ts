@@ -18,9 +18,9 @@ export const PORTAL_OPTIONS = (Object.entries(PORTAL_LABELS) as [CapturePortal, 
 )
 
 export const CAPTURE_STATUS_LABELS: Record<CaptureStatus, string> = {
-  NO_CONTACTADO: 'No contactado',
+  NO_CONTACTADO: 'Por contactar',
   CONTACTADO: 'Contactado',
-  EN_CURSO: 'En curso',
+  EN_CURSO: 'En seguimiento',
   ENTRADA_AGENDADA: 'Entrada agendada',
   CONVERTIDO: 'Convertido',
   RECHAZADO: 'Rechazado',
@@ -36,14 +36,28 @@ export const CAPTURE_STATUS_COLORS: Record<CaptureStatus, string> = {
   RECHAZADO: '#d64545', // red
 }
 
-/** Columnas del tablero, en orden de flujo. RECHAZADO va aparte (no es columna). */
+/** Etapas de las captaciones abiertas. */
 export const CAPTURE_BOARD_COLUMNS: CaptureStatus[] = [
   'NO_CONTACTADO',
   'CONTACTADO',
   'EN_CURSO',
   'ENTRADA_AGENDADA',
-  'CONVERTIDO',
 ]
+
+export const captureViews = {
+  abiertas: 'Abiertas',
+  convertidas: 'Convertidas',
+  rechazadas: 'Rechazadas',
+} as const
+export type CaptureView = keyof typeof captureViews
+
+export function captureViewOf(c: {
+  status: CaptureStatus
+  sellerLeadId: string | null
+}): CaptureView {
+  if (c.sellerLeadId || c.status === 'CONVERTIDO') return 'convertidas'
+  return c.status === 'RECHAZADO' ? 'rechazadas' : 'abiertas'
+}
 
 export function isValidPortal(v: string): v is CapturePortal {
   return v in PORTAL_LABELS

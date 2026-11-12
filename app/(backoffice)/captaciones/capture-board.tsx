@@ -1,12 +1,11 @@
 'use client'
 
-import { useEffect, useState, useTransition } from 'react'
+import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import {
   CAPTURE_BOARD_COLUMNS,
   CAPTURE_STATUS_COLORS,
   CAPTURE_STATUS_LABELS,
-  captureAnchorId,
 } from '@/lib/captacion'
 import { updateCaptureStatus, scheduleEntrada } from './actions'
 import { CaptureCard, type CaptureCardData } from './capture-card'
@@ -41,15 +40,6 @@ export function CaptureBoard({
   const [entradaAt, setEntradaAt] = useState('')
   const [notice, setNotice] = useState<string | null>(null)
 
-  useEffect(() => {
-    if (!focusId) return
-    document.getElementById(captureAnchorId(focusId))?.scrollIntoView({
-      behavior: 'smooth',
-      block: 'center',
-      inline: 'center',
-    })
-  }, [focusId])
-
   const byStatus = new Map<CaptureStatus, CaptureCardData[]>()
   for (const c of cards) {
     const list = byStatus.get(c.status) ?? []
@@ -65,10 +55,6 @@ export function CaptureBoard({
     const card = cards.find((c) => c.id === id)
     if (!card || card.status === target) return
 
-    if (target === 'CONVERTIDO') {
-      setNotice('Convertir crea la ficha de vendedor: usa el botón «Convertir» de la tarjeta.')
-      return
-    }
     if (target === 'ENTRADA_AGENDADA') {
       setScheduleFor(id)
       return
@@ -87,7 +73,10 @@ export function CaptureBoard({
     if (!scheduleFor || !entradaAt) return
     startTransition(async () => {
       const res = await scheduleEntrada(scheduleFor, new Date(entradaAt).toISOString())
-      if (res.error) setNotice(res.error)
+      if (res.error) {
+        setNotice(res.error)
+        return
+      }
       setScheduleFor(null)
       setEntradaAt('')
       router.refresh()
@@ -109,7 +98,7 @@ export function CaptureBoard({
         </div>
       )}
 
-      <div className="flex gap-3 overflow-x-auto pb-2">
+      <div className="grid min-w-0 gap-3 sm:grid-cols-2 xl:grid-cols-4">
         {CAPTURE_BOARD_COLUMNS.map((status) => {
           const list = byStatus.get(status) ?? []
           const isOver = overCol === status
@@ -123,7 +112,7 @@ export function CaptureBoard({
               onDragLeave={() => setOverCol((c) => (c === status ? null : c))}
               onDrop={() => handleDrop(status)}
               className={cn(
-                'flex w-[288px] shrink-0 flex-col rounded-[13px] border bg-canvas transition-colors',
+                'flex min-w-0 flex-col rounded-[13px] border bg-canvas transition-colors',
                 isOver ? 'border-brand' : 'border-line'
               )}
             >
@@ -149,14 +138,17 @@ export function CaptureBoard({
                   list.map((c) => (
                     <div
                       key={c.id}
-                      draggable={!pending && c.status !== 'CONVERTIDO'}
-                      onDragStart={() => setDragId(c.id)}
+                      draggable={!pending}
+                      onDragStart={(e) => {
+                        e.dataTransfer.setData('text/plain', c.id)
+                        setDragId(c.id)
+                      }}
                       onDragEnd={() => {
                         setDragId(null)
                         setOverCol(null)
                       }}
                       className={cn(
-                        c.status !== 'CONVERTIDO' && 'cursor-grab active:cursor-grabbing',
+                        'cursor-grab active:cursor-grabbing',
                         dragId === c.id && 'opacity-60'
                       )}
                     >
@@ -176,6 +168,7 @@ export function CaptureBoard({
           className="fixed inset-0 z-50 flex items-center justify-center p-4"
           style={{ background: 'rgba(8,10,14,0.45)' }}
           role="dialog"
+          aria-label="Agendar entrada"
           aria-modal="true"
         >
           <div className="w-full max-w-[360px] rounded-[14px] border border-line bg-card p-5">
@@ -184,6 +177,7 @@ export function CaptureBoard({
               ¿Cuándo trae el vehículo a la nave?
             </p>
             <input
+              aria-label="Fecha y hora de entrada"
               type="datetime-local"
               value={entradaAt}
               onChange={(e) => setEntradaAt(e.target.value)}
