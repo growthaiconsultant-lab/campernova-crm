@@ -16,6 +16,7 @@ async function main() {
       usage: 'tests/ui/buyer-usage-fixture.tsx',
       stock: 'tests/ui/buyer-stock-fixture.tsx',
       offers: 'tests/ui/buyer-offers-fixture.tsx',
+      offersList: 'tests/ui/offers-list-fixture.tsx',
       captures: 'tests/ui/capture-workspace-fixture.tsx',
       vehicleInventory: 'tests/ui/vehicle-inventory-fixture.tsx',
       inventoryOperations: 'tests/ui/inventory-operations-fixture.tsx',

@@ -9,6 +9,7 @@ export default defineConfig({
     'buyer-usage.spec.ts',
     'buyer-stock.spec.ts',
     'buyer-offers.spec.ts',
+    'offers-list.spec.ts',
     'buyer-documents.spec.ts',
     'buyer-postventa.spec.ts',
     'seller-followup.spec.ts',
