@@ -15,6 +15,13 @@ interface TopbarProps {
   leading?: React.ReactNode
 }
 
+const listTitles: Record<string, string | undefined> = {
+  '/vendedores': 'Vendedores',
+  '/vehiculos': 'Vehículos',
+  '/captaciones': 'Captaciones',
+  '/ofertas': 'Ofertas',
+}
+
 /**
  * Header del shell (mockup: 60px, fondo --card, borde inferior --line).
  * Desktop: buscador global (⌘K) + "Nuevo lead" (--brand) + campana.
@@ -28,13 +35,7 @@ export function Topbar({ leading }: TopbarProps) {
   const [buyersHref, setBuyersHref] = useState('/compradores')
   const [sellersHref, setSellersHref] = useState('/vendedores')
   const sellerList = pathname === '/vendedores'
-  const listTitle = sellerList
-    ? 'Vendedores'
-    : pathname === '/vehiculos'
-      ? 'Vehículos'
-      : pathname === '/captaciones'
-        ? 'Captaciones'
-        : null
+  const listTitle = listTitles[pathname]
   const sellerSection = sellerList || pathname.startsWith('/vendedores/')
   const buyerDetail = Boolean(params.id && pathname === `/compradores/${params.id}`)
   useEffect(() => {

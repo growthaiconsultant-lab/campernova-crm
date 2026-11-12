@@ -41,6 +41,8 @@ export function BuyerOfferGroups({
       const history = target.closest('details[data-offer-history]')
       if (history instanceof HTMLDetailsElement) history.open = true
       if (target instanceof HTMLDetailsElement) target.open = true
+      const reservationDetails = target.querySelector('details')
+      if (reservationDetails instanceof HTMLDetailsElement) reservationDetails.open = true
       target.scrollIntoView({ block: 'nearest' })
     }
     function fromHash() {
