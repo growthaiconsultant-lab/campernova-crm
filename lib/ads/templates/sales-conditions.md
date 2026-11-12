@@ -5,7 +5,7 @@ Este bloque debe aparecer **siempre completo y al final** de cada anuncio. Nunca
 ```
 Condiciones de venta
 
-- Garantía de 12 meses incluida
+- Garantía de 24 meses en vehículo y vivienda incluida
 - Posibilidad de ampliar garantía hasta 36 meses
 - Financiación hasta 15 años (4,99%)
 - Posibilidad de prueba mecánica externa

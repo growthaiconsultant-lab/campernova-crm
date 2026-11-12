@@ -237,14 +237,14 @@ describe('integración · finalización atómica de entrega (camino feliz)', () 
     const buyer = await prisma.buyerLead.findUnique({ where: { id: seeded.buyerId } })
     expect(buyer?.status).toBe('CERRADO')
 
-    // Garantía exactamente una, vinculada y con fechas correctas (+12 meses).
+    // Garantía exactamente una, vinculada y con fechas correctas (+24 meses).
     const warranties = await prisma.warranty.findMany({ where: { deliveryId: seeded.deliveryId } })
     expect(warranties).toHaveLength(1)
     expect(warranties[0].vehicleId).toBe(seeded.vehicleId)
     expect(warranties[0].buyerLeadId).toBe(seeded.buyerId)
     expect(warranties[0].startDate).toEqual(now)
     const expectedEnd = new Date(now)
-    expectedEnd.setFullYear(expectedEnd.getFullYear() + 1)
+    expectedEnd.setUTCFullYear(expectedEnd.getUTCFullYear() + 2)
     expect(warranties[0].endDate).toEqual(expectedEnd)
 
     // Seguimientos: exactamente DIA_7 y DIA_30.

@@ -1,5 +1,5 @@
 import { readFileSync } from 'node:fs'
-import { test, expect, type Page } from '@playwright/test'
+import { test, expect, captureNira, type Page } from './web-landing-fixture'
 const tag = readFileSync('docs/analytics/gtm-meta-base.html', 'utf8').match(
   /<script>([\s\S]*?)<\/script>/
 )![1]
@@ -91,6 +91,7 @@ for (const slug of ['vende-tu-camper', 'encuentra-tu-camper']) {
   }) => {
     const requests = await intercept(page)
     await page.addInitScript(() => localStorage.setItem('cn_cookie_consent', 'all'))
+    const nira = await captureNira(page, slug === 'vende-tu-camper' ? 'vende' : 'encuentra')
     const bodies: Record<string, unknown>[] = []
     let crmCount = 0
     await page.route(`**/api/landing/${slug}`, async (r) => {
@@ -98,19 +99,16 @@ for (const slug of ['vende-tu-camper', 'encuentra-tu-camper']) {
       bodies.push(r.request().postDataJSON())
       await r.fulfill({ status: crmCount === 1 ? 503 : 200, json: { ok: crmCount !== 1 } })
     })
-    await page.route('https://docs.niraagency.com/api/formulario/**', async (r) => {
-      bodies.push(r.request().postDataJSON())
-      await r.fulfill({ json: { ok: true } })
-    })
     await page.goto(`/${slug}?utm_source=instagram&utm_campaign=qa_tracking&ad_id=qa_ad`)
     await expect.poll(async () => (await calls(page, 'PageView')).length).toBe(1)
     await fill(page, slug)
     await page.locator('button[type=submit]').click()
     await expect(page.locator('#cn-done h3')).toHaveText('Falta completar el envío')
-    await expect.poll(async () => (await calls(page, 'Lead')).length).toBe(1)
+    expect(await calls(page, 'Lead')).toHaveLength(0)
     await page.locator('#cn-retry').click()
     await expect(page.locator('#cn-done h3')).toHaveText('¡Recibido!')
     expect((await calls(page, 'Lead')).length).toBe(1)
+    expect(nira).toHaveLength(1)
     const answers = bodies.map((b) => b.respuestas as Record<string, unknown>)
     expect(answers.every((a) => a.pagina === `/${slug}.html`)).toBe(true)
     const crm = bodies.find((b) => b.gdpr_consent === true)!
@@ -140,11 +138,7 @@ test('queues a consented Lead until the GTM pixel is ready without duplication',
   })
   await intercept(page, wait)
   await page.addInitScript(() => localStorage.setItem('cn_cookie_consent', 'all'))
-  for (const url of [
-    '**/api/landing/encuentra-tu-camper',
-    'https://docs.niraagency.com/api/formulario/**',
-  ])
-    await page.route(url, (r) => r.fulfill({ json: { ok: true } }))
+  await page.route('**/api/landing/encuentra-tu-camper', (r) => r.fulfill({ json: { ok: true } }))
   await page.goto('/encuentra-tu-camper', { waitUntil: 'domcontentloaded' })
   await fill(page, 'encuentra-tu-camper')
   await page.locator('button[type=submit]').click()

@@ -16,7 +16,7 @@ export async function generateMetadata(): Promise<Metadata> {
   return pageMetadata({
     title: 'Autocaravanas y campers seminuevas por marca',
     description:
-      'Explora nuestro stock de autocaravanas y campers seminuevas por marca. Todas revisadas en taller propio y con garantía de 12 meses en CampersNova.',
+      'Explora nuestro stock de autocaravanas y campers seminuevas por marca. Todas revisadas en taller propio y con garantía de 2 años en vehículo y vivienda en CampersNova.',
     path: PATH,
     noindex: brands.length === 0,
   })
@@ -83,7 +83,7 @@ export default async function BrandsIndexPage() {
             </h1>
             <p className="mt-5 text-[17px] leading-relaxed" style={{ color: 'var(--cn-ink-700)' }}>
               Selecciona una marca para ver el stock disponible. Cada vehículo se entrega revisado,
-              con garantía de 12 meses ampliable y cambio de nombre incluido.
+              con garantía de 2 años en vehículo y vivienda y cambio de nombre gratuito.
             </p>
           </header>
 

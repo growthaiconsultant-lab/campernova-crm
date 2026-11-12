@@ -251,7 +251,7 @@ export async function completeDeliveryTx(
   await tx.activity.create({
     data: {
       type: 'GARANTIA_ACTIVADA',
-      content: 'Garantía de 12 meses activada automáticamente.',
+      content: 'Garantía de 24 meses en vehículo y vivienda activada automáticamente.',
       agentId: p.actorId,
       sellerLeadId: vehicle.sellerLeadId,
       buyerLeadId: p.buyerLeadId,

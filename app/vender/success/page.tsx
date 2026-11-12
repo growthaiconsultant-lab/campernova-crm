@@ -1,3 +1,4 @@
+import { PublicNav } from '@/components/public-nav'
 import Link from 'next/link'
 
 function formatEur(value: number): string {
@@ -25,11 +26,7 @@ export default function VenderSuccessPage({
   return (
     <div className="flex min-h-screen flex-col bg-gradient-to-b from-background to-muted/30">
       {/* Header */}
-      <header className="border-b bg-background/80 backdrop-blur">
-        <div className="mx-auto flex max-w-2xl items-center justify-between px-4 py-4">
-          <span className="text-lg font-bold text-primary">CampersNova</span>
-        </div>
-      </header>
+      <PublicNav />
 
       <main className="mx-auto flex w-full max-w-2xl flex-1 flex-col items-center justify-center px-4 py-16 text-center">
         {/* Icono */}

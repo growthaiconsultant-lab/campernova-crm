@@ -1447,7 +1447,7 @@ model DocumentVersion {
   @@map("document_versions")
 }
 
-/// Garantía activada automáticamente al completar la entrega (12 meses, ampliable a 36).
+/// Garantía activada automáticamente al completar la entrega (fecha de vencimiento fijada al crear la garantía).
 model Warranty {
   id           String    @id @default(cuid())
   vehicleId    String    @unique @map("vehicle_id")

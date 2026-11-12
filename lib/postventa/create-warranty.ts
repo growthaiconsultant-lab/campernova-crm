@@ -27,7 +27,9 @@ export async function createWarrantyForDelivery(
 
   const startDate = delivery.completedAt
   const endDate = new Date(startDate)
-  endDate.setFullYear(endDate.getFullYear() + 1)
+  endDate.setUTCFullYear(endDate.getUTCFullYear() + 2)
+  // Una entrega del 29 de febrero vence el último día de febrero del año de destino.
+  if (endDate.getUTCMonth() !== startDate.getUTCMonth()) endDate.setUTCDate(0)
 
   const warranty = await db.warranty.create({
     data: {
