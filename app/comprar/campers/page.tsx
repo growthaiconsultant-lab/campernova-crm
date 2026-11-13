@@ -37,7 +37,7 @@ export default async function CampersPage() {
       ]}
       eyebrow="Campers"
       title="Campers seminuevas en venta"
-      intro="Furgonetas camper listas para viajar, seleccionadas por estado, equipamiento y kilometraje. Cada camper pasa por nuestro taller y se entrega con garantía de 2 años en vehículo y vivienda, financiación a tu medida y cambio de nombre gratuito."
+      intro="Consulta las fotos y el equipamiento de las campers disponibles. Compra con garantía de 2 años en vehículo y vivienda, financiación a tu medida y cambio de nombre gratuito."
       vehicles={vehicles}
       related={{
         heading: 'Otras formas de buscar',
