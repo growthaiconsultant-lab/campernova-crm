@@ -1,3 +1,4 @@
+import { PublicFooter } from '@/components/public-footer'
 import { PublicNav } from '@/components/public-nav'
 import Link from 'next/link'
 
@@ -103,6 +104,7 @@ export default function VenderSuccessPage({
           Volver a campersnova.com →
         </Link>
       </main>
+      <PublicFooter />
     </div>
   )
 }
