@@ -10,9 +10,9 @@ const PATH = '/comprar/campers'
 export async function generateMetadata(): Promise<Metadata> {
   const vehicles = await getPublishedVehiclesSafe({ type: 'CAMPER' })
   return pageMetadata({
-    title: 'Campers seminuevas en venta · revisadas y con garantía',
+    title: 'Campers seminuevas en venta con garantía',
     description:
-      'Campers y furgonetas camper seminuevas en venta en Barcelona: revisadas en taller propio, con garantía de 2 años en vehículo y vivienda, financiación y cambio de nombre gratuito.',
+      'Campers y furgonetas camper seminuevas en venta en Barcelona, con garantía de 2 años en vehículo y vivienda, financiación y cambio de nombre gratuito.',
     path: PATH,
     noindex: vehicles.length === 0,
   })
@@ -37,7 +37,7 @@ export default async function CampersPage() {
       ]}
       eyebrow="Campers"
       title="Campers seminuevas en venta"
-      intro="Furgonetas camper listas para viajar, seleccionadas por estado, equipamiento y kilometraje. Cada camper pasa por nuestro taller y se entrega con garantía de 2 años en vehículo y vivienda, financiación a tu medida y cambio de nombre gratuito."
+      intro="Consulta las fotos y el equipamiento de las campers disponibles. Compra con garantía de 2 años en vehículo y vivienda, financiación a tu medida y cambio de nombre gratuito."
       vehicles={vehicles}
       related={{
         heading: 'Otras formas de buscar',

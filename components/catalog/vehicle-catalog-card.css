@@ -29,8 +29,7 @@
   grid-template-columns: 1fr 1fr;
   gap: 2px;
 }
-.cn-stock-badge,
-.cn-stock-verified {
+.cn-stock-badge {
   position: absolute;
   top: 12px;
   left: 12px;
@@ -51,10 +50,6 @@
   height: 6px;
   border-radius: 50%;
   background: #4d7957;
-}
-.cn-stock-verified {
-  left: auto;
-  right: 12px;
 }
 .cn-stock-body {
   flex: 1;

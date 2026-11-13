@@ -150,9 +150,7 @@ export function CatalogView({
                 className="mx-auto mt-3 max-w-[46ch] text-[15px] leading-relaxed"
                 style={{ color: 'var(--cn-ink-700)' }}
               >
-                Cada vehículo pasa por taller, revisión y verificación documental antes de
-                publicarse. Cuéntale a Nova qué buscas y te avisamos en cuanto entre algo que
-                encaje.
+                Cuéntale a Nova qué buscas y te avisamos en cuanto entre algo que encaje.
               </p>
               <div className="mt-7 flex flex-wrap items-center justify-center gap-3">
                 <Link

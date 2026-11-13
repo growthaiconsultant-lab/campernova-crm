@@ -13,7 +13,7 @@ export async function generateMetadata(): Promise<Metadata> {
   return pageMetadata({
     title: 'Catálogo de autocaravanas y campers seminuevas en venta',
     description:
-      'Todas las autocaravanas y campers seminuevas disponibles en CampersNova: revisadas en taller propio, con garantía de 2 años en vehículo y vivienda, financiación y cambio de nombre gratuito.',
+      'Todas las autocaravanas y campers seminuevas disponibles en CampersNova, con garantía de 2 años en vehículo y vivienda, financiación y cambio de nombre gratuito.',
     path: PATH,
     noindex: available.length + reserved.length === 0,
   })
@@ -49,7 +49,7 @@ export default async function CatalogHubPage() {
       ]}
       eyebrow="Stock disponible"
       title="Autocaravanas y campers seminuevas en venta"
-      intro="Cada vehículo de CampersNova pasa por nuestro taller, una revisión mecánica independiente y verificación documental antes de publicarse. Compra con garantía de 2 años en vehículo y vivienda, financiación a tu medida y cambio de nombre gratuito."
+      intro="Compra con garantía de 2 años en vehículo y vivienda, financiación a tu medida y cambio de nombre gratuito."
       vehicles={vehicles}
       reserved={reserved}
       related={{

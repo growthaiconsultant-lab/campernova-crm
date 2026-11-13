@@ -16,8 +16,8 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const data = await getPublishedVehiclesByBrandSlug(params.marca)
   if (!data) return {}
   return pageMetadata({
-    title: `${data.brand} seminuevas en venta · revisadas y con garantía`,
-    description: `Autocaravanas y campers ${data.brand} seminuevas en venta en CampersNova: revisadas en taller propio, con garantía de 2 años en vehículo y vivienda, financiación y cambio de nombre gratuito.`,
+    title: `${data.brand} seminuevas en venta con garantía`,
+    description: `Autocaravanas y campers ${data.brand} seminuevas en venta en CampersNova, con garantía de 2 años en vehículo y vivienda, financiación y cambio de nombre gratuito.`,
     path: `/comprar/marcas/${params.marca}`,
   })
 }
@@ -47,7 +47,7 @@ export default async function BrandPage({ params }: Props) {
       ]}
       eyebrow={`Marca · ${data.brand}`}
       title={`${data.brand} seminuevas en venta`}
-      intro={`Nuestro stock disponible de la marca ${data.brand}. Cada vehículo pasa por taller, revisión mecánica independiente y verificación documental, y se entrega con garantía de 2 años en vehículo y vivienda, financiación a tu medida y cambio de nombre gratuito.`}
+      intro={`Nuestro stock disponible de la marca ${data.brand}. Cada vehículo se entrega con garantía de 2 años en vehículo y vivienda, financiación a tu medida y cambio de nombre gratuito.`}
       vehicles={data.vehicles}
       related={{
         heading: 'Seguir explorando',

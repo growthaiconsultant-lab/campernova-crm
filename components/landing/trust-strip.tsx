@@ -2,7 +2,7 @@ export function TrustStrip() {
   return (
     <div className="relative z-10 -mt-14 px-8 pb-4 max-[640px]:px-5">
       <div
-        className="mx-auto max-w-[1280px] rounded-[24px] px-8 py-2 lg:grid lg:grid-cols-4 lg:gap-x-8 lg:py-7"
+        className="mx-auto max-w-[1280px] rounded-[24px] px-8 py-2 lg:grid lg:grid-cols-3 lg:gap-x-8 lg:py-7"
         style={{
           background: '#fff',
           boxShadow: '0 4px 32px rgba(61,47,36,0.10)',
@@ -39,25 +39,6 @@ export function TrustStrip() {
 }
 
 const ITEMS = [
-  {
-    icon: (
-      <svg
-        width="18"
-        height="18"
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="1.7"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        aria-hidden="true"
-      >
-        <path d="M12 3l8 3v6c0 5-3.5 8.5-8 9-4.5-.5-8-4-8-9V6l8-3z" />
-      </svg>
-    ),
-    title: 'Vehículos revisados',
-    text: 'Cada camper o autocaravana pasa por revisión técnica antes de publicarse.',
-  },
   {
     icon: (
       <svg
