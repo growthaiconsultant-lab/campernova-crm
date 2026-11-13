@@ -3,7 +3,7 @@ import { PublicVehicleGallery } from '@/components/catalog/public-vehicle-galler
 import Link from 'next/link'
 import { formatEur } from '@/lib/format/currency'
 import { notFound } from 'next/navigation'
-import { Shield, Eye, Handshake, Sparkles, Check, MapPin, Phone, BadgeCheck } from 'lucide-react'
+import { Eye, Handshake, Sparkles, Check, MapPin, Phone } from 'lucide-react'
 import { PublicNav } from '@/components/public-nav'
 import { PublicFooter } from '@/components/public-footer'
 import { JsonLd } from '@/components/json-ld'
@@ -171,16 +171,6 @@ export default async function VehicleDetailPage({ params }: Props) {
                 </div>
               )}
 
-              {v.verified && (
-                <div
-                  className="mb-3 inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[12px] font-semibold"
-                  style={{ background: 'rgba(31,138,91,0.12)', color: '#1f8a5b' }}
-                >
-                  <BadgeCheck size={14} />
-                  Verificado por CampersNova
-                </div>
-              )}
-
               <p className="mb-2 inline-block rounded-full bg-stone-100 px-3 py-1 text-sm font-semibold text-stone-900">
                 {v.availability}
               </p>
@@ -279,8 +269,6 @@ export default async function VehicleDetailPage({ params }: Props) {
                 </h2>
                 <ul className="mt-4 space-y-3" style={{ listStyle: 'none', padding: 0 }}>
                   {[
-                    'Vehículo revisado por mecánico independiente',
-                    'Documentación completa y kilometraje verificado',
                     'Asesoramiento durante y después de la compra',
                     'Gestión de transferencia incluida',
                   ].map((b) => (
@@ -360,7 +348,6 @@ export default async function VehicleDetailPage({ params }: Props) {
                 style={{ borderColor: 'var(--cn-line)' }}
               >
                 {[
-                  { Icon: Shield, text: 'Vehículo revisado y documentado' },
                   ...(v.availability === 'Disponible'
                     ? [{ Icon: Eye, text: 'Visita presencial sin compromiso' }]
                     : []),

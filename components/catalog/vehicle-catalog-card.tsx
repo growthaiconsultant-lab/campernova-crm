@@ -1,6 +1,6 @@
 import Image from 'next/image'
 import Link from 'next/link'
-import { BadgeCheck, MessageCircle } from 'lucide-react'
+import { MessageCircle } from 'lucide-react'
 import type { PublicVehicle } from '@/lib/public-catalog'
 import { formatEur } from '@/lib/format/currency'
 import { BUSINESS } from '@/lib/seo'
@@ -94,11 +94,6 @@ export function VehicleCatalogCard({
       <span className="cn-stock-badge" data-available={!archived && !reserved}>
         {badge}
       </span>
-      {v.verified && (
-        <span className="cn-stock-verified">
-          <BadgeCheck size={15} /> Verificado
-        </span>
-      )}
       <div className="cn-stock-body">
         <p className="cn-stock-make">{[v.typeLabel, brand].filter(Boolean).join(' · ')}</p>
         <h3>
