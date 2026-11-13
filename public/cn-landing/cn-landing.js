@@ -432,21 +432,3 @@ var CN_CONFIG = window.CN_CONFIG || {
     off(); i = (i + 1) % org.length; org[i].classList.add('lg-act'); if (dup[i]) dup[i].classList.add('lg-act');
   }, 1100);
 })();
-
-/* v62 · pie: abierto o cerrado ahora, según el horario publicado y la hora de Barcelona */
-(function () {
-  var el = document.getElementById('cn-ahora'); if (!el || !window.Intl) return;
-  try {
-    var p = {};
-    new Intl.DateTimeFormat('en-GB', { timeZone: 'Europe/Madrid', weekday: 'short', hour: '2-digit', minute: '2-digit', hour12: false })
-      .formatToParts(new Date()).forEach(function (x) { p[x.type] = x.value; });
-    var d = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].indexOf(p.weekday), m = (+p.hour % 24) * 60 + (+p.minute);
-    if (d < 0) return;
-    var cierre = d < 5 ? 19 : d === 5 ? 13 : 0, t1 = 'Cerrado ahora', t2;
-    if (cierre && m >= 600 && m < cierre * 60) { t1 = 'Abierto ahora'; t2 = 'Hasta las ' + cierre + ':00'; el.classList.add('abierto'); }
-    else if (cierre && m < 600) t2 = 'Abrimos hoy a las 10:00';
-    else { var n = (d + 1) % 7; t2 = 'Abrimos ' + (n === 6 ? 'el lunes' : 'mañana') + ' a las 10:00'; }
-    var tx = el.querySelector('.pie-tx'), b = document.createElement('b'), s = document.createElement('small');
-    b.textContent = t1; s.textContent = t2; tx.textContent = ''; tx.appendChild(b); tx.appendChild(s); el.hidden = false;
-  } catch {}
-})();

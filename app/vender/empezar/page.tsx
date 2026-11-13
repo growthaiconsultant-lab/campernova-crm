@@ -1,5 +1,6 @@
 'use client'
 
+import { PublicFooter } from '@/components/public-footer'
 import { PublicNav } from '@/components/public-nav'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import Image from 'next/image'
@@ -868,6 +869,7 @@ export default function VenderEmpezarPage() {
           )}
         </div>
       </main>
+      <PublicFooter />
     </div>
   )
 }

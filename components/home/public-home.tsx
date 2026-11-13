@@ -1,7 +1,7 @@
 import Image from 'next/image'
 import Link from 'next/link'
 import { BUSINESS, BUSINESS_MAPS_URL } from '@/lib/seo'
-import { homeFormPaths } from '@/lib/public-navigation'
+import { PublicFooter } from '@/components/public-footer'
 import { InstagramMosaic } from './instagram-mosaic'
 import { PublicNav } from '@/components/public-nav'
 import { HomeBrands } from './home-brands'
@@ -238,61 +238,8 @@ export function PublicHome({ vehicles }: { vehicles: CardVehicle[] }) {
             </div>
           </section>
         </main>
-        <footer className="bottom">
-          <div className="shell">
-            <div className="cols">
-              <div>
-                <Link href="/" aria-label="CampersNova, inicio">
-                  <Image
-                    alt="CampersNova"
-                    src="/logo-cn-cropped.png"
-                    width={756}
-                    height={334}
-                    sizes="100px"
-                  />
-                </Link>
-              </div>
-              <div>
-                <b>Vehículos</b>
-                <Link href="/comprar/vehiculos">Catálogo completo</Link>
-                <Link href="/comprar/campers">Campers en venta</Link>
-                <Link href="/comprar/autocaravanas">Autocaravanas en venta</Link>
-                <Link href="/comprar/marcas">Buscar por marca</Link>
-                <Link href="/busqueda-bajo-pedido">Búsqueda a medida</Link>
-              </div>
-              <div>
-                <b>CampersNova</b>
-                <a href={homeFormPaths['/comprar']}>Comprar</a>
-                <a href={homeFormPaths['/vender']}>Vender</a>
-                <Link href="/sobre">Sobre nosotros</Link>
-                <a href="#taller">Taller</a>
-                <a href="#garantias">Garantías y posventa</a>
-                <a href="#tienda">Tienda online</a>
-                <Link href="/como-funciona">Cómo funciona</Link>
-              </div>
-              <div>
-                <b>Contacto</b>
-                <Link href="/contacto">Contacto</Link>
-                <a href={`tel:${BUSINESS.phone}`}>{BUSINESS.phoneDisplay}</a>
-                <a href="mailto:info@campersnova.com">info@campersnova.com</a>
-                <a
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  href="https://www.instagram.com/campersnova/"
-                >
-                  Instagram
-                </a>
-              </div>
-            </div>
-            <div className="legal">
-              <span>© {new Date().getFullYear()} Campers Nova, S.L.</span>
-              <Link href="/aviso-legal">Aviso legal</Link>
-              <Link href="/privacidad">Privacidad</Link>
-              <Link href="/cookies">Cookies</Link>
-            </div>
-          </div>
-        </footer>
       </div>
+      <PublicFooter />
     </div>
   )
 }

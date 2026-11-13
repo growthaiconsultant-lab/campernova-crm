@@ -4,6 +4,7 @@ import localFont from 'next/font/local'
 import { Inter, Fraunces, JetBrains_Mono, Hanken_Grotesk } from 'next/font/google'
 import './globals.css'
 import '../public/cn-landing/public-menu.css'
+import '../public/cn-landing/public-footer.css'
 import { CookieBanner } from '@/components/cookie-banner'
 import { PostHogProvider } from '@/components/posthog-provider'
 import { GoogleTagManager } from '@/components/google-tag-manager'
@@ -86,6 +87,7 @@ export default function RootLayout({
     <html lang="es">
       <head>
         <meta name="facebook-domain-verification" content="dkbsd7oht54oe4wqqfc3tji8w7dr2v" />
+        <Script src="/cn-landing/public-footer.js?v=1" strategy="afterInteractive" />
         <Script src="/cn-landing/public-menu.js?v=2" strategy="afterInteractive" />
         <Script src="/cn-landing/visit-source.js?v=1" strategy="beforeInteractive" />
         <Script src="/cn-landing/cn-consent.js?v=69" strategy="beforeInteractive" />
