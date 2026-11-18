@@ -1,5 +1,6 @@
 'use client'
 
+import { MAX_VEHICLE_PHOTOS } from '@/lib/vehicle-photo-limit'
 import { useEffect, useRef, useState } from 'react'
 import Image from 'next/image'
 import { ArrowLeft, ArrowRight, GripVertical, Loader2, Upload, Trash2 } from 'lucide-react'
@@ -24,7 +25,6 @@ export type VehiclePhoto = {
   category?: PhotoCategory | null
 }
 
-const MAX_PHOTOS = 30
 const ACCEPTED_MIME = ['image/jpeg', 'image/png', 'image/webp']
 // PUB-1: categorías de foto para el anuncio. Opcional (Sin categoría) mientras el gate esté relajado.
 const CATEGORY_OPTIONS: { value: PhotoCategory; label: string }[] = [
@@ -83,12 +83,12 @@ export function VehiclePhotoUploader({ vehicleId, initialPhotos, className, onBu
     const list = Array.from(files)
     const accepted = list
       .filter((f) => ACCEPTED_MIME.includes(f.type))
-      .slice(0, Math.max(0, MAX_PHOTOS - photos.length))
+      .slice(0, Math.max(0, MAX_VEHICLE_PHOTOS - photos.length))
     return run(async () => {
       if (!accepted.length) {
         setError(
-          photos.length >= MAX_PHOTOS
-            ? 'Has alcanzado el máximo de 30 fotos.'
+          photos.length >= MAX_VEHICLE_PHOTOS
+            ? `Has alcanzado el máximo de ${MAX_VEHICLE_PHOTOS} fotos.`
             : 'Solo se admiten JPEG, PNG o WebP.'
         )
         return
@@ -144,7 +144,7 @@ export function VehiclePhotoUploader({ vehicleId, initialPhotos, className, onBu
   }
   const totalCount = photos.length + uploading
   const belowMin = photos.length < MIN_PHOTOS
-  const atMax = totalCount >= MAX_PHOTOS
+  const atMax = totalCount >= MAX_VEHICLE_PHOTOS
 
   return (
     <fieldset disabled={busy} aria-busy={busy} className={cn('min-w-0 space-y-3', className)}>
@@ -173,10 +173,10 @@ export function VehiclePhotoUploader({ vehicleId, initialPhotos, className, onBu
       >
         <Upload className="mb-1 h-5 w-5 text-muted-foreground" aria-hidden />
         <p className="text-sm font-medium">
-          {atMax ? `Has alcanzado el máximo (${MAX_PHOTOS})` : 'Arrastra fotos aquí o haz clic'}
+          {atMax ? `Has alcanzado el máximo (${MAX_VEHICLE_PHOTOS})` : 'Arrastra fotos aquí o haz clic'}
         </p>
         <p className="mt-1 text-xs text-muted-foreground">
-          JPEG, PNG o WebP · se comprimen a ≤1.5 MB · {photos.length}/{MAX_PHOTOS}
+          JPEG, PNG o WebP · se comprimen a ≤1.5 MB · {photos.length}/{MAX_VEHICLE_PHOTOS}
         </p>
         <input
           ref={inputRef}

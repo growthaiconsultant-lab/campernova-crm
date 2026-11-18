@@ -1,5 +1,6 @@
 'use server'
 
+import { MAX_VEHICLE_PHOTOS } from '@/lib/vehicle-photo-limit'
 import { revalidatePath } from 'next/cache'
 import { randomUUID } from 'node:crypto'
 import { withLockedRoots } from '@/lib/locking/with-locked-roots'
@@ -90,7 +91,7 @@ export async function uploadVehiclePhoto(formData: FormData): Promise<UploadOk |
 
   try {
     const photo = await withLockedRoots([{ type: 'vehicle', id: vehicleId }], async (tx) => {
-      if ((await tx.vehiclePhoto.count({ where: { vehicleId } })) >= 30) return null
+      if ((await tx.vehiclePhoto.count({ where: { vehicleId } })) >= MAX_VEHICLE_PHOTOS) return null
       const last = await tx.vehiclePhoto.aggregate({ where: { vehicleId }, _max: { order: true } })
       return tx.vehiclePhoto.create({
         data: { vehicleId, url, order: (last._max.order ?? -1) + 1, category },
@@ -115,7 +116,7 @@ export async function uploadVehiclePhoto(formData: FormData): Promise<UploadOk |
     throw error
   }
   await supabase.storage.from(VEHICLE_PHOTOS_BUCKET).remove([path])
-  return { error: 'Has alcanzado el máximo de 30 fotos.' }
+  return { error: `Has alcanzado el máximo de ${MAX_VEHICLE_PHOTOS} fotos.` }
 }
 
 export async function deleteVehiclePhoto(photoId: string): Promise<Ok | ActionError> {
