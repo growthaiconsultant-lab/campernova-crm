@@ -348,7 +348,7 @@ it('la portada pública sigue el orden guardado y se rechazan órdenes obsoletas
 it('dos subidas simultáneas respetan la última plaza y la portada previa', async () => {
   const { v } = await fixture('NUEVO')
   await db.vehiclePhoto.createMany({
-    data: Array.from({ length: 29 }, (_, order) => ({
+    data: Array.from({ length: 49 }, (_, order) => ({
       vehicleId: v.id,
       order,
       url: '/previa-' + order + '.jpg',
@@ -366,11 +366,11 @@ it('dos subidas simultáneas respetan la última plaza y la portada previa', asy
     expect(res.filter((r) => 'photo' in r)).toHaveLength(1)
     expect(res.filter((r) => 'error' in r)).toHaveLength(1)
     const photos = await listVehiclePhotos(v.id)
-    expect(photos).toHaveLength(30)
+    expect(photos).toHaveLength(50)
     expect(photos[0].url).toBe('/previa-0.jpg')
-    expect(photos[29].order).toBe(29)
+    expect(photos[49].order).toBe(49)
     expect(storedPhotos.size).toBe(1)
-    expect(await deleteVehiclePhoto(photos[29].id)).toEqual({ ok: true })
+    expect(await deleteVehiclePhoto(photos[49].id)).toEqual({ ok: true })
     expect(storedPhotos.size).toBe(0)
   } finally {
     vi.unstubAllEnvs()
