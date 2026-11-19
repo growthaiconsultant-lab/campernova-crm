@@ -93,7 +93,7 @@ export async function updateCaptureStatus(
 
   if (status === 'CONVERTIDO')
     return { error: 'Crea la ficha de vendedor para convertir la captación.' }
-  if (status === 'ENTRADA_AGENDADA')
+  if (status === 'ENTRADA_AGENDADA' || status === 'VISITA_CONFIRMADA')
     return { error: 'Indica la fecha y hora para agendar la entrada.' }
 
   let reason: LostReason | null = null
@@ -125,15 +125,21 @@ export async function updateCaptureStatus(
  */
 export async function scheduleEntrada(
   id: string,
-  dateTimeIso: string
+  dateTimeIso: string,
+  stage: 'ENTRADA_AGENDADA' | 'VISITA_CONFIRMADA' = 'ENTRADA_AGENDADA'
 ): Promise<{ error?: string }> {
   await requireAgente()
+  if (stage !== 'ENTRADA_AGENDADA' && stage !== 'VISITA_CONFIRMADA')
+    return { error: 'Etapa no válida' }
   const date = new Date(dateTimeIso)
   if (isNaN(date.getTime())) return { error: 'Fecha no válida' }
 
   const changed = await db.vehicleCapture.updateMany({
     where: { id, sellerLeadId: null },
-    data: { status: 'ENTRADA_AGENDADA', entradaScheduledAt: date },
+    data:
+      stage === 'VISITA_CONFIRMADA'
+        ? { status: stage, visitScheduledAt: date }
+        : { status: stage, entradaScheduledAt: date },
   })
   if (!changed.count)
     return {

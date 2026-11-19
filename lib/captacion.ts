@@ -19,9 +19,12 @@ export const PORTAL_OPTIONS = (Object.entries(PORTAL_LABELS) as [CapturePortal, 
 
 export const CAPTURE_STATUS_LABELS: Record<CaptureStatus, string> = {
   NO_CONTACTADO: 'Por contactar',
+  SIN_INTERES: 'No interés',
+  NO_CONTESTA: 'No contesta',
+  VISITA_CONFIRMADA: 'Visita confirmada',
   CONTACTADO: 'Contactado',
-  EN_CURSO: 'En seguimiento',
-  ENTRADA_AGENDADA: 'Entrada agendada',
+  EN_CURSO: 'Seguimiento',
+  ENTRADA_AGENDADA: 'Entrega agendada',
   CONVERTIDO: 'Convertido',
   RECHAZADO: 'Rechazado',
 }
@@ -29,6 +32,9 @@ export const CAPTURE_STATUS_LABELS: Record<CaptureStatus, string> = {
 /** Colores por estado para el tablero (dot + acento). */
 export const CAPTURE_STATUS_COLORS: Record<CaptureStatus, string> = {
   NO_CONTACTADO: '#8b94a3', // ink3
+  SIN_INTERES: '#b44848',
+  NO_CONTESTA: '#836910',
+  VISITA_CONFIRMADA: '#3274ab',
   CONTACTADO: '#3a6fd4', // blue
   EN_CURSO: '#c9820a', // amber
   ENTRADA_AGENDADA: '#0e7d6b', // brand
@@ -37,25 +43,43 @@ export const CAPTURE_STATUS_COLORS: Record<CaptureStatus, string> = {
 }
 
 /** Etapas de las captaciones abiertas. */
-export const CAPTURE_BOARD_COLUMNS: CaptureStatus[] = [
+export const CAPTURE_OPEN_STAGES: CaptureStatus[] = [
   'NO_CONTACTADO',
-  'CONTACTADO',
+  'NO_CONTESTA',
   'EN_CURSO',
+  'VISITA_CONFIRMADA',
   'ENTRADA_AGENDADA',
 ]
 
+export const CAPTURE_BOARD_COLUMNS = [
+  'NO_CONTACTADO',
+  'SIN_INTERES',
+  'NO_CONTESTA',
+  'EN_CURSO',
+  'VISITA_CONFIRMADA',
+  'ENTRADA_AGENDADA',
+  'EN_STOCK',
+] as const
+
+export type CaptureColumn = (typeof CAPTURE_BOARD_COLUMNS)[number]
+
 export const captureViews = {
-  abiertas: 'Abiertas',
+  abiertas: 'Tablero',
   convertidas: 'Convertidas',
   rechazadas: 'Rechazadas',
+  sinInteres: 'No interés',
+  stock: 'En stock',
 } as const
 export type CaptureView = keyof typeof captureViews
 
 export function captureViewOf(c: {
+  arrivalAt?: string | null
   status: CaptureStatus
   sellerLeadId: string | null
 }): CaptureView {
+  if (c.sellerLeadId && c.arrivalAt) return 'stock'
   if (c.sellerLeadId || c.status === 'CONVERTIDO') return 'convertidas'
+  if (c.status === 'SIN_INTERES') return 'sinInteres'
   return c.status === 'RECHAZADO' ? 'rechazadas' : 'abiertas'
 }
 
@@ -63,12 +87,29 @@ export function isValidPortal(v: string): v is CapturePortal {
   return v in PORTAL_LABELS
 }
 export function isValidCaptureStatus(v: string): v is CaptureStatus {
-  return v in CAPTURE_STATUS_LABELS
+  return Object.prototype.hasOwnProperty.call(CAPTURE_STATUS_LABELS, v)
 }
 
 /** Estados en los que aún tiene sentido tocar la captación (no terminales de éxito). */
 export function isTerminalCaptureStatus(s: CaptureStatus): boolean {
-  return s === 'CONVERTIDO' || s === 'RECHAZADO'
+  return s === 'CONVERTIDO' || s === 'RECHAZADO' || s === 'SIN_INTERES'
+}
+
+const madridDay = new Intl.DateTimeFormat('sv-SE', {
+  timeZone: 'Europe/Madrid',
+  year: 'numeric',
+  month: '2-digit',
+  day: '2-digit',
+})
+
+export function captureDay(instant: string | Date): string {
+  return madridDay.format(new Date(instant))
+}
+
+export function stockInPeriod(arrivalAt: string | null, from: string, to: string): boolean {
+  if (!arrivalAt) return false
+  const date = captureDay(arrivalAt)
+  return (!from || date >= from) && (!to || date <= to)
 }
 
 export function captureAnchorId(id: string): string {

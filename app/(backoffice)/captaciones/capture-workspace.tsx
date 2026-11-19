@@ -15,6 +15,8 @@ import {
 } from '@/components/ui/dialog'
 import {
   captureAnchorId,
+  captureDay,
+  stockInPeriod,
   captureViewOf,
   captureViews,
   PORTAL_OPTIONS,
@@ -54,6 +56,10 @@ export function CaptureWorkspace({
   const router = useRouter()
   const [pending, startTransition] = useTransition()
   const [adding, setAdding] = useState(false)
+  const [from, setFrom] = useState(() =>
+    focusId ? '' : captureDay(new Date()).slice(0, 7) + '-01'
+  )
+  const [to, setTo] = useState(() => (focusId ? '' : captureDay(new Date())))
   const filtered = cards.filter(
     (c) =>
       (!portal || c.portal === portal) &&
@@ -63,8 +69,20 @@ export function CaptureWorkspace({
     abiertas: [],
     convertidas: [],
     rechazadas: [],
+    stock: [],
+    sinInteres: [],
   }
   for (const c of filtered) groups[captureViewOf(c)].push(c)
+  const stock = groups.stock
+    .filter((c) => stockInPeriod(c.arrivalAt, from, to))
+    .sort((a, b) => b.arrivalAt!.localeCompare(a.arrivalAt!))
+  const boardCards = [...groups.abiertas, ...groups.sinInteres, ...stock]
+  const totals = new Map<string, number>()
+  for (const c of stock) {
+    const id = c.assignedToId ?? ''
+    totals.set(id, (totals.get(id) ?? 0) + 1)
+  }
+  const visible = view === 'stock' ? stock : groups[view]
   const responsible = new Map(agents.map((a) => [a.id, a.name]))
   for (const c of cards)
     if (c.assignedToId && c.assignedToName) responsible.set(c.assignedToId, c.assignedToName)
@@ -78,7 +96,7 @@ export function CaptureWorkspace({
         ?.scrollIntoView({ block: 'center', inline: 'nearest' })
   }, [focusId, view])
   return (
-    <div className="space-y-4">
+    <div className="min-w-0 max-w-full space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="font-hanken text-2xl font-bold tracking-tight text-ink">Captaciones</h1>
@@ -124,7 +142,14 @@ export function CaptureWorkspace({
             aria-current={view === key ? 'page' : undefined}
             className="inline-flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium text-ink2 hover:bg-muted aria-[current=page]:bg-brand-tint aria-[current=page]:text-brand"
           >
-            {captureViews[key]} <span className="font-mono text-xs">{groups[key].length}</span>
+            {captureViews[key]}{' '}
+            <span className="font-mono text-xs">
+              {key === 'abiertas'
+                ? boardCards.length
+                : key === 'stock'
+                  ? stock.length
+                  : groups[key].length}
+            </span>
           </Link>
         ))}
       </nav>
@@ -174,19 +199,61 @@ export function CaptureWorkspace({
           </button>
         )}
       </fieldset>
-      {groups[view].length ? (
-        view === 'abiertas' ? (
-          <CaptureBoard cards={groups.abiertas} agents={agents} focusId={focusId} />
-        ) : (
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            {groups[view].map((c) => (
-              <CaptureCard key={c.id} c={c} agents={agents} focused={focusId === c.id} />
-            ))}
-          </div>
-        )
+      {(view === 'stock' || view === 'abiertas') && (
+        <fieldset className="flex flex-wrap items-end gap-3">
+          <legend className="mb-2 text-sm font-semibold">Entradas por fecha de recepción</legend>
+          <label className="grid gap-1 text-xs">
+            Desde
+            <input
+              type="date"
+              className="rounded-md border p-2"
+              value={from}
+              max={to || undefined}
+              onChange={(e) => setFrom(e.target.value)}
+            />
+          </label>
+          <label className="grid gap-1 text-xs">
+            Hasta
+            <input
+              type="date"
+              className="rounded-md border p-2"
+              value={to}
+              min={from || undefined}
+              onChange={(e) => setTo(e.target.value)}
+            />
+          </label>
+          <button
+            type="button"
+            className="p-2 text-sm text-brand underline"
+            onClick={() => {
+              setFrom('')
+              setTo('')
+            }}
+          >
+            Todo el histórico
+          </button>
+        </fieldset>
+      )}
+      {view === 'stock' && stock.length > 0 && (
+        <ul aria-label="Entradas por comercial" className="flex flex-wrap gap-4 text-sm">
+          {Array.from(totals, ([id, count]) => (
+            <li key={id}>
+              {responsible.get(id) ?? 'Sin asignar'} · <strong>{count}</strong>
+            </li>
+          ))}
+        </ul>
+      )}
+      {view === 'abiertas' ? (
+        <CaptureBoard cards={boardCards} agents={agents} focusId={focusId} />
+      ) : visible.length ? (
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          {visible.map((c) => (
+            <CaptureCard key={c.id} c={c} agents={agents} focused={focusId === c.id} />
+          ))}
+        </div>
       ) : (
         <p role="status" className="rounded-xl border bg-card p-5 text-sm">
-          No hay captaciones {view}
+          No hay captaciones en esta vista
           {portal || owner ? ' con estos filtros' : ''}.
         </p>
       )}

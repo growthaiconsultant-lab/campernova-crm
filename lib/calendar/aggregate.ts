@@ -72,6 +72,7 @@ export type EventRow = {
 
 export type CaptureRow = {
   id: string
+  isVisit?: boolean
   entradaScheduledAt: Date
   title: string | null
   portalLabel: string
@@ -235,8 +236,8 @@ export function captureToItem(r: CaptureRow): CalendarItem {
   return {
     id: `captacion:${r.id}`,
     source: 'captacion',
-    kindLabel: 'Entrada',
-    title: `Entrada · ${label} (${r.portalLabel})`,
+    kindLabel: r.isVisit ? 'Visita de valoración' : 'Entrada',
+    title: `${r.isVisit ? 'Visita de valoración' : 'Entrada'} · ${label} (${r.portalLabel})`,
     start: r.entradaScheduledAt,
     end: null,
     allDay: false,

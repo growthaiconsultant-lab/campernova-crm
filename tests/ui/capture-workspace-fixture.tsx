@@ -18,6 +18,8 @@ const base: CaptureCardData = {
   assignedToName: 'Ana',
   notes: 'Revisar detalles',
   rejectionReason: null,
+  visitScheduledAt: null,
+  arrivalAt: null,
   entradaScheduledAt: null,
   sellerLeadId: null,
 }
@@ -38,6 +40,14 @@ const cards: CaptureCardData[] = [
     title: 'Vehículo convertido',
     status: 'CONVERTIDO',
     sellerLeadId: 'seller-demo',
+  },
+  {
+    ...base,
+    id: 'recibida',
+    title: 'Recepción de diciembre',
+    status: 'CONVERTIDO',
+    sellerLeadId: 'seller-received',
+    arrivalAt: '2026-11-30T23:15:00Z',
   },
   { ...base, id: 'rechazada', title: 'Vehículo rechazado', status: 'RECHAZADO' },
 ]
@@ -86,10 +96,10 @@ Object.assign(window, {
       render()
       return {}
     },
-    schedule: (id: string, at: string) => {
+    schedule: (id: string, at: string, stage: CaptureStatus = 'ENTRADA_AGENDADA') => {
       Object.assign(cards.find((c) => c.id === id)!, {
-        status: 'ENTRADA_AGENDADA',
-        entradaScheduledAt: at,
+        status: stage,
+        ...(stage === 'VISITA_CONFIRMADA' ? { visitScheduledAt: at } : { entradaScheduledAt: at }),
       })
       render()
       return {}

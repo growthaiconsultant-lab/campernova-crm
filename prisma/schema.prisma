@@ -295,6 +295,9 @@ enum CaptureStatus {
   ENTRADA_AGENDADA
   CONVERTIDO
   RECHAZADO
+  SIN_INTERES
+  NO_CONTESTA
+  VISITA_CONFIRMADA
 }
 
 /// Próxima acción comercial sobre un lead (CAM-60).
@@ -1609,6 +1612,7 @@ model VehicleCapture {
   status             CaptureStatus @default(NO_CONTACTADO)
   notes              String?
   rejectionReason    LostReason?   @map("rejection_reason")
+  visitScheduledAt   DateTime?     @map("visit_scheduled_at")
   entradaScheduledAt DateTime?     @map("entrada_scheduled_at")
   assignedToId       String?       @map("assigned_to_id")
   createdById        String        @map("created_by_id")

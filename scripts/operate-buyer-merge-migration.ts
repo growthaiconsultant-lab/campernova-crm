@@ -10,11 +10,16 @@ import {
   type RemoteMigrationRow,
 } from '../lib/deploy/migration-guard'
 
-const migration = '20261022170000_buyer_merge_identity'
+const buyerMigration = '20261022170000_buyer_merge_identity'
+const captureMigration = '20261119120000_capture_stages'
 async function main() {
-  if (!process.env.BUYER_MERGE_MIGRATION_APPLY) return
+  const applyCapture = process.env.VERCEL_ENV === 'production' &&
+    process.env.VERCEL_GIT_COMMIT_REF === 'main' &&
+    process.env.VERCEL_GIT_COMMIT_MESSAGE?.split(/\r?\n/).includes('Apply-Migration: ' + captureMigration)
+  const migration = applyCapture ? captureMigration : process.env.BUYER_MERGE_MIGRATION_APPLY
+  if (!migration) return
   if (
-    process.env.BUYER_MERGE_MIGRATION_APPLY !== migration ||
+    (!applyCapture && migration !== buyerMigration) ||
     process.env.VERCEL_ENV !== 'production'
   )
     throw Error('INVALID_OPERATOR_SCOPE')
@@ -31,7 +36,7 @@ async function main() {
       >`SELECT migration_name, checksum, started_at, finished_at, rolled_back_at FROM _prisma_migrations`
     const check = evaluateMigrations(local, await history())
     if (check.ok) {
-      console.log('BUYER_MERGE_MIGRATION_ALREADY_APPLIED')
+      console.log('Migration already applied', migration)
       return
     }
     if (
@@ -52,7 +57,7 @@ async function main() {
     // Prisma output can include connection details: log only a fixed outcome.
     if (result.status !== 0) throw Error('MIGRATION_FAILED')
     if (!evaluateMigrations(local, await history()).ok) throw Error('MIGRATION_POSTFLIGHT_FAILED')
-    console.log('BUYER_MERGE_MIGRATION_VERIFIED')
+    console.log('Migration verified', migration)
   } finally {
     await db.$disconnect()
   }

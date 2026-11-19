@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import {
-  CAPTURE_BOARD_COLUMNS,
+  CAPTURE_OPEN_STAGES,
   captureViewOf,
+  stockInPeriod,
   CAPTURE_STATUS_LABELS,
   captureAnchorId,
   findDuplicateCaptureByPhone,
@@ -14,23 +15,36 @@ import {
 } from './captacion'
 
 describe('labels/opciones', () => {
-  it('4 portales y 6 estados', () => {
+  it('4 portales y 9 estados', () => {
     expect(Object.keys(PORTAL_LABELS)).toHaveLength(4)
-    expect(Object.keys(CAPTURE_STATUS_LABELS)).toHaveLength(6)
+    expect(Object.keys(CAPTURE_STATUS_LABELS)).toHaveLength(9)
   })
   it('el tablero excluye RECHAZADO', () => {
-    expect(CAPTURE_BOARD_COLUMNS).not.toContain('RECHAZADO')
-    expect(CAPTURE_BOARD_COLUMNS).toEqual([
+    expect(CAPTURE_OPEN_STAGES).not.toContain('RECHAZADO')
+    expect(CAPTURE_OPEN_STAGES).toEqual([
       'NO_CONTACTADO',
-      'CONTACTADO',
+      'NO_CONTESTA',
       'EN_CURSO',
+      'VISITA_CONFIRMADA',
       'ENTRADA_AGENDADA',
     ])
-    for (const status of CAPTURE_BOARD_COLUMNS)
+    for (const status of CAPTURE_OPEN_STAGES)
       expect(captureViewOf({ status, sellerLeadId: null })).toBe('abiertas')
     expect(captureViewOf({ status: 'EN_CURSO', sellerLeadId: 'seller' })).toBe('convertidas')
     expect(captureViewOf({ status: 'CONVERTIDO', sellerLeadId: null })).toBe('convertidas')
     expect(captureViewOf({ status: 'RECHAZADO', sellerLeadId: null })).toBe('rechazadas')
+  })
+  it('cuenta las entradas por llegada física y día de Madrid', () => {
+    const received = {
+      status: 'CONVERTIDO' as const,
+      sellerLeadId: 'seller',
+      arrivalAt: '2026-11-30T23:15:00Z',
+    }
+    expect(captureViewOf(received)).toBe('stock')
+    expect(stockInPeriod(received.arrivalAt, '2026-12-01', '2026-12-01')).toBe(true)
+    expect(stockInPeriod(received.arrivalAt, '', '2026-11-30')).toBe(false)
+    expect(stockInPeriod(null, '', '')).toBe(false)
+    expect(captureViewOf({ status: 'SIN_INTERES', sellerLeadId: null })).toBe('sinInteres')
   })
   it('validadores', () => {
     expect(isValidPortal('WALLAPOP')).toBe(true)

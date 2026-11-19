@@ -66,6 +66,15 @@ it('clasifica sin reescribir las captaciones antiguas y mantiene el vínculo y e
     expect(await db.vehicleCapture.findMany({ where: { title }, orderBy: { id: 'asc' } })).toEqual(
       saved.sort((a, b) => a.id.localeCompare(b.id))
     )
+    const visit = '2026-11-19T12:00:00.000Z'
+    const dropoff = '2026-12-01T12:00:00.000Z'
+    expect(await scheduleEntrada(open.id, visit, 'VISITA_CONFIRMADA')).toEqual({})
+    expect(await scheduleEntrada(open.id, dropoff)).toEqual({})
+    expect(await db.vehicleCapture.findUniqueOrThrow({ where: { id: open.id } })).toMatchObject({
+      visitScheduledAt: new Date(visit),
+      entradaScheduledAt: new Date(dropoff),
+    })
+    expect(await updateCaptureStatus(open.id, 'NO_CONTACTADO')).toEqual({})
     expect(await updateCapture(open.id, { phone: '600000000' })).toEqual({})
     expect(await db.vehicleCapture.findUniqueOrThrow({ where: { id: open.id } })).toMatchObject({
       phone: '600000000',

@@ -1,0 +1,4 @@
+ALTER TYPE "CaptureStatus" ADD VALUE 'SIN_INTERES';
+ALTER TYPE "CaptureStatus" ADD VALUE 'NO_CONTESTA';
+ALTER TYPE "CaptureStatus" ADD VALUE 'VISITA_CONFIRMADA';
+ALTER TABLE "vehicle_captures" ADD COLUMN "visit_scheduled_at" TIMESTAMP(3);
