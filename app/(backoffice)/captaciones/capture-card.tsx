@@ -305,9 +305,16 @@ export function CaptureCard({
               </button>
             )}
           {view === 'abiertas' && c.status === 'ENTRADA_AGENDADA' && c.entradaScheduledAt && (
-            <button type="button" className={primary} onClick={convert} disabled={converting}>
+            <button
+              type="button"
+              className={primary}
+              onClick={convert}
+              disabled={converting}
+              aria-label={converting ? 'Creando ficha' : 'Crear ficha vendedor'}
+              title="Crear ficha de vendedor"
+            >
               <FilePlus2 size={14} aria-hidden />
-              {converting ? 'Creando ficha…' : 'Crear ficha vendedor'}
+              <span className="whitespace-nowrap">{converting ? 'Creando ficha…' : 'Crear ficha'}</span>
             </button>
           )}
           {(view === 'convertidas' || view === 'stock') &&
