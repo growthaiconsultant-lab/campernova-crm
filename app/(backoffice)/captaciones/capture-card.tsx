@@ -157,7 +157,7 @@ export function CaptureCard({
 
   const view = captureViewOf(c)
   const primary =
-    'inline-flex min-h-8 w-full items-center justify-start gap-2 rounded-md border border-brand/25 bg-brand/5 px-2.5 py-1.5 text-left font-hanken text-[12px] font-semibold leading-4 text-brand transition-colors hover:border-brand hover:bg-brand/10 focus-visible:outline-brand disabled:opacity-50 [&>svg]:shrink-0'
+    'inline-flex min-h-8 w-full items-center justify-start gap-2 rounded-md border border-transparent bg-brand-tint px-2.5 py-1.5 text-left font-hanken text-[12px] font-semibold leading-4 text-brand transition-colors hover:border-brand hover:bg-brand hover:text-white focus-visible:outline-brand disabled:opacity-50 [&>svg]:shrink-0'
   const dot = CAPTURE_STATUS_COLORS[c.status]
   const idle = !editing && !rejecting && !scheduling
 
