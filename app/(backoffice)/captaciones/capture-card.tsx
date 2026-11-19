@@ -9,7 +9,10 @@ import {
   Pencil,
   Check,
   CalendarClock,
-  ArrowRightLeft,
+  FilePlus2,
+  ChevronDown,
+  Phone,
+  ListChecks,
 } from 'lucide-react'
 import {
   convertCaptureToSellerLead,
@@ -154,7 +157,7 @@ export function CaptureCard({
 
   const view = captureViewOf(c)
   const primary =
-    'mt-2 inline-flex w-full items-center justify-center gap-2 rounded-md bg-brand px-3 py-2 text-sm font-semibold text-white hover:bg-brand2 disabled:opacity-50'
+    'inline-flex min-h-8 w-full items-center justify-start gap-2 rounded-md border border-transparent bg-brand-tint px-2.5 py-1.5 text-left font-hanken text-[12px] font-semibold leading-4 text-brand transition-colors hover:border-brand hover:bg-brand hover:text-white focus-visible:outline-brand disabled:opacity-50 [&>svg]:shrink-0'
   const dot = CAPTURE_STATUS_COLORS[c.status]
   const idle = !editing && !rejecting && !scheduling
 
@@ -252,8 +255,7 @@ export function CaptureCard({
       )}
 
       {idle && (
-        <div className="mt-2 border-t border-line pt-2">
-          {view === 'abiertas' && <p className="text-xs font-medium text-ink2">Siguiente paso</p>}
+        <div className="mt-2 border-t border-line pt-2 empty:hidden">
           {view === 'abiertas' &&
             (c.status === 'NO_CONTACTADO' || c.status === 'NO_CONTESTA') &&
             (c.phone || c.listingUrl ? (
@@ -267,11 +269,13 @@ export function CaptureCard({
                     : c.listingUrl!
                 }
               >
-                {c.phone ? 'Contactar por WhatsApp' : 'Contactar desde el anuncio'}
+                {c.phone ? <MessageCircle size={14} aria-hidden /> : <ExternalLink size={14} aria-hidden />}
+                {c.phone ? 'Abrir WhatsApp' : 'Abrir anuncio'}
               </a>
             ) : (
               <button type="button" className={primary} onClick={edit}>
-                Añadir teléfono de contacto
+                <Phone size={14} aria-hidden />
+                Añadir teléfono
               </button>
             ))}
           {view === 'abiertas' && c.status === 'CONTACTADO' && (
@@ -281,6 +285,7 @@ export function CaptureCard({
               disabled={pending}
               onClick={() => changeStatus('EN_CURSO')}
             >
+              <ListChecks size={14} aria-hidden />
               Iniciar seguimiento
             </button>
           )}
@@ -295,13 +300,21 @@ export function CaptureCard({
                   changeStatus(c.status === 'EN_CURSO' ? 'VISITA_CONFIRMADA' : 'ENTRADA_AGENDADA')
                 }
               >
+                <CalendarClock size={14} aria-hidden />
                 {c.status === 'EN_CURSO' ? 'Confirmar visita' : 'Agendar entrega'}
               </button>
             )}
           {view === 'abiertas' && c.status === 'ENTRADA_AGENDADA' && c.entradaScheduledAt && (
-            <button type="button" className={primary} onClick={convert} disabled={converting}>
-              <ArrowRightLeft size={14} aria-hidden />
-              {converting ? 'Creando ficha…' : 'Crear ficha de vendedor'}
+            <button
+              type="button"
+              className={primary}
+              onClick={convert}
+              disabled={converting}
+              aria-label={converting ? 'Creando ficha' : 'Crear ficha vendedor'}
+              title="Crear ficha de vendedor"
+            >
+              <FilePlus2 size={14} aria-hidden />
+              <span className="whitespace-nowrap">{converting ? 'Creando ficha…' : 'Crear ficha'}</span>
             </button>
           )}
           {(view === 'convertidas' || view === 'stock') &&
@@ -454,19 +467,19 @@ export function CaptureCard({
       {idle && (
         <div className="mt-2.5 flex items-center gap-1.5">
           {!c.sellerLeadId && (
-            <label className="relative flex-1">
+            <label className="relative min-w-0 flex-1 rounded-md focus-within:ring-2 focus-within:ring-brand">
               <span
                 className={cn(
-                  'flex items-center gap-1.5 rounded-[8px] border border-line px-2 py-1 font-hanken text-[11.5px] font-semibold'
+                  'flex min-h-7 items-center gap-1.5 rounded-md border border-line px-2 font-hanken text-[11.5px] font-medium text-ink2'
                 )}
-                style={{ color: dot }}
               >
                 <span className="h-1.5 w-1.5 rounded-full" style={{ background: dot }} />
                 {CAPTURE_STATUS_LABELS[c.status]}
+                <ChevronDown size={12} className="ml-auto shrink-0" aria-hidden />
               </span>
               <select
                 aria-label="Cambiar etapa"
-                className="absolute inset-0 cursor-pointer opacity-0"
+                className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
                 value={c.status}
                 onChange={(e) => changeStatus(e.target.value as CaptureStatus)}
                 disabled={pending}
@@ -489,6 +502,7 @@ export function CaptureCard({
             type="button"
             onClick={edit}
             aria-label="Editar captación"
+            title="Editar captación"
             className="flex h-7 w-7 items-center justify-center rounded-[8px] border border-line text-ink2 transition-colors hover:bg-canvas"
           >
             <Pencil size={13} strokeWidth={2} />

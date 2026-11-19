@@ -15,7 +15,7 @@ test('separa los estados, filtra y muestra el siguiente paso correcto', async ({
   await expect(page.locator('header').getByText('Captaciones', { exact: true })).toBeVisible()
   await expect(page.getByRole('link', { name: /^Tablero/ })).toHaveAttribute('aria-current', 'page')
   const first = page.getByRole('article', { name: 'Ford prueba' })
-  await expect(first.getByRole('link', { name: 'Contactar desde el anuncio' })).toHaveAttribute(
+  await expect(first.getByRole('link', { name: 'Abrir anuncio' })).toHaveAttribute(
     'href',
     'https://example.test/anuncio'
   )
@@ -26,7 +26,11 @@ test('separa los estados, filtra y muestra el siguiente paso correcto', async ({
   await card.getByLabel('Cambiar etapa').selectOption('ENTRADA_AGENDADA')
   await card.getByLabel('Fecha y hora de la cita').fill('2027-01-15T12:00')
   await card.getByRole('button', { name: 'Guardar cita' }).click()
-  await expect(card.getByRole('button', { name: 'Crear ficha de vendedor' })).toBeVisible()
+  const createSeller = card.getByRole('button', { name: 'Crear ficha vendedor' })
+  await expect(createSeller).toBeVisible()
+  // Una etiqueta partida en dos líneas superaría la altura compacta de la tarjeta.
+  await createSeller.scrollIntoViewIfNeeded()
+  await expect(createSeller).toHaveCSS('height', '32px')
   await page.getByRole('button', { name: 'Limpiar filtros' }).click()
   await page.getByRole('link', { name: 'Convertidas 1' }).click()
   await expect(page.getByRole('article')).toHaveCount(1)
