@@ -51,9 +51,14 @@ function captureTask(
   entry: Date | null
 ) {
   if (!c.assignedTo) return 'Asignar captación'
-  if (entry) return 'Revisar entrada pendiente'
+  if (entry)
+    return c.status === 'VISITA_CONFIRMADA'
+      ? 'Revisar visita pendiente'
+      : 'Revisar entrada pendiente'
   if (c.status === 'NO_CONTACTADO')
     return c.phone || c.listingUrl ? 'Contactar con el vendedor' : 'Añadir teléfono de contacto'
+  if (c.status === 'NO_CONTESTA') return 'Volver a contactar'
+  if (c.status === 'VISITA_CONFIRMADA') return 'Valorar vehículo'
   return c.status === 'CONTACTADO' ? 'Iniciar seguimiento' : 'Agendar entrada'
 }
 
@@ -144,7 +149,7 @@ export async function getWorkday(
       where: {
         assignedToId: ownerId,
         sellerLeadId: null,
-        status: { notIn: ['CONVERTIDO', 'RECHAZADO'] },
+        status: { notIn: ['CONVERTIDO', 'RECHAZADO', 'SIN_INTERES'] },
       },
       select: {
         id: true,
@@ -152,6 +157,7 @@ export async function getWorkday(
         status: true,
         portal: true,
         entradaScheduledAt: true,
+        visitScheduledAt: true,
         assignedTo: name,
         phone: true,
         listingUrl: true,
@@ -229,7 +235,12 @@ export async function getWorkday(
     })
   }
   for (const c of captures) {
-    const entry = c.status === 'ENTRADA_AGENDADA' ? c.entradaScheduledAt : null
+    const entry =
+      c.status === 'ENTRADA_AGENDADA'
+        ? c.entradaScheduledAt
+        : c.status === 'VISITA_CONFIRMADA'
+          ? c.visitScheduledAt
+          : null
     const row = {
       context: (c.title || 'Vehículo sin identificar') + ' · ' + PORTAL_LABELS[c.portal],
       owner: c.assignedTo?.name ?? null,
@@ -237,7 +248,11 @@ export async function getWorkday(
       when: entry,
     }
     if (entry && entry >= from && entry < to) {
-      agenda.push({ ...row, title: 'Entrada de vehículo', label: clock.format(entry) })
+      agenda.push({
+        ...row,
+        title: c.status === 'VISITA_CONFIRMADA' ? 'Visita de valoración' : 'Entrada de vehículo',
+        label: clock.format(entry),
+      })
     } else if (!entry || entry < from || !c.assignedTo) {
       tasks.push({
         ...row,

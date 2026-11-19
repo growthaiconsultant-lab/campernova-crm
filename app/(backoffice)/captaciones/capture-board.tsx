@@ -4,6 +4,7 @@ import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import {
   CAPTURE_BOARD_COLUMNS,
+  type CaptureColumn,
   CAPTURE_STATUS_COLORS,
   CAPTURE_STATUS_LABELS,
 } from '@/lib/captacion'
@@ -15,7 +16,7 @@ import type { CaptureStatus } from '@prisma/client'
 type Agent = { id: string; name: string }
 
 /** Estados a los que se puede soltar directamente (sin datos extra). */
-const DIRECT_DROP: CaptureStatus[] = ['NO_CONTACTADO', 'CONTACTADO', 'EN_CURSO']
+const DIRECT_DROP: CaptureStatus[] = ['NO_CONTACTADO', 'SIN_INTERES', 'NO_CONTESTA', 'EN_CURSO']
 
 /**
  * Tablero de sourcing (CAP1) con drag & drop entre columnas: al soltar cambia
@@ -35,27 +36,36 @@ export function CaptureBoard({
   const router = useRouter()
   const [pending, startTransition] = useTransition()
   const [dragId, setDragId] = useState<string | null>(null)
-  const [overCol, setOverCol] = useState<CaptureStatus | null>(null)
+  const [overCol, setOverCol] = useState<CaptureColumn | null>(null)
   const [scheduleFor, setScheduleFor] = useState<string | null>(null)
+  const [stage, setStage] = useState<'ENTRADA_AGENDADA' | 'VISITA_CONFIRMADA'>('ENTRADA_AGENDADA')
   const [entradaAt, setEntradaAt] = useState('')
   const [notice, setNotice] = useState<string | null>(null)
 
-  const byStatus = new Map<CaptureStatus, CaptureCardData[]>()
+  const byStatus = new Map<CaptureColumn, CaptureCardData[]>()
   for (const c of cards) {
-    const list = byStatus.get(c.status) ?? []
+    const column =
+      c.arrivalAt && c.sellerLeadId ? 'EN_STOCK' : c.status === 'CONTACTADO' ? 'EN_CURSO' : c.status
+    if (column === 'CONVERTIDO' || column === 'RECHAZADO') continue
+    const list = byStatus.get(column) ?? []
     list.push(c)
-    byStatus.set(c.status, list)
+    byStatus.set(column, list)
   }
 
-  function handleDrop(target: CaptureStatus) {
+  function handleDrop(target: CaptureColumn) {
     const id = dragId
     setDragId(null)
     setOverCol(null)
     if (!id) return
+    if (target === 'EN_STOCK') {
+      setNotice('Registra la llegada física en la ficha del vehículo para que aparezca en stock.')
+      return
+    }
     const card = cards.find((c) => c.id === id)
     if (!card || card.status === target) return
 
-    if (target === 'ENTRADA_AGENDADA') {
+    if (target === 'ENTRADA_AGENDADA' || target === 'VISITA_CONFIRMADA') {
+      setStage(target)
       setScheduleFor(id)
       return
     }
@@ -72,7 +82,7 @@ export function CaptureBoard({
   function confirmSchedule() {
     if (!scheduleFor || !entradaAt) return
     startTransition(async () => {
-      const res = await scheduleEntrada(scheduleFor, new Date(entradaAt).toISOString())
+      const res = await scheduleEntrada(scheduleFor, new Date(entradaAt).toISOString(), stage)
       if (res.error) {
         setNotice(res.error)
         return
@@ -98,7 +108,10 @@ export function CaptureBoard({
         </div>
       )}
 
-      <div className="grid min-w-0 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+      <div
+        aria-label="Tablero de captaciones"
+        className="grid w-full min-w-0 max-w-full auto-cols-[minmax(13rem,1fr)] grid-flow-col items-start gap-3 overflow-x-auto pb-3"
+      >
         {CAPTURE_BOARD_COLUMNS.map((status) => {
           const list = byStatus.get(status) ?? []
           const isOver = overCol === status
@@ -119,12 +132,17 @@ export function CaptureBoard({
               <div className="flex items-center gap-2 border-b border-line2 px-3 py-2.5">
                 <span
                   className="h-2 w-2 shrink-0 rounded-full"
-                  style={{ background: CAPTURE_STATUS_COLORS[status] }}
+                  style={{
+                    background:
+                      status === 'EN_STOCK'
+                        ? CAPTURE_STATUS_COLORS.CONVERTIDO
+                        : CAPTURE_STATUS_COLORS[status],
+                  }}
                   aria-hidden
                 />
-                <span className="font-hanken text-[12.5px] font-semibold text-ink">
-                  {CAPTURE_STATUS_LABELS[status]}
-                </span>
+                <h2 className="font-hanken text-[12.5px] font-semibold text-ink">
+                  {status === 'EN_STOCK' ? 'En stock' : CAPTURE_STATUS_LABELS[status]}
+                </h2>
                 <span className="ml-auto rounded-full bg-track px-2 py-0.5 font-mono text-[11px] font-semibold text-ink2">
                   {list.length}
                 </span>
@@ -138,7 +156,7 @@ export function CaptureBoard({
                   list.map((c) => (
                     <div
                       key={c.id}
-                      draggable={!pending}
+                      draggable={!pending && !c.sellerLeadId}
                       onDragStart={(e) => {
                         e.dataTransfer.setData('text/plain', c.id)
                         setDragId(c.id)
@@ -168,16 +186,20 @@ export function CaptureBoard({
           className="fixed inset-0 z-50 flex items-center justify-center p-4"
           style={{ background: 'rgba(8,10,14,0.45)' }}
           role="dialog"
-          aria-label="Agendar entrada"
+          aria-label={CAPTURE_STATUS_LABELS[stage]}
           aria-modal="true"
         >
           <div className="w-full max-w-[360px] rounded-[14px] border border-line bg-card p-5">
-            <h3 className="font-hanken text-[15px] font-bold text-ink">Agendar entrada</h3>
+            <h3 className="font-hanken text-[15px] font-bold text-ink">
+              {CAPTURE_STATUS_LABELS[stage]}
+            </h3>
             <p className="mt-1 font-hanken text-[12.5px] text-ink2">
-              ¿Cuándo trae el vehículo a la nave?
+              {stage === 'VISITA_CONFIRMADA'
+                ? '¿Cuándo es la visita de valoración?'
+                : '¿Cuándo trae el vehículo a la nave?'}
             </p>
             <input
-              aria-label="Fecha y hora de entrada"
+              aria-label="Fecha y hora de la cita"
               type="datetime-local"
               value={entradaAt}
               onChange={(e) => setEntradaAt(e.target.value)}
@@ -200,7 +222,7 @@ export function CaptureBoard({
                 disabled={pending || !entradaAt}
                 className="rounded-[10px] bg-brand px-3.5 py-2 font-hanken text-[12.5px] font-semibold text-white transition-colors hover:bg-brand2 disabled:opacity-50"
               >
-                Agendar entrada
+                Guardar cita
               </button>
             </div>
           </div>

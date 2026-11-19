@@ -19,7 +19,7 @@ import {
 } from './actions'
 import {
   CAPTURE_STATUS_COLORS,
-  CAPTURE_BOARD_COLUMNS,
+  CAPTURE_OPEN_STAGES,
   captureViewOf,
   CAPTURE_STATUS_LABELS,
   PORTAL_LABELS,
@@ -40,6 +40,8 @@ export type CaptureCardData = {
   status: CaptureStatus
   notes: string | null
   rejectionReason: LostReason | null
+  arrivalAt: string | null
+  visitScheduledAt: string | null
   entradaScheduledAt: string | null
   assignedToId: string | null
   assignedToName: string | null
@@ -64,7 +66,9 @@ export function CaptureCard({
   const [pending, startTransition] = useTransition()
   const [rejecting, setRejecting] = useState(false)
   const [reason, setReason] = useState('')
-  const [scheduling, setScheduling] = useState(false)
+  const [scheduling, setScheduling] = useState<'ENTRADA_AGENDADA' | 'VISITA_CONFIRMADA' | null>(
+    null
+  )
   const [entradaAt, setEntradaAt] = useState('')
   const [editing, setEditing] = useState(false)
   const [notes, setNotes] = useState(c.notes ?? '')
@@ -75,7 +79,7 @@ export function CaptureCard({
 
   function changeStatus(next: CaptureStatus) {
     if (next === 'RECHAZADO') return setRejecting(true)
-    if (next === 'ENTRADA_AGENDADA') return setScheduling(true)
+    if (next === 'ENTRADA_AGENDADA' || next === 'VISITA_CONFIRMADA') return setScheduling(next)
     setError(null)
     startTransition(async () => {
       const res = await updateCaptureStatus(c.id, next)
@@ -98,13 +102,13 @@ export function CaptureCard({
   }
 
   function confirmSchedule() {
-    if (!entradaAt) return setError('Indica fecha y hora de la entrada')
+    if (!entradaAt || !scheduling) return setError('Indica fecha y hora de la entrada')
     setError(null)
     startTransition(async () => {
-      const res = await scheduleEntrada(c.id, new Date(entradaAt).toISOString())
+      const res = await scheduleEntrada(c.id, new Date(entradaAt).toISOString(), scheduling)
       if (res.error) setError(res.error)
       else {
-        setScheduling(false)
+        setScheduling(null)
         router.refresh()
       }
     })
@@ -222,6 +226,18 @@ export function CaptureCard({
         </p>
       )}
 
+      {c.arrivalAt && (
+        <p className="mt-2 text-xs">
+          Recepción ·{' '}
+          {new Date(c.arrivalAt).toLocaleDateString('es-ES', { timeZone: 'Europe/Madrid' })}
+        </p>
+      )}
+      {c.status === 'VISITA_CONFIRMADA' && c.visitScheduledAt && (
+        <p className="mt-2 text-xs">
+          Visita ·{' '}
+          {new Date(c.visitScheduledAt).toLocaleString('es-ES', { timeZone: 'Europe/Madrid' })}
+        </p>
+      )}
       {c.entradaScheduledAt && c.status === 'ENTRADA_AGENDADA' && (
         <p className="mt-1.5 inline-flex items-center gap-1 font-mono text-[11px] font-medium text-info">
           <CalendarClock size={12} strokeWidth={2} /> Entrada ·
@@ -239,7 +255,7 @@ export function CaptureCard({
         <div className="mt-2 border-t border-line pt-2">
           {view === 'abiertas' && <p className="text-xs font-medium text-ink2">Siguiente paso</p>}
           {view === 'abiertas' &&
-            c.status === 'NO_CONTACTADO' &&
+            (c.status === 'NO_CONTACTADO' || c.status === 'NO_CONTESTA') &&
             (c.phone || c.listingUrl ? (
               <a
                 className={primary}
@@ -270,13 +286,16 @@ export function CaptureCard({
           )}
           {view === 'abiertas' &&
             (c.status === 'EN_CURSO' ||
+              c.status === 'VISITA_CONFIRMADA' ||
               (c.status === 'ENTRADA_AGENDADA' && !c.entradaScheduledAt)) && (
               <button
                 type="button"
                 className={primary}
-                onClick={() => changeStatus('ENTRADA_AGENDADA')}
+                onClick={() =>
+                  changeStatus(c.status === 'EN_CURSO' ? 'VISITA_CONFIRMADA' : 'ENTRADA_AGENDADA')
+                }
               >
-                Agendar entrada
+                {c.status === 'EN_CURSO' ? 'Confirmar visita' : 'Agendar entrega'}
               </button>
             )}
           {view === 'abiertas' && c.status === 'ENTRADA_AGENDADA' && c.entradaScheduledAt && (
@@ -285,7 +304,7 @@ export function CaptureCard({
               {converting ? 'Creando ficha…' : 'Crear ficha de vendedor'}
             </button>
           )}
-          {view === 'convertidas' &&
+          {(view === 'convertidas' || view === 'stock') &&
             (c.sellerLeadId ? (
               <Link
                 href={'/vendedores/' + c.sellerLeadId}
@@ -305,9 +324,13 @@ export function CaptureCard({
       {/* Agendar entrada inline */}
       {scheduling && (
         <div className="border-info/30 mt-2 space-y-2 rounded-[9px] border bg-info-tint p-2">
-          <p className="font-hanken text-[11px] font-medium text-info">¿Cuándo trae el vehículo?</p>
+          <p className="font-hanken text-[11px] font-medium text-info">
+            {scheduling === 'VISITA_CONFIRMADA'
+              ? '¿Cuándo es la visita de valoración?'
+              : '¿Cuándo trae el vehículo?'}
+          </p>
           <input
-            aria-label="Fecha y hora de entrada"
+            aria-label="Fecha y hora de la cita"
             type="datetime-local"
             value={entradaAt}
             onChange={(e) => setEntradaAt(e.target.value)}
@@ -320,11 +343,11 @@ export function CaptureCard({
               disabled={pending}
               className="rounded-[8px] bg-info px-2 py-1 font-hanken text-[11px] font-semibold text-white disabled:opacity-50"
             >
-              Agendar entrada
+              Guardar cita
             </button>
             <button
               type="button"
-              onClick={() => setScheduling(false)}
+              onClick={() => setScheduling(null)}
               className="rounded-[8px] border border-line px-2 py-1 font-hanken text-[11px] text-ink2"
             >
               Cancelar
@@ -449,7 +472,12 @@ export function CaptureCard({
                 disabled={pending}
               >
                 {c.status === 'CONVERTIDO' && <option value="CONVERTIDO">Convertido</option>}
-                {[...CAPTURE_BOARD_COLUMNS, 'RECHAZADO' as const].map((s) => (
+                {[
+                  ...CAPTURE_OPEN_STAGES,
+                  'SIN_INTERES' as const,
+                  'RECHAZADO' as const,
+                  ...(c.status === 'CONTACTADO' ? ['CONTACTADO' as const] : []),
+                ].map((s) => (
                   <option key={s} value={s}>
                     {CAPTURE_STATUS_LABELS[s]}
                   </option>

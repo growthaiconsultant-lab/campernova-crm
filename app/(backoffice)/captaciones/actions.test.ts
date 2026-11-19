@@ -112,6 +112,17 @@ describe('etapas del tablero', () => {
     expect(await updateCaptureStatus('cap', 'ENTRADA_AGENDADA')).toHaveProperty('error')
     expect(mockDb.vehicleCapture.updateMany).not.toHaveBeenCalled()
   })
+  it('exige y guarda una fecha de visita independiente de la entrega', async () => {
+    expect(await updateCaptureStatus('cap', 'VISITA_CONFIRMADA')).toHaveProperty('error')
+    expect(await scheduleEntrada('cap', 'inválida', 'VISITA_CONFIRMADA')).toHaveProperty('error')
+    mockDb.vehicleCapture.updateMany.mockResolvedValue({ count: 1 })
+    const iso = '2026-11-19T14:00:00Z'
+    expect(await scheduleEntrada('cap', iso, 'VISITA_CONFIRMADA')).toEqual({})
+    expect(mockDb.vehicleCapture.updateMany).toHaveBeenCalledWith({
+      where: { id: 'cap', sellerLeadId: null },
+      data: { status: 'VISITA_CONFIRMADA', visitScheduledAt: new Date(iso) },
+    })
+  })
   it('un cambio de etapa o fecha desactualizado respeta la ficha ya vinculada', async () => {
     mockDb.vehicleCapture.updateMany.mockResolvedValue({ count: 0 })
     expect(await updateCaptureStatus('cap', 'EN_CURSO')).toHaveProperty('error')

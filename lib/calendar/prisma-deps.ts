@@ -147,11 +147,15 @@ export function prismaCalendarDeps(db: Prisma.TransactionClient): CalendarDeps {
     async listCaptures(from, to): Promise<CaptureRow[]> {
       const rows = await db.vehicleCapture.findMany({
         where: {
-          status: 'ENTRADA_AGENDADA',
-          entradaScheduledAt: { gte: from, lt: to },
+          OR: [
+            { status: 'ENTRADA_AGENDADA', entradaScheduledAt: { gte: from, lt: to } },
+            { status: 'VISITA_CONFIRMADA', visitScheduledAt: { gte: from, lt: to } },
+          ],
         },
         select: {
           id: true,
+          status: true,
+          visitScheduledAt: true,
           entradaScheduledAt: true,
           title: true,
           portal: true,
@@ -160,7 +164,10 @@ export function prismaCalendarDeps(db: Prisma.TransactionClient): CalendarDeps {
       })
       return rows.map((r) => ({
         id: r.id,
-        entradaScheduledAt: r.entradaScheduledAt as Date,
+        isVisit: r.status === 'VISITA_CONFIRMADA',
+        entradaScheduledAt: (r.status === 'VISITA_CONFIRMADA'
+          ? r.visitScheduledAt
+          : r.entradaScheduledAt) as Date,
         title: r.title,
         portalLabel: PORTAL_LABELS[r.portal],
         assignedTo: r.assignedTo,

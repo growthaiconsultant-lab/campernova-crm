@@ -20,7 +20,10 @@ export default async function CaptacionesPage({
   const [captures, agents] = await Promise.all([
     db.vehicleCapture.findMany({
       orderBy: { updatedAt: 'desc' },
-      include: { assignedTo: { select: { name: true } } },
+      include: {
+        assignedTo: { select: { name: true } },
+        sellerLead: { select: { vehicle: { select: { physicalArrivalAt: true } } } },
+      },
     }),
     db.user.findMany({
       where: { active: true },
@@ -39,6 +42,8 @@ export default async function CaptacionesPage({
     status: c.status,
     notes: c.notes,
     rejectionReason: c.rejectionReason,
+    arrivalAt: c.sellerLead?.vehicle?.physicalArrivalAt?.toISOString() ?? null,
+    visitScheduledAt: c.visitScheduledAt?.toISOString() ?? null,
     entradaScheduledAt: c.entradaScheduledAt ? c.entradaScheduledAt.toISOString() : null,
     assignedToId: c.assignedToId,
     assignedToName: c.assignedTo?.name ?? null,
@@ -52,7 +57,10 @@ export default async function CaptacionesPage({
   const focused = cards.find((c) => c.id === focusId)
   const view = focused
     ? captureViewOf(focused)
-    : searchParams.vista === 'convertidas' || searchParams.vista === 'rechazadas'
+    : searchParams.vista === 'convertidas' ||
+        searchParams.vista === 'rechazadas' ||
+        searchParams.vista === 'stock' ||
+        searchParams.vista === 'sinInteres'
       ? searchParams.vista
       : 'abiertas'
   return (

@@ -13,10 +13,7 @@ test.beforeEach(async ({ page }) => {
 })
 test('separa los estados, filtra y muestra el siguiente paso correcto', async ({ page }) => {
   await expect(page.locator('header').getByText('Captaciones', { exact: true })).toBeVisible()
-  await expect(page.getByRole('link', { name: 'Abiertas 2' })).toHaveAttribute(
-    'aria-current',
-    'page'
-  )
+  await expect(page.getByRole('link', { name: /^Tablero/ })).toHaveAttribute('aria-current', 'page')
   const first = page.getByRole('article', { name: 'Ford prueba' })
   await expect(first.getByRole('link', { name: 'Contactar desde el anuncio' })).toHaveAttribute(
     'href',
@@ -26,9 +23,9 @@ test('separa los estados, filtra y muestra el siguiente paso correcto', async ({
   await expect(first).toHaveCount(0)
   await page.getByRole('combobox', { name: 'Portal', exact: true }).selectOption('COCHES_NET')
   const card = page.getByRole('article', { name: 'Camper en seguimiento' })
-  await card.getByRole('button', { name: 'Agendar entrada' }).click()
-  await card.getByLabel('Fecha y hora de entrada').fill('2027-01-15T12:00')
-  await card.getByRole('button', { name: 'Agendar entrada' }).click()
+  await card.getByLabel('Cambiar etapa').selectOption('ENTRADA_AGENDADA')
+  await card.getByLabel('Fecha y hora de la cita').fill('2027-01-15T12:00')
+  await card.getByRole('button', { name: 'Guardar cita' }).click()
   await expect(card.getByRole('button', { name: 'Crear ficha de vendedor' })).toBeVisible()
   await page.getByRole('button', { name: 'Limpiar filtros' }).click()
   await page.getByRole('link', { name: 'Convertidas 1' }).click()
@@ -51,17 +48,40 @@ test('abre el alta bajo demanda y permite revisar una captación duplicada sin c
   await form.getByRole('button', { name: 'Guardar captación' }).click()
   await form.getByRole('button', { name: 'Ver captación', exact: true }).click()
   await expect(form).toHaveCount(0)
-  await expect(page.getByRole('link', { name: 'Abiertas 2' })).toHaveAttribute(
-    'aria-current',
-    'page'
-  )
+  await expect(page.getByRole('link', { name: /^Tablero/ })).toHaveAttribute('aria-current', 'page')
   await expect(page.getByRole('article', { name: 'Ford prueba' })).toBeVisible()
   await page.getByRole('button', { name: 'Nueva captación' }).click()
   await form.getByLabel('Modelo').fill('Alta de prueba')
   await form.getByRole('button', { name: 'Guardar captación' }).click()
   await expect(page.getByRole('article', { name: 'Alta de prueba' })).toBeVisible()
-  await expect(page.getByRole('link', { name: 'Abiertas 3' })).toHaveAttribute(
-    'aria-current',
-    'page'
-  )
+  await expect(page.getByRole('link', { name: /^Tablero/ })).toHaveAttribute('aria-current', 'page')
+})
+
+test('filtra las entradas por fecha real y comercial', async ({ page }) => {
+  await page.getByRole('link', { name: /^En stock/ }).click()
+  await page.getByRole('button', { name: 'Todo el histórico' }).click()
+  await page.getByLabel('Hasta', { exact: true }).fill('2026-11-30')
+  const card = page.getByRole('article', { name: 'Recepción de diciembre' })
+  await expect(card).toHaveCount(0)
+  await page.getByLabel('Hasta', { exact: true }).fill('2026-12-01')
+  await expect(card).toBeVisible()
+  await page.getByRole('combobox', { name: 'Responsable', exact: true }).selectOption('sin-asignar')
+  await expect(card).toHaveCount(0)
+})
+
+test('mantiene las siete columnas en el orden comercial incluso vacías', async ({ page }) => {
+  const headings = page.getByLabel('Tablero de captaciones').getByRole('heading', { level: 2 })
+  const stages = [
+    'Por contactar',
+    'No interés',
+    'No contesta',
+    'Seguimiento',
+    'Visita confirmada',
+    'Entrega agendada',
+    'En stock',
+  ]
+  await expect(headings).toHaveText(stages)
+  await page.getByRole('combobox', { name: 'Portal', exact: true }).selectOption('MILANUNCIOS')
+  await expect(headings).toHaveText(stages)
+  await expect(page.getByText('Sin tarjetas', { exact: true })).toHaveCount(7)
 })
