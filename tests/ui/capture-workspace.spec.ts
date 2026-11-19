@@ -26,7 +26,10 @@ test('separa los estados, filtra y muestra el siguiente paso correcto', async ({
   await card.getByLabel('Cambiar etapa').selectOption('ENTRADA_AGENDADA')
   await card.getByLabel('Fecha y hora de la cita').fill('2027-01-15T12:00')
   await card.getByRole('button', { name: 'Guardar cita' }).click()
-  await expect(card.getByRole('button', { name: 'Crear ficha vendedor' })).toBeVisible()
+  const createSeller = card.getByRole('button', { name: 'Crear ficha vendedor' })
+  await expect(createSeller).toBeVisible()
+  // Una etiqueta partida en dos líneas superaría la altura compacta de la tarjeta.
+  expect((await createSeller.boundingBox())!.height).toBeLessThanOrEqual(36)
   await page.getByRole('button', { name: 'Limpiar filtros' }).click()
   await page.getByRole('link', { name: 'Convertidas 1' }).click()
   await expect(page.getByRole('article')).toHaveCount(1)
