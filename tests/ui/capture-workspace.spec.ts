@@ -29,7 +29,8 @@ test('separa los estados, filtra y muestra el siguiente paso correcto', async ({
   const createSeller = card.getByRole('button', { name: 'Crear ficha vendedor' })
   await expect(createSeller).toBeVisible()
   // Una etiqueta partida en dos líneas superaría la altura compacta de la tarjeta.
-  expect((await createSeller.boundingBox())!.height).toBeLessThanOrEqual(36)
+  await createSeller.scrollIntoViewIfNeeded()
+  await expect(createSeller).toHaveCSS('height', '32px')
   await page.getByRole('button', { name: 'Limpiar filtros' }).click()
   await page.getByRole('link', { name: 'Convertidas 1' }).click()
   await expect(page.getByRole('article')).toHaveCount(1)
