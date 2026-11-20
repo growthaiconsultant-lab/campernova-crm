@@ -91,6 +91,15 @@ Object.assign(window, {
       render()
       return { id: 'nueva' }
     },
+    arrive: (id: string) => {
+      Object.assign(cards.find((card) => card.id === id)!, {
+        arrivalAt: new Date().toISOString(),
+        status: 'CONVERTIDO',
+        sellerLeadId: 'seller-demo',
+      })
+      render()
+      return {}
+    },
     status: (id: string, status: CaptureStatus) => {
       cards.find((c) => c.id === id)!.status = status
       render()
