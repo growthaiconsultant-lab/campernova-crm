@@ -251,7 +251,10 @@ export default async function CompradoresPage({ searchParams }: { searchParams: 
           {initials}
         </span>
         <div className="min-w-0">
-          <div className="break-words text-sm font-bold leading-tight text-ink">{l.name}</div>
+          <div className="break-words text-sm font-bold leading-tight text-ink">
+            {l.followupTitle ?? l.name}
+          </div>
+          {l.followupTitle && <div className="text-xs text-ink2">{l.name}</div>}
           <div className="mt-1 text-xs font-medium text-ink2">{prefs(l)}</div>
           <SearchRequestBadge leadId={l.id} className="mt-1" />
         </div>
@@ -332,6 +335,16 @@ export default async function CompradoresPage({ searchParams }: { searchParams: 
       </BuyerPreview>
     )
   }
+  function addNoteLink(l: Lead) {
+    return (
+      <Link
+        href={`/compradores/${l.id}?tab=ficha&notesPage=1#buyer-note`}
+        className="text-xs font-semibold text-brand hover:underline"
+      >
+        Añadir nota
+      </Link>
+    )
+  }
   const columns: Column<Lead>[] = [
     { key: 'buyer', header: 'Comprador', cell: identity },
     {
@@ -341,6 +354,7 @@ export default async function CompradoresPage({ searchParams }: { searchParams: 
       cell: (l) => (
         <div className="grid justify-items-start gap-1">
           {status(l)}
+          {addNoteLink(l)}
           {nextAction(l)}
         </div>
       ),
@@ -465,6 +479,7 @@ export default async function CompradoresPage({ searchParams }: { searchParams: 
             <div className="grid gap-2 border-t border-line2 pt-2">
               <div className="flex flex-wrap items-center gap-2">
                 {status(l)}
+                {addNoteLink(l)}
                 {nextAction(l)}
               </div>
               <div className="flex flex-wrap items-start gap-2">
