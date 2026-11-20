@@ -6,6 +6,7 @@ import { BUYER_LEAD_ACTIVE_STATUSES } from '@/lib/state-machine'
 import { Eyebrow, EmptyState } from '@/components/redesign'
 import { cn } from '@/lib/utils'
 import { SearchRequestBadge } from '@/components/search-request-badge'
+import { BuyerFollowupTitleEditor } from '../buyer-followup-title-editor'
 import type { LeadTemperature } from '@prisma/client'
 
 /**
@@ -153,54 +154,71 @@ export default async function PipelinePage() {
                       const offerAmount = b.offers[0]?.amount ? Number(b.offers[0].amount) : null
                       const cita = b.calendarEvents[0]?.startAt
                       return (
-                        <Link
+                        <article
                           key={b.id}
-                          href={`/compradores/${b.id}`}
-                          className="hover:border-ink3/40 rounded-[11px] border border-line bg-card p-[11px] shadow-[0_1px_2px_rgba(20,25,34,0.04)] transition-colors"
+                          className="rounded-[11px] border border-line bg-card p-[11px] shadow-[0_1px_2px_rgba(20,25,34,0.04)]"
                         >
-                          <div className="flex items-center justify-between gap-2">
-                            <span className="truncate font-hanken text-[12.5px] font-semibold text-ink">
-                              {b.name}
-                            </span>
-                            {b.temperature && (
-                              <span
-                                title={TEMPERATURE_LABELS[b.temperature]}
-                                className="h-2 w-2 shrink-0 rounded-full"
-                                style={{ backgroundColor: TEMP_HEX[b.temperature] }}
-                                aria-hidden
-                              />
+                          <Link href={`/compradores/${b.id}`} className="block hover:underline">
+                            <div className="flex items-center justify-between gap-2">
+                              <span className="min-w-0 break-words font-hanken text-[12.5px] font-bold text-ink">
+                                {b.followupTitle ?? b.name}
+                              </span>
+                              {b.temperature && (
+                                <span
+                                  title={TEMPERATURE_LABELS[b.temperature]}
+                                  className="h-2 w-2 shrink-0 rounded-full"
+                                  style={{ backgroundColor: TEMP_HEX[b.temperature] }}
+                                  aria-hidden
+                                />
+                              )}
+                            </div>
+                            {b.followupTitle && <p className="text-xs text-ink2">{b.name}</p>}
+                            <div className="mt-1 font-mono text-[10.5px] text-ink3">
+                              {b.maxBudget
+                                ? `hasta ${EUR(Number(b.maxBudget))}`
+                                : 'sin presupuesto'}
+                            </div>
+                            <SearchRequestBadge leadId={b.id} className="mt-1.5" />
+                            {col.key === 'oferta' && offerAmount != null && (
+                              <div className="mt-1 font-mono text-[11px] font-semibold text-warn">
+                                oferta {EUR(offerAmount)}
+                              </div>
                             )}
-                          </div>
-                          <div className="mt-1 font-mono text-[10.5px] text-ink3">
-                            {b.maxBudget ? `hasta ${EUR(Number(b.maxBudget))}` : 'sin presupuesto'}
-                          </div>
-                          <SearchRequestBadge leadId={b.id} className="mt-1.5" />
-                          {col.key === 'oferta' && offerAmount != null && (
-                            <div className="mt-1 font-mono text-[11px] font-semibold text-warn">
-                              oferta {EUR(offerAmount)}
-                            </div>
-                          )}
-                          {col.key === 'cita' && cita && (
-                            <div
-                              className={cn('mt-1 font-mono text-[11px] font-semibold text-brand')}
-                            >
-                              cita{' '}
-                              {new Date(cita).toLocaleString('es-ES', {
-                                day: 'numeric',
-                                month: 'short',
-                                hour: '2-digit',
-                                minute: '2-digit',
-                                timeZone: 'Europe/Madrid',
-                              })}
-                            </div>
-                          )}
-                          {bestMatch && (
-                            <div className="mt-1.5 truncate font-hanken text-[11px] font-medium text-ink2">
-                              ↳ {bestMatch.vehicle.brand} {bestMatch.vehicle.model} ·{' '}
-                              <span className="text-brand">{bestMatch.score}</span>
-                            </div>
-                          )}
-                        </Link>
+                            {col.key === 'cita' && cita && (
+                              <div
+                                className={cn(
+                                  'mt-1 font-mono text-[11px] font-semibold text-brand'
+                                )}
+                              >
+                                cita{' '}
+                                {new Date(cita).toLocaleString('es-ES', {
+                                  day: 'numeric',
+                                  month: 'short',
+                                  hour: '2-digit',
+                                  minute: '2-digit',
+                                  timeZone: 'Europe/Madrid',
+                                })}
+                              </div>
+                            )}
+                            {bestMatch && (
+                              <div className="mt-1.5 truncate font-hanken text-[11px] font-medium text-ink2">
+                                ↳ {bestMatch.vehicle.brand} {bestMatch.vehicle.model} ·{' '}
+                                <span className="text-brand">{bestMatch.score}</span>
+                              </div>
+                            )}
+                          </Link>
+                          <Link
+                            href={`/compradores/${b.id}?tab=ficha&notesPage=1#buyer-note`}
+                            className="mt-2 inline-block text-xs font-semibold text-brand hover:underline"
+                          >
+                            Añadir nota
+                          </Link>
+                          <BuyerFollowupTitleEditor
+                            leadId={b.id}
+                            buyerName={b.name}
+                            title={b.followupTitle}
+                          />
+                        </article>
                       )
                     })
                   )}
