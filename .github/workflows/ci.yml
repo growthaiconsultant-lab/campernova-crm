@@ -320,7 +320,8 @@ jobs:
           assert buyer_consent_columns "$(psql "$PSQL_URL" -tAc "SELECT count(*) FROM information_schema.columns WHERE table_schema='public' AND table_name='buyer_leads' AND column_name IN ('gdpr_consent_at','gdpr_consent_ip') AND is_nullable='YES'")" 2
           # COM-42 enlaza el presupuesto con su reparación mediante una FK opcional y única.
           # CAP-2 adds one nullable visit timestamp and three capture stages.
-          assert columns "$columns" 532
+          # buyer_leads.followup_title añade una columna opcional.
+          assert columns "$columns" 533
           assert inspection_checklist_columns "$(psql "$PSQL_URL" -tAc "SELECT count(*) FROM information_schema.columns WHERE table_schema='public' AND table_name='work_order_checklist' AND column_name IN ('installed','owner_quote') AND data_type='boolean'")" 2
           assert matching_catalog_columns "$(psql "$PSQL_URL" -tAc "SELECT count(*) FROM information_schema.columns WHERE table_schema='public' AND table_name IN ('vehicles','buyer_leads') AND column_name='match_catalog' AND data_type='jsonb' AND is_nullable='NO'")" 2
           assert enums "$enums" 60

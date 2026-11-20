@@ -11,15 +11,17 @@ import {
 } from '../lib/deploy/migration-guard'
 
 const buyerMigration = '20261022170000_buyer_merge_identity'
-const captureMigration = '20261119120000_capture_stages'
+const mainMigrations = ['20261119120000_capture_stages', '20261120120000_buyer_followup_title']
 async function main() {
-  const applyCapture = process.env.VERCEL_ENV === 'production' &&
-    process.env.VERCEL_GIT_COMMIT_REF === 'main' &&
-    process.env.VERCEL_GIT_COMMIT_MESSAGE?.split(/\r?\n/).includes('Apply-Migration: ' + captureMigration)
-  const migration = applyCapture ? captureMigration : process.env.BUYER_MERGE_MIGRATION_APPLY
+  const trailers = process.env.VERCEL_GIT_COMMIT_MESSAGE?.split(/\r?\n/)
+  const authorizedMigration =
+    process.env.VERCEL_ENV === 'production' && process.env.VERCEL_GIT_COMMIT_REF === 'main'
+      ? mainMigrations.find((name) => trailers?.includes('Apply-Migration: ' + name))
+      : undefined
+  const migration = authorizedMigration ?? process.env.BUYER_MERGE_MIGRATION_APPLY
   if (!migration) return
   if (
-    (!applyCapture && migration !== buyerMigration) ||
+    (!authorizedMigration && migration !== buyerMigration) ||
     process.env.VERCEL_ENV !== 'production'
   )
     throw Error('INVALID_OPERATOR_SCOPE')
