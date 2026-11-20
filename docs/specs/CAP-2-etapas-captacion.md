@@ -33,3 +33,7 @@ El commit de publicación en main puede solicitar esta migración concreta media
 La migración añade tres valores al enum y una fecha opcional. Las lecturas y los filtros no escriben en la base de datos. Contactado y los rechazos anteriores conservan su significado. Se mantienen los permisos de agente y la protección de las captaciones vinculadas.
 
 Validar primero la migración y las consultas en PostgreSQL de pruebas, comprobar históricos y probar las dos citas en la interfaz. Aplicar la ampliación antes de publicar el cliente. Si hay que detener la activación, conservar los valores escritos y utilizar una versión compatible con los nuevos estados.
+
+## Recepción desde Captaciones
+
+Desde Entrega agendada, Convertidas o al soltar una tarjeta en En stock, el comercial confirma la llegada física. Para captaciones sin vínculo, la confirmación explica y ejecuta la creación de ficha mediante la conversión existente. Un fallo posterior permite reintentar desde Convertidas. La llegada reutiliza la operación idempotente de Entrada, con su usuario, fecha e inspección. Cancelar cierra el diálogo sin escrituras. No requiere migración. La reversión consiste en restaurar la interfaz anterior, conservando las recepciones registradas.
