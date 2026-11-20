@@ -89,3 +89,28 @@ test('mantiene las siete columnas en el orden comercial incluso vacías', async 
   await expect(headings).toHaveText(stages)
   await expect(page.getByText('Sin tarjetas', { exact: true })).toHaveCount(7)
 })
+
+test('confirma la recepción de una ficha vinculada antes de pasarla a stock', async ({ page }) => {
+  await page.getByRole('link', { name: 'Convertidas 1' }).click()
+  await page.getByRole('button', { name: 'Registrar llegada' }).click()
+  await page.getByRole('button', { name: 'Cancelar' }).click()
+  await expect(page.getByRole('article', { name: 'Vehículo convertido' })).toBeVisible()
+  await page.getByRole('button', { name: 'Registrar llegada' }).click()
+  await page.getByRole('button', { name: 'Confirmar llegada' }).click()
+  await page.getByRole('link', { name: /^En stock/ }).click()
+  await expect(page.getByRole('article', { name: 'Vehículo convertido' })).toBeVisible()
+})
+
+test('soltar en stock pide confirmar la creación de ficha y la llegada', async ({
+  page,
+}, testInfo) => {
+  test.skip(testInfo.project.name !== 'chrome', 'En móvil se usa el botón de recepción.')
+  const card = page.getByRole('article', { name: 'Camper en seguimiento' })
+  const stock = page.getByRole('heading', { name: 'En stock', exact: true })
+  await card.dragTo(stock)
+  const dialog = page.getByRole('dialog', { name: 'Registrar llegada a la nave' })
+  await expect(dialog).toBeVisible()
+  await dialog.getByRole('button', { name: 'Crear ficha y confirmar llegada' }).click()
+  await expect(dialog).toHaveCount(0)
+  await expect(card.getByText(/Recepción/)).toBeVisible()
+})

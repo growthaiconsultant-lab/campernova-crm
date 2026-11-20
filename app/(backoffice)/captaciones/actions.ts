@@ -2,6 +2,7 @@
 
 import { revalidatePath } from 'next/cache'
 import { db } from '@/lib/db'
+import { registerPhysicalArrival } from '../vendedores/[id]/entry-actions'
 import { requireAgente } from '@/lib/auth'
 import { phonesMatch } from '@/lib/phone'
 import {
@@ -291,6 +292,21 @@ export async function updateCapture(id: string, data: EditInput): Promise<{ erro
     },
   })
 
+  revalidatePath('/captaciones')
+  return {}
+}
+
+/** La recepción usa el mismo vehículo, actor y registro idempotente que la ficha de entrada. */
+export async function registerCaptureArrival(id: string): Promise<{ error?: string }> {
+  await requireAgente()
+  const capture = await db.vehicleCapture.findUnique({
+    where: { id },
+    select: { sellerLead: { select: { vehicle: { select: { id: true } } } } },
+  })
+  const vehicle = capture?.sellerLead?.vehicle
+  if (!vehicle) return { error: 'Completa la ficha del vehículo antes de registrar su llegada.' }
+  const result = await registerPhysicalArrival({ vehicleId: vehicle.id })
+  if (!result.ok) return { error: result.error }
   revalidatePath('/captaciones')
   return {}
 }

@@ -24,6 +24,7 @@ import {
 } from '@/lib/captacion'
 import { CaptureCard, type CaptureCardData } from './capture-card'
 import { CaptureBoard } from './capture-board'
+import { convertCaptureToSellerLead, registerCaptureArrival } from './actions'
 import { QuickAddCapture } from './quick-add-capture'
 
 type Props = {
@@ -55,6 +56,37 @@ export function CaptureWorkspace({
 }: Props) {
   const router = useRouter()
   const [pending, startTransition] = useTransition()
+  const [arrivalId, setArrivalId] = useState<string | null>(null)
+  const [arrivalError, setArrivalError] = useState('')
+  const [savingArrival, setSavingArrival] = useState(false)
+  const arrival = cards.find((card) => card.id === arrivalId)
+  function openArrival(card: CaptureCardData) {
+    setArrivalError('')
+    setArrivalId(card.id)
+  }
+  async function confirmArrival(card: CaptureCardData) {
+    if (savingArrival) return
+    setSavingArrival(true)
+    setArrivalError('')
+    try {
+      if (!card.sellerLeadId) {
+        const created = await convertCaptureToSellerLead(card.id)
+        if (created.error || !created.sellerLeadId) {
+          setArrivalError(created.error || 'No se pudo vincular el vehículo.')
+          return
+        }
+      }
+      const result = await registerCaptureArrival(card.id)
+      if (result.error) setArrivalError(result.error)
+      else setArrivalId(null)
+      router.refresh()
+    } catch {
+      setArrivalError('No se pudo confirmar la recepción. Puedes volver a intentarlo.')
+      router.refresh()
+    } finally {
+      setSavingArrival(false)
+    }
+  }
   const [adding, setAdding] = useState(false)
   const [from, setFrom] = useState(() =>
     focusId ? '' : captureDay(new Date()).slice(0, 7) + '-01'
@@ -243,12 +275,64 @@ export function CaptureWorkspace({
           ))}
         </ul>
       )}
+      <Dialog
+        open={Boolean(arrival)}
+        onOpenChange={(open) => {
+          if (!open && !savingArrival) setArrivalId(null)
+        }}
+      >
+        {arrival && (
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Registrar llegada a la nave</DialogTitle>
+              <DialogDescription>
+                ¿Ha llegado físicamente {arrival.title || 'este vehículo'}?
+                {!arrival.sellerLeadId &&
+                  ' Se creará su ficha de vendedor y vehículo antes de registrar la recepción.'}
+              </DialogDescription>
+            </DialogHeader>
+            {arrivalError && (
+              <p role="alert" className="text-sm text-destructive">
+                {arrivalError}
+              </p>
+            )}
+            {arrivalError && arrival.sellerLeadId && (
+              <Link className="text-sm underline" href={`/vendedores/${arrival.sellerLeadId}`}>
+                Abrir ficha del vendedor
+              </Link>
+            )}
+            <div className="flex flex-wrap justify-end gap-2">
+              <Button variant="outline" disabled={savingArrival} onClick={() => setArrivalId(null)}>
+                Cancelar
+              </Button>
+              <Button disabled={savingArrival} onClick={() => confirmArrival(arrival)}>
+                {savingArrival
+                  ? 'Registrando…'
+                  : arrival.sellerLeadId
+                    ? 'Confirmar llegada'
+                    : 'Crear ficha y confirmar llegada'}
+              </Button>
+            </div>
+          </DialogContent>
+        )}
+      </Dialog>
       {view === 'abiertas' ? (
-        <CaptureBoard cards={boardCards} agents={agents} focusId={focusId} />
+        <CaptureBoard
+          onArrival={openArrival}
+          cards={boardCards}
+          agents={agents}
+          focusId={focusId}
+        />
       ) : visible.length ? (
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {visible.map((c) => (
-            <CaptureCard key={c.id} c={c} agents={agents} focused={focusId === c.id} />
+            <CaptureCard
+              onArrival={openArrival}
+              key={c.id}
+              c={c}
+              agents={agents}
+              focused={focusId === c.id}
+            />
           ))}
         </div>
       ) : (

@@ -72,7 +72,7 @@ async function main() {
           )
           plugin.onLoad({ filter: /.*/, namespace: 'capture-actions' }, () => ({
             contents:
-              'export const createCapture=(...args)=>window.captureFixture.create(...args);export const updateCaptureStatus=(...args)=>window.captureFixture.status(...args);export const scheduleEntrada=(...args)=>window.captureFixture.schedule(...args);export const updateCapture=()=>({});export const convertCaptureToSellerLead=()=>({sellerLeadId:"seller-demo"})',
+              'export const registerCaptureArrival=(id)=>window.captureFixture.arrive(id);export const createCapture=(...args)=>window.captureFixture.create(...args);export const updateCaptureStatus=(...args)=>window.captureFixture.status(...args);export const scheduleEntrada=(...args)=>window.captureFixture.schedule(...args);export const updateCapture=()=>({});export const convertCaptureToSellerLead=()=>({sellerLeadId:"seller-demo"})',
           }))
           plugin.onResolve({ filter: /^\.\/(actions|rv-suggest-actions)$/ }, (args) =>
             args.importer.endsWith('vehicle-edit-form.tsx')

@@ -60,9 +60,11 @@ export function CaptureCard({
   c,
   agents,
   focused = false,
+  onArrival,
 }: {
   c: CaptureCardData
   agents: Agent[]
+  onArrival: (card: CaptureCardData) => void
   focused?: boolean
 }) {
   const router = useRouter()
@@ -315,6 +317,11 @@ export function CaptureCard({
             >
               <FilePlus2 size={14} aria-hidden />
               <span className="whitespace-nowrap">{converting ? 'Creando ficha…' : 'Crear ficha'}</span>
+            </button>
+          )}
+          {!c.arrivalAt && (c.status === 'ENTRADA_AGENDADA' || (view === 'convertidas' && c.sellerLeadId)) && (
+            <button type="button" className={primary} onClick={() => onArrival(c)}>
+              <Check size={14} aria-hidden /> Registrar llegada
             </button>
           )}
           {(view === 'convertidas' || view === 'stock') &&

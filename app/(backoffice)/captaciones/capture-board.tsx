@@ -28,9 +28,11 @@ export function CaptureBoard({
   cards,
   agents,
   focusId = null,
+  onArrival,
 }: {
   cards: CaptureCardData[]
   agents: Agent[]
+  onArrival: (card: CaptureCardData) => void
   focusId?: string | null
 }) {
   const router = useRouter()
@@ -57,12 +59,14 @@ export function CaptureBoard({
     setDragId(null)
     setOverCol(null)
     if (!id) return
+    const card = cards.find((c) => c.id === id)
+    if (!card || card.arrivalAt) return
     if (target === 'EN_STOCK') {
-      setNotice('Registra la llegada física en la ficha del vehículo para que aparezca en stock.')
+      setNotice(null)
+      onArrival(card)
       return
     }
-    const card = cards.find((c) => c.id === id)
-    if (!card || card.status === target) return
+    if (card.status === target) return
 
     if (target === 'ENTRADA_AGENDADA' || target === 'VISITA_CONFIRMADA') {
       setStage(target)
@@ -170,7 +174,7 @@ export function CaptureBoard({
                         dragId === c.id && 'opacity-60'
                       )}
                     >
-                      <CaptureCard c={c} agents={agents} focused={focusId === c.id} />
+                      <CaptureCard onArrival={onArrival} c={c} agents={agents} focused={focusId === c.id} />
                     </div>
                   ))
                 )}
