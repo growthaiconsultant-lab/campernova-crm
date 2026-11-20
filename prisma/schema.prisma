@@ -942,6 +942,7 @@ model BuyerLead {
   hasKids                Boolean?            @map("has_kids") // → literas / Isofix (preferencia)
   status                 BuyerLeadStatus     @default(NUEVO)
   source                 String?
+  followupTitle          String?             @map("followup_title")
   nextActionType         NextActionType?     @map("next_action_type")
   nextActionDueAt        DateTime?           @map("next_action_due_at")
   lostReason             LostReason?         @map("lost_reason")
