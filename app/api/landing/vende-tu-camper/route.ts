@@ -3,8 +3,11 @@ import { db } from '@/lib/db'
 import {
   landingSellerSchema,
   LandingRateLimitError,
+  metaSellerSchema,
   saveLandingSeller,
+  saveMetaSeller,
 } from '@/lib/landing/seller-intake'
+import { authenticateSellerLeadAds } from '@/lib/landing/lead-ads-auth'
 
 export const runtime = 'nodejs'
 
@@ -16,7 +19,12 @@ const json = (body: object, status = 200) =>
   })
 
 export async function POST(request: NextRequest) {
-  if (request.headers.get('origin') !== new URL(request.url).origin) {
+  const authorization = request.headers.get('authorization')
+  const leadAds = authorization !== null
+  if (leadAds && !authenticateSellerLeadAds(authorization)) {
+    return json({ ok: false, error: 'unauthorized' }, 401)
+  }
+  if (!leadAds && request.headers.get('origin') !== new URL(request.url).origin) {
     return json({ ok: false, error: 'origin' }, 403)
   }
   if (!request.headers.get('content-type')?.toLowerCase().startsWith('application/json')) {
@@ -42,14 +50,20 @@ export async function POST(request: NextRequest) {
   } catch {
     return json({ ok: false, error: 'invalid_data' }, 400)
   }
-  const parsed = landingSellerSchema.safeParse(body)
-  if (!parsed.success) return json({ ok: false, error: 'invalid_data' }, 400)
-  const ip =
-    request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ??
-    request.headers.get('x-real-ip') ??
-    null
   try {
-    await saveLandingSeller(db, parsed.data, ip)
+    if (leadAds) {
+      const parsed = metaSellerSchema.safeParse(body)
+      if (!parsed.success) return json({ ok: false, error: 'invalid_data' }, 400)
+      await saveMetaSeller(db, parsed.data)
+    } else {
+      const parsed = landingSellerSchema.safeParse(body)
+      if (!parsed.success) return json({ ok: false, error: 'invalid_data' }, 400)
+      const ip =
+        request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ??
+        request.headers.get('x-real-ip') ??
+        null
+      await saveLandingSeller(db, parsed.data, ip)
+    }
     return json({ ok: true })
   } catch (error) {
     if (error instanceof LandingRateLimitError) return json({ ok: false, error: 'rate_limit' }, 429)
