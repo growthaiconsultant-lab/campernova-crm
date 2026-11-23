@@ -1,15 +1,17 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { NextRequest } from 'next/server'
 import { landingPayload } from '@/tests/fixtures/landing-seller'
 
-const mocks = vi.hoisted(() => ({ save: vi.fn() }))
+const mocks = vi.hoisted(() => ({ save: vi.fn(), saveMeta: vi.fn() }))
 vi.mock('@/lib/db', () => ({ db: {} }))
 vi.mock('@/lib/landing/seller-intake', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@/lib/landing/seller-intake')>()),
   saveLandingSeller: mocks.save,
+  saveMetaSeller: mocks.saveMeta,
 }))
 import { POST } from './route'
 import { LandingRateLimitError } from '@/lib/landing/seller-intake'
+import { metaSellerPayload } from '@/tests/fixtures/meta-seller'
 
 function request(
   body: unknown = landingPayload(),
@@ -65,5 +67,61 @@ describe('landing API boundary', () => {
     expect(await response.json()).toEqual({ ok: false, error: 'unavailable' })
     expect(log).toHaveBeenCalledWith('[landing/seller] persistence failed')
     log.mockRestore()
+  })
+})
+
+describe('Meta seller relay', () => {
+  const token = 's'.repeat(32)
+
+  function metaRequest(body: unknown, credential?: string, origin?: string) {
+    return new NextRequest('https://campersnova.com/api/landing/vende-tu-camper', {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        ...(credential && { authorization: `Bearer ${credential}` }),
+        ...(origin && { origin }),
+      },
+      body: JSON.stringify(body),
+    })
+  }
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+    vi.stubEnv('META_SELLER_INTAKE_KEY', token)
+    vi.stubEnv('META_BUYER_INTAKE_KEY', 'b'.repeat(32))
+    mocks.saveMeta.mockResolvedValue(undefined)
+  })
+  afterEach(() => vi.unstubAllEnvs())
+
+  it('accepts an authenticated lead for the owner form, with no browser origin', async () => {
+    const data = metaSellerPayload()
+    const response = await POST(metaRequest(data, token))
+    expect(response.status).toBe(200)
+    expect(await response.json()).toEqual({ ok: true })
+    expect(mocks.saveMeta).toHaveBeenCalledWith({}, data)
+    expect(mocks.save).not.toHaveBeenCalled()
+  })
+
+  it('rejects the buyer key, missing auth, invalid seller key and a disabled seller key', async () => {
+    const data = metaSellerPayload()
+    expect((await POST(metaRequest(data, 'b'.repeat(32)))).status).toBe(401)
+    expect((await POST(metaRequest(data))).status).toBe(403)
+    expect((await POST(metaRequest(data, 'wrong', 'https://campersnova.com'))).status).toBe(401)
+    vi.stubEnv('META_SELLER_INTAKE_KEY', undefined)
+    expect((await POST(metaRequest(data, token))).status).toBe(401)
+    expect(mocks.saveMeta).not.toHaveBeenCalled()
+    expect(mocks.save).not.toHaveBeenCalled()
+  })
+
+  it('refuses the buyer form ID and numeric IDs that could lose precision', async () => {
+    const data = metaSellerPayload()
+    for (const payload of [
+      { ...data, form_id: '3364123057107449' },
+      { ...data, form_id: Number(data.form_id) },
+      { ...data, lead_id: Number(data.lead_id) },
+    ]) {
+      expect((await POST(metaRequest(payload, token))).status).toBe(400)
+    }
+    expect(mocks.saveMeta).not.toHaveBeenCalled()
   })
 })

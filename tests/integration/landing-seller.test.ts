@@ -3,13 +3,18 @@ import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest'
 import type { PrismaClient } from '@prisma/client'
 import { createGuardedTestPrisma } from './db'
 import { landingPayload } from '../fixtures/landing-seller'
+import { metaSellerPayload } from '../fixtures/meta-seller'
 import { attributionFromActivities, landingCaptureSelection } from '@/lib/landing/attribution'
 import {
   landingSellerSchema,
   landingLeadId,
   LANDING_SOURCE,
   LandingRateLimitError,
+  META_SELLER_SOURCE,
+  metaSellerLeadId,
+  metaSellerSchema,
   saveLandingSeller,
+  saveMetaSeller,
 } from '@/lib/landing/seller-intake'
 
 let db: PrismaClient, other: PrismaClient
@@ -33,6 +38,42 @@ function input() {
 }
 
 describe('landing seller · PostgreSQL real', () => {
+  it('stores a Meta owner once across concurrent and corrected deliveries', async () => {
+    const payload = metaSellerPayload(BigInt(`0x${randomUUID().replace(/-/g, '')}`).toString())
+    const data = metaSellerSchema.parse(payload)
+    const id = metaSellerLeadId(data)
+    ids.push(id)
+    await Promise.all([saveMetaSeller(db, data), saveMetaSeller(other, data)])
+    await saveMetaSeller(db, { ...data, cuando: 'Lo antes posible' })
+
+    const lead = await db.sellerLead.findUniqueOrThrow({
+      where: { id },
+      include: { vehicle: true, activities: true },
+    })
+    expect(lead).toMatchObject({
+      name: data.nombre,
+      phone: data.telefono,
+      canal: 'PRO',
+      intakeStatus: 'PENDIENTE',
+      status: 'NUEVO',
+      source: META_SELLER_SOURCE,
+      gdprConsentAt: null,
+      gdprConsentIp: null,
+    })
+    expect(lead.vehicle).toMatchObject({
+      type: 'AUTOCARAVANA',
+      model: 'Adria Coral',
+      km: 85000,
+      location: 'Barcelona',
+      year: null,
+    })
+    expect(lead.vehicle?.desiredPrice?.toString()).toBe('49500.5')
+    expect(lead.activities.map((activity) => activity.content)).toEqual([
+      'Meta Lead Ads · Vende tu camper\nPlazo de venta: En 1 a 3 meses\nQuiere cambiarla por otro vehículo: Sí',
+    ])
+    expect(await db.kpiEvent.count({ where: { entityId: id } })).toBe(1)
+  })
+
   it('persists pending seller, vehicle, consent, original answers and one KPI atomically', async () => {
     const data = input(),
       now = new Date()

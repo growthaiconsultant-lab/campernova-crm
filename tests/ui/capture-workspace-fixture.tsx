@@ -106,10 +106,14 @@ Object.assign(window, {
       return {}
     },
     schedule: (id: string, at: string, stage: CaptureStatus = 'ENTRADA_AGENDADA') => {
-      Object.assign(cards.find((c) => c.id === id)!, {
+      const index = cards.findIndex((card) => card.id === id)
+      // Replacing the card mirrors a refreshed server response. Mutating it in place
+      // can render the new actions in the previous column before the board moves it.
+      cards[index] = {
+        ...cards[index],
         status: stage,
         ...(stage === 'VISITA_CONFIRMADA' ? { visitScheduledAt: at } : { entradaScheduledAt: at }),
-      })
+      }
       render()
       return {}
     },
