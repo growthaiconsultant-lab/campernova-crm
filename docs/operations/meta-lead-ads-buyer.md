@@ -78,7 +78,7 @@ sortear la autenticación. Sin CORS, sin consulta de leads ni IDs expuestos por 
 
 ## Dónde aparecen y activación
 
-CRM → [Compradores de Meta](https://crm.campersnova.com/compradores?source=META).
+CRM → [Compradores de Meta](https://campersnova.com/compradores?view=todos&source=META).
 Origen Meta / Facebook, estado Nuevo y bloque Origen de la campaña con
 facebook/lead_ads y campaña/anuncio disponibles. La IP del servidor no se atribuye al interesado.
 
