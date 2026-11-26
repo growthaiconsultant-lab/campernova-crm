@@ -15,6 +15,7 @@ const BACKOFFICE_PREFIXES = [
   '/taller',
   '/entregas',
   '/postventa',
+  '/encuestas',
   '/usuarios',
   '/ajustes',
   '/matches',

@@ -1,5 +1,7 @@
 import { notFound, redirect } from 'next/navigation'
 import Link from 'next/link'
+import { LeadSurveys } from '@/components/surveys/lead-surveys'
+import { surveyCursor } from '@/lib/surveys/responses'
 import { DocumentsPanel } from '@/components/operations/documents-panel'
 import { db } from '@/lib/db'
 import { requireAgente } from '@/lib/auth'
@@ -117,10 +119,13 @@ export default async function FichaCompradorPage({
     actionsPage?: string
     ver?: string
     historial?: string
+    cursor?: string
   }
 }) {
   const requested = searchParams.tab ?? 'ficha'
-  const activeTab = ['busqueda', 'vehiculos', 'documentos', 'postventa'].includes(requested)
+  const activeTab = ['busqueda', 'vehiculos', 'documentos', 'postventa', 'encuestas'].includes(
+    requested
+  )
     ? requested
     : 'ficha'
   const notesPage = followupPage(searchParams.notesPage)
@@ -481,6 +486,7 @@ export default async function FichaCompradorPage({
     { key: 'busqueda', label: 'Qué busca' },
     { key: 'vehiculos', label: 'Vehículos y ofertas' },
     { key: 'documentos', label: 'Documentos' },
+    { key: 'encuestas', label: 'Encuestas' },
     ...(showPostventa ? [{ key: 'postventa', label: 'Postventa' }] : []),
   ]
   const tracked = new Map<string, TrackedVehicle>()
@@ -684,6 +690,9 @@ export default async function FichaCompradorPage({
         </nav>
       </header>
       <div className="mx-auto w-full max-w-[1440px] flex-1 p-4 pb-12 md:p-8">
+        {activeTab === 'encuestas' && (
+          <LeadSurveys kind="buyer" lead={lead} cursor={surveyCursor(searchParams.cursor)} />
+        )}
         {activeTab === 'ficha' && (
           <div id="seguimiento" className="mx-auto max-w-4xl space-y-5">
             <BuyerActionsPanel

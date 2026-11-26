@@ -1,3 +1,5 @@
+import { LeadSurveys } from '@/components/surveys/lead-surveys'
+import { surveyCursor } from '@/lib/surveys/responses'
 import { SellerPriceComparison } from '@/components/seller-price-comparison'
 import { formatEur } from '@/lib/format/currency'
 import { sellerSale } from '@/lib/seller-sale'
@@ -104,7 +106,7 @@ export default async function FichaVendedorPage({
   searchParams,
 }: {
   params: { id: string }
-  searchParams: { tab?: string }
+  searchParams: { tab?: string; cursor?: string }
 }) {
   const currentUser = await requireAgente()
   const [lead, agents, activities] = await Promise.all([
@@ -208,9 +210,10 @@ export default async function FichaVendedorPage({
         'actividad',
         'preparacion',
         'vendedor',
+        'encuestas',
         ...(v ? ['compradores', 'economia', 'publicacion'] : []),
       ]
-    : ['resumen', 'actividad']
+    : ['resumen', 'actividad', 'encuestas']
   const activeTab = validTabs.includes(requestedTab) ? requestedTab : 'resumen'
   const saleTab = ['compradores', 'economia', 'publicacion'].includes(activeTab)
   const groupTab = saleTab
@@ -585,11 +588,13 @@ export default async function FichaVendedorPage({
         { key: 'resumen', label: 'Seguimiento' },
         { key: 'vendedor', label: 'Vendedor' },
         { key: 'preparacion', label: 'Vehículo y documentos' },
+        { key: 'encuestas', label: 'Encuestas' },
         ...(v ? [{ key: 'compradores', label: 'Venta' }] : []),
       ]
     : [
         { key: 'resumen', label: 'Solicitud' },
         { key: 'actividad', label: 'Actividad' },
+        { key: 'encuestas', label: 'Encuestas' },
       ]
 
   // ── Form default values ────────────────────────────────────────────────────
@@ -810,6 +815,9 @@ export default async function FichaVendedorPage({
       <div className="mx-auto w-full max-w-5xl flex-1">
         {/* Main content */}
         <div className="ph-mask min-w-0 space-y-4 p-4 pb-10 md:p-6 md:pb-16" data-sentry-mask>
+          {activeTab === 'encuestas' && (
+            <LeadSurveys kind="seller" lead={lead} cursor={surveyCursor(searchParams.cursor)} />
+          )}
           {activeTab === 'resumen' && isAdmitted && (
             <SellerFollowupPanel
               id={lead.id}
