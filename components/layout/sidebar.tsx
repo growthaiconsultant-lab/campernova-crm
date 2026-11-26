@@ -13,6 +13,7 @@ import {
   Wrench,
   Truck,
   ShieldCheck,
+  ClipboardList,
   LineChart,
   BarChart3,
   Target,
@@ -95,6 +96,7 @@ const NAV_SECTIONS: NavSection[] = [
         icon: ShieldCheck,
         roles: ['ADMIN', 'AGENTE', 'ENTREGAS'],
       },
+      { href: '/encuestas', label: 'Encuestas', icon: ClipboardList, roles: ['ADMIN', 'AGENTE'] },
     ],
   },
   {
