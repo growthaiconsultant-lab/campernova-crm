@@ -40,6 +40,7 @@ describe('CRM survey pages', () => {
     try {
       const lead = {
         id: 'active-profile',
+        name: 'Perfil QA',
         archivedAt: null,
         email: 'qa@example.test',
         phone: '600000000',

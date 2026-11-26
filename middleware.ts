@@ -73,6 +73,8 @@ export async function middleware(request: NextRequest) {
   if (isConfiguredCronPath(pathname)) {
     return NextResponse.next({ request })
   }
+  // La encuesta autentica esta llamada entre servidores en el propio endpoint.
+  if (pathname === '/api/encuestas/identificacion') return NextResponse.next({ request })
 
   const isPublic =
     pathname === '/vende-tu-camper' ||

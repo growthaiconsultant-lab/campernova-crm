@@ -21,7 +21,13 @@ export async function LeadSurveys({
   cursor,
 }: {
   kind: SurveyLeadKind
-  lead: { id: string; archivedAt: Date | null; email: string | null; phone: string | null }
+  lead: {
+    id: string
+    name: string | null
+    archivedAt: Date | null
+    email: string | null
+    phone: string | null
+  }
   cursor?: string
 }) {
   const aliases =
@@ -42,6 +48,7 @@ export async function LeadSurveys({
 
   if (
     !lead.archivedAt &&
+    lead.name?.trim() &&
     (hasEmail || hasPhone) &&
     validSurveySecret(key) &&
     isSurveyLeadId(lead.id)
@@ -74,9 +81,10 @@ export async function LeadSurveys({
           <p className="text-sm text-muted-foreground">
             Ficha archivada. Las respuestas siguen disponibles.
           </p>
-        ) : !hasPhone && !hasEmail ? (
+        ) : !lead.name?.trim() || (!hasPhone && !hasEmail) ? (
           <p className="text-sm text-muted-foreground">
-            Añade un teléfono o correo a la ficha para enviar una invitación.
+            Completa el nombre y al menos un teléfono o correo en la ficha para enviar una
+            invitación.
           </p>
         ) : !invitation ? (
           <p className="text-sm text-muted-foreground">

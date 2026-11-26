@@ -27,14 +27,19 @@ export async function sendSurveyEmail(input: unknown): Promise<{ ok: boolean; me
     invite.kind === 'buyer'
       ? await db.buyerLead.findUnique({
           where: { id: invite.leadId },
-          select: { email: true, archivedAt: true, mergedIntoId: true },
+          select: { email: true, name: true, archivedAt: true, mergedIntoId: true },
         })
       : await db.sellerLead.findUnique({
           where: { id: invite.leadId },
-          select: { email: true, archivedAt: true },
+          select: { email: true, name: true, archivedAt: true },
         })
 
-  if (!lead || lead.archivedAt || ('mergedIntoId' in lead && lead.mergedIntoId)) {
+  if (
+    !lead ||
+    !lead.name?.trim() ||
+    lead.archivedAt ||
+    ('mergedIntoId' in lead && lead.mergedIntoId)
+  ) {
     return { ok: false, message: 'La ficha ya no admite envíos. Recarga para consultar su estado.' }
   }
   const email = lead.email?.trim()
