@@ -56,6 +56,20 @@ export function SurveyResponseList({
                 {dateTime.format(new Date(row.submittedAt))}
               </time>
             </div>
+            <p className="mt-2 text-sm text-muted-foreground">
+              {row.verificationMethod === 'email'
+                ? 'Identificación confirmada por correo'
+                : row.verificationMethod === 'telefono'
+                  ? 'Identificación confirmada por teléfono'
+                  : row.crmLeadId
+                    ? 'Respuesta anterior · enlace personal sin confirmar contacto'
+                    : 'Respuesta anterior · sin identificar'}
+            </p>
+            {row.wantsContact && (
+              <p className="mt-1 text-sm font-medium">
+                Solicitó que le contactemos a través de su ficha
+              </p>
+            )}
             <div className="mt-2 flex flex-wrap gap-x-5 gap-y-1 text-sm">
               <span>
                 Satisfacción general <strong>{row.satisfaction}/5</strong>

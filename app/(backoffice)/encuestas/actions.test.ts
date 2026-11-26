@@ -37,8 +37,13 @@ beforeEach(() => {
   vi.stubEnv('EMAIL_FROM', 'CampersNova <qa@example.test>')
   vi.stubEnv('RESEND_API_KEY', 'example-test-key')
   deps.authorize.mockResolvedValue({ role: 'AGENTE' })
-  deps.buyer.mockResolvedValue({ email: recipient, archivedAt: null, mergedIntoId: null })
-  deps.seller.mockResolvedValue({ email: recipient, archivedAt: null })
+  deps.buyer.mockResolvedValue({
+    email: recipient,
+    name: 'Perfil QA',
+    archivedAt: null,
+    mergedIntoId: null,
+  })
+  deps.seller.mockResolvedValue({ email: recipient, name: 'Perfil QA', archivedAt: null })
   deps.send.mockResolvedValue({ error: null })
 })
 afterEach(() => vi.unstubAllEnvs())
@@ -69,7 +74,12 @@ describe('sendSurveyEmail', () => {
     await expect(
       sendSurveyEmail({ ...input, recipient: 'wrong@example.test' })
     ).resolves.toMatchObject({ ok: false })
-    deps.buyer.mockResolvedValue({ email: recipient, archivedAt: new Date(), mergedIntoId: null })
+    deps.buyer.mockResolvedValue({
+      email: recipient,
+      name: 'Perfil QA',
+      archivedAt: new Date(),
+      mergedIntoId: null,
+    })
     await expect(sendSurveyEmail(input)).resolves.toMatchObject({ ok: false })
     deps.authorize.mockRejectedValue(new Error('Forbidden'))
     await expect(sendSurveyEmail(input)).rejects.toThrow('Forbidden')

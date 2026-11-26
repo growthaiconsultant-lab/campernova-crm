@@ -27,6 +27,8 @@ const responseSchema = z.object({
   contactPhone: nullableText,
   crmKind: z.enum(['buyer', 'seller']).nullable(),
   crmLeadId: nullableText,
+  verificationMethod: z.enum(['email', 'telefono']).nullable().optional(),
+  wantsContact: z.boolean().optional(),
   ratings: z.array(
     z.object({
       label: z.string(),
